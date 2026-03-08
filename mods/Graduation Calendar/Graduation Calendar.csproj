@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Graduation Calendar</ModName>
+    <RootNamespace>GraduationCalendar</RootNamespace>
+    <AssemblyName>com.cosmo.graduationcalendar</AssemblyName>
+    <Version>0.2.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\GraduationCalendar.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

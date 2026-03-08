@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Graduation Rebalances</ModName>
+    <RootNamespace>GraduationRebalances</RootNamespace>
+    <AssemblyName>com.cosmo.graduationrebalances</AssemblyName>
+    <Version>0.2.6</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\GraduationRebalances.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

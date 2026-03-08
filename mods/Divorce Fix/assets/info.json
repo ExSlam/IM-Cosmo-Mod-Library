@@ -1,0 +1,8 @@
+{
+  "Title": "Divorce Fix",
+  "Description": "Clears marriage state on divorce events so flirting works again.",
+  "Author": "Cosmo",
+  "Version": "2.0.0",
+  "Tags": ["gameplay"],
+  "HarmonyID": "com.cosmo.divorcefix"
+}

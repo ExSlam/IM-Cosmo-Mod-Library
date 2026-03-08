@@ -1,0 +1,77 @@
+<Project>
+  <PropertyGroup>
+    <ModOutputDirDebug Condition="'$(ModOutputDirDebug)' == ''">$(MSBuildThisFileDirectory)artifacts\mods\Debug</ModOutputDirDebug>
+    <ModOutputDirRelease Condition="'$(ModOutputDirRelease)' == ''">$(MSBuildThisFileDirectory)artifacts\mods\Release</ModOutputDirRelease>
+    <dllDir Condition="'$(dllDir)' == ''">$(MSBuildThisFileDirectory)..\dll</dllDir>
+
+    <LangVersion>latest</LangVersion>
+    <TargetFramework>net46</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net46" Version="1.0.3">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp" Private="false">
+      <HintPath>$(dllDir)\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass" Private="false">
+      <HintPath>$(dllDir)\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="0Harmony" Private="false">
+      <HintPath>$(dllDir)\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.JSONSerializeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro" Private="false">
+      <HintPath>$(dllDir)\Unity.TextMeshPro.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <ModOutputDir>$(ModOutputDirDebug)</ModOutputDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <ModOutputDir>$(ModOutputDirRelease)</ModOutputDir>
+  </PropertyGroup>
+
+  <Target Name="CleanModOutputDir" BeforeTargets="Clean" Condition="'$(ModName)' != '' and Exists('$(ModOutputDir)\$(ModName)')">
+    <RemoveDir Directories="$(ModOutputDir)\$(ModName)" />
+  </Target>
+
+  <Target Name="CopyModArtifacts" AfterTargets="Build" Condition="'$(ModName)' != ''">
+    <MakeDir Directories="$(ModOutputDir)\$(ModName)" Condition="!Exists('$(ModOutputDir)\$(ModName)')" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(ModOutputDir)\$(ModName)\$(AssemblyName).dll" />
+    <Copy
+      SourceFiles="$(TargetDir)$(AssemblyName).pdb"
+      DestinationFiles="$(ModOutputDir)\$(ModName)\$(AssemblyName).pdb"
+      Condition="Exists('$(TargetDir)$(AssemblyName).pdb')" />
+    <Exec
+      Command='xcopy /Y /E /I "$(MSBuildProjectDirectory)\assets" "$(ModOutputDir)\$(ModName)"'
+      Condition="Exists('$(MSBuildProjectDirectory)\assets')" />
+  </Target>
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Staff Firing Freeze Fix</ModName>
+    <RootNamespace>StaffFiringFreezeFix</RootNamespace>
+    <AssemblyName>com.cosmo.stafffiringfreezefix</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\StaffFiringFreezeFix.cs" />
+  </ItemGroup>
+</Project>

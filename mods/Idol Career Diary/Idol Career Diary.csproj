@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Idol Career Diary</ModName>
+    <RootNamespace>IdolCareerDiary</RootNamespace>
+    <AssemblyName>com.cosmo.idolcareerdiary</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\IdolCareerDiary.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

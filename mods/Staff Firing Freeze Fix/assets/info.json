@@ -1,0 +1,8 @@
+{
+  "Title": "Staff Firing Freeze Fix",
+  "Description": "Prevents room and business proposal state from getting stuck when staff are fired mid-task.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["gameplay", "fix"],
+  "HarmonyID": "com.cosmo.stafffiringfreezefix"
+}

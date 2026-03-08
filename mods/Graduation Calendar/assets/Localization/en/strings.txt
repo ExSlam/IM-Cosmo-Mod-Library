@@ -1,0 +1,19 @@
+﻿# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Format: key=value
+
+profile.extras.graduation_label=Graduation: 
+common.unknown=Unknown
+common.close=Close
+menu.button_tooltip=Graduation Calendar
+menu.button_label=Calendar
+ui.title=Graduation Calendar
+view.calendar=Calendar View
+view.graduations_only=Graduations Only
+view.yearly=Yearly View
+view.monthly=Monthly View
+empty.no_idols=No idols available
+empty.no_graduations=No graduations
+empty.no_graduations_scheduled=No graduations scheduled
+

@@ -1,0 +1,8 @@
+{
+  "Title": "Graduation Calendar",
+  "Description": "Shows graduation dates in Extras and adds a calendar popup.",
+  "Author": "Cosmo",
+  "Version": "0.2.1",
+  "Tags": ["ui", "gameplay"],
+  "HarmonyID": "com.cosmo.graduationcalendar"
+}

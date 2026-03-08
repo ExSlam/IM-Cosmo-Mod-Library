@@ -1,0 +1,8 @@
+{
+  "Title": "Idol Career Diary",
+  "Description": "Profile-integrated career timeline UI powered by IM Data Core and IM UI Framework. Requires IMDataCore v1.0.0+ (com.cosmo.imdatacore) and IMUIFramework v1.0.0+ (com.cosmo.imuiframework).",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["ui", "career", "im-data-core"],
+  "HarmonyID": "com.cosmo.idolcareerdiary"
+}

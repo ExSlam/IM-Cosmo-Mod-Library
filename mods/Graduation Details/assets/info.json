@@ -1,0 +1,8 @@
+{
+  "Title": "Graduation Details",
+  "Description": "Adds a graduated idol details popup with earnings, singles, and marriage info.",
+  "Author": "Cosmo",
+  "Version": "0.1.2",
+  "Tags": ["ui", "gameplay"],
+  "HarmonyID": "com.cosmo.graduationdetails"
+}

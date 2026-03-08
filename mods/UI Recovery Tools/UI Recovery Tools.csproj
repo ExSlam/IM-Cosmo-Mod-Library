@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>UI Recovery Tools</ModName>
+    <RootNamespace>UIRecoveryTools</RootNamespace>
+    <AssemblyName>com.cosmo.uirecovery</AssemblyName>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\UIRecoveryTools.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

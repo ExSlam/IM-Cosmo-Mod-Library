@@ -1,0 +1,45 @@
+﻿# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Format: key=value
+
+bridge.button_label=UI Bridge
+bridge.button_tooltip=Open UI bridge/helper showcase
+bridge.popup_title=UI Bridge Helpers
+common.close=Close
+
+# Raw text keys used by IMUiKit/IMUiBridges
+AA FXAA=AA FXAA
+Bound: {0} | Legacy: {1} | Hover: {2}=Bound: {0} | Legacy: {1} | Hover: {2}
+Bridge Helper UIs=Bridge Helper UIs
+Bridge tooltip demo=Bridge tooltip demo
+Cine -=Cine -
+Cine +=Cine +
+CinematicEffects + ImageEffects=CinematicEffects + ImageEffects
+Clones a native CustomDropdown template and rewires items/events for mod use.=Clones a native CustomDropdown template and rewires items/events for mod use.
+Custom Popup=Custom Popup
+Disable FX=Disable FX
+Enable FX=Enable FX
+FX: {0} | CineBloom: {1:0.00} | ImgBloom: {2:0.00}=FX: {0} | CineBloom: {1:0.00} | ImgBloom: {2:0.00}
+Gradient Preview=Gradient Preview
+Hover Me=Hover Me
+Img -=Img -
+Img +=Img +
+ModernUIPack Dropdown Bridge=ModernUIPack Dropdown Bridge
+No Camera found. Pass a camera or wait until game scene initializes.=No Camera found. Pass a camera or wait until game scene initializes.
+No canvas found for tooltip widgets.=No canvas found for tooltip widgets.
+No ModernUIPack dropdown template found yet. Open a base settings popup first, then retry.=No ModernUIPack dropdown template found yet. Open a base settings popup first, then retry.
+Open UI bridge/helper showcase=Open UI bridge/helper showcase
+Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.=Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.
+Tooltip bridge demo=Tooltip bridge demo
+TryAddTopMenuButton failed: awards button not found.=TryAddTopMenuButton failed: awards button not found.
+TryCloneModernWindowManager failed: no WindowManager template found.=TryCloneModernWindowManager failed: no WindowManager template found.
+TryCreateHoverTooltipWidget failed: GUICamera object is required by HoverTooltip.=TryCreateHoverTooltipWidget failed: GUICamera object is required by HoverTooltip.
+TryCreateModernDropdown failed: no CustomDropdown template found.=TryCreateModernDropdown failed: no CustomDropdown template found.
+TryCreatePopupScaffold failed: popup parent not found.=TryCreatePopupScaffold failed: popup parent not found.
+UI Bridge=UI Bridge
+UI Bridge Helpers=UI Bridge Helpers
+UI Bridge Showcase=UI Bridge Showcase
+UI Extensions Tooltips=UI Extensions Tooltips
+UIGradient Bridge=UIGradient Bridge
+

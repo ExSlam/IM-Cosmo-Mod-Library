@@ -1,0 +1,12 @@
+﻿# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Format: key=value
+
+overlay.header_format=Errors ({0} overlay, {1} clear blur)
+overlay.no_messages=No messages to show.
+overlay.clear_blur_format=Clear Blur ({0})
+overlay.clear_log=Clear Log
+overlay.close_format=Close ({0})
+common.disabled=Disabled
+

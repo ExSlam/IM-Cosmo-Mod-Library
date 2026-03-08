@@ -1,0 +1,16 @@
+﻿# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Format: key=value
+
+notification.unit_month=month
+notification.unit_day=day
+notification.note_prefix= graduation extended by 
+notification.reason_monthly=monthly performance
+notification.reason_center=center milestone
+notification.reason_weekly=weekly factors
+notification.reason_weekly_announced=weekly factors (announced)
+notification.option_label=Graduation day postponing
+notification.reason_suffix_format= ({0})
+notification.message_format={0}{1}{2}{3}. New date: {4}
+

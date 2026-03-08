@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>IM UI Framework</ModName>
+    <RootNamespace>IMUiFramework</RootNamespace>
+    <AssemblyName>com.cosmo.imuiframework</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\IMUiFramework.cs" />
+    <Compile Include="src\IMUiBridges.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

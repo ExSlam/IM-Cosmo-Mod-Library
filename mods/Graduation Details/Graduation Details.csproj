@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Graduation Details</ModName>
+    <RootNamespace>GraduationDetails</RootNamespace>
+    <AssemblyName>com.cosmo.graduationdetails</AssemblyName>
+    <Version>0.1.2</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\GraduationDetails.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

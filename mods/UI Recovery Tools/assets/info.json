@@ -1,0 +1,8 @@
+{
+  "Title": "UI Recovery Tools",
+  "Description": "Adds configurable single-key recovery hotkeys + error overlay. Edit UIRecoveryTools.config.ini to set keys. Defaults: F9 clear blur/input, F10 toggle overlay.",
+  "Author": "Cosmo",
+  "Version": "0.2.0",
+  "Tags": ["ui", "debug", "qol"],
+  "HarmonyID": "com.cosmo.uirecovery"
+}

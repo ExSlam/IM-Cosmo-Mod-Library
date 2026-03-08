@@ -1,0 +1,8 @@
+[
+  {
+    "type": "checkbox",
+    "varID": "IdolCareerDiary_ShowUnknownSocialParticipants",
+    "labelID": "Career Diary: Show undiscovered social participants",
+    "defaultValue": false
+  }
+]

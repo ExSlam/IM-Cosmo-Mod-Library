@@ -1,0 +1,18 @@
+﻿# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Format: key=value
+
+context_menu.profile.tooltip_ready=Show idol profile
+context_menu.profile.tooltip_pending=Show idol profile (data pending)
+context_menu.profile.label=Profile
+jobs.total_earnings_prefix=Total earnings: 
+jobs.married_to_prefix=Married to: 
+jobs.married_to_none=Married to: No
+jobs.custody_unknown=Custody: Unknown
+jobs.custody_child_singular= child
+jobs.custody_child_plural= children
+jobs.custody_player_prefix=Custody: Player (
+jobs.custody_idol_prefix=Custody: Idol (
+jobs.custody_none=Custody: None
+

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IMDataCore.TemplateMod</RootNamespace>
+    <AssemblyName>com.example.imdatacoretemplatemod</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="TemplateDataCoreBridge.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="com.cosmo.imdatacore">
+      <HintPath>..\..\bin\$(Configuration)\net46\com.cosmo.imdatacore.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
