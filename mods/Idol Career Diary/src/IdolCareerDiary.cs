@@ -296,6 +296,8 @@ namespace IdolCareerDiary
         internal const int CloseButtonInProfileHierarchyScore = 40;
         internal const int CloseButtonInteractableScore = 20;
         internal const int CloseButtonExactLabelMatchScore = 240;
+        internal const int CloseButtonLocalizationKeyMatchScore = 220;
+        internal const int CloseButtonPreferredNameMatchScore = 120;
         internal const int CloseButtonTextContainsCloseTokenScore = 60;
         internal const int CloseButtonTextMatchScore = 50;
         internal const int CloseButtonTooltipMatchScore = 30;
@@ -312,6 +314,7 @@ namespace IdolCareerDiary
         internal const int ActionRowBottomPadding = 2;
 
         internal const string CloseTokenLower = "close";
+        internal const string CloseActionButtonObjectName = "OK";
         internal const string CloseMethodToken = "Close";
         internal const string CloseGlyphUpper = "X";
         internal const string PopupManagerTypeToken = "PopupManager";
@@ -3650,6 +3653,14 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Retries injection once the profile popup becomes active in hierarchy.
+        /// </summary>
+        private void OnEnable()
+        {
+            EnsureInjected();
+        }
+
+        /// <summary>
         /// Runs close safety-net when profile popup root gets disabled unexpectedly.
         /// </summary>
         private void OnDisable()
@@ -3815,15 +3826,21 @@ namespace IdolCareerDiary
                 diaryTabButtonObject.SetActive(true);
 
                 StripTabBehavior(diaryTabButtonObject);
-                ApplyButtonLabel(diaryTabButtonObject, C.DiaryTabLabel);
             }
 
             if (diaryTabButtonObject != null)
             {
+                diaryTabButtonObject.name = C.DiaryTabButtonName;
                 diaryTabButtonObject.SetActive(true);
             }
 
+            ApplyButtonLabel(diaryTabButtonObject, C.DiaryTabLabel);
             PlaceButtonNearCloseControl(diaryTabButtonObject, closeButton);
+
+            if (diaryTabButtonObject != null && diaryTabButtonObject.transform.parent != null)
+            {
+                SetLayerRecursively(diaryTabButtonObject, diaryTabButtonObject.transform.parent.gameObject.layer);
+            }
 
             CanvasGroup buttonCanvasGroup = diaryTabButtonObject.GetComponent<CanvasGroup>();
             if (buttonCanvasGroup != null)
@@ -14621,6 +14638,11 @@ namespace IdolCareerDiary
                 return int.MinValue;
             }
 
+            if (IsOversizedCloseButtonCandidate(candidate, popup))
+            {
+                return int.MinValue;
+            }
+
             int score = C.ZeroIndex;
             score += C.CloseButtonActiveHierarchyScore;
             if (popup != null && popup.transform != null && candidate.transform.IsChildOf(popup.transform))
@@ -14636,6 +14658,14 @@ namespace IdolCareerDiary
             bool hasCloseIndicator = false;
             string localizedCloseLabel = GetLocalizedCloseLabel();
             string nameLower = (candidate.gameObject.name ?? string.Empty).ToLowerInvariant();
+            if (popup != null &&
+                candidate.transform.parent == popup.transform &&
+                string.Equals(candidate.gameObject.name, C.CloseActionButtonObjectName, StringComparison.OrdinalIgnoreCase))
+            {
+                hasCloseIndicator = true;
+                score += C.CloseButtonPreferredNameMatchScore;
+            }
+
             if (nameLower.Contains(C.CloseTokenLower))
             {
                 hasCloseIndicator = true;
@@ -14656,6 +14686,12 @@ namespace IdolCareerDiary
                     hasCloseIndicator = true;
                     score += C.CloseButtonTooltipMatchScore;
                 }
+            }
+
+            if (HasCloseLocalizationMarker(candidate.gameObject))
+            {
+                hasCloseIndicator = true;
+                score += C.CloseButtonLocalizationKeyMatchScore;
             }
 
             string displayText = GetButtonDisplayText(candidate.gameObject);
@@ -14692,6 +14728,85 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Rejects full-popup overlay buttons that are not useful as visible close anchors.
+        /// </summary>
+        private static bool IsOversizedCloseButtonCandidate(Button candidate, Profile_Popup popup)
+        {
+            if (candidate == null || popup == null)
+            {
+                return false;
+            }
+
+            RectTransform candidateRect = candidate.GetComponent<RectTransform>();
+            RectTransform popupRect = popup.GetComponent<RectTransform>();
+            if (candidateRect == null || popupRect == null)
+            {
+                return false;
+            }
+
+            Rect candidateBounds = candidateRect.rect;
+            Rect popupBounds = popupRect.rect;
+            if (candidateBounds.width <= C.FloatZero || candidateBounds.height <= C.FloatZero ||
+                popupBounds.width <= C.FloatZero || popupBounds.height <= C.FloatZero)
+            {
+                return false;
+            }
+
+            bool stretchesAcrossParent =
+                candidateRect.anchorMin.x <= 0.001f &&
+                candidateRect.anchorMin.y <= 0.001f &&
+                candidateRect.anchorMax.x >= 0.999f &&
+                candidateRect.anchorMax.y >= 0.999f;
+
+            if (!stretchesAcrossParent)
+            {
+                return false;
+            }
+
+            float widthRatio = candidateBounds.width / popupBounds.width;
+            float heightRatio = candidateBounds.height / popupBounds.height;
+            return widthRatio >= 0.9f && heightRatio >= 0.9f;
+        }
+
+        /// <summary>
+        /// Detects localization markers that explicitly identify a button as a close action.
+        /// </summary>
+        private static bool HasCloseLocalizationMarker(GameObject buttonObject)
+        {
+            if (buttonObject == null)
+            {
+                return false;
+            }
+
+            Lang_Button[] langButtons = buttonObject.GetComponentsInChildren<Lang_Button>(true);
+            for (int i = C.ZeroIndex; i < langButtons.Length; i++)
+            {
+                Lang_Button langButton = langButtons[i];
+                if (langButton == null)
+                {
+                    continue;
+                }
+
+                if (MatchesCloseLocalizationKey(langButton.Constant) || MatchesCloseLocalizationKey(langButton.Tooltip))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Checks whether a localization key maps to the game's standard close labels.
+        /// </summary>
+        private static bool MatchesCloseLocalizationKey(string key)
+        {
+            return string.Equals(key, C.LanguageKeyClose, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, C.LanguageKeyButtonClose, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, C.LanguageKeyPopupClose, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Resolves localized close label with fallback.
         /// </summary>
         private static string GetLocalizedCloseLabel()
@@ -14719,7 +14834,7 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Places Career Diary button immediately left of the close button.
+        /// Places Career Diary button immediately right of the close button.
         /// </summary>
         private static void PlaceButtonNearCloseControl(GameObject buttonObject, Button closeButton)
         {
@@ -14759,6 +14874,7 @@ namespace IdolCareerDiary
             float closeWidth = closeRect.rect.width > C.FloatZero ? closeRect.rect.width : closeRect.sizeDelta.x;
             float closeHeight = closeRect.rect.height > C.FloatZero ? closeRect.rect.height : closeRect.sizeDelta.y;
             float targetWidth = closeWidth;
+            LayoutElement buttonLayoutElement = buttonObject.GetComponent<LayoutElement>();
 
             LayoutGroup parentLayout = closeButton.transform.parent != null
                 ? closeButton.transform.parent.GetComponent<LayoutGroup>()
@@ -14766,12 +14882,12 @@ namespace IdolCareerDiary
             if (parentLayout != null)
             {
                 LayoutElement closeLayoutElement = closeButton.GetComponent<LayoutElement>();
-                LayoutElement buttonLayoutElement = buttonObject.GetComponent<LayoutElement>();
                 if (buttonLayoutElement == null)
                 {
                     buttonLayoutElement = buttonObject.AddComponent<LayoutElement>();
                 }
 
+                buttonLayoutElement.ignoreLayout = false;
                 if (closeLayoutElement != null)
                 {
                     buttonLayoutElement.minWidth = closeLayoutElement.minWidth;
@@ -14790,41 +14906,15 @@ namespace IdolCareerDiary
                 return;
             }
 
+            if (buttonLayoutElement != null)
+            {
+                buttonLayoutElement.ignoreLayout = true;
+            }
+
             buttonRect.sizeDelta = new Vector2(targetWidth, closeHeight);
 
             float offsetX = ((closeWidth + targetWidth) * C.HeaderPlacementHalfScale) + C.HeaderButtonHorizontalSpacing;
             buttonRect.anchoredPosition = new Vector2(closeRect.anchoredPosition.x + offsetX, closeRect.anchoredPosition.y);
-        }
-
-        /// <summary>
-        /// Places Career Diary button at top-right header fallback position.
-        /// </summary>
-        private static void PlaceButtonInHeaderFallback(GameObject buttonObject, Profile_Popup popup)
-        {
-            if (buttonObject == null || popup == null || popup.Header_Name == null)
-            {
-                return;
-            }
-
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            RectTransform headerRect = popup.Header_Name.GetComponent<RectTransform>();
-            if (buttonRect == null || headerRect == null)
-            {
-                return;
-            }
-
-            Transform parent = headerRect.parent;
-            if (parent != null && buttonObject.transform.parent != parent)
-            {
-                buttonObject.transform.SetParent(parent, false);
-            }
-
-            float headerHeight = headerRect.rect.height > C.FloatZero ? headerRect.rect.height : buttonRect.sizeDelta.y;
-            buttonRect.anchorMin = new Vector2(C.FloatOne, C.FloatOne);
-            buttonRect.anchorMax = new Vector2(C.FloatOne, C.FloatOne);
-            buttonRect.pivot = new Vector2(C.FloatOne, C.FloatOne);
-            buttonRect.sizeDelta = new Vector2(C.HeaderButtonMinimumWidth, headerHeight);
-            buttonRect.anchoredPosition = new Vector2(-C.HeaderButtonHorizontalSpacing, -C.HeaderButtonHorizontalSpacing);
         }
 
         /// <summary>
