@@ -11,6 +11,8 @@
 *.log
 *.tmp
 *.pdb
+*.dll
+*.md.backup
 
 **/bin/
 **/obj/
