@@ -11,11 +11,19 @@ namespace IdolCareerDiary
         private const string EnglishFolderName = "en";
         private const string StringsFileName = "strings.txt";
         private const string PrimaryKeyPrefix = "c.";
-        private const int MaxLanguageCodeLength = 16;
+        private const int MaxLanguageCodeLength = 64;
         private const int MaxLocalizationEntries = 4096;
         private const int MaxLineLength = 8192;
         private const int MaxKeyLength = 96;
         private const int MaxValueLength = 4096;
+        private const string LanguageEnglish = "en";
+        private const string LanguageJapanese = "ja";
+        private const string LanguageChinese = "zh";
+        private const string LanguageRussian = "ru";
+        private const string LanguagePortuguese = "pt";
+        private const string ScriptHans = "Hans";
+        private const string ScriptHant = "Hant";
+        private const string RegionBrazil = "BR";
 
         private static readonly Dictionary<string, string> Values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private static bool loaded;
@@ -60,8 +68,7 @@ namespace IdolCareerDiary
                 // Backward-compatibility fallback for older packs: Localization/strings.txt
                 LoadFile(Path.Combine(localizationDir, StringsFileName));
 
-                List<string> languageCodes = BuildLanguageCodeCandidates();
-                List<string> folderCandidates = BuildLanguageFolderCandidates(languageCodes);
+                List<string> folderCandidates = BuildLanguageFolderCandidates(GetConfiguredLanguageCode());
                 for (int i = 0; i < folderCandidates.Count; i++)
                 {
                     string folder = folderCandidates[i];
@@ -78,119 +85,196 @@ namespace IdolCareerDiary
             }
         }
 
-        private static List<string> BuildLanguageCodeCandidates()
-        {
-            List<string> list = new List<string>();
-            string configured = GetConfiguredLanguageCode();
-            if (string.IsNullOrEmpty(configured))
-            {
-                return list;
-            }
-
-            AddCodeCandidate(list, configured);
-            AddCodeCandidate(list, configured.Replace("-", string.Empty).Replace("_", string.Empty));
-
-            int separatorIndex = configured.IndexOfAny(new[] { '-', '_' });
-            if (separatorIndex > 0)
-            {
-                AddCodeCandidate(list, configured.Substring(0, separatorIndex));
-            }
-
-            string alias = GetAlias(configured);
-            AddCodeCandidate(list, alias);
-            return list;
-        }
-
-        private static void AddCodeCandidate(List<string> list, string code)
-        {
-            if (list == null || string.IsNullOrEmpty(code))
-            {
-                return;
-            }
-
-            string normalized = NormalizeLanguageCode(code);
-            if (string.IsNullOrEmpty(normalized))
-            {
-                return;
-            }
-
-            if (!list.Contains(normalized))
-            {
-                list.Add(normalized);
-            }
-        }
-
-        private static List<string> BuildLanguageFolderCandidates(List<string> languageCodes)
+        private static List<string> BuildLanguageFolderCandidates(string configuredLanguageCode)
         {
             List<string> folders = new List<string>();
-            if (languageCodes == null || languageCodes.Count == 0)
+            List<string> tags = BuildLanguageTagCandidates(configuredLanguageCode);
+            for (int i = 0; i < tags.Count; i++)
             {
-                return folders;
-            }
-
-            for (int i = 0; i < languageCodes.Count; i++)
-            {
-                AddLanguageFolderVariants(folders, languageCodes[i]);
+                AddFolderNameVariants(folders, tags[i]);
             }
 
             return folders;
         }
 
-        private static void AddLanguageFolderVariants(List<string> folders, string code)
+        private static List<string> BuildLanguageTagCandidates(string configuredLanguageCode)
         {
-            if (folders == null || string.IsNullOrEmpty(code))
-            {
-                return;
-            }
-
-            string normalized = NormalizeLanguageCode(code);
-            if (string.IsNullOrEmpty(normalized))
-            {
-                return;
-            }
-
-            AddCodeCandidate(folders, normalized);
-
-            string canonical = GetAlias(normalized);
+            List<string> tags = new List<string>();
+            string canonical = ResolveConfiguredLanguageTag(configuredLanguageCode);
             if (string.IsNullOrEmpty(canonical))
             {
-                canonical = normalized;
+                return tags;
             }
 
-            AddCodeCandidate(folders, canonical);
-
-            switch (canonical)
+            string language;
+            string script;
+            string region;
+            ParseLanguageTag(canonical, out language, out script, out region);
+            if (string.IsNullOrEmpty(language))
             {
-                case "en":
-                    AddCodeCandidate(folders, "english");
-                    AddCodeCandidate(folders, "enus");
-                    AddCodeCandidate(folders, "enusutf8");
+                return tags;
+            }
+
+            if (string.Equals(language, LanguageChinese, StringComparison.OrdinalIgnoreCase))
+            {
+                string resolvedScript = !string.IsNullOrEmpty(script)
+                    ? script
+                    : InferChineseScript(region);
+
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, resolvedScript, region));
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, resolvedScript, string.Empty));
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, string.Empty, region));
+                AddLanguageTagCandidate(tags, language);
+                return tags;
+            }
+
+            AddLanguageTagCandidate(tags, canonical);
+            if (!string.IsNullOrEmpty(script) && !string.IsNullOrEmpty(region))
+            {
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, script, string.Empty));
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, string.Empty, region));
+            }
+            else if (!string.IsNullOrEmpty(script))
+            {
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, script, string.Empty));
+            }
+            else if (!string.IsNullOrEmpty(region))
+            {
+                AddLanguageTagCandidate(tags, BuildLanguageTag(language, string.Empty, region));
+            }
+
+            AddLanguageTagCandidate(tags, language);
+            return tags;
+        }
+
+        private static void AddLanguageTagCandidate(List<string> tags, string tag)
+        {
+            if (tags == null || string.IsNullOrEmpty(tag))
+            {
+                return;
+            }
+
+            string canonical = CanonicalizeLanguageTag(tag);
+            if (string.IsNullOrEmpty(canonical))
+            {
+                return;
+            }
+
+            for (int i = 0; i < tags.Count; i++)
+            {
+                if (string.Equals(tags[i], canonical, StringComparison.OrdinalIgnoreCase))
+                {
                     return;
-                case "jp":
-                    AddCodeCandidate(folders, "ja");
-                    AddCodeCandidate(folders, "japanese");
+                }
+            }
+
+            tags.Add(canonical);
+        }
+
+        private static void AddFolderNameVariants(List<string> folders, string tag)
+        {
+            if (folders == null || string.IsNullOrEmpty(tag))
+            {
+                return;
+            }
+
+            string canonical = CanonicalizeLanguageTag(tag);
+            if (string.IsNullOrEmpty(canonical))
+            {
+                return;
+            }
+
+            AddFolderCandidate(folders, canonical);
+            AddFolderCandidate(folders, canonical.ToLowerInvariant());
+            AddFolderCandidate(folders, canonical.Replace('-', '_'));
+            AddFolderCandidate(folders, canonical.ToLowerInvariant().Replace('-', '_'));
+            AddLegacyFolderAliases(folders, canonical);
+        }
+
+        private static void AddFolderCandidate(List<string> folders, string folder)
+        {
+            if (folders == null || string.IsNullOrEmpty(folder))
+            {
+                return;
+            }
+
+            for (int i = 0; i < folders.Count; i++)
+            {
+                if (string.Equals(folders[i], folder, StringComparison.OrdinalIgnoreCase))
+                {
                     return;
-                case "cn":
-                    AddCodeCandidate(folders, "zh");
-                    AddCodeCandidate(folders, "zhcn");
-                    AddCodeCandidate(folders, "zh-cn");
-                    AddCodeCandidate(folders, "zh_cn");
-                    AddCodeCandidate(folders, "schinese");
-                    AddCodeCandidate(folders, "tchinese");
-                    AddCodeCandidate(folders, "chinese");
-                    return;
-                case "ru":
-                    AddCodeCandidate(folders, "russian");
-                    AddCodeCandidate(folders, "ua");
-                    AddCodeCandidate(folders, "ukrainian");
-                    return;
-                case "ptbr":
-                    AddCodeCandidate(folders, "pt");
-                    AddCodeCandidate(folders, "pt-br");
-                    AddCodeCandidate(folders, "pt_br");
-                    AddCodeCandidate(folders, "portuguese");
-                    AddCodeCandidate(folders, "brazilian");
-                    return;
+                }
+            }
+
+            folders.Add(folder);
+        }
+
+        private static void AddLegacyFolderAliases(List<string> folders, string canonicalTag)
+        {
+            if (folders == null || string.IsNullOrEmpty(canonicalTag))
+            {
+                return;
+            }
+
+            string language;
+            string script;
+            string region;
+            ParseLanguageTag(canonicalTag, out language, out script, out region);
+
+            if (string.Equals(language, LanguageEnglish, StringComparison.OrdinalIgnoreCase))
+            {
+                AddFolderCandidate(folders, "english");
+                AddFolderCandidate(folders, "en-us");
+                AddFolderCandidate(folders, "en-us-utf8");
+                return;
+            }
+
+            if (string.Equals(language, LanguageJapanese, StringComparison.OrdinalIgnoreCase))
+            {
+                AddFolderCandidate(folders, "jp");
+                AddFolderCandidate(folders, "japanese");
+                return;
+            }
+
+            if (string.Equals(language, LanguageChinese, StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(script, ScriptHans, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(script))
+                {
+                    AddFolderCandidate(folders, "schinese");
+                    AddFolderCandidate(folders, "zhcn");
+                    AddFolderCandidate(folders, "zh-cn");
+                    AddFolderCandidate(folders, "zh_cn");
+                }
+
+                if (string.Equals(script, ScriptHant, StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(script))
+                {
+                    AddFolderCandidate(folders, "tchinese");
+                }
+
+                AddFolderCandidate(folders, "cn");
+                AddFolderCandidate(folders, "chinese");
+                return;
+            }
+
+            if (string.Equals(language, LanguageRussian, StringComparison.OrdinalIgnoreCase))
+            {
+                AddFolderCandidate(folders, "russian");
+                return;
+            }
+
+            if (string.Equals(language, LanguagePortuguese, StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(region, RegionBrazil, StringComparison.OrdinalIgnoreCase))
+                {
+                    AddFolderCandidate(folders, "ptbr");
+                    AddFolderCandidate(folders, "pt_br");
+                    AddFolderCandidate(folders, "brazilian");
+                }
+
+                if (string.IsNullOrEmpty(region))
+                {
+                    AddFolderCandidate(folders, "portuguese");
+                }
             }
         }
 
@@ -200,7 +284,7 @@ namespace IdolCareerDiary
             {
                 if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
                 {
-                    return staticVars.Settings.Language.Trim().ToLowerInvariant();
+                    return staticVars.Settings.Language.Trim();
                 }
             }
             catch
@@ -210,45 +294,20 @@ namespace IdolCareerDiary
             return string.Empty;
         }
 
-        private static string GetAlias(string code)
+        private static string ResolveConfiguredLanguageTag(string code)
         {
             if (string.IsNullOrEmpty(code))
             {
                 return string.Empty;
             }
 
-            switch (code)
+            string alias = ResolveKnownLanguageAlias(code);
+            if (!string.IsNullOrEmpty(alias))
             {
-                case "english":
-                case "en":
-                case "enus":
-                case "enusutf8":
-                    return "en";
-                case "japanese":
-                case "ja":
-                case "jp":
-                    return "jp";
-                case "schinese":
-                case "tchinese":
-                case "zh":
-                case "zhcn":
-                case "cn":
-                    return "cn";
-                case "russian":
-                case "ukrainian":
-                case "ru":
-                case "ua":
-                    return "ru";
-                case "portuguese":
-                case "brazilian":
-                case "pt":
-                case "ptbr":
-                case "pt-br":
-                case "pt_br":
-                    return "ptbr";
-                default:
-                    return string.Empty;
+                return alias;
             }
+
+            return CanonicalizeLanguageTag(code);
         }
 
         private static string GetAssemblyDirectory()
@@ -348,7 +407,7 @@ namespace IdolCareerDiary
                 return string.Empty;
             }
 
-            string normalized = code.Trim().ToLowerInvariant();
+            string normalized = code.Trim();
             if (normalized.Length == 0 || normalized.Length > MaxLanguageCodeLength)
             {
                 return string.Empty;
@@ -364,6 +423,308 @@ namespace IdolCareerDiary
             }
 
             return normalized;
+        }
+
+        private static string ResolveKnownLanguageAlias(string code)
+        {
+            string normalized = NormalizeLooseLanguageAliasKey(code);
+            switch (normalized)
+            {
+                case "en":
+                case "english":
+                case "enus":
+                case "enusutf8":
+                    return "en";
+                case "ja":
+                case "jp":
+                case "japanese":
+                    return "ja";
+                case "zh":
+                case "chinese":
+                    return "zh";
+                case "zhcn":
+                case "cn":
+                case "schinese":
+                    return "zh-Hans";
+                case "zhtw":
+                case "zhhk":
+                case "zhmo":
+                case "tchinese":
+                    return "zh-Hant";
+                case "ru":
+                case "russian":
+                    return "ru";
+                case "pt":
+                case "portuguese":
+                    return "pt";
+                case "ptbr":
+                case "ptbrutf8":
+                case "brazilian":
+                    return "pt-BR";
+                case "ko":
+                case "korean":
+                case "koreana":
+                    return "ko";
+                case "de":
+                case "german":
+                    return "de";
+                case "fr":
+                case "french":
+                    return "fr";
+                case "it":
+                case "italian":
+                    return "it";
+                case "es":
+                case "spanish":
+                    return "es";
+                case "es419":
+                case "latam":
+                case "spanishlatam":
+                    return "es-419";
+                case "pl":
+                case "polish":
+                    return "pl";
+                case "tr":
+                case "turkish":
+                    return "tr";
+                case "th":
+                case "thai":
+                    return "th";
+                case "vi":
+                case "vietnamese":
+                    return "vi";
+                case "uk":
+                case "ukrainian":
+                    return "uk";
+                case "cs":
+                case "czech":
+                    return "cs";
+                case "da":
+                case "danish":
+                    return "da";
+                case "nl":
+                case "dutch":
+                    return "nl";
+                case "fi":
+                case "finnish":
+                    return "fi";
+                case "hu":
+                case "hungarian":
+                    return "hu";
+                case "no":
+                case "norwegian":
+                    return "no";
+                case "ro":
+                case "romanian":
+                    return "ro";
+                case "sv":
+                case "swedish":
+                    return "sv";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string NormalizeLooseLanguageAliasKey(string code)
+        {
+            if (string.IsNullOrEmpty(code))
+            {
+                return string.Empty;
+            }
+
+            string trimmed = code.Trim().ToLowerInvariant();
+            if (trimmed.Length == 0 || trimmed.Length > MaxLanguageCodeLength)
+            {
+                return string.Empty;
+            }
+
+            char[] buffer = new char[trimmed.Length];
+            int count = 0;
+            for (int i = 0; i < trimmed.Length; i++)
+            {
+                char c = trimmed[i];
+                if (char.IsLetterOrDigit(c))
+                {
+                    buffer[count++] = c;
+                }
+            }
+
+            return count == 0 ? string.Empty : new string(buffer, 0, count);
+        }
+
+        private static string CanonicalizeLanguageTag(string code)
+        {
+            string normalized = NormalizeLanguageCode(code);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return string.Empty;
+            }
+
+            string collapsed = normalized.Replace('_', '-');
+            string[] parts = collapsed.Split('-');
+            if (parts.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i].Length == 0 || parts[i].Length > 8)
+                {
+                    return string.Empty;
+                }
+
+                for (int j = 0; j < parts[i].Length; j++)
+                {
+                    if (!char.IsLetterOrDigit(parts[i][j]))
+                    {
+                        return string.Empty;
+                    }
+                }
+
+                if (i == 0)
+                {
+                    parts[i] = parts[i].ToLowerInvariant();
+                    continue;
+                }
+
+                bool isScript = parts[i].Length == 4 && IsAllLetters(parts[i]);
+                bool isRegion = (parts[i].Length == 2 && IsAllLetters(parts[i])) || (parts[i].Length == 3 && IsAllDigits(parts[i]));
+                if (isScript)
+                {
+                    parts[i] = char.ToUpperInvariant(parts[i][0]) + parts[i].Substring(1).ToLowerInvariant();
+                    continue;
+                }
+
+                if (isRegion)
+                {
+                    parts[i] = parts[i].ToUpperInvariant();
+                    continue;
+                }
+
+                parts[i] = parts[i].ToLowerInvariant();
+            }
+
+            return string.Join("-", parts);
+        }
+
+        private static void ParseLanguageTag(string code, out string language, out string script, out string region)
+        {
+            language = string.Empty;
+            script = string.Empty;
+            region = string.Empty;
+
+            string canonical = CanonicalizeLanguageTag(code);
+            if (string.IsNullOrEmpty(canonical))
+            {
+                return;
+            }
+
+            string[] parts = canonical.Split('-');
+            if (parts.Length == 0)
+            {
+                return;
+            }
+
+            language = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string part = parts[i];
+                if (string.IsNullOrEmpty(script) && part.Length == 4 && IsAllLetters(part))
+                {
+                    script = char.ToUpperInvariant(part[0]) + part.Substring(1).ToLowerInvariant();
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(region) && ((part.Length == 2 && IsAllLetters(part)) || (part.Length == 3 && IsAllDigits(part))))
+                {
+                    region = part.ToUpperInvariant();
+                }
+            }
+        }
+
+        private static string BuildLanguageTag(string language, string script, string region)
+        {
+            List<string> parts = new List<string>();
+            if (!string.IsNullOrEmpty(language))
+            {
+                parts.Add(language);
+            }
+
+            if (!string.IsNullOrEmpty(script))
+            {
+                parts.Add(script);
+            }
+
+            if (!string.IsNullOrEmpty(region))
+            {
+                parts.Add(region);
+            }
+
+            if (parts.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            return CanonicalizeLanguageTag(string.Join("-", parts.ToArray()));
+        }
+
+        private static string InferChineseScript(string region)
+        {
+            if (string.IsNullOrEmpty(region))
+            {
+                return string.Empty;
+            }
+
+            switch (region.ToUpperInvariant())
+            {
+                case "CN":
+                case "SG":
+                case "MY":
+                    return ScriptHans;
+                case "TW":
+                case "HK":
+                case "MO":
+                    return ScriptHant;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static bool IsAllLetters(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (!char.IsLetter(value[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsAllDigits(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (!char.IsDigit(value[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static string NormalizeKey(string rawKey)

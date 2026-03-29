@@ -1,9 +1,17 @@
 # Localization file
 # Base language (English): Localization/en/strings.txt
-# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
+# Per-language overrides use BCP 47 tags in folder names:
+#   Localization/ja/strings.txt
+#   Localization/zh-Hans/strings.txt
+#   Localization/zh-Hant/strings.txt
+#   Localization/pt-BR/strings.txt
+# Generic language fallback also works, for example Localization/fr/strings.txt.
+# Legacy aliases (jp, cn, ptbr, etc.) are still supported for backward compatibility.
 # Format: key=value
 
 c.DateFormatUi=ddd, dd MMM yyyy
+c.ConfigCommentHeader=# IdolCareerDiary configuration
+c.ConfigCommentShowUnknownSocialParticipants=# Show social-event participants even when producer does not know them.
 c.DiaryTabLabel=Career Diary
 c.LabelAccidents=Accidents
 c.LabelAction=Action
@@ -241,6 +249,14 @@ c.TextCountryLevel=Country Level
 c.TextCountryNewFans=Country New Fans
 c.TextCountryRevenue=Country Revenue
 c.TextDailyAgencyUpdate=Daily Agency Update
+c.TextDurationUnitDaySingular=day
+c.TextDurationUnitDayPlural=days
+c.TextDurationUnitWeekSingular=week
+c.TextDurationUnitWeekPlural=weeks
+c.TextDurationUnitMonthSingular=month
+c.TextDurationUnitMonthPlural=months
+c.TextDurationUnitYearSingular=year
+c.TextDurationUnitYearPlural=years
 c.TextDamagesAppliedYes=Damages Applied: Yes
 c.TextDamagesPaid=Damages Paid: 
 c.TextDateStatus=Date Status
@@ -678,6 +694,9 @@ c.CodeLabel.youngadult=Young Adult
 c.CodeLabel.adult=Adult
 c.CodeLabel.internet=Internet
 c.CodeLabel.tv=TV
+c.CodeLabel.activity.performance=Performance
+c.CodeLabel.activity.promotion=Promotion
+c.CodeLabel.activity.spatreatment=Spa Treatment
 
 # Added automatically to keep all player-facing keys localizable.
 c.LabelBullying=Bullying

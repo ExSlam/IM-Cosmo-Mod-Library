@@ -41,10 +41,12 @@ namespace IdolCareerDiary
         internal const string ConfigCommentPrefixHash = "#";
         internal const string ConfigCommentPrefixSemicolon = ";";
         internal const string ConfigCommentPrefixSlashSlash = "//";
+        internal static readonly string ConfigCommentHeader = ModLocalization.Get("c.ConfigCommentHeader", "# IdolCareerDiary configuration");
+        internal static readonly string ConfigCommentShowUnknownSocialParticipants = ModLocalization.Get("c.ConfigCommentShowUnknownSocialParticipants", "# Show social-event participants even when producer does not know them.");
         internal static readonly string[] DefaultConfigTemplateLines = new[]
         {
-            "# IdolCareerDiary configuration",
-            "# Show social-event participants even when producer does not know them.",
+            ConfigCommentHeader,
+            ConfigCommentShowUnknownSocialParticipants,
             "show_unknown_social_participants=false"
         };
         internal static readonly string MessageCoreDependencyDetected = ModLocalization.Get("c.MessageCoreDependencyDetected", "Detected required dependency: IMDataCore.");
@@ -206,6 +208,14 @@ namespace IdolCareerDiary
         internal static readonly string OpenIdolSuffix = ModLocalization.Get("c.OpenIdolSuffix", " profile");
 
         internal static readonly string DateFormatUi = ModLocalization.Get("c.DateFormatUi", "ddd, dd MMM yyyy");
+        internal static readonly string TextDurationUnitDaySingular = ModLocalization.Get("c.TextDurationUnitDaySingular", "day");
+        internal static readonly string TextDurationUnitDayPlural = ModLocalization.Get("c.TextDurationUnitDayPlural", "days");
+        internal static readonly string TextDurationUnitWeekSingular = ModLocalization.Get("c.TextDurationUnitWeekSingular", "week");
+        internal static readonly string TextDurationUnitWeekPlural = ModLocalization.Get("c.TextDurationUnitWeekPlural", "weeks");
+        internal static readonly string TextDurationUnitMonthSingular = ModLocalization.Get("c.TextDurationUnitMonthSingular", "month");
+        internal static readonly string TextDurationUnitMonthPlural = ModLocalization.Get("c.TextDurationUnitMonthPlural", "months");
+        internal static readonly string TextDurationUnitYearSingular = ModLocalization.Get("c.TextDurationUnitYearSingular", "year");
+        internal static readonly string TextDurationUnitYearPlural = ModLocalization.Get("c.TextDurationUnitYearPlural", "years");
         internal const string DateFormatRoundTrip = "o";
         internal const string OutcomeLinesJoinSeparator = "\n";
 
@@ -11422,13 +11432,13 @@ namespace IdolCareerDiary
             int totalDays = Mathf.Max(C.ZeroIndex, (endDate.Date - startDate.Date).Days);
             if (totalDays < 7)
             {
-                return FormatDurationComponent(totalDays, "day");
+                return FormatDurationComponent(totalDays, C.TextDurationUnitDaySingular, C.TextDurationUnitDayPlural);
             }
 
             if (totalDays < 30)
             {
                 int weeks = Mathf.Max(C.LastFromCount, totalDays / 7);
-                return FormatDurationComponent(weeks, "week");
+                return FormatDurationComponent(weeks, C.TextDurationUnitWeekSingular, C.TextDurationUnitWeekPlural);
             }
 
             if (totalDays < 365)
@@ -11437,7 +11447,8 @@ namespace IdolCareerDiary
                 DateTime cursor;
                 CountCalendarMonths(startDate.Date, endDate.Date, out months, out cursor);
                 int weeks = Mathf.Max(C.ZeroIndex, (endDate.Date - cursor).Days / 7);
-                return FormatDurationComponent(months, "month") + C.SeparatorSpace + FormatDurationComponent(weeks, "week");
+                return FormatDurationComponent(months, C.TextDurationUnitMonthSingular, C.TextDurationUnitMonthPlural) + C.SeparatorSpace +
+                    FormatDurationComponent(weeks, C.TextDurationUnitWeekSingular, C.TextDurationUnitWeekPlural);
             }
 
             int years;
@@ -11447,9 +11458,9 @@ namespace IdolCareerDiary
             DateTime monthCursor;
             CountCalendarMonths(yearCursor, endDate.Date, out remainingMonths, out monthCursor);
             int remainingWeeks = Mathf.Max(C.ZeroIndex, (endDate.Date - monthCursor).Days / 7);
-            return FormatDurationComponent(years, "year") + C.SeparatorSpace +
-                FormatDurationComponent(remainingMonths, "month") + C.SeparatorSpace +
-                FormatDurationComponent(remainingWeeks, "week");
+            return FormatDurationComponent(years, C.TextDurationUnitYearSingular, C.TextDurationUnitYearPlural) + C.SeparatorSpace +
+                FormatDurationComponent(remainingMonths, C.TextDurationUnitMonthSingular, C.TextDurationUnitMonthPlural) + C.SeparatorSpace +
+                FormatDurationComponent(remainingWeeks, C.TextDurationUnitWeekSingular, C.TextDurationUnitWeekPlural);
         }
 
         /// <summary>
@@ -11483,9 +11494,9 @@ namespace IdolCareerDiary
         /// <summary>
         /// Formats one duration unit with pluralization.
         /// </summary>
-        private static string FormatDurationComponent(int value, string unitSingular)
+        private static string FormatDurationComponent(int value, string unitSingular, string unitPlural)
         {
-            string unit = value == C.LastFromCount ? unitSingular : (unitSingular + "s");
+            string unit = value == C.LastFromCount ? unitSingular : unitPlural;
             return value.ToString(CultureInfo.InvariantCulture) + C.SeparatorSpace + unit;
         }
 

@@ -2,6 +2,8 @@
 
 Source repository for Cosmo's Idol Manager mods.
 
+- [Localization Guide](LOCALIZATION.md) - How to add base-game and mod translations, including new languages not shipped by default.
+
 ## Mods Included
 
 - [Divorce Fix](mods/Divorce%20Fix/README.md) - Clears marriage state on divorce events so flirting works again.
