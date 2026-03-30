@@ -331,6 +331,13 @@ namespace IdolCareerDiary
         internal const string LanguageKeyClose = "CLOSE";
         internal const string LanguageKeyButtonClose = "BUTTON__CLOSE";
         internal const string LanguageKeyPopupClose = "POPUP__CLOSE";
+        internal const string LanguageKeySunday = "SUNDAY";
+        internal const string LanguageKeyMonday = "MONDAY";
+        internal const string LanguageKeyTuesday = "TUESDAY";
+        internal const string LanguageKeyWednesday = "WEDNESDAY";
+        internal const string LanguageKeyThursday = "THURSDAY";
+        internal const string LanguageKeyFriday = "FRIDAY";
+        internal const string LanguageKeySaturday = "SATURDAY";
         internal static readonly string LabelCloseFallback = ModLocalization.Get("c.LabelCloseFallback", "Close");
         internal const string MethodChartPopupRender = "Render";
 
@@ -7381,7 +7388,7 @@ namespace IdolCareerDiary
                 DateTime releaseDate = single.ReleaseData.ReleaseDate;
                 if (releaseDate.Year > DateTime.MinValue.Year)
                 {
-                    releaseDateText = releaseDate.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                    releaseDateText = FormatUiDate(releaseDate);
                 }
             }
 
@@ -7813,7 +7820,7 @@ namespace IdolCareerDiary
 
             DateTime releaseDate = single.ReleaseData != null ? single.ReleaseData.ReleaseDate : DateTime.MinValue;
             string releaseDateText = releaseDate.Year > DateTime.MinValue.Year
-                ? releaseDate.ToString(C.DateFormatUi, CultureInfo.InvariantCulture)
+                ? FormatUiDate(releaseDate)
                 : C.LabelUnknown;
 
             int chartPosition = single.ReleaseData != null ? single.ReleaseData.Chart_Position : C.UnknownChartPosition;
@@ -11269,9 +11276,9 @@ namespace IdolCareerDiary
                 insertIndex = lines.Count;
             }
 
-            string startLine = C.TextStartDatePrefix + startDate.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+            string startLine = C.TextStartDatePrefix + FormatUiDate(startDate);
             string durationLine = C.TextDuration + FormatLifecycleDuration(startDate, endDate);
-            string endLine = endLabel + endDate.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+            string endLine = endLabel + FormatUiDate(endDate);
 
             lines.Insert(insertIndex, startLine);
             lines.Insert(insertIndex + C.LastFromCount, durationLine);
@@ -11417,11 +11424,78 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Formats one UI date using the mod pattern and game-localized weekday names.
+        /// </summary>
+        private static string FormatUiDate(DateTime value)
+        {
+            return value.ToString(C.DateFormatUi, GetUiDateCulture());
+        }
+
+        /// <summary>
+        /// Creates a date culture that keeps invariant parsing behavior while adopting game weekday labels.
+        /// </summary>
+        private static CultureInfo GetUiDateCulture()
+        {
+            CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+            DateTimeFormatInfo invariantFormat = CultureInfo.InvariantCulture.DateTimeFormat;
+
+            string sunday = GetGameLocalization(C.LanguageKeySunday);
+            string monday = GetGameLocalization(C.LanguageKeyMonday);
+            string tuesday = GetGameLocalization(C.LanguageKeyTuesday);
+            string wednesday = GetGameLocalization(C.LanguageKeyWednesday);
+            string thursday = GetGameLocalization(C.LanguageKeyThursday);
+            string friday = GetGameLocalization(C.LanguageKeyFriday);
+            string saturday = GetGameLocalization(C.LanguageKeySaturday);
+
+            culture.DateTimeFormat.DayNames = new[]
+            {
+                string.IsNullOrEmpty(sunday) ? invariantFormat.DayNames[(int)DayOfWeek.Sunday] : sunday,
+                string.IsNullOrEmpty(monday) ? invariantFormat.DayNames[(int)DayOfWeek.Monday] : monday,
+                string.IsNullOrEmpty(tuesday) ? invariantFormat.DayNames[(int)DayOfWeek.Tuesday] : tuesday,
+                string.IsNullOrEmpty(wednesday) ? invariantFormat.DayNames[(int)DayOfWeek.Wednesday] : wednesday,
+                string.IsNullOrEmpty(thursday) ? invariantFormat.DayNames[(int)DayOfWeek.Thursday] : thursday,
+                string.IsNullOrEmpty(friday) ? invariantFormat.DayNames[(int)DayOfWeek.Friday] : friday,
+                string.IsNullOrEmpty(saturday) ? invariantFormat.DayNames[(int)DayOfWeek.Saturday] : saturday
+            };
+
+            // The base game only exposes one localized label per weekday key, so use it for both ddd and dddd.
+            culture.DateTimeFormat.AbbreviatedDayNames = new[]
+            {
+                string.IsNullOrEmpty(sunday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Sunday] : sunday,
+                string.IsNullOrEmpty(monday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Monday] : monday,
+                string.IsNullOrEmpty(tuesday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Tuesday] : tuesday,
+                string.IsNullOrEmpty(wednesday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Wednesday] : wednesday,
+                string.IsNullOrEmpty(thursday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Thursday] : thursday,
+                string.IsNullOrEmpty(friday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Friday] : friday,
+                string.IsNullOrEmpty(saturday) ? invariantFormat.AbbreviatedDayNames[(int)DayOfWeek.Saturday] : saturday
+            };
+            culture.DateTimeFormat.ShortestDayNames = (string[])culture.DateTimeFormat.AbbreviatedDayNames.Clone();
+            return culture;
+        }
+
+        /// <summary>
+        /// Reads one localization value from the game's active language dictionary.
+        /// </summary>
+        private static string GetGameLocalization(string key)
+        {
+            if (Language.Data != null)
+            {
+                string value;
+                if (Language.Data.TryGetValue(key, out value) && !string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
         /// Parses one UI-formatted date line value.
         /// </summary>
         private static bool TryParseUiDateText(string dateText, out DateTime parsed)
         {
-            return DateTime.TryParseExact(dateText ?? string.Empty, C.DateFormatUi, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed);
+            return DateTime.TryParseExact(dateText ?? string.Empty, C.DateFormatUi, GetUiDateCulture(), DateTimeStyles.None, out parsed);
         }
 
         /// <summary>
@@ -13109,7 +13183,7 @@ namespace IdolCareerDiary
             DateTime parsed;
             if (TryResolveTimelineDate(ev, out parsed))
             {
-                return parsed.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                return FormatUiDate(parsed);
             }
 
             if (ev.GameDateKey > C.ZeroIndex)
@@ -13233,12 +13307,12 @@ namespace IdolCareerDiary
             DateTime dt;
             if (TryParseEventDate(ev.GameDateTime, out dt))
             {
-                return dt.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                return FormatUiDate(dt);
             }
 
             if (TryParseDateKeyForUi(ev.GameDateKey, out dt))
             {
-                return dt.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                return FormatUiDate(dt);
             }
 
             return ev.GameDateKey.ToString(CultureInfo.InvariantCulture);
@@ -14019,13 +14093,13 @@ namespace IdolCareerDiary
             DateTime parsed;
             if (TryParseEventDate(roundTrip, out parsed))
             {
-                return parsed.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                return FormatUiDate(parsed);
             }
 
             int parsedDateKey;
             if (TryParseInt(roundTrip, out parsedDateKey) && TryParseDateKeyForUi(parsedDateKey, out parsed))
             {
-                return parsed.ToString(C.DateFormatUi, CultureInfo.InvariantCulture);
+                return FormatUiDate(parsed);
             }
 
             return C.LabelUnknown;

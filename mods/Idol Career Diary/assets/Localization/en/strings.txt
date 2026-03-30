@@ -8,6 +8,9 @@
 # Generic language fallback also works, for example Localization/fr/strings.txt.
 # Legacy aliases (jp, cn, ptbr, etc.) are still supported for backward compatibility.
 # Format: key=value
+# Date formatting notes:
+# - ddd and dddd use the base game's weekday localization keys (SUNDAY through SATURDAY).
+# - The base game currently exposes only one localized label per weekday, so ddd and dddd render the same text.
 
 c.DateFormatUi=ddd, dd MMM yyyy
 c.ConfigCommentHeader=# IdolCareerDiary configuration
