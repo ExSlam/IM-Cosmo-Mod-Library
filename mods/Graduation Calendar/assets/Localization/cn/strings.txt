@@ -1,4 +1,17 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Calendar.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+profile.extras.graduation_label=毕业： 
+common.unknown=未知
+common.close=关闭
+menu.button_tooltip=毕业日历
+menu.button_label=日历
+ui.title=毕业日历
+view.calendar=日历视图
+view.graduations_only=仅限毕业典礼
+view.yearly=年度视图
+view.monthly=月视图
+empty.no_idols=没有可用的偶像
+empty.no_graduations=没有毕业典礼
+empty.no_graduations_scheduled=没有安排毕业典礼

@@ -1,4 +1,17 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Calendar.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+profile.extras.graduation_label=Выпускной: 
+common.unknown=Неизвестно
+common.close=Закрыть
+menu.button_tooltip=Календарь выпускных
+menu.button_label=Календарь
+ui.title=Календарь выпускных
+view.calendar=Просмотр календаря
+view.graduations_only=Только выпускные
+view.yearly=Ежегодный просмотр
+view.monthly=Ежемесячный просмотр
+empty.no_idols=Нет доступных айдолов
+empty.no_graduations=Нет выпускных экзаменов
+empty.no_graduations_scheduled=Выпускных не запланировано

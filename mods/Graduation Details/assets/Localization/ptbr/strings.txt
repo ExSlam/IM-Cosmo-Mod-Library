@@ -1,4 +1,16 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Details.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+context_menu.profile.tooltip_ready=Mostrar perfil de ídolo
+context_menu.profile.tooltip_pending=Mostrar perfil do ídolo (dados pendentes)
+context_menu.profile.label=Perfil
+jobs.total_earnings_prefix=Ganhos totais: 
+jobs.married_to_prefix=Casado com: 
+jobs.married_to_none=Casado com: Não
+jobs.custody_unknown=Custódia: Desconhecida
+jobs.custody_child_singular= criança
+jobs.custody_child_plural= crianças
+jobs.custody_player_prefix=Custódia: Jogador (
+jobs.custody_idol_prefix=Custódia: Ídolo (
+jobs.custody_none=Custódia: Nenhuma

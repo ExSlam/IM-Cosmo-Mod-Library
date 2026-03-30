@@ -1,4 +1,0 @@
-﻿# Localization override file
-# Format: key=value
-# Only include keys you want to override from ../en/strings.txt
-

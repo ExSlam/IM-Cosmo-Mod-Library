@@ -1,4 +1,16 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Details.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+context_menu.profile.tooltip_ready=显示偶像简介
+context_menu.profile.tooltip_pending=显示偶像简介（数据待定）
+context_menu.profile.label=公司简介
+jobs.total_earnings_prefix=总收入： 
+jobs.married_to_prefix=结婚对象： 
+jobs.married_to_none=已婚对象： 否
+jobs.custody_unknown=监护权：未知
+jobs.custody_child_singular= 孩子
+jobs.custody_child_plural= 儿童
+jobs.custody_player_prefix=监护人：玩家 (
+jobs.custody_idol_prefix=监护人：偶像（
+jobs.custody_none=监护权：无

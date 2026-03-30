@@ -1,4 +1,17 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Calendar.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+profile.extras.graduation_label=卒業: 
+common.unknown=不明
+common.close=閉じる
+menu.button_tooltip=卒業カレンダー
+menu.button_label=カレンダー
+ui.title=卒業カレンダー
+view.calendar=カレンダービュー
+view.graduations_only=卒業生のみ
+view.yearly=年間ビュー
+view.monthly=月次ビュー
+empty.no_idols=出演可能なアイドルがいない
+empty.no_graduations=卒業式はありません
+empty.no_graduations_scheduled=卒業予定はありません

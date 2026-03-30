@@ -1,4 +1,17 @@
-﻿# Localization override file
+# Machine-translated localization for Graduation Calendar.
+# Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
-# Only include keys you want to override from ../en/strings.txt
 
+profile.extras.graduation_label=Graduação: 
+common.unknown=Desconhecido
+common.close=Fechar
+menu.button_tooltip=Calendário de formatura
+menu.button_label=Calendário
+ui.title=Calendário de formatura
+view.calendar=Visualização de calendário
+view.graduations_only=Somente graduações
+view.yearly=Visão Anual
+view.monthly=Visualização Mensal
+empty.no_idols=Nenhum ídolo disponível
+empty.no_graduations=Sem graduações
+empty.no_graduations_scheduled=Não há formaturas agendadas
