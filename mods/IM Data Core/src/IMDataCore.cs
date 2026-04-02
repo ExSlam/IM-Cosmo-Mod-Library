@@ -508,9 +508,16 @@ namespace IMDataCore
         internal const string RelationshipBreakReasonGeneric = "generic_breakup";
         internal const string DateInteractionTypeGoOnDate = "go_on_date";
         internal const string DateInteractionTypeGoOnSpecificDate = "go_on_specific_date";
+        internal const string DateInteractionResultTokenPublicDate = "pub";
+        internal const string DateInteractionResultTokenRoutineDate = "generic";
         internal const string DateInteractionResultTokenNone = "none";
         internal const string DateInteractionResultTokenDeferred = "deferred";
         internal const string DateInteractionResultTokenSeparator = "|";
+        internal const string DateInteractionResultSummaryCodeDialogueFollowup = "dialogue_followup";
+        internal const string DateInteractionResultSummaryCodeNoSpecialResult = "no_special_result";
+        internal const string DateInteractionResultSummaryCodePublicDate = "public_date";
+        internal const string DateInteractionResultSummaryCodeRoutineDate = "routine_date";
+        internal const string DateInteractionResultSummaryCodeMultiResult = "multi_result";
         internal const string CliqueSignatureMemberSeparator = "-";
         internal const string UnknownCliqueEntityIdentifier = "unknown_clique";
         internal const string UnknownBullyingEntityIdentifier = "unknown_bullying";
@@ -1331,10 +1338,16 @@ namespace IMDataCore
         internal const string JsonFieldDateStatusBefore = "date_status_before";
         internal const string JsonFieldDateStatusAfter = "date_status_after";
         internal const string JsonFieldDateResultToken = "date_result_token";
+        internal const string JsonFieldDateResultSummaryCode = "date_result_summary_code";
         internal const string JsonFieldDateCaughtBefore = "date_caught_before";
         internal const string JsonFieldDateCaughtAfter = "date_caught_after";
         internal const string JsonFieldDateRelationshipLevelBefore = "date_relationship_level_before";
         internal const string JsonFieldDateRelationshipLevelAfter = "date_relationship_level_after";
+        internal const string JsonFieldReplyEffectEntries = "reply_effect_entries";
+        internal const string JsonFieldReplyEffectTarget = "target";
+        internal const string JsonFieldReplyEffectParameter = "parameter";
+        internal const string JsonFieldReplyEffectFormula = "formula";
+        internal const string JsonFieldReplyEffectSpecial = "special";
         internal const string JsonFieldMarriageStage = "marriage_stage";
         internal const string JsonFieldMarriageRoute = "marriage_route";
         internal const string JsonFieldMarriagePartnerStatus = "marriage_partner_status";
@@ -5992,6 +6005,61 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Resolves one normalized summary code for player date outcomes.
+        /// </summary>
+        private static string ResolveDateInteractionResultSummaryCode(IList<string> resultTokens)
+        {
+            if (resultTokens == null)
+            {
+                return CoreConstants.DateInteractionResultSummaryCodeDialogueFollowup;
+            }
+
+            int nonEmptyTokenCount = CoreConstants.ZeroBasedListStartIndex;
+            string normalizedSingleToken = string.Empty;
+            for (int tokenIndex = CoreConstants.ZeroBasedListStartIndex; tokenIndex < resultTokens.Count; tokenIndex++)
+            {
+                string token = resultTokens[tokenIndex];
+                if (string.IsNullOrEmpty(token))
+                {
+                    continue;
+                }
+
+                string normalizedToken = token.Trim().ToLowerInvariant();
+                if (normalizedToken.Length == CoreConstants.ZeroBasedListStartIndex)
+                {
+                    continue;
+                }
+
+                if (nonEmptyTokenCount == CoreConstants.ZeroBasedListStartIndex)
+                {
+                    normalizedSingleToken = normalizedToken;
+                }
+
+                nonEmptyTokenCount++;
+            }
+
+            if (nonEmptyTokenCount < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return CoreConstants.DateInteractionResultSummaryCodeNoSpecialResult;
+            }
+
+            if (nonEmptyTokenCount > CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return CoreConstants.DateInteractionResultSummaryCodeMultiResult;
+            }
+
+            switch (normalizedSingleToken)
+            {
+                case CoreConstants.DateInteractionResultTokenPublicDate:
+                    return CoreConstants.DateInteractionResultSummaryCodePublicDate;
+                case CoreConstants.DateInteractionResultTokenRoutineDate:
+                    return CoreConstants.DateInteractionResultSummaryCodeRoutineDate;
+                default:
+                    return normalizedSingleToken;
+            }
+        }
+
+        /// <summary>
         /// Reads one variables value using safe empty-string fallback.
         /// </summary>
         private static string ResolveVariableValueOrEmpty(string variableKey)
@@ -7262,6 +7330,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldDateStatusBefore, payload.DateStatusBefore ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldDateStatusAfter, payload.DateStatusAfter ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldDateResultToken, payload.DateResultToken ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldDateResultSummaryCode, payload.DateResultSummaryCode ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldDateCaughtBefore, payload.DateCaughtBefore, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldDateCaughtAfter, payload.DateCaughtAfter, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldDateRelationshipLevelBefore, payload.DateRelationshipLevelBefore, ref isFirstProperty);
@@ -8831,6 +8900,7 @@ namespace IMDataCore
         public string DateStatusBefore = string.Empty;
         public string DateStatusAfter = string.Empty;
         public string DateResultToken = string.Empty;
+        public string DateResultSummaryCode = string.Empty;
         public bool DateCaughtBefore;
         public bool DateCaughtAfter;
         public int DateRelationshipLevelBefore;
@@ -9704,6 +9774,18 @@ namespace IMDataCore
     /// JSON payload emitted when a random-event reply is resolved.
     /// </summary>
     [Serializable]
+    internal sealed class RandomEventReplyEffectEntry
+    {
+        public string target = string.Empty;
+        public string parameter = string.Empty;
+        public string formula = string.Empty;
+        public string special = string.Empty;
+    }
+
+    /// <summary>
+    /// JSON payload emitted when a random-event reply is resolved.
+    /// </summary>
+    [Serializable]
     internal sealed class RandomEventConcludedEventPayload
     {
         public string random_event_id = string.Empty;
@@ -9715,6 +9797,7 @@ namespace IMDataCore
         public string reply_description = string.Empty;
         public int reply_effect_count;
         public string reply_effect_summary = string.Empty;
+        public RandomEventReplyEffectEntry[] reply_effect_entries;
         public string actors_summary = string.Empty;
         public long estimated_liability;
         public long money_before;

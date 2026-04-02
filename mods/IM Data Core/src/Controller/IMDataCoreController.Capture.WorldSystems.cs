@@ -4565,6 +4565,7 @@ namespace IMDataCore
                 reply_description = reply.description ?? string.Empty,
                 reply_effect_count = reply.Effects != null ? reply.Effects.Count : CoreConstants.ZeroBasedListStartIndex,
                 reply_effect_summary = BuildDialogueActionSummary(reply.Effects),
+                reply_effect_entries = BuildDialogueActionEntries(reply.Effects),
                 actors_summary = snapshotBefore.ActorSummaryBefore,
                 estimated_liability = snapshotBefore.EstimatedLiabilityBefore,
                 money_before = snapshotBefore.MoneyBefore,
@@ -5736,6 +5737,39 @@ namespace IMDataCore
             }
 
             return summaryBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Builds structured effect entries for one random-event reply.
+        /// </summary>
+        private static RandomEventReplyEffectEntry[] BuildDialogueActionEntries(IReadOnlyList<data_dialogues._action> actions)
+        {
+            if (actions == null || actions.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return null;
+            }
+
+            List<RandomEventReplyEffectEntry> entries = new List<RandomEventReplyEffectEntry>(actions.Count);
+            for (int actionIndex = CoreConstants.ZeroBasedListStartIndex; actionIndex < actions.Count; actionIndex++)
+            {
+                data_dialogues._action action = actions[actionIndex];
+                if (action == null)
+                {
+                    continue;
+                }
+
+                entries.Add(new RandomEventReplyEffectEntry
+                {
+                    target = action.target ?? string.Empty,
+                    parameter = action.parameter ?? string.Empty,
+                    formula = action.formula ?? string.Empty,
+                    special = action.special ?? string.Empty
+                });
+            }
+
+            return entries.Count < CoreConstants.MinimumNonEmptyCollectionCount
+                ? null
+                : entries.ToArray();
         }
 
         /// <summary>

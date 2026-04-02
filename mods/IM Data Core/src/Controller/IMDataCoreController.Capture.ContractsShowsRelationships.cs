@@ -2772,6 +2772,7 @@ namespace IMDataCore
                     ? CoreEnumNameMapping.ToDatingPartnerStatusCode(partnerAfter.Status)
                     : CoreConstants.StatusCodeUnknown,
                 DateResultToken = ResolveDateInteractionResultToken(resultTokens),
+                DateResultSummaryCode = ResolveDateInteractionResultSummaryCode(resultTokens),
                 DateCaughtBefore = safeSnapshot.DateCaughtBefore,
                 DateCaughtAfter = Dating.Data != null && Dating.Data.Caught,
                 DateRelationshipLevelBefore = safeSnapshot.RelationshipLevelBefore,

@@ -338,6 +338,41 @@ namespace IdolCareerDiary
         internal const string LanguageKeyThursday = "THURSDAY";
         internal const string LanguageKeyFriday = "FRIDAY";
         internal const string LanguageKeySaturday = "SATURDAY";
+        internal const string LanguageKeyShow = "SHOW";
+        internal const string LanguageKeySingle = "SINGLE";
+        internal const string LanguageKeyLoan = "LOAN";
+        internal const string LanguageKeyBusiness = "BIZ";
+        internal const string LanguageKeyBusinessAd = "BIZ_AD";
+        internal const string LanguageKeyBusinessVariety = "BIZ__VARIETY";
+        internal const string LanguageKeyBusinessTv = "BIZ__TV";
+        internal const string LanguageKeyActivityPromotion = "ACTIVITIES__PROMOTION";
+        internal const string LanguageKeyActivitySpaTreatment = "ACTIVITIES__SPATREATMENT";
+        internal const string LanguageKeySingleGenre = "SINGLE__GENRE";
+        internal const string LanguageKeySingleLyrics = "SINGLE__LYRICS";
+        internal const string LanguageKeySingleChoreography = "SINGLE__CHOREO";
+        internal const string LanguageKeySingleMarketing = "SINGLE__MARKETING";
+        internal const string LanguageKeyShowRadio = "SHOW__RADIO";
+        internal const string LanguageKeyShowInternet = "SHOW__INTERNET";
+        internal const string LanguageKeyShowTv = "SHOW__TV";
+        internal const string LanguageKeyShowEntireGroup = "SHOW__ENTIRE_GROUP";
+        internal const string LanguageKeyShowRotatingCast = "SHOW__ROTATING_CAST";
+        internal const string LanguageKeyShowPermanentCast = "SHOW__PERMANENT_CAST";
+        internal const string LanguageKeyResearchProducer = "RESEARCH__PRODUCER";
+        internal const string LanguageKeyLoanFujimoto = "LOANS__FUJIMOTO";
+        internal const string LanguageKeyLoanBank = "LOANS__BANK";
+        internal const string LanguageKeyLoanInvestor = "LOANS__INVESTOR";
+        internal const string LanguageKeyLoanOneMonth = "LOANS__1_MONTH";
+        internal const string LanguageKeyLoanThreeMonths = "LOANS__3_MONTHS";
+        internal const string LanguageKeyLoanSixMonths = "LOANS__6_MONTHS";
+        internal const string LanguageKeyTheaterPerformance = "THEATER__PERFORMANCE";
+        internal const string LanguageKeyTheaterManzai = "THEATER__MANZAI";
+        internal const string LanguageKeyTheaterDayOff = "THEATER__DAY_OFF";
+        internal const string LanguageKeyTheaterEveryone = "THEATER__EVERYONE";
+        internal const string LanguageKeyCafeAuto = "CAFE__AUTO";
+        internal const string LanguageKeyCafeHighestStamina = "CAFE__HIGHEST_STAMINA";
+        internal const string LanguageKeyCafeBestStats = "CAFE__BEST_STATS";
+        internal const string LanguageKeyPopular = "POPULAR";
+        internal const string LanguageKeyUnpopular = "UNPOPULAR";
         internal static readonly string LabelCloseFallback = ModLocalization.Get("c.LabelCloseFallback", "Close");
         internal const string MethodChartPopupRender = "Render";
 
@@ -941,9 +976,9 @@ namespace IdolCareerDiary
         internal static readonly string TextLoanId = ModLocalization.Get("c.TextLoanId", "Loan ID");
         internal const string KeyLoanId = "loan_id";
         internal const string KeyLoanLifecycleAction = "loan_lifecycle_action";
-        internal static readonly string TextLoanType = ModLocalization.Get("c.TextLoanType", "Loan Type");
+        internal static readonly string TextLoanType = ModLocalization.Get("c.TextLoanType", "Lender");
         internal const string KeyLoanType = "loan_type";
-        internal static readonly string TextLoanDuration = ModLocalization.Get("c.TextLoanDuration", "Loan Duration");
+        internal static readonly string TextLoanDuration = ModLocalization.Get("c.TextLoanDuration", "Repayment Term");
         internal const string KeyLoanDuration = "loan_duration";
         internal static readonly string TextLoanActive = ModLocalization.Get("c.TextLoanActive", "Loan Active");
         internal const string KeyLoanActiveBefore = "loan_active_before";
@@ -1001,8 +1036,15 @@ namespace IdolCareerDiary
         internal static readonly string TextBankruptcyGameOverUsed = ModLocalization.Get("c.TextBankruptcyGameOverUsed", "Bankruptcy Game Over Used");
         internal const string KeyGameOverBankruptcyUsedBefore = "game_over_bankruptcy_used_before";
         internal const string KeyGameOverBankruptcyUsedAfter = "game_over_bankruptcy_used_after";
-        internal static readonly string TextTriggeredDialogue = ModLocalization.Get("c.TextTriggeredDialogue", "Triggered Dialogue");
+        internal static readonly string TextTriggeredDialogue = ModLocalization.Get("c.TextTriggeredDialogue", "Triggered Story Event");
         internal const string KeyTriggeredDialogue = "triggered_dialogue";
+        internal const string CodeStoryBankruptcyBailOut = "bankruptcy_bail_out";
+        internal const string CodeStoryRecruit = "story_recruit";
+        internal const string CodeStoryGameOverBankruptcy = "game_over_bankruptcy";
+        internal const string CodeStoryFirstScandalPoints = "first_scandal_points";
+        internal const string CodeStoryGameOverWarningScandalPoints = "game_over_warning_scandal_points";
+        internal const string CodeStoryScandalPointsParents = "scandal_points_parents";
+        internal const string CodeStoryGameOverScandalPoints = "game_over_scandal_points";
         internal static readonly string TextCafeCreated = ModLocalization.Get("c.TextCafeCreated", "Cafe Created");
         internal static readonly string TextCafeDestroyed = ModLocalization.Get("c.TextCafeDestroyed", "Cafe Destroyed");
         internal static readonly string TextCafeDailyResult = ModLocalization.Get("c.TextCafeDailyResult", "Cafe Daily Result");
@@ -1019,11 +1061,31 @@ namespace IdolCareerDiary
         internal const string KeyWorkingStaffCount = "working_staff_count";
         internal static readonly string TextWorkingStaffCount = ModLocalization.Get("c.TextWorkingStaffCount", "Working Staff Count");
         internal const string KeyCafePriority = "cafe_priority";
-        internal static readonly string TextCafePriority = ModLocalization.Get("c.TextCafePriority", "Cafe Priority");
+        internal static readonly string TextCafePriority = ModLocalization.Get("c.TextCafePriority", "Cafe Focus");
         internal const string KeyStaffPriority = "staff_priority";
-        internal static readonly string TextStaffPriority = ModLocalization.Get("c.TextStaffPriority", "Staff Priority");
+        internal static readonly string TextStaffPriority = ModLocalization.Get("c.TextStaffPriority", "Staff Assignment Priority");
         internal const string KeyMenuSummary = "menu_summary";
-        internal static readonly string TextMenuSummary = ModLocalization.Get("c.TextMenuSummary", "Menu Summary");
+        internal static readonly string TextMenuSummary = ModLocalization.Get("c.TextMenuSummary", "Weekly Menu");
+        internal static readonly string TextMenuDayEntry = ModLocalization.Get("c.TextMenuDayEntry", "{0}: {1}");
+        internal static readonly string TextUnknownDishFormat = ModLocalization.Get("c.TextUnknownDishFormat", "Dish #{0}");
+        internal static readonly string TextNoCafeDishesSet = ModLocalization.Get("c.TextNoCafeDishesSet", "No dishes set");
+        internal static readonly string TextWeekdayMonday = ModLocalization.Get("c.TextWeekdayMonday", "Monday");
+        internal static readonly string TextWeekdayTuesday = ModLocalization.Get("c.TextWeekdayTuesday", "Tuesday");
+        internal static readonly string TextWeekdayWednesday = ModLocalization.Get("c.TextWeekdayWednesday", "Wednesday");
+        internal static readonly string TextWeekdayThursday = ModLocalization.Get("c.TextWeekdayThursday", "Thursday");
+        internal static readonly string TextWeekdayFriday = ModLocalization.Get("c.TextWeekdayFriday", "Friday");
+        internal static readonly string TextWeekdaySaturday = ModLocalization.Get("c.TextWeekdaySaturday", "Saturday");
+        internal static readonly string TextWeekdaySunday = ModLocalization.Get("c.TextWeekdaySunday", "Sunday");
+        internal const int WeekdayIndexMonday = 0;
+        internal const int WeekdayIndexTuesday = 1;
+        internal const int WeekdayIndexWednesday = 2;
+        internal const int WeekdayIndexThursday = 3;
+        internal const int WeekdayIndexFriday = 4;
+        internal const int WeekdayIndexSaturday = 5;
+        internal const int WeekdayIndexSunday = 6;
+        internal const int CafeMenuEntryFieldCount = 2;
+        internal const int CafeMenuDayIndexField = 0;
+        internal const int CafeMenuDishIdField = 1;
         internal const string KeyLifecycleDate = "lifecycle_date";
         internal const string KeyDishId = "dish_id";
         internal static readonly string TextDishId = ModLocalization.Get("c.TextDishId", "Dish ID");
@@ -1034,7 +1096,7 @@ namespace IdolCareerDiary
         internal const string KeyCafeProfit = "profit";
         internal static readonly string TextCafeProfit = ModLocalization.Get("c.TextCafeProfit", "Cafe Profit");
         internal const string KeyFanType = "fan_type";
-        internal static readonly string TextFanType = ModLocalization.Get("c.TextFanType", "Fan Type");
+        internal static readonly string TextFanType = ModLocalization.Get("c.TextFanType", "Target Fan Segment");
         internal const string KeyStaffedIdolCount = "staffed_idol_count";
         internal static readonly string TextStaffedIdolCount = ModLocalization.Get("c.TextStaffedIdolCount", "Staffed Idol Count");
         internal static readonly string TextStaffedIdols = ModLocalization.Get("c.TextStaffedIdols", "Staffed Idols: ");
@@ -1060,7 +1122,11 @@ namespace IdolCareerDiary
         internal const string KeyKohaiToSenpaiRatioAfter = "kohai_to_senpai_ratio_after";
         internal static readonly string TextKohaiToSenpaiRatio = ModLocalization.Get("c.TextKohaiToSenpaiRatio", "Kohai -> Senpai Ratio");
         internal const string KeyMentorPairsSummary = "mentor_pairs_summary";
-        internal static readonly string TextMentorPairsSummary = ModLocalization.Get("c.TextMentorPairsSummary", "Mentor Pairs Summary");
+        internal static readonly string TextMentorPairsSummary = ModLocalization.Get("c.TextMentorPairsSummary", "Active Mentorships");
+        internal static readonly string TextMentorPairFormat = ModLocalization.Get("c.TextMentorPairFormat", "{0} -> {1}");
+        internal const int MentorPairEntryFieldCount = 2;
+        internal const int MentorPairMentorIdField = 0;
+        internal const int MentorPairKohaiIdField = 1;
         internal static readonly string TextScandalCheck = ModLocalization.Get("c.TextScandalCheck", "Scandal Check");
         internal const string KeyTestGameOver = "test_go";
         internal static readonly string TextTestGameOver = ModLocalization.Get("c.TextTestGameOver", "Test Game Over");
@@ -1144,6 +1210,40 @@ namespace IdolCareerDiary
         internal const string KeyReplyDescription = "reply_description";
         internal static readonly string LabelEffects = ModLocalization.Get("c.LabelEffects", "Effects");
         internal const string KeyReplyEffectSummary = "reply_effect_summary";
+        internal const string KeyReplyEffectEntries = "reply_effect_entries";
+        internal const string KeyReplyEffectTarget = "target";
+        internal const string KeyReplyEffectParameter = "parameter";
+        internal const string KeyReplyEffectFormula = "formula";
+        internal const string KeyReplyEffectSpecial = "special";
+        internal static readonly string TextRandomEffectResourceChange = ModLocalization.Get("c.TextRandomEffectResourceChange", "{0}: {1}");
+        internal static readonly string TextRandomEffectActorParameterChange = ModLocalization.Get("c.TextRandomEffectActorParameterChange", "{0}: {1} {2}");
+        internal static readonly string TextRandomEffectFanOpinionChange = ModLocalization.Get("c.TextRandomEffectFanOpinionChange", "{0} Audience Opinion: {1}");
+        internal static readonly string TextRandomEffectTriggeredStoryEvent = ModLocalization.Get("c.TextRandomEffectTriggeredStoryEvent", "Triggers Story Event: {0}");
+        internal static readonly string TextRandomEffectAddedTask = ModLocalization.Get("c.TextRandomEffectAddedTask", "Adds Task: {0}");
+        internal static readonly string TextRandomEffectAddedFollowUpTask = ModLocalization.Get("c.TextRandomEffectAddedFollowUpTask", "Adds Follow-Up Task: {0}");
+        internal static readonly string TextRandomEffectSetPolicy = ModLocalization.Get("c.TextRandomEffectSetPolicy", "Sets Policy: {0}");
+        internal const string CodeRandomEffectTargetResource = "resource";
+        internal const string CodeRandomEffectTargetFans = "fans";
+        internal const string CodeRandomEffectTargetMeta = "meta";
+        internal const string CodeRandomEffectTargetGroup = "group";
+        internal const string CodeRandomEffectParameterStartDialogue = "start_dialogue";
+        internal const string CodeRandomEffectParameterStartDialogueSameActor = "start_dialogue_same_actor";
+        internal const string CodeRandomEffectParameterAddTask = "add_task";
+        internal const string CodeRandomEffectParameterAddTaskSub = "add_task_sub";
+        internal const string CodeRandomEffectParameterAddTaskContinue = "add_task_continue";
+        internal const string CodeRandomEffectParameterAddTaskContinueSub = "add_task_continue_sub";
+        internal const string CodeRandomEffectParameterSetPolicy = "set_policy";
+        internal const string CodeRandomEffectActorParameterPrefix = "param ";
+        internal const int ReplyEffectEntryMinimumFieldCount = 4;
+        internal const int ReplyEffectTargetField = 0;
+        internal const int ReplyEffectParameterField = 1;
+        internal const int ReplyEffectFormulaField = 2;
+        internal const int ReplyEffectSpecialField = 3;
+        internal const int ActorSummaryFieldCount = 4;
+        internal const int ActorSummaryKindField = 0;
+        internal const int ActorSummaryIdField = 1;
+        internal const int ActorSummaryTokenField = 2;
+        internal const int ActorSummaryDisplayNameField = 3;
         internal const string KeyActorsSummary = "actors_summary";
         internal static readonly string TextInvolvedIdols = ModLocalization.Get("c.TextInvolvedIdols", "Involved Idols: ");
         internal static readonly string TextFansChange = ModLocalization.Get("c.TextFansChange", "Fans Change");
@@ -1155,10 +1255,13 @@ namespace IdolCareerDiary
         internal static readonly string TextSubstoryDelayed = ModLocalization.Get("c.TextSubstoryDelayed", "Substory Delayed");
         internal static readonly string TextSubstoryCompleted = ModLocalization.Get("c.TextSubstoryCompleted", "Substory Completed");
         internal const string KeySubstoryParentId = "substory_parent_id";
+        internal const string KeySubstoryParentDisplayName = "substory_parent_display_name";
         internal const string KeySubstoryId = "substory_id";
-        internal static readonly string TextSubstoryType = ModLocalization.Get("c.TextSubstoryType", "Substory Type");
+        internal const string KeySubstoryDisplayName = "substory_display_name";
+        internal static readonly string TextSubstoryType = ModLocalization.Get("c.TextSubstoryType", "Story Event Type");
         internal const string KeySubstoryType = "substory_type";
         internal const string KeySubstoryLifecycleAction = "substory_lifecycle_action";
+        internal static readonly string TextParentStory = ModLocalization.Get("c.TextParentStory", "Parent Story");
         internal static readonly string TextScheduledTime = ModLocalization.Get("c.TextScheduledTime", "Scheduled Time");
         internal const string KeyScheduledLaunchTime = "scheduled_launch_time";
         internal static readonly string TextQueueCount = ModLocalization.Get("c.TextQueueCount", "Ready Substories");
@@ -1172,11 +1275,21 @@ namespace IdolCareerDiary
         internal static readonly string TextTaskClosed = ModLocalization.Get("c.TextTaskClosed", "Task Closed");
         internal const string KeyTaskCustom = "task_custom";
         internal const string KeyTaskType = "task_type";
-        internal static readonly string TextTaskType = ModLocalization.Get("c.TextTaskType", "Task Type");
+        internal static readonly string TextTaskType = ModLocalization.Get("c.TextTaskType", "Task Category");
+        internal static readonly string TextTaskSummary = ModLocalization.Get("c.TextTaskSummary", "Task Summary");
+        internal static readonly string TextTaskSummaryTypePart = ModLocalization.Get("c.TextTaskSummaryTypePart", "category {0}");
+        internal static readonly string TextTaskSummaryGoalPart = ModLocalization.Get("c.TextTaskSummaryGoalPart", "goal {0}");
+        internal static readonly string TextTaskSummaryRoutePart = ModLocalization.Get("c.TextTaskSummaryRoutePart", "{0} route");
+        internal static readonly string TextTaskSummarySkillPart = ModLocalization.Get("c.TextTaskSummarySkillPart", "requires {0}");
+        internal static readonly string TextTaskSummaryIdolPart = ModLocalization.Get("c.TextTaskSummaryIdolPart", "assigned to {0}");
+        internal static readonly string TextTaskSummaryAgentPart = ModLocalization.Get("c.TextTaskSummaryAgentPart", "handled by {0}");
+        internal static readonly string TextTaskSummaryStoryPart = ModLocalization.Get("c.TextTaskSummaryStoryPart", "story {0}");
         internal static readonly string LabelGoal = ModLocalization.Get("c.LabelGoal", "Goal");
         internal const string KeyTaskGoal = "task_goal";
         internal static readonly string LabelRoute = ModLocalization.Get("c.LabelRoute", "Route");
-        internal const string KeyTaskRoute = "Route";
+        internal const string KeyTaskRoute = "route";
+        internal const string KeyTaskRouteLegacy = "Route";
+        internal const string KeyTaskSubstory = "task_substory";
         internal static readonly string LabelSkill = ModLocalization.Get("c.LabelSkill", "Skill");
         internal const string KeyTaskSkill = "task_skill";
         internal static readonly string LabelAgent = ModLocalization.Get("c.LabelAgent", "Agent");
@@ -1196,8 +1309,8 @@ namespace IdolCareerDiary
         internal static readonly string TextResearchParameterLeveledUp = ModLocalization.Get("c.TextResearchParameterLeveledUp", "Research Parameter Leveled Up");
         internal const string KeyParamTitle = "param_title";
         internal const string KeyResearchType = "research_type";
-        internal static readonly string TextResearchType = ModLocalization.Get("c.TextResearchType", "Research Type");
-        internal static readonly string TextParameterType = ModLocalization.Get("c.TextParameterType", "Parameter Type");
+        internal static readonly string TextResearchType = ModLocalization.Get("c.TextResearchType", "Research Area");
+        internal static readonly string TextParameterType = ModLocalization.Get("c.TextParameterType", "Affected Parameter");
         internal const string KeyParamType = "param_type";
         internal static readonly string LabelParameter = ModLocalization.Get("c.LabelParameter", "Parameter");
         internal const string KeyLevelBefore = "level_before";
@@ -1228,11 +1341,24 @@ namespace IdolCareerDiary
         internal static readonly string TextTrendUpdateCost = ModLocalization.Get("c.TextTrendUpdateCost", "Trend Update Cost");
         internal const string KeyTrendUpdateCost = "trend_update_cost";
         internal static readonly string TextGenreTrends = ModLocalization.Get("c.TextGenreTrends", "Genre Trends");
+        internal static readonly string TextGenreTrendsRising = ModLocalization.Get("c.TextGenreTrendsRising", "Rising Genres");
+        internal static readonly string TextGenreTrendsFalling = ModLocalization.Get("c.TextGenreTrendsFalling", "Falling Genres");
         internal const string KeyTrendsGenreSummary = "trends_genre_summary";
         internal static readonly string TextLyricsTrends = ModLocalization.Get("c.TextLyricsTrends", "Lyrics Trends");
+        internal static readonly string TextLyricsTrendsRising = ModLocalization.Get("c.TextLyricsTrendsRising", "Rising Lyrics");
+        internal static readonly string TextLyricsTrendsFalling = ModLocalization.Get("c.TextLyricsTrendsFalling", "Falling Lyrics");
         internal const string KeyTrendsLyricsSummary = "trends_lyrics_summary";
         internal static readonly string TextChoreoTrends = ModLocalization.Get("c.TextChoreoTrends", "Choreo Trends");
+        internal static readonly string TextChoreoTrendsRising = ModLocalization.Get("c.TextChoreoTrendsRising", "Rising Choreography");
+        internal static readonly string TextChoreoTrendsFalling = ModLocalization.Get("c.TextChoreoTrendsFalling", "Falling Choreography");
+        internal static readonly string TextTrendEntryWithPoints = ModLocalization.Get("c.TextTrendEntryWithPoints", "{0} ({1} points)");
         internal const string KeyTrendsChoreoSummary = "trends_choreo_summary";
+        internal const string CodeRising = "rising";
+        internal const string CodeFalling = "falling";
+        internal const int TrendSummaryMinimumFieldCount = 2;
+        internal const int TrendSummaryTitleField = 0;
+        internal const int TrendSummaryDirectionField = 1;
+        internal const int TrendSummaryPointsField = 2;
         internal static readonly string TextPushSlotStarted = ModLocalization.Get("c.TextPushSlotStarted", "Push Slot Started");
         internal static readonly string TextPushSlotEnded = ModLocalization.Get("c.TextPushSlotEnded", "Push Slot Ended");
         internal static readonly string TextPushSlotProgressed = ModLocalization.Get("c.TextPushSlotProgressed", "Push Slot Progressed");
@@ -1291,7 +1417,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelAuditions = ModLocalization.Get("c.LabelAuditions", "Auditions");
         internal static readonly string TextAuditionType = ModLocalization.Get("c.TextAuditionType", "Audition Type");
         internal const string KeyAuditionType = "audition_type";
-        internal static readonly string TextResetType = ModLocalization.Get("c.TextResetType", "Reset Type");
+        internal static readonly string TextResetType = ModLocalization.Get("c.TextResetType", "Cooldown Reset");
         internal const string KeyResetType = "reset_type";
         internal static readonly string LabelCost = ModLocalization.Get("c.LabelCost", "Cost");
         internal const string KeyCost = "Cost";
@@ -1403,6 +1529,17 @@ namespace IdolCareerDiary
         internal const string KeyDateStatusBefore = "date_status_before";
         internal const string KeyDateStatusAfter = "date_status_after";
         internal const string KeyDateResultToken = "date_result_token";
+        internal const string KeyDateResultSummaryCode = "date_result_summary_code";
+        internal static readonly string TextDateOutcome = ModLocalization.Get("c.TextDateOutcome", "Date Outcome");
+        internal const string CodeDateResultTokenPublic = "pub";
+        internal const string CodeDateResultTokenGeneric = "generic";
+        internal const string CodeDateResultTokenDeferred = "deferred";
+        internal const string CodeDateResultTokenNone = "none";
+        internal const string CodeDateResultDialogueFollowup = "dialogue_followup";
+        internal const string CodeDateResultNoSpecialResult = "no_special_result";
+        internal const string CodeDateResultPublicDate = "public_date";
+        internal const string CodeDateResultRoutineDate = "routine_date";
+        internal const string CodeDateResultMultiResult = "multi_result";
         internal static readonly string LabelCaught = ModLocalization.Get("c.LabelCaught", "Caught");
         internal const string KeyDateCaughtBefore = "date_caught_before";
         internal const string KeyDateCaughtAfter = "date_caught_after";
@@ -1589,6 +1726,9 @@ namespace IdolCareerDiary
         internal static readonly string TextAppliedPoints = ModLocalization.Get("c.TextAppliedPoints", "Applied Points");
         internal const string KeyGroupPointsApplied = "group_points_applied";
         internal const string SeparatorPipe = "|";
+        internal const char SeparatorPipeCharacter = '|';
+        internal const char SeparatorColonCharacter = ':';
+        internal const char SeparatorCommaCharacter = ',';
         internal const string SeparatorSpaceSlashSpace = " / ";
         internal static readonly string TextTimelineLimitedToLatestPrefix = ModLocalization.Get("c.TextTimelineLimitedToLatestPrefix", "Timeline limited to latest ");
         internal static readonly string TextVisibleEventsForUiPerformanceSuffix = ModLocalization.Get("c.TextVisibleEventsForUiPerformanceSuffix", " visible events for UI performance.");
@@ -1725,7 +1865,7 @@ namespace IdolCareerDiary
         internal static readonly string TextTheaterOpened = ModLocalization.Get("c.TextTheaterOpened", "Theater Opened");
         internal static readonly string TextTheaterClosed = ModLocalization.Get("c.TextTheaterClosed", "Theater Closed");
         internal static readonly string TextTheater = ModLocalization.Get("c.TextTheater", "Theater #");
-        internal static readonly string TextProgramType = ModLocalization.Get("c.TextProgramType", "Program Type: ");
+        internal static readonly string TextProgramType = ModLocalization.Get("c.TextProgramType", "Theater Schedule: ");
         internal static readonly string TextAttendance = ModLocalization.Get("c.TextAttendance", "Attendance: ");
         internal static readonly string TextRevenue = ModLocalization.Get("c.TextRevenue", "Revenue: ");
         internal static readonly string TextSubscriberChange = ModLocalization.Get("c.TextSubscriberChange", "Subscriber Change: ");
@@ -1791,6 +1931,12 @@ namespace IdolCareerDiary
         internal static readonly string TextRotatingCast = ModLocalization.Get("c.TextRotatingCast", "Rotating Cast");
         internal const string CodePermanentCast = "permanentcast";
         internal static readonly string TextPermanentCast = ModLocalization.Get("c.TextPermanentCast", "Permanent Cast");
+        internal const string CodeActivityPrefix = "activity.";
+        internal const string CodeEveryone = "everyone";
+        internal const string CodePlayer = "player";
+        internal const string CodeBusiness = "business";
+        internal const string CodeStamina = "stamina";
+        internal const string CodeStats = "stats";
         internal const string KeyTakenIdol = "taken_idol";
         internal static readonly string TextDatingAnotherIdol = ModLocalization.Get("c.TextDatingAnotherIdol", "Dating Another Idol");
         internal const string KeyTakenPlayer = "taken_player";
@@ -4523,7 +4669,10 @@ namespace IdolCareerDiary
             AddBoolTransitionLine(lines, C.TextBailoutUsed, payload, C.KeyBailoutUsedBefore, C.KeyBailoutUsedAfter);
             AddBoolTransitionLine(lines, C.TextStoryRecruitUsed, payload, C.KeyStoryRecruitUsedBefore, C.KeyStoryRecruitUsedAfter);
             AddBoolTransitionLine(lines, C.TextBankruptcyGameOverUsed, payload, C.KeyGameOverBankruptcyUsedBefore, C.KeyGameOverBankruptcyUsedAfter);
-            AddCodeLineIfKnown(lines, C.TextTriggeredDialogue, ReadStr(payload, C.KeyTriggeredDialogue));
+            if (C.ShowTechnicalEventMetadata)
+            {
+                AddCodeLineIfKnown(lines, C.TextTriggeredDialogue, ReadStr(payload, C.KeyTriggeredDialogue));
+            }
         }
 
         /// <summary>
@@ -4589,7 +4738,17 @@ namespace IdolCareerDiary
             AddIntLineIfPresent(lines, C.TextWorkingStaffCount, payload, C.KeyWorkingStaffCount);
             AddCodeLineIfKnown(lines, C.TextCafePriority, ReadStr(payload, C.KeyCafePriority));
             AddCodeLineIfKnown(lines, C.TextStaffPriority, ReadStr(payload, C.KeyStaffPriority));
-            AddRawLineIfKnown(lines, C.TextMenuSummary, ReadStr(payload, C.KeyMenuSummary));
+            string menuSummary = BuildCafeMenuDisplaySummary(cafeId, ReadStr(payload, C.KeyMenuSummary));
+            if (!string.IsNullOrEmpty(menuSummary))
+            {
+                lines.Add(C.TextMenuSummary + C.SeparatorColonSpace + menuSummary);
+            }
+
+            if (C.ShowTechnicalEventMetadata)
+            {
+                AddRawLineIfKnown(lines, C.TextMenuSummary, ReadStr(payload, C.KeyMenuSummary));
+            }
+
             AddDateLineIfKnown(lines, C.LabelDate, ReadStr(payload, C.KeyLifecycleDate));
         }
 
@@ -4646,7 +4805,17 @@ namespace IdolCareerDiary
             AddIntLineIfPresent(lines, C.TextActiveMentorCount, payload, C.KeyActiveMentorCount);
             AddFloatTransitionLine(lines, C.TextSenpaiToKohaiRatio, payload, C.KeySenpaiToKohaiRatioBefore, C.KeySenpaiToKohaiRatioAfter);
             AddFloatTransitionLine(lines, C.TextKohaiToSenpaiRatio, payload, C.KeyKohaiToSenpaiRatioBefore, C.KeyKohaiToSenpaiRatioAfter);
-            AddRawLineIfKnown(lines, C.TextMentorPairsSummary, ReadStr(payload, C.KeyMentorPairsSummary));
+            string mentorPairsSummary = BuildMentorPairsDisplaySummary(ReadStr(payload, C.KeyMentorPairsSummary));
+            if (!string.IsNullOrEmpty(mentorPairsSummary) && !IsMentorPairsSummaryRedundant(ReadStr(payload, C.KeyMentorPairsSummary), mentorId, kohaiId))
+            {
+                lines.Add(C.TextMentorPairsSummary + C.SeparatorColonSpace + mentorPairsSummary);
+            }
+
+            if (C.ShowTechnicalEventMetadata)
+            {
+                AddRawLineIfKnown(lines, C.TextMentorPairsSummary, ReadStr(payload, C.KeyMentorPairsSummary));
+            }
+
             AddDateLineIfKnown(lines, C.LabelDate, ReadStr(payload, C.KeyEventDate));
         }
 
@@ -4668,7 +4837,10 @@ namespace IdolCareerDiary
             AddBoolTransitionLine(lines, C.TextScandalParentCooldown, payload, C.KeyScandalParentCooldownBefore, C.KeyScandalParentCooldownAfter);
             AddBoolTransitionLine(lines, C.TextAuditionFailure, payload, C.KeyAuditionFailureBefore, C.KeyAuditionFailureAfter);
             AddIntTransitionLine(lines, C.TextActiveIdolCount, payload, C.KeyActiveIdolCountBefore, C.KeyActiveIdolCountAfter);
-            AddCodeLineIfKnown(lines, C.TextTriggeredDialogue, ReadStr(payload, C.KeyTriggeredDialogue));
+            if (C.ShowTechnicalEventMetadata)
+            {
+                AddCodeLineIfKnown(lines, C.TextTriggeredDialogue, ReadStr(payload, C.KeyTriggeredDialogue));
+            }
         }
 
         /// <summary>
@@ -4756,7 +4928,17 @@ namespace IdolCareerDiary
                 AddCodeLineIfKnown(lines, C.TextEventState, ReadStr(payload, C.KeyRandomEventState));
                 AddRawLineIfKnown(lines, C.LabelChoice, ReadStr(payload, C.KeyReplyText));
                 AddRawLineIfKnown(lines, C.LabelResult, ReadStr(payload, C.KeyReplyDescription));
-                AddRawLineIfKnown(lines, C.LabelEffects, ReadStr(payload, C.KeyReplyEffectSummary));
+
+                List<string> effectLines = BuildRandomEventEffectLines(payload);
+                for (int effectIndex = C.ZeroIndex; effectIndex < effectLines.Count; effectIndex++)
+                {
+                    lines.Add(effectLines[effectIndex]);
+                }
+
+                if (C.ShowTechnicalEventMetadata)
+                {
+                    AddRawLineIfKnown(lines, C.LabelEffects, ReadStr(payload, C.KeyReplyEffectSummary));
+                }
 
                 string actors = BuildActorSummary(ReadStr(payload, C.KeyActorsSummary));
                 if (!string.IsNullOrEmpty(actors))
@@ -4786,10 +4968,21 @@ namespace IdolCareerDiary
                     p.Title = C.TextSubstoryCompleted;
                 }
 
-                string parentId = NormalizeRawText(ReadStr(payload, C.KeySubstoryParentId));
-                string substoryId = NormalizeRawText(ReadStr(payload, C.KeySubstoryId));
-                p.WithWhom = parentId != C.LabelUnknown ? HumanizeUnknown(parentId) : HumanizeUnknown(substoryId);
-                AddCodeLineIfKnown(lines, C.TextSubstoryType, ReadStr(payload, C.KeySubstoryType));
+                string substoryDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryId, C.KeySubstoryDisplayName);
+                string parentDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryParentId, C.KeySubstoryParentDisplayName);
+                p.WithWhom = substoryDisplayName != C.LabelUnknown
+                    ? substoryDisplayName
+                    : (parentDisplayName != C.LabelUnknown ? parentDisplayName : C.LabelStory);
+                if (parentDisplayName != C.LabelUnknown && !string.Equals(parentDisplayName, p.WithWhom, StringComparison.OrdinalIgnoreCase))
+                {
+                    lines.Add(C.TextParentStory + C.SeparatorColonSpace + parentDisplayName);
+                }
+
+                if (C.ShowTechnicalEventMetadata)
+                {
+                    AddCodeLineIfKnown(lines, C.TextSubstoryType, ReadStr(payload, C.KeySubstoryType));
+                }
+
                 AddCodeLineIfKnown(lines, C.LabelAction, ReadStr(payload, C.KeySubstoryLifecycleAction));
                 AddDateLineIfKnown(lines, C.TextScheduledTime, ReadStr(payload, C.KeyScheduledLaunchTime));
                 AddIntTransitionLine(lines, C.TextQueueCount, payload, C.KeyQueueCountBefore, C.KeyQueueCountAfter);
@@ -4800,18 +4993,14 @@ namespace IdolCareerDiary
             p.Title = type == C.EventTaskCompleted
                 ? C.TextTaskCompleted
                 : (type == C.EventTaskFailed ? C.TextTaskFailed : C.TextTaskClosed);
+            string taskSummary = BuildTaskSummary(payload);
             string taskName = NormalizeRawText(ReadStr(payload, C.KeyTaskCustom));
-            p.WithWhom = taskName != C.LabelUnknown ? HumanizeUnknown(taskName) : HumanizeUnknown(ReadStr(payload, C.KeyTaskType));
-            AddCodeLineIfKnown(lines, C.TextTaskType, ReadStr(payload, C.KeyTaskType));
-            AddCodeLineIfKnown(lines, C.LabelGoal, ReadStr(payload, C.KeyTaskGoal));
-            AddCodeLineIfKnown(lines, C.LabelRoute, ReadStr(payload, C.KeyTaskRoute));
-            AddCodeLineIfKnown(lines, C.LabelSkill, ReadStr(payload, C.KeyTaskSkill));
-            AddRawLineIfKnown(lines, C.LabelAgent, ReadStr(payload, C.KeyTaskAgentName));
-
-            int taskIdolId = ReadId(payload, C.KeyTaskGirlId);
-            if (taskIdolId >= C.MinId)
+            p.WithWhom = taskName != C.LabelUnknown
+                ? HumanizeUnknown(taskName)
+                : (!string.IsNullOrEmpty(taskSummary) ? taskSummary : HumanizeUnknown(ReadStr(payload, C.KeyTaskType)));
+            if (!string.IsNullOrEmpty(taskSummary))
             {
-                lines.Add(C.TextAssignedIdol + ResolveIdolNameById(taskIdolId));
+                lines.Add(C.TextTaskSummary + C.SeparatorColonSpace + taskSummary);
             }
 
             AddBoolTransitionLine(lines, C.LabelFulfilled, payload, C.KeyFulfilledBefore, C.KeyFulfilledAfter);
@@ -4851,9 +5040,49 @@ namespace IdolCareerDiary
                 AddLongTransitionLine(lines, C.TextRisingGroups, payload, C.KeyRisingGroupCountBefore, C.KeyRisingGroupCountAfter);
                 AddLongTransitionLine(lines, C.TextDisbandedGroups, payload, C.KeyDeadGroupCountBefore, C.KeyDeadGroupCountAfter);
                 AddSignedLineIfNonZero(lines, C.TextTrendUpdateCost, ReadLong(payload, C.KeyTrendUpdateCost));
-                AddRawLineIfKnown(lines, C.TextGenreTrends, ReadStr(payload, C.KeyTrendsGenreSummary));
-                AddRawLineIfKnown(lines, C.TextLyricsTrends, ReadStr(payload, C.KeyTrendsLyricsSummary));
-                AddRawLineIfKnown(lines, C.TextChoreoTrends, ReadStr(payload, C.KeyTrendsChoreoSummary));
+                string risingGenres = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsGenreSummary), C.CodeRising);
+                string fallingGenres = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsGenreSummary), C.CodeFalling);
+                string risingLyrics = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsLyricsSummary), C.CodeRising);
+                string fallingLyrics = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsLyricsSummary), C.CodeFalling);
+                string risingChoreo = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsChoreoSummary), C.CodeRising);
+                string fallingChoreo = BuildTrendSummaryByDirection(ReadStr(payload, C.KeyTrendsChoreoSummary), C.CodeFalling);
+                if (!string.IsNullOrEmpty(risingGenres))
+                {
+                    lines.Add(C.TextGenreTrendsRising + C.SeparatorColonSpace + risingGenres);
+                }
+
+                if (!string.IsNullOrEmpty(fallingGenres))
+                {
+                    lines.Add(C.TextGenreTrendsFalling + C.SeparatorColonSpace + fallingGenres);
+                }
+
+                if (!string.IsNullOrEmpty(risingLyrics))
+                {
+                    lines.Add(C.TextLyricsTrendsRising + C.SeparatorColonSpace + risingLyrics);
+                }
+
+                if (!string.IsNullOrEmpty(fallingLyrics))
+                {
+                    lines.Add(C.TextLyricsTrendsFalling + C.SeparatorColonSpace + fallingLyrics);
+                }
+
+                if (!string.IsNullOrEmpty(risingChoreo))
+                {
+                    lines.Add(C.TextChoreoTrendsRising + C.SeparatorColonSpace + risingChoreo);
+                }
+
+                if (!string.IsNullOrEmpty(fallingChoreo))
+                {
+                    lines.Add(C.TextChoreoTrendsFalling + C.SeparatorColonSpace + fallingChoreo);
+                }
+
+                if (C.ShowTechnicalEventMetadata)
+                {
+                    AddRawLineIfKnown(lines, C.TextGenreTrends, ReadStr(payload, C.KeyTrendsGenreSummary));
+                    AddRawLineIfKnown(lines, C.TextLyricsTrends, ReadStr(payload, C.KeyTrendsLyricsSummary));
+                    AddRawLineIfKnown(lines, C.TextChoreoTrends, ReadStr(payload, C.KeyTrendsChoreoSummary));
+                }
+
                 return;
             }
 
@@ -5129,7 +5358,7 @@ namespace IdolCareerDiary
                 AddTransitionLine(lines, C.LabelRoute, ReadStr(payload, C.KeyDateRouteBefore), ReadStr(payload, C.KeyDateRouteAfter));
                 AddTransitionLine(lines, C.LabelStage, ReadStr(payload, C.KeyDateStageBefore), ReadStr(payload, C.KeyDateStageAfter));
                 AddTransitionLine(lines, C.TextDateStatus, ReadStr(payload, C.KeyDateStatusBefore), ReadStr(payload, C.KeyDateStatusAfter));
-                AddCodeLineIfKnown(lines, C.LabelResult, ReadStr(payload, C.KeyDateResultToken));
+                AddCodeLineIfKnown(lines, C.TextDateOutcome, ResolveDateOutcomeCode(payload));
                 AddBoolTransitionLine(lines, C.LabelCaught, payload, C.KeyDateCaughtBefore, C.KeyDateCaughtAfter);
                 AddLongTransitionLine(lines, C.TextRelationshipLevel, payload, C.KeyDateRelationshipLevelBefore, C.KeyDateRelationshipLevelAfter);
             }
@@ -10417,7 +10646,7 @@ namespace IdolCareerDiary
                 string scheduleType = HumanizeUnknown(ReadStr(payload, C.JsonTheaterScheduleType));
                 if (scheduleType != C.LabelUnknown)
                 {
-                    outcomeLines.Add(C.TextProgramType + scheduleType);
+                    outcomeLines.Add(FormatLocalizedText(C.TextProgramType, scheduleType));
                 }
 
                 int attendance = ReadInt(payload, C.JsonTheaterAttendance);
@@ -13271,6 +13500,647 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Reads one preferred payload field with one legacy fallback field.
+        /// </summary>
+        private static string ReadStrWithFallback(JSONNode payload, string field, string fallbackField)
+        {
+            string value = ReadStr(payload, field);
+            return !string.IsNullOrEmpty(value)
+                ? value
+                : ReadStr(payload, fallbackField);
+        }
+
+        /// <summary>
+        /// Normalizes one code/token value for comparisons.
+        /// </summary>
+        private static string NormalizeCodeToken(string rawCode)
+        {
+            if (string.IsNullOrEmpty(rawCode))
+            {
+                return string.Empty;
+            }
+
+            return rawCode.Trim().ToLowerInvariant().Replace(C.SeparatorDash, C.SeparatorUnderscore);
+        }
+
+        /// <summary>
+        /// Resolves localized weekday text for cafe menu summaries.
+        /// </summary>
+        private static string ResolveWeekdayLabelByIndex(int dayIndex)
+        {
+            switch (dayIndex)
+            {
+                case C.WeekdayIndexMonday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeyMonday)) ? C.TextWeekdayMonday : GetGameLocalization(C.LanguageKeyMonday);
+                case C.WeekdayIndexTuesday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeyTuesday)) ? C.TextWeekdayTuesday : GetGameLocalization(C.LanguageKeyTuesday);
+                case C.WeekdayIndexWednesday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeyWednesday)) ? C.TextWeekdayWednesday : GetGameLocalization(C.LanguageKeyWednesday);
+                case C.WeekdayIndexThursday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeyThursday)) ? C.TextWeekdayThursday : GetGameLocalization(C.LanguageKeyThursday);
+                case C.WeekdayIndexFriday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeyFriday)) ? C.TextWeekdayFriday : GetGameLocalization(C.LanguageKeyFriday);
+                case C.WeekdayIndexSaturday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeySaturday)) ? C.TextWeekdaySaturday : GetGameLocalization(C.LanguageKeySaturday);
+                case C.WeekdayIndexSunday:
+                    return string.IsNullOrEmpty(GetGameLocalization(C.LanguageKeySunday)) ? C.TextWeekdaySunday : GetGameLocalization(C.LanguageKeySunday);
+                default:
+                    return C.LabelUnknown;
+            }
+        }
+
+        /// <summary>
+        /// Resolves one cafe dish title by id with localized fallback text.
+        /// </summary>
+        private static string ResolveCafeDishTitle(int cafeId, int dishId)
+        {
+            if (dishId < C.MinId)
+            {
+                return C.TextNoCafeDishesSet;
+            }
+
+            Cafes._cafe cafe = Cafes.GetCafe(cafeId);
+            Cafes._cafe._dish dish = cafe != null ? cafe.GetDishByID(dishId) : null;
+            string dishTitle = NormalizeRawText(dish != null ? dish.Title : string.Empty);
+            return dishTitle != C.LabelUnknown
+                ? dishTitle
+                : FormatLocalizedText(C.TextUnknownDishFormat, dishId.ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// Parses one compact cafe-menu summary into readable weekday -> dish text.
+        /// </summary>
+        private static string BuildCafeMenuDisplaySummary(int cafeId, string menuSummary)
+        {
+            string rawSummary = NormalizeRawText(menuSummary);
+            if (rawSummary == C.LabelUnknown)
+            {
+                return string.Empty;
+            }
+
+            string[] entries = rawSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            List<string> displayEntries = new List<string>();
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.CafeMenuEntryFieldCount)
+                {
+                    continue;
+                }
+
+                int dayIndex;
+                int dishId;
+                if (!TryParseInt(fields[C.CafeMenuDayIndexField], out dayIndex) || !TryParseInt(fields[C.CafeMenuDishIdField], out dishId))
+                {
+                    continue;
+                }
+
+                if (dishId < C.MinId)
+                {
+                    continue;
+                }
+
+                string weekdayLabel = ResolveWeekdayLabelByIndex(dayIndex);
+                if (weekdayLabel == C.LabelUnknown)
+                {
+                    continue;
+                }
+
+                string dishTitle = ResolveCafeDishTitle(cafeId, dishId);
+                displayEntries.Add(FormatLocalizedText(C.TextMenuDayEntry, weekdayLabel, dishTitle));
+            }
+
+            return displayEntries.Count > C.ZeroIndex
+                ? string.Join(C.ListJoinSeparator, displayEntries.ToArray())
+                : C.TextNoCafeDishesSet;
+        }
+
+        /// <summary>
+        /// Parses active mentorship pairs into readable idol-name text.
+        /// </summary>
+        private static string BuildMentorPairsDisplaySummary(string mentorPairsSummary)
+        {
+            string rawSummary = NormalizeRawText(mentorPairsSummary);
+            if (rawSummary == C.LabelUnknown)
+            {
+                return string.Empty;
+            }
+
+            string[] entries = rawSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            List<string> displayPairs = new List<string>();
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.MentorPairEntryFieldCount)
+                {
+                    continue;
+                }
+
+                int mentorId;
+                int kohaiId;
+                if (!TryParseInt(fields[C.MentorPairMentorIdField], out mentorId) || !TryParseInt(fields[C.MentorPairKohaiIdField], out kohaiId))
+                {
+                    continue;
+                }
+
+                string mentorName = ResolveIdolNameById(mentorId);
+                string kohaiName = ResolveIdolNameById(kohaiId);
+                if (mentorName == C.LabelUnknown || kohaiName == C.LabelUnknown)
+                {
+                    continue;
+                }
+
+                displayPairs.Add(FormatLocalizedText(C.TextMentorPairFormat, mentorName, kohaiName));
+            }
+
+            return displayPairs.Count > C.ZeroIndex
+                ? string.Join(C.ListJoinSeparator, displayPairs.ToArray())
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Returns true when one mentorship summary would only restate the focused pair.
+        /// </summary>
+        private static bool IsMentorPairsSummaryRedundant(string mentorPairsSummary, int mentorId, int kohaiId)
+        {
+            string rawSummary = NormalizeRawText(mentorPairsSummary);
+            if (rawSummary == C.LabelUnknown)
+            {
+                return true;
+            }
+
+            string[] entries = rawSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            if (entries.Length != C.LastFromCount)
+            {
+                return false;
+            }
+
+            string[] fields = entries[C.ZeroIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+            if (fields.Length < C.MentorPairEntryFieldCount)
+            {
+                return false;
+            }
+
+            int parsedMentorId;
+            int parsedKohaiId;
+            return TryParseInt(fields[C.MentorPairMentorIdField], out parsedMentorId)
+                && TryParseInt(fields[C.MentorPairKohaiIdField], out parsedKohaiId)
+                && parsedMentorId == mentorId
+                && parsedKohaiId == kohaiId;
+        }
+
+        /// <summary>
+        /// Resolves readable story-event text from one substory identifier.
+        /// </summary>
+        private static string ResolveSubstoryDisplayNameFromId(string substoryId)
+        {
+            string normalizedId = NormalizeRawText(substoryId);
+            if (normalizedId == C.LabelUnknown)
+            {
+                return C.LabelUnknown;
+            }
+
+            data_dialogues._dialogue dialogue = data_dialogues.GetDialogueByID(substoryId);
+            if (dialogue != null)
+            {
+                string dialogueDisplayName = HumanizeUnknown(dialogue.id);
+                if (dialogueDisplayName != C.LabelUnknown)
+                {
+                    return dialogueDisplayName;
+                }
+            }
+
+            return HumanizeUnknown(substoryId);
+        }
+
+        /// <summary>
+        /// Resolves one substory display name from optional payload display text or fallback id.
+        /// </summary>
+        private static string ResolveSubstoryDisplayName(JSONNode payload, string idField, string displayNameField)
+        {
+            string displayName = NormalizeRawText(ReadStr(payload, displayNameField));
+            return displayName != C.LabelUnknown
+                ? displayName
+                : ResolveSubstoryDisplayNameFromId(ReadStr(payload, idField));
+        }
+
+        /// <summary>
+        /// Builds one localized task summary from captured task fields.
+        /// </summary>
+        private static string BuildTaskSummary(JSONNode payload)
+        {
+            if (payload == null)
+            {
+                return string.Empty;
+            }
+
+            List<string> summaryParts = new List<string>();
+            string customTask = NormalizeRawText(ReadStr(payload, C.KeyTaskCustom));
+            if (customTask != C.LabelUnknown)
+            {
+                summaryParts.Add(HumanizeUnknown(customTask));
+            }
+            else
+            {
+                string taskSubstory = ResolveSubstoryDisplayNameFromId(ReadStr(payload, C.KeyTaskSubstory));
+                if (taskSubstory != C.LabelUnknown)
+                {
+                    summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryStoryPart, taskSubstory));
+                }
+            }
+
+            string taskType = HumanizeUnknown(ReadStr(payload, C.KeyTaskType));
+            if (taskType != C.LabelUnknown)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryTypePart, taskType));
+            }
+
+            string taskGoal = HumanizeUnknown(ReadStr(payload, C.KeyTaskGoal));
+            if (taskGoal != C.LabelUnknown)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryGoalPart, taskGoal));
+            }
+
+            string taskRoute = HumanizeUnknown(ReadStrWithFallback(payload, C.KeyTaskRoute, C.KeyTaskRouteLegacy));
+            if (taskRoute != C.LabelUnknown)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryRoutePart, taskRoute));
+            }
+
+            string taskSkill = HumanizeUnknown(ReadStr(payload, C.KeyTaskSkill));
+            if (taskSkill != C.LabelUnknown)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummarySkillPart, taskSkill));
+            }
+
+            int taskIdolId = ReadId(payload, C.KeyTaskGirlId);
+            if (taskIdolId >= C.MinId)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryIdolPart, ResolveIdolNameById(taskIdolId)));
+            }
+
+            string taskAgentName = NormalizeRawText(ReadStr(payload, C.KeyTaskAgentName));
+            if (taskAgentName != C.LabelUnknown)
+            {
+                summaryParts.Add(FormatLocalizedText(C.TextTaskSummaryAgentPart, taskAgentName));
+            }
+
+            return summaryParts.Count > C.ZeroIndex
+                ? string.Join(C.ListJoinSeparator, summaryParts.ToArray())
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Builds readable rival-trend text for one rising/falling direction.
+        /// </summary>
+        private static string BuildTrendSummaryByDirection(string rawSummary, string directionCode)
+        {
+            string normalizedSummary = NormalizeRawText(rawSummary);
+            if (normalizedSummary == C.LabelUnknown)
+            {
+                return string.Empty;
+            }
+
+            string normalizedDirection = NormalizeCodeToken(directionCode);
+            string[] entries = normalizedSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            List<string> displayEntries = new List<string>();
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.TrendSummaryMinimumFieldCount)
+                {
+                    continue;
+                }
+
+                string entryDirection = NormalizeCodeToken(fields[C.TrendSummaryDirectionField]);
+                if (!string.Equals(entryDirection, normalizedDirection, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string title = NormalizeRawText(fields[C.TrendSummaryTitleField]);
+                if (title == C.LabelUnknown)
+                {
+                    continue;
+                }
+
+                int points;
+                if (fields.Length > C.TrendSummaryPointsField && TryParseInt(fields[C.TrendSummaryPointsField], out points))
+                {
+                    displayEntries.Add(FormatLocalizedText(C.TextTrendEntryWithPoints, title, points.ToString(CultureInfo.InvariantCulture)));
+                    continue;
+                }
+
+                displayEntries.Add(title);
+            }
+
+            return displayEntries.Count > C.ZeroIndex
+                ? string.Join(C.ListJoinSeparator, displayEntries.ToArray())
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Resolves normalized player-date outcome code from new or legacy payload fields.
+        /// </summary>
+        private static string ResolveDateOutcomeCode(JSONNode payload)
+        {
+            string summaryCode = NormalizeCodeToken(ReadStr(payload, C.KeyDateResultSummaryCode));
+            if (!string.IsNullOrEmpty(summaryCode))
+            {
+                return summaryCode;
+            }
+
+            string legacyToken = ReadStr(payload, C.KeyDateResultToken);
+            string normalizedToken = NormalizeCodeToken(legacyToken);
+            if (string.IsNullOrEmpty(normalizedToken))
+            {
+                return string.Empty;
+            }
+
+            if (normalizedToken.IndexOf(C.SeparatorPipe, StringComparison.Ordinal) >= C.ZeroIndex)
+            {
+                return C.CodeDateResultMultiResult;
+            }
+
+            switch (normalizedToken)
+            {
+                case C.CodeDateResultTokenPublic:
+                    return C.CodeDateResultPublicDate;
+                case C.CodeDateResultTokenGeneric:
+                    return C.CodeDateResultRoutineDate;
+                case C.CodeDateResultTokenDeferred:
+                    return C.CodeDateResultDialogueFollowup;
+                case C.CodeDateResultTokenNone:
+                    return C.CodeDateResultNoSpecialResult;
+                default:
+                    return normalizedToken;
+            }
+        }
+
+        /// <summary>
+        /// Returns first token from one space-delimited payload string.
+        /// </summary>
+        private static string GetFirstToken(string rawValue)
+        {
+            string normalized = NormalizeRawText(rawValue);
+            if (normalized == C.LabelUnknown)
+            {
+                return string.Empty;
+            }
+
+            int separatorIndex = normalized.IndexOf(C.SeparatorSpace, StringComparison.Ordinal);
+            return separatorIndex > C.ZeroIndex
+                ? normalized.Substring(C.ZeroIndex, separatorIndex)
+                : normalized;
+        }
+
+        /// <summary>
+        /// Builds actor-token lookup for random-event effect rendering.
+        /// </summary>
+        private static Dictionary<string, string> BuildRandomEventActorLookup(string actorsSummary)
+        {
+            Dictionary<string, string> actorLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string normalizedSummary = NormalizeRawText(actorsSummary);
+            if (normalizedSummary == C.LabelUnknown)
+            {
+                return actorLookup;
+            }
+
+            string[] entries = normalizedSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.ActorSummaryFieldCount)
+                {
+                    continue;
+                }
+
+                string actorToken = NormalizeCodeToken(fields[C.ActorSummaryTokenField]);
+                string actorDisplayName = NormalizeRawText(fields[C.ActorSummaryDisplayNameField]);
+                if (string.IsNullOrEmpty(actorToken) || actorDisplayName == C.LabelUnknown)
+                {
+                    continue;
+                }
+
+                actorLookup[actorToken] = actorDisplayName;
+            }
+
+            return actorLookup;
+        }
+
+        /// <summary>
+        /// Returns true when one resource effect already has a better dedicated delta row.
+        /// </summary>
+        private static bool ShouldSkipAggregateRandomResourceCode(string resourceCode)
+        {
+            string normalizedCode = NormalizeCodeToken(resourceCode);
+            return normalizedCode == "money"
+                || normalizedCode == "fans"
+                || normalizedCode == "fame"
+                || normalizedCode == "buzz";
+        }
+
+        /// <summary>
+        /// Adds one humanized random-event effect line when supported by current parser rules.
+        /// </summary>
+        private static bool TryBuildRandomEffectLine(
+            Dictionary<string, string> actorLookup,
+            string target,
+            string parameter,
+            string formula,
+            out string line)
+        {
+            line = string.Empty;
+            string normalizedTarget = NormalizeCodeToken(target);
+            string normalizedParameter = NormalizeCodeToken(parameter);
+            long parsedAmount;
+
+            if (normalizedTarget == C.CodeRandomEffectTargetResource)
+            {
+                if (ShouldSkipAggregateRandomResourceCode(normalizedParameter) || !long.TryParse(formula ?? string.Empty, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedAmount))
+                {
+                    return false;
+                }
+
+                string resourceName = HumanizeUnknown(parameter);
+                if (resourceName == C.LabelUnknown)
+                {
+                    return false;
+                }
+
+                line = FormatLocalizedText(C.TextRandomEffectResourceChange, resourceName, FormatSignedNumber(parsedAmount));
+                return true;
+            }
+
+            if (normalizedTarget == C.CodeRandomEffectTargetFans)
+            {
+                if (!long.TryParse(formula ?? string.Empty, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedAmount))
+                {
+                    return false;
+                }
+
+                string fanSegment = HumanizeUnknown(parameter);
+                if (fanSegment == C.LabelUnknown)
+                {
+                    return false;
+                }
+
+                line = FormatLocalizedText(C.TextRandomEffectFanOpinionChange, fanSegment, FormatSignedNumber(parsedAmount));
+                return true;
+            }
+
+            if (normalizedTarget == C.CodeRandomEffectTargetMeta)
+            {
+                string firstToken = GetFirstToken(formula);
+                if (normalizedParameter == C.CodeRandomEffectParameterStartDialogue || normalizedParameter == C.CodeRandomEffectParameterStartDialogueSameActor)
+                {
+                    string storyName = ResolveSubstoryDisplayNameFromId(firstToken);
+                    if (storyName == C.LabelUnknown)
+                    {
+                        return false;
+                    }
+
+                    line = FormatLocalizedText(C.TextRandomEffectTriggeredStoryEvent, storyName);
+                    return true;
+                }
+
+                if (normalizedParameter == C.CodeRandomEffectParameterAddTask || normalizedParameter == C.CodeRandomEffectParameterAddTaskSub)
+                {
+                    string taskName = HumanizeUnknown(firstToken);
+                    if (taskName == C.LabelUnknown)
+                    {
+                        return false;
+                    }
+
+                    line = FormatLocalizedText(C.TextRandomEffectAddedTask, taskName);
+                    return true;
+                }
+
+                if (normalizedParameter == C.CodeRandomEffectParameterAddTaskContinue || normalizedParameter == C.CodeRandomEffectParameterAddTaskContinueSub)
+                {
+                    string taskName = HumanizeUnknown(firstToken);
+                    if (taskName == C.LabelUnknown)
+                    {
+                        return false;
+                    }
+
+                    line = FormatLocalizedText(C.TextRandomEffectAddedFollowUpTask, taskName);
+                    return true;
+                }
+
+                if (normalizedParameter == C.CodeRandomEffectParameterSetPolicy)
+                {
+                    string policyValue = HumanizeUnknown(formula);
+                    if (policyValue == C.LabelUnknown)
+                    {
+                        return false;
+                    }
+
+                    line = FormatLocalizedText(C.TextRandomEffectSetPolicy, policyValue);
+                    return true;
+                }
+
+                return false;
+            }
+
+            if ((parameter ?? string.Empty).StartsWith(C.CodeRandomEffectActorParameterPrefix, StringComparison.OrdinalIgnoreCase)
+                && long.TryParse(formula ?? string.Empty, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedAmount))
+            {
+                string actorName;
+                string normalizedActorTarget = NormalizeCodeToken(target);
+                if (string.IsNullOrEmpty(normalizedActorTarget) || !actorLookup.TryGetValue(normalizedActorTarget, out actorName))
+                {
+                    actorName = HumanizeUnknown(target);
+                }
+
+                string parameterCode = parameter.Substring(C.CodeRandomEffectActorParameterPrefix.Length);
+                string parameterName = HumanizeUnknown(parameterCode);
+                if (actorName == C.LabelUnknown || parameterName == C.LabelUnknown)
+                {
+                    return false;
+                }
+
+                line = FormatLocalizedText(C.TextRandomEffectActorParameterChange, actorName, parameterName, FormatSignedNumber(parsedAmount));
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Builds player-facing random-event effect lines from structured or legacy payload fields.
+        /// </summary>
+        private static List<string> BuildRandomEventEffectLines(JSONNode payload)
+        {
+            List<string> effectLines = new List<string>();
+            if (payload == null)
+            {
+                return effectLines;
+            }
+
+            Dictionary<string, string> actorLookup = BuildRandomEventActorLookup(ReadStr(payload, C.KeyActorsSummary));
+            JSONNode structuredEntries = payload[C.KeyReplyEffectEntries];
+            if (!IsMissingNode(structuredEntries) && structuredEntries.Count > C.ZeroIndex)
+            {
+                for (int entryIndex = C.ZeroIndex; entryIndex < structuredEntries.Count; entryIndex++)
+                {
+                    JSONNode entry = structuredEntries[entryIndex];
+                    string line;
+                    if (!TryBuildRandomEffectLine(
+                        actorLookup,
+                        ReadStr(entry, C.KeyReplyEffectTarget),
+                        ReadStr(entry, C.KeyReplyEffectParameter),
+                        ReadStr(entry, C.KeyReplyEffectFormula),
+                        out line))
+                    {
+                        continue;
+                    }
+
+                    if (!effectLines.Contains(line))
+                    {
+                        effectLines.Add(line);
+                    }
+                }
+
+                return effectLines;
+            }
+
+            string legacySummary = NormalizeRawText(ReadStr(payload, C.KeyReplyEffectSummary));
+            if (legacySummary == C.LabelUnknown)
+            {
+                return effectLines;
+            }
+
+            string[] entries = legacySummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.ReplyEffectEntryMinimumFieldCount)
+                {
+                    continue;
+                }
+
+                string line;
+                if (!TryBuildRandomEffectLine(
+                    actorLookup,
+                    fields[C.ReplyEffectTargetField],
+                    fields[C.ReplyEffectParameterField],
+                    fields[C.ReplyEffectFormulaField],
+                    out line))
+                {
+                    continue;
+                }
+
+                if (!effectLines.Contains(line))
+                {
+                    effectLines.Add(line);
+                }
+            }
+
+            return effectLines;
+        }
+
+        /// <summary>
         /// Returns selected event from cache.
         /// </summary>
         private IMDataCoreEvent FindSelectedEvent()
@@ -13978,6 +14848,609 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Resolves one code-like token through base-game localized labels when the game already exposes that wording.
+        /// </summary>
+        private static bool TryResolveGameCodeLabel(string rawCode, out string label)
+        {
+            string normalized = NormalizeCodeToken(rawCode);
+            if (normalized.Length == C.ZeroIndex)
+            {
+                label = string.Empty;
+                return false;
+            }
+
+            if (TryResolveGameFanCodeLabel(normalized, out label) ||
+                TryResolveGameParameterCodeLabel(normalized, out label) ||
+                TryResolveGameActivityCodeLabel(normalized, out label) ||
+                TryResolveGameShowCodeLabel(normalized, out label) ||
+                TryResolveGameLoanCodeLabel(normalized, out label) ||
+                TryResolveGameBroadcastCodeLabel(normalized, out label) ||
+                TryResolveGameCountryCodeLabel(normalized, out label) ||
+                TryResolveGameRelationshipCodeLabel(normalized, out label) ||
+                TryResolveGamePriorityCodeLabel(normalized, out label) ||
+                TryResolveGameBusinessCodeLabel(normalized, out label))
+            {
+                return !string.IsNullOrEmpty(label);
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized fan segment labels.
+        /// </summary>
+        private static bool TryResolveGameFanCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.male)))
+            {
+                label = resources.GetFanTitle(resources.fanType.male);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.female)))
+            {
+                label = resources.GetFanTitle(resources.fanType.female);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.casual)))
+            {
+                label = resources.GetFanTitle(resources.fanType.casual);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.hardcore)))
+            {
+                label = resources.GetFanTitle(resources.fanType.hardcore);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.teen)))
+            {
+                label = resources.GetFanTitle(resources.fanType.teen);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.youngAdult)))
+            {
+                label = resources.GetFanTitle(resources.fanType.youngAdult);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(resources.fanType.adult)))
+            {
+                label = resources.GetFanTitle(resources.fanType.adult);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeEveryone)
+            {
+                label = GetGameLocalization(C.LanguageKeyTheaterEveryone);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized idol and single parameter labels.
+        /// </summary>
+        private static bool TryResolveGameParameterCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.cute)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.cute);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.cool)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.cool);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.sexy)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.sexy);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.pretty)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.pretty);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.dance)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.dance);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.vocal)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.vocal);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.funny)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.funny);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.smart)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.smart);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.physicalStamina)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.physicalStamina);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.mentalStamina)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.mentalStamina);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.famePoints)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.famePoints);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.teamChemistry)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.teamChemistry);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(data_girls._paramType.scandalPoints)))
+            {
+                label = data_girls.GetParamName(data_girls._paramType.scandalPoints);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.genre)))
+            {
+                label = GetGameLocalization(C.LanguageKeySingleGenre);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.lyrics)))
+            {
+                label = GetGameLocalization(C.LanguageKeySingleLyrics);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.choreography)))
+            {
+                label = GetGameLocalization(C.LanguageKeySingleChoreography);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.marketing)))
+            {
+                label = GetGameLocalization(C.LanguageKeySingleMarketing);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized activity and theater schedule labels.
+        /// </summary>
+        private static bool TryResolveGameActivityCodeLabel(string normalizedCode, out string label)
+        {
+            string performanceCode = NormalizeCodeToken(nameof(Activity._type.performance));
+            if (normalizedCode == performanceCode || normalizedCode == C.CodeActivityPrefix + performanceCode)
+            {
+                label = GetGameLocalization(C.LanguageKeyTheaterPerformance);
+                return true;
+            }
+
+            string promotionCode = NormalizeCodeToken(nameof(Activity._type.promotion));
+            if (normalizedCode == promotionCode || normalizedCode == C.CodeActivityPrefix + promotionCode)
+            {
+                label = GetGameLocalization(C.LanguageKeyActivityPromotion);
+                return true;
+            }
+
+            string spaTreatmentCode = NormalizeCodeToken(nameof(Activity._type.spa_treatment));
+            if (normalizedCode == spaTreatmentCode || normalizedCode == C.CodeActivityPrefix + spaTreatmentCode)
+            {
+                label = GetGameLocalization(C.LanguageKeyActivitySpaTreatment);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Theaters._theater._schedule._type.auto)))
+            {
+                label = GetGameLocalization(C.LanguageKeyCafeAuto);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Theaters._theater._schedule._type.manzai)))
+            {
+                label = GetGameLocalization(C.LanguageKeyTheaterManzai);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Theaters._theater._schedule._type.day_off)))
+            {
+                label = GetGameLocalization(C.LanguageKeyTheaterDayOff);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized show, cast, and medium labels.
+        /// </summary>
+        private static bool TryResolveGameShowCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == C.CodeEntireGroup)
+            {
+                label = GetGameLocalization(C.LanguageKeyShowEntireGroup);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeRotatingCast)
+            {
+                label = GetGameLocalization(C.LanguageKeyShowRotatingCast);
+                return true;
+            }
+
+            if (normalizedCode == C.CodePermanentCast)
+            {
+                label = GetGameLocalization(C.LanguageKeyShowPermanentCast);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Shows._param._media_type.radio)))
+            {
+                label = GetGameLocalization(C.LanguageKeyShowRadio);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Shows._param._media_type.internet)))
+            {
+                label = GetGameLocalization(C.LanguageKeyShowInternet);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Shows._param._media_type.tv)))
+            {
+                label = GetGameLocalization(C.LanguageKeyShowTv);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._goal.show)))
+            {
+                label = GetGameLocalization(C.LanguageKeyShow);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._goal.single)))
+            {
+                label = GetGameLocalization(C.LanguageKeySingle);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized loan labels.
+        /// </summary>
+        private static bool TryResolveGameLoanCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._type.fujimoto_loan)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoan);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._type.fujimoto)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanFujimoto);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._type.bank)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanBank);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._type.investor)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanInvestor);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._duration.one_month)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanOneMonth);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._duration.three_months)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanThreeMonths);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(loans._loan._duration.six_months)))
+            {
+                label = GetGameLocalization(C.LanguageKeyLoanSixMonths);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized election broadcast labels.
+        /// </summary>
+        private static bool TryResolveGameBroadcastCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_SSK._broadcast.liveBlog)))
+            {
+                label = SEvent_SSK.GetBroadcastTitle(SEvent_SSK._broadcast.liveBlog);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_SSK._broadcast.webStream)))
+            {
+                label = SEvent_SSK.GetBroadcastTitle(SEvent_SSK._broadcast.webStream);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_SSK._broadcast.localTV)))
+            {
+                label = SEvent_SSK.GetBroadcastTitle(SEvent_SSK._broadcast.localTV);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_SSK._broadcast.nationalTV)))
+            {
+                label = SEvent_SSK.GetBroadcastTitle(SEvent_SSK._broadcast.nationalTV);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized world-tour country labels.
+        /// </summary>
+        private static bool TryResolveGameCountryCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.russia)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.russia);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.china)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.china);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.southKorea)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.southKorea);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.india)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.india);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.thailand)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.thailand);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.philippines)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.philippines);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.indonesia)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.indonesia);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.australia)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.australia);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.southAfrica)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.southAfrica);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.canada)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.canada);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.US)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.US);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.brazil)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.brazil);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.argentina)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.argentina);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.UK)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.UK);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.france)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.france);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.germany)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.germany);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.italy)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.italy);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(SEvent_Tour._country.spain)))
+            {
+                label = SEvent_Tour.GetCountryTitle(SEvent_Tour._country.spain);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized producer-relationship labels.
+        /// </summary>
+        private static bool TryResolveGameRelationshipCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(Relationships_Player._type.Friendship)))
+            {
+                label = Relationships_Player.GetEventName(Relationships_Player._type.Friendship);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Relationships_Player._type.Influence)))
+            {
+                label = Relationships_Player.GetEventName(Relationships_Player._type.Influence);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(Relationships_Player._type.Romance)))
+            {
+                label = Relationships_Player.GetEventName(Relationships_Player._type.Romance);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized cafe priority labels.
+        /// </summary>
+        private static bool TryResolveGamePriorityCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == NormalizeCodeToken(nameof(agency._room._cafe_priority.popular)))
+            {
+                label = GetGameLocalization(C.LanguageKeyPopular);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(agency._room._cafe_priority.unpopular)))
+            {
+                label = GetGameLocalization(C.LanguageKeyUnpopular);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeStamina)
+            {
+                label = GetGameLocalization(C.LanguageKeyCafeHighestStamina);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeStats)
+            {
+                label = GetGameLocalization(C.LanguageKeyCafeBestStats);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// Resolves base-game localized business and producer labels.
+        /// </summary>
+        private static bool TryResolveGameBusinessCodeLabel(string normalizedCode, out string label)
+        {
+            if (normalizedCode == C.CodePlayer)
+            {
+                label = GetGameLocalization(C.LanguageKeyResearchProducer);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._goal.ad)))
+            {
+                label = GetGameLocalization(C.LanguageKeyBusinessAd);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._goal.variety)))
+            {
+                label = GetGameLocalization(C.LanguageKeyBusinessVariety);
+                return true;
+            }
+
+            if (normalizedCode == NormalizeCodeToken(nameof(tasks._task._goal.drama)))
+            {
+                label = GetGameLocalization(C.LanguageKeyBusinessTv);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeBusiness)
+            {
+                label = GetGameLocalization(C.LanguageKeyBusiness);
+                return true;
+            }
+
+            label = string.Empty;
+            return false;
+        }
+
+        /// <summary>
         /// Resolves optional localization override for one code-like token.
         /// </summary>
         private static string ResolveCodeLabel(string rawCode)
@@ -13985,6 +15458,12 @@ namespace IdolCareerDiary
             if (string.IsNullOrEmpty(rawCode))
             {
                 return string.Empty;
+            }
+
+            string gameLabel;
+            if (TryResolveGameCodeLabel(rawCode, out gameLabel))
+            {
+                return gameLabel;
             }
 
             string normalized = rawCode.Trim().ToLowerInvariant()
@@ -14327,27 +15806,46 @@ namespace IdolCareerDiary
         /// </summary>
         private static string FormatLocalizedText(string template, string value)
         {
+            return FormatLocalizedText(template, new[] { value });
+        }
+
+        /// <summary>
+        /// Formats one localized string with placeholder support and legacy concat fallback.
+        /// </summary>
+        private static string FormatLocalizedText(string template, params string[] values)
+        {
             string safeTemplate = template ?? string.Empty;
-            string safeValue = value ?? string.Empty;
+            string[] safeValues = values ?? new string[C.ZeroIndex];
             if (safeTemplate.Length == C.ZeroIndex)
             {
-                return safeValue;
+                return safeValues.Length > C.ZeroIndex
+                    ? string.Join(C.ListJoinSeparator, safeValues)
+                    : string.Empty;
             }
 
-            if (safeTemplate.IndexOf("{0", StringComparison.Ordinal) >= C.ZeroIndex)
+            try
             {
-                try
+                string formatted = string.Format(CultureInfo.InvariantCulture, safeTemplate, safeValues);
+                if (!string.Equals(formatted, safeTemplate, StringComparison.Ordinal))
                 {
-                    return string.Format(CultureInfo.InvariantCulture, safeTemplate, safeValue);
+                    return formatted;
                 }
-                catch
-                {
-                }
+            }
+            catch
+            {
+            }
+
+            string joinedValues = safeValues.Length > C.ZeroIndex
+                ? string.Join(C.ListJoinSeparator, safeValues)
+                : string.Empty;
+            if (joinedValues.Length == C.ZeroIndex)
+            {
+                return safeTemplate;
             }
 
             return safeTemplate.EndsWith(C.SeparatorSpace, StringComparison.Ordinal)
-                ? safeTemplate + safeValue
-                : safeTemplate + C.SeparatorSpace + safeValue;
+                ? safeTemplate + joinedValues
+                : safeTemplate + C.SeparatorSpace + joinedValues;
         }
 
         /// <summary>
