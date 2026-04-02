@@ -86,7 +86,7 @@ namespace IdolCareerDiary
         internal static readonly string TitleSingleSenbatsu = ModLocalization.Get("c.TitleSingleSenbatsu", "Senbatsu");
         internal static readonly string TitleSingleSenbatsuStats = ModLocalization.Get("c.TitleSingleSenbatsuStats", "Senbatsu Stats");
         internal static readonly string LabelBackToTimeline = ModLocalization.Get("c.LabelBackToTimeline", "Back to Timeline");
-        internal static readonly string LabelOpenSource = ModLocalization.Get("c.LabelOpenSource", "Open Source Entity");
+        internal static readonly string LabelOpenSource = ModLocalization.Get("c.LabelOpenSource", "Open Related Record");
         internal static readonly string LabelOpenSingleFormation = ModLocalization.Get("c.LabelOpenSingleFormation", "Open Formation Viewer");
         internal static readonly string LabelOpenSingleChart = ModLocalization.Get("c.LabelOpenSingleChart", "Open Sales Chart");
         internal static readonly string LabelRefresh = ModLocalization.Get("c.LabelRefresh", "Refresh Timeline");
@@ -117,7 +117,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelAverageBuzzPrefix = ModLocalization.Get("c.LabelAverageBuzzPrefix", "Average buzz: ");
         internal static readonly string LabelDatePrefix = ModLocalization.Get("c.LabelDatePrefix", "Date: ");
         internal static readonly string LabelUnknown = ModLocalization.Get("c.LabelUnknown", "Unknown");
-        internal static readonly string LabelNoSource = ModLocalization.Get("c.LabelNoSource", "No direct source popup is available for this event type.");
+        internal static readonly string LabelNoSource = ModLocalization.Get("c.LabelNoSource", "No related popup is available for this event.");
         internal static readonly string LabelMainSystemsUnavailable = ModLocalization.Get("c.LabelMainSystemsUnavailable", "Main systems unavailable.");
         internal static readonly string OutcomeLinePrefix = ModLocalization.Get("c.OutcomeLinePrefix", " - ");
         internal static readonly string ListJoinSeparator = ModLocalization.Get("c.ListJoinSeparator", ", ");
@@ -160,7 +160,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelSingleCohortHardcoreFansPrefix = ModLocalization.Get("c.LabelSingleCohortHardcoreFansPrefix", "Cohort hardcore fans: ");
         internal static readonly string LabelSingleCohortCasualFansPrefix = ModLocalization.Get("c.LabelSingleCohortCasualFansPrefix", "Cohort casual fans: ");
         internal static readonly string LabelSingleCohortOtherFansPrefix = ModLocalization.Get("c.LabelSingleCohortOtherFansPrefix", "Cohort other fans: ");
-        internal static readonly string LabelSingleNewFansDeltaPrefix = ModLocalization.Get("c.LabelSingleNewFansDeltaPrefix", "Release/cohort delta: ");
+        internal static readonly string LabelSingleNewFansDeltaPrefix = ModLocalization.Get("c.LabelSingleNewFansDeltaPrefix", "Release/cohort difference: ");
         internal static readonly string LabelSingleCohortBreakdownUnavailable = ModLocalization.Get("c.LabelSingleCohortBreakdownUnavailable", "Cohort breakdown unavailable in this event payload.");
         internal static readonly string TextSingleCohortEstimatedFromFanAppeal = ModLocalization.Get("c.TextSingleCohortEstimatedFromFanAppeal", "Cohort split estimated from fan-appeal weights because detailed segment data was empty.");
         internal static readonly string TextReleaseDataTag = ModLocalization.Get("c.TextReleaseDataTag", " (release data)");
@@ -198,10 +198,10 @@ namespace IdolCareerDiary
         internal static readonly string LabelWithWhomPrefix = ModLocalization.Get("c.LabelWithWhomPrefix", "With whom: ");
         internal static readonly string LabelShow = ModLocalization.Get("c.LabelShow", "Show");
         internal static readonly string LabelOutcomePrefix = ModLocalization.Get("c.LabelOutcomePrefix", "Outcome change: ");
-        internal static readonly string LabelSourcePrefix = ModLocalization.Get("c.LabelSourcePrefix", "Source entity: ");
-        internal static readonly string LabelNamespacePrefix = ModLocalization.Get("c.LabelNamespacePrefix", "Namespace: ");
-        internal static readonly string LabelPatchPrefix = ModLocalization.Get("c.LabelPatchPrefix", "Source patch: ");
-        internal static readonly string LabelPayloadPrefix = ModLocalization.Get("c.LabelPayloadPrefix", "Payload: ");
+        internal static readonly string LabelSourcePrefix = ModLocalization.Get("c.LabelSourcePrefix", "Related record: ");
+        internal static readonly string LabelNamespacePrefix = ModLocalization.Get("c.LabelNamespacePrefix", "Event Namespace: ");
+        internal static readonly string LabelPatchPrefix = ModLocalization.Get("c.LabelPatchPrefix", "Capture Hook: ");
+        internal static readonly string LabelPayloadPrefix = ModLocalization.Get("c.LabelPayloadPrefix", "Raw Event Data: ");
         internal static readonly bool ShowTechnicalEventMetadata = false;
 
         internal static readonly string OpenIdolPrefix = ModLocalization.Get("c.OpenIdolPrefix", "Open ");
@@ -834,7 +834,7 @@ namespace IdolCareerDiary
         internal const string KeyElectionPlaceAfter = "election_place_after";
         internal static readonly string LabelVotes = ModLocalization.Get("c.LabelVotes", "Votes");
         internal static readonly string TextFamePoints = ModLocalization.Get("c.TextFamePoints", "Fame Points");
-        internal static readonly string TextResultCount = ModLocalization.Get("c.TextResultCount", "Result Count");
+        internal static readonly string TextResultCount = ModLocalization.Get("c.TextResultCount", "Ranked Idols");
         internal static readonly string TextConcertCreated = ModLocalization.Get("c.TextConcertCreated", "Concert Created");
         internal static readonly string TextConcertStarted = ModLocalization.Get("c.TextConcertStarted", "Concert Started");
         internal static readonly string TextConcertFinished = ModLocalization.Get("c.TextConcertFinished", "Concert Finished");
@@ -896,10 +896,10 @@ namespace IdolCareerDiary
         internal const string KeyChoiceType = "choice_type";
         internal static readonly string LabelResult = ModLocalization.Get("c.LabelResult", "Result");
         internal const string KeyResultType = "result_type";
-        internal static readonly string TextHypeDelta = ModLocalization.Get("c.TextHypeDelta", "Hype Delta");
+        internal static readonly string TextHypeDelta = ModLocalization.Get("c.TextHypeDelta", "Hype Change");
         internal const string KeyHypeDeltaApplied = "hype_delta_applied";
         internal const string KeyResultHypeDelta = "result_hype_delta";
-        internal static readonly string TextExpectedHypeDelta = ModLocalization.Get("c.TextExpectedHypeDelta", "Expected Hype Delta");
+        internal static readonly string TextExpectedHypeDelta = ModLocalization.Get("c.TextExpectedHypeDelta", "Expected Hype Change");
         internal const string KeyExpectedHypeDelta = "expected_hype_delta";
         internal static readonly string TextSuccessChance = ModLocalization.Get("c.TextSuccessChance", "Success Chance");
         internal const string KeyAccidentSuccessChance = "accident_success_chance";
@@ -907,7 +907,7 @@ namespace IdolCareerDiary
         internal const string KeyActualRevenue = "actual_revenue";
         internal static readonly string TextFinalProfit = ModLocalization.Get("c.TextFinalProfit", "Final Profit");
         internal const string KeyActualProfit = "actual_profit";
-        internal static readonly string TextIdolPayout = ModLocalization.Get("c.TextIdolPayout", "Idol Payout");
+        internal static readonly string TextIdolPayout = ModLocalization.Get("c.TextIdolPayout", "Total Idol Concert Earnings");
         internal const string KeyIdolPayoutTotal = "idol_payout_total";
         internal static readonly string LabelAccidents = ModLocalization.Get("c.LabelAccidents", "Accidents");
         internal const string KeyUsedAccidentTitles = "used_accident_titles";
@@ -1136,7 +1136,7 @@ namespace IdolCareerDiary
         internal static readonly string TextRandomEventConcluded = ModLocalization.Get("c.TextRandomEventConcluded", "Random Event Concluded");
         internal const string KeyRandomEventTitle = "random_event_title";
         internal const string KeyRandomEventId = "random_event_id";
-        internal static readonly string TextEventState = ModLocalization.Get("c.TextEventState", "Event State");
+        internal static readonly string TextEventState = ModLocalization.Get("c.TextEventState", "Event Progress");
         internal const string KeyRandomEventStateBefore = "random_event_state_before";
         internal const string KeyRandomEventStateAfter = "random_event_state_after";
         internal const string KeyRandomEventState = "random_event_state";
@@ -1161,10 +1161,10 @@ namespace IdolCareerDiary
         internal const string KeySubstoryLifecycleAction = "substory_lifecycle_action";
         internal static readonly string TextScheduledTime = ModLocalization.Get("c.TextScheduledTime", "Scheduled Time");
         internal const string KeyScheduledLaunchTime = "scheduled_launch_time";
-        internal static readonly string TextQueueCount = ModLocalization.Get("c.TextQueueCount", "Queue Count");
+        internal static readonly string TextQueueCount = ModLocalization.Get("c.TextQueueCount", "Ready Substories");
         internal const string KeyQueueCountBefore = "queue_count_before";
         internal const string KeyQueueCountAfter = "queue_count_after";
-        internal static readonly string TextDelayedQueue = ModLocalization.Get("c.TextDelayedQueue", "Delayed Queue");
+        internal static readonly string TextDelayedQueue = ModLocalization.Get("c.TextDelayedQueue", "Delayed Substories");
         internal const string KeyDelayedQueueCountBefore = "delayed_queue_count_before";
         internal const string KeyDelayedQueueCountAfter = "delayed_queue_count_after";
         internal static readonly string TextTaskCompleted = ModLocalization.Get("c.TextTaskCompleted", "Task Completed");
@@ -1208,12 +1208,12 @@ namespace IdolCareerDiary
         internal static readonly string LabelPoints = ModLocalization.Get("c.LabelPoints", "Points");
         internal const string KeyPointsBefore = "points_before";
         internal const string KeyPointsAfter = "points_after";
-        internal static readonly string TextPointsDelta = ModLocalization.Get("c.TextPointsDelta", "Points Delta");
+        internal static readonly string TextPointsDelta = ModLocalization.Get("c.TextPointsDelta", "Point Change");
         internal const string KeyPointsDelta = "points_delta";
         internal static readonly string TextRivalTrendsUpdated = ModLocalization.Get("c.TextRivalTrendsUpdated", "Rival Trends Updated");
         internal static readonly string TextRivalMonthlyRecalculated = ModLocalization.Get("c.TextRivalMonthlyRecalculated", "Rival Monthly Recalculated");
         internal static readonly string TextRivalOffice = ModLocalization.Get("c.TextRivalOffice", "Rival Office");
-        internal static readonly string TextMonthIndex = ModLocalization.Get("c.TextMonthIndex", "Month Index");
+        internal static readonly string TextMonthIndex = ModLocalization.Get("c.TextMonthIndex", "Rival Market Month Number");
         internal const string KeyMonthIndexBefore = "month_index_before";
         internal const string KeyMonthIndexAfter = "month_index_after";
         internal static readonly string TextActiveGroups = ModLocalization.Get("c.TextActiveGroups", "Active Groups");
@@ -1238,10 +1238,10 @@ namespace IdolCareerDiary
         internal static readonly string TextPushSlotProgressed = ModLocalization.Get("c.TextPushSlotProgressed", "Push Slot Progressed");
         internal const string KeyPushCurrentIdolId = "push_current_idol_id";
         internal const string KeyPushPreviousIdolId = "push_previous_idol_id";
-        internal static readonly string TextSlotIndex = ModLocalization.Get("c.TextSlotIndex", "Slot Index");
+        internal static readonly string TextSlotIndex = ModLocalization.Get("c.TextSlotIndex", "Push Slot Number");
         internal const string KeyPushSlotIndex = "push_slot_index";
         internal const string SeparatorArrow = " -> ";
-        internal static readonly string TextDaysInSlot = ModLocalization.Get("c.TextDaysInSlot", "Days In Slot");
+        internal static readonly string TextDaysInSlot = ModLocalization.Get("c.TextDaysInSlot", "Days in Push Slot");
         internal const string KeyPushDaysInSlot = "push_days_in_slot";
         internal const string KeyPushLifecycleAction = "push_lifecycle_action";
         internal static readonly string TextWishGenerated = ModLocalization.Get("c.TextWishGenerated", "Wish Generated");
@@ -1250,25 +1250,25 @@ namespace IdolCareerDiary
         internal static readonly string TextWishType = ModLocalization.Get("c.TextWishType", "Wish Type");
         internal const string KeyWishTypeBefore = "wish_type_before";
         internal const string KeyWishTypeAfter = "wish_type_after";
-        internal static readonly string TextWishFormula = ModLocalization.Get("c.TextWishFormula", "Wish Formula");
+        internal static readonly string TextWishFormula = ModLocalization.Get("c.TextWishFormula", "Wish Goal");
         internal const string KeyWishFormulaBefore = "wish_formula_before";
         internal const string KeyWishFormulaAfter = "wish_formula_after";
         internal const string KeyWishFulfilledBefore = "wish_fulfilled_before";
         internal const string KeyWishFulfilledAfter = "wish_fulfilled_after";
-        internal static readonly string TextInfluenceDelta = ModLocalization.Get("c.TextInfluenceDelta", "Influence Delta");
+        internal static readonly string TextInfluenceDelta = ModLocalization.Get("c.TextInfluenceDelta", "Influence Change");
         internal const string KeyInfluencePointsDelta = "influence_points_delta";
-        internal static readonly string TextMentalStaminaDelta = ModLocalization.Get("c.TextMentalStaminaDelta", "Mental Stamina Delta");
+        internal static readonly string TextMentalStaminaDelta = ModLocalization.Get("c.TextMentalStaminaDelta", "Mental Stamina Change");
         internal const string KeyMentalStaminaDelta = "mental_stamina_delta";
         internal static readonly string TextBlackmailQueued = ModLocalization.Get("c.TextBlackmailQueued", "Blackmail Queued");
         internal static readonly string TextBlackmailTriggered = ModLocalization.Get("c.TextBlackmailTriggered", "Blackmail Triggered");
         internal const string KeyTargetId = "target_id";
         internal const string KeySpyId = "spy_id";
         internal static readonly string TextSpyIdol = ModLocalization.Get("c.TextSpyIdol", "Spy Idol: ");
-        internal static readonly string TextDaysUntilReport = ModLocalization.Get("c.TextDaysUntilReport", "Days Until Report");
+        internal static readonly string TextDaysUntilReport = ModLocalization.Get("c.TextDaysUntilReport", "Days Until Blackmail Report");
         internal const string KeyDaysUntilReport = "days_until_report";
         internal static readonly string TextQueueSize = ModLocalization.Get("c.TextQueueSize", "Queue Size");
         internal const string KeyQueueSizeAfter = "queue_size_after";
-        internal static readonly string TextSuccessTier = ModLocalization.Get("c.TextSuccessTier", "Success Tier");
+        internal static readonly string TextSuccessTier = ModLocalization.Get("c.TextSuccessTier", "Blackmail Result Tier");
         internal const string KeySuccessTier = "success_tier";
         internal static readonly string TextInfluenceAward = ModLocalization.Get("c.TextInfluenceAward", "Influence Award");
         internal const string KeyInfluenceAward = "influence_award";
@@ -1381,7 +1381,7 @@ namespace IdolCareerDiary
         internal static readonly string TextDecisionDate = ModLocalization.Get("c.TextDecisionDate", "Decision Date");
         internal const string KeyDecisionDate = "decision_date";
         internal static readonly string TextProducerRelationshipUpdated = ModLocalization.Get("c.TextProducerRelationshipUpdated", "Producer Relationship Updated");
-        internal static readonly string TextRelationshipType = ModLocalization.Get("c.TextRelationshipType", "Relationship Type");
+        internal static readonly string TextRelationshipType = ModLocalization.Get("c.TextRelationshipType", "Producer Relationship");
         internal const string KeyPlayerRelationshipType = "player_relationship_type";
         internal static readonly string TextRelationshipPoints = ModLocalization.Get("c.TextRelationshipPoints", "Relationship Points");
         internal const string KeyPlayerPointsBefore = "player_points_before";
@@ -1399,7 +1399,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelStage = ModLocalization.Get("c.LabelStage", "Stage");
         internal const string KeyDateStageBefore = "date_stage_before";
         internal const string KeyDateStageAfter = "date_stage_after";
-        internal static readonly string TextDateStatus = ModLocalization.Get("c.TextDateStatus", "Date Status");
+        internal static readonly string TextDateStatus = ModLocalization.Get("c.TextDateStatus", "Dating Status");
         internal const string KeyDateStatusBefore = "date_status_before";
         internal const string KeyDateStatusAfter = "date_status_after";
         internal const string KeyDateResultToken = "date_result_token";
@@ -1412,7 +1412,7 @@ namespace IdolCareerDiary
         internal static readonly string TextMarriageOutcome = ModLocalization.Get("c.TextMarriageOutcome", "Marriage Outcome");
         internal const string KeyMarriageRoute = "marriage_route";
         internal const string KeyMarriageStage = "marriage_stage";
-        internal static readonly string TextPartnerStatus = ModLocalization.Get("c.TextPartnerStatus", "Partner Status");
+        internal static readonly string TextPartnerStatus = ModLocalization.Get("c.TextPartnerStatus", "Marriage Status");
         internal const string KeyMarriagePartnerStatus = "marriage_partner_status";
         internal const string KeyMarriageGoodOutcome = "marriage_good_outcome";
         internal static readonly string TextGoodOutcome = ModLocalization.Get("c.TextGoodOutcome", "Good Outcome: ");
@@ -1438,7 +1438,7 @@ namespace IdolCareerDiary
         internal static readonly string TextCliqueMembers = ModLocalization.Get("c.TextCliqueMembers", "Clique Members");
         internal const string KeyCliqueMemberCount = "clique_member_count";
         internal const string KeyCliqueQuitWasViolent = "clique_quit_was_violent";
-        internal static readonly string TextViolentExit = ModLocalization.Get("c.TextViolentExit", "Violent Exit: ");
+        internal static readonly string TextViolentExit = ModLocalization.Get("c.TextViolentExit", "Kicked Out of Clique: ");
         internal static readonly string TextSingleCreated = ModLocalization.Get("c.TextSingleCreated", "Single Created");
         internal static readonly string TextSingleCancelled = ModLocalization.Get("c.TextSingleCancelled", "Single Cancelled");
         internal static readonly string TextSingleStatusUpdated = ModLocalization.Get("c.TextSingleStatusUpdated", "Single Status Updated");
@@ -1496,7 +1496,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelGenre = ModLocalization.Get("c.LabelGenre", "Genre");
         internal const string KeyShowGenreTitle = "show_genre_title";
         internal static readonly string LabelCast = ModLocalization.Get("c.LabelCast", "Cast");
-        internal static readonly string TextCastType = ModLocalization.Get("c.TextCastType", "Cast Type");
+        internal static readonly string TextCastType = ModLocalization.Get("c.TextCastType", "Casting Style");
         internal const string KeyShowCastTypeBefore = "show_cast_type_before";
         internal const string KeyShowCastTypeAfter = "show_cast_type_after";
         internal static readonly string TextShowTitle = ModLocalization.Get("c.TextShowTitle", "Show Title");
@@ -1519,7 +1519,7 @@ namespace IdolCareerDiary
         internal static readonly string TextAverageRevenue = ModLocalization.Get("c.TextAverageRevenue", "Average Revenue");
         internal static readonly string TextAverageNewFans = ModLocalization.Get("c.TextAverageNewFans", "Average New Fans");
         internal static readonly string TextAverageBuzz = ModLocalization.Get("c.TextAverageBuzz", "Average Buzz");
-        internal static readonly string TextRelaunchCount = ModLocalization.Get("c.TextRelaunchCount", "Relaunch Count");
+        internal static readonly string TextRelaunchCount = ModLocalization.Get("c.TextRelaunchCount", "Times Relaunched");
         internal const string KeyShowRelaunchCount = "show_relaunch_count";
         internal static readonly string TextLaunchDate = ModLocalization.Get("c.TextLaunchDate", "Launch Date");
         internal const string KeyShowLaunchDate = "show_launch_date";
@@ -1533,9 +1533,9 @@ namespace IdolCareerDiary
         internal static readonly string LabelProduct = ModLocalization.Get("c.LabelProduct", "Product");
         internal static readonly string TextContractType = ModLocalization.Get("c.TextContractType", "Contract Type");
         internal static readonly string TextContractFocus = ModLocalization.Get("c.TextContractFocus", "Contract Focus");
-        internal static readonly string TextScope = ModLocalization.Get("c.TextScope", "Scope: ");
-        internal static readonly string TextGroupContract = ModLocalization.Get("c.TextGroupContract", "Group Contract");
-        internal static readonly string TextIdolContract = ModLocalization.Get("c.TextIdolContract", "Idol Contract");
+        internal static readonly string TextScope = ModLocalization.Get("c.TextScope", "Contract Applies To: ");
+        internal static readonly string TextGroupContract = ModLocalization.Get("c.TextGroupContract", "Entire Group");
+        internal static readonly string TextIdolContract = ModLocalization.Get("c.TextIdolContract", "One Idol");
         internal static readonly string TextEndDate = ModLocalization.Get("c.TextEndDate", "End Date");
         internal static readonly string TextDurationMonths = ModLocalization.Get("c.TextDurationMonths", "Duration (Months)");
         internal static readonly string TextActivation = ModLocalization.Get("c.TextActivation", "Activation: ");
@@ -1566,14 +1566,14 @@ namespace IdolCareerDiary
         internal const string KeyGroupAppealHardcoreness = "group_appeal_hardcoreness";
         internal static readonly string TextTargetAge = ModLocalization.Get("c.TextTargetAge", "Target Age");
         internal const string KeyGroupAppealAge = "group_appeal_age";
-        internal static readonly string TextSourceParameter = ModLocalization.Get("c.TextSourceParameter", "Source Parameter");
+        internal static readonly string TextSourceParameter = ModLocalization.Get("c.TextSourceParameter", "Stat Used For This Change");
         internal const string KeyGroupSourceParamType = "group_source_param_type";
         internal static readonly string TextTargetFanSegment = ModLocalization.Get("c.TextTargetFanSegment", "Target Fan Segment");
         internal const string KeyGroupTargetFanType = "group_target_fan_type";
         internal static readonly string TextParameterPoints = ModLocalization.Get("c.TextParameterPoints", "Parameter Points");
         internal const string KeyGroupPointsBefore = "group_points_before";
         internal const string KeyGroupPointsAfter = "group_points_after";
-        internal static readonly string TextParameterDelta = ModLocalization.Get("c.TextParameterDelta", "Parameter Delta");
+        internal static readonly string TextParameterDelta = ModLocalization.Get("c.TextParameterDelta", "Parameter Point Change");
         internal const string KeyGroupPointsDelta = "group_points_delta";
         internal static readonly string TextAvailablePoints = ModLocalization.Get("c.TextAvailablePoints", "Available Points");
         internal const string KeyGroupAvailablePointsBefore = "group_available_points_before";
@@ -1633,8 +1633,8 @@ namespace IdolCareerDiary
         internal const string FormatGuidCompact = "N";
         internal const string SeparatorDash = "-";
         internal const string SeparatorSpace = " ";
-        internal static readonly string TextSourceEntityOpened = ModLocalization.Get("c.TextSourceEntityOpened", "Source entity opened.");
-        internal static readonly string TextUnableToOpenSourceEntity = ModLocalization.Get("c.TextUnableToOpenSourceEntity", "Unable to open source entity: ");
+        internal static readonly string TextSourceEntityOpened = ModLocalization.Get("c.TextSourceEntityOpened", "Related record opened.");
+        internal static readonly string TextUnableToOpenSourceEntity = ModLocalization.Get("c.TextUnableToOpenSourceEntity", "Unable to open related record: ");
         internal static readonly string TextEventIsNull = ModLocalization.Get("c.TextEventIsNull", "Event is null.");
         internal static readonly string TextInvalidSingleId = ModLocalization.Get("c.TextInvalidSingleId", "Invalid single id.");
         internal static readonly string TextSingleNotFound = ModLocalization.Get("c.TextSingleNotFound", "Single not found.");
@@ -1666,11 +1666,11 @@ namespace IdolCareerDiary
         internal static readonly string TextDatingPartnerStatusUpdated = ModLocalization.Get("c.TextDatingPartnerStatusUpdated", "Dating Partner Status Updated");
         internal static readonly string TextDatingHistoryHasDatedAnotherIdol = ModLocalization.Get("c.TextDatingHistoryHasDatedAnotherIdol", "Dating History: Has dated another idol");
         internal static readonly string TextScandalHistoryYes = ModLocalization.Get("c.TextScandalHistoryYes", "Scandal History: Yes");
-        internal static readonly string TextUsedGoodsStatusYes = ModLocalization.Get("c.TextUsedGoodsStatusYes", "Used Goods Status: Yes");
+        internal static readonly string TextUsedGoodsStatusYes = ModLocalization.Get("c.TextUsedGoodsStatusYes", "Known Dating History: Yes");
         internal static readonly string TextStartedDatingAnotherIdol = ModLocalization.Get("c.TextStartedDatingAnotherIdol", "Started Dating Another Idol");
         internal static readonly string TextDatingEnded = ModLocalization.Get("c.TextDatingEnded", "Dating Ended");
         internal static readonly string TextRelationshipStatusUpdated = ModLocalization.Get("c.TextRelationshipStatusUpdated", "Relationship Status Updated");
-        internal static readonly string TextDynamic = ModLocalization.Get("c.TextDynamic", "Dynamic: ");
+        internal static readonly string TextDynamic = ModLocalization.Get("c.TextDynamic", "Relationship Trend: ");
         internal static readonly string TextPairStateDating = ModLocalization.Get("c.TextPairStateDating", "Pair State: Dating");
         internal static readonly string TextRelationshipScore = ModLocalization.Get("c.TextRelationshipScore", "Relationship Score: ");
         internal const string FormatSingleMetricTwoDecimals = "0.##";
@@ -1687,7 +1687,7 @@ namespace IdolCareerDiary
         internal static readonly string TextAgency = ModLocalization.Get("c.TextAgency", "Agency: ");
         internal static readonly string TextContractTypePrefix = ModLocalization.Get("c.TextContractTypePrefix", "Contract Type: ");
         internal static readonly string TextContractFocusPrefix = ModLocalization.Get("c.TextContractFocusPrefix", "Contract Focus: ");
-        internal static readonly string TextScopeGroupContract = ModLocalization.Get("c.TextScopeGroupContract", "Scope: Group Contract");
+        internal static readonly string TextScopeGroupContract = ModLocalization.Get("c.TextScopeGroupContract", "Contract Applies To: Entire Group");
         internal static readonly string TextStartDatePrefix = ModLocalization.Get("c.TextStartDatePrefix", "Start Date: ");
         internal static readonly string TextEndDatePrefix = ModLocalization.Get("c.TextEndDatePrefix", "End Date: ");
         internal static readonly string TextDuration = ModLocalization.Get("c.TextDuration", "Duration: ");
@@ -1699,7 +1699,7 @@ namespace IdolCareerDiary
         internal static readonly string TextWeeklyFansPrefix = ModLocalization.Get("c.TextWeeklyFansPrefix", "Weekly Fans: ");
         internal static readonly string TextWeeklyStaminaPrefix = ModLocalization.Get("c.TextWeeklyStaminaPrefix", "Weekly Stamina: ");
         internal static readonly string TextDamagesPaid = ModLocalization.Get("c.TextDamagesPaid", "Damages Paid: ");
-        internal static readonly string TextBreakContext = ModLocalization.Get("c.TextBreakContext", "Break Context: ");
+        internal static readonly string TextBreakContext = ModLocalization.Get("c.TextBreakContext", "Contract Break Trigger: ");
         internal static readonly string TextDamagesAppliedYes = ModLocalization.Get("c.TextDamagesAppliedYes", "Damages Applied: Yes");
         internal static readonly string TextCompletionContractReachedItsEndDate = ModLocalization.Get("c.TextCompletionContractReachedItsEndDate", "Completion: Contract reached its end date.");
         internal static readonly string TextWeeklyContractBenefitsApplied = ModLocalization.Get("c.TextWeeklyContractBenefitsApplied", "Weekly Contract Benefits Applied");
@@ -1751,7 +1751,7 @@ namespace IdolCareerDiary
         internal static readonly string TextFinalPlace = ModLocalization.Get("c.TextFinalPlace", "Final Place: #");
         internal static readonly string TextScandalPointsUpdated = ModLocalization.Get("c.TextScandalPointsUpdated", "Scandal Points Updated");
         internal static readonly string TextScandalPointsPrefix = ModLocalization.Get("c.TextScandalPointsPrefix", "Scandal Points: ");
-        internal static readonly string TextDelta = ModLocalization.Get("c.TextDelta", "Delta: ");
+        internal static readonly string TextDelta = ModLocalization.Get("c.TextDelta", "Scandal Point Change: ");
         internal static readonly string TextMedicalInjury = ModLocalization.Get("c.TextMedicalInjury", "Medical Injury");
         internal static readonly string TextMedicalDepression = ModLocalization.Get("c.TextMedicalDepression", "Medical Depression");
         internal static readonly string TextMedicalHiatusStarted = ModLocalization.Get("c.TextMedicalHiatusStarted", "Medical Hiatus Started");
@@ -1775,7 +1775,7 @@ namespace IdolCareerDiary
         internal static readonly string TextTvShowTitlePrefix = ModLocalization.Get("c.TextTvShowTitlePrefix", "TV Show: ");
         internal static readonly string TextShowTitlePrefix = ModLocalization.Get("c.TextShowTitlePrefix", "Show: ");
         internal static readonly string TextSingleTitlePrefix = ModLocalization.Get("c.TextSingleTitlePrefix", "Single: ");
-        internal static readonly string TextRelationshipWith = ModLocalization.Get("c.TextRelationshipWith", "Relationship with ");
+        internal static readonly string TextRelationshipWith = ModLocalization.Get("c.TextRelationshipWith", "Relationship with {0}");
         internal static readonly string TextBullying = ModLocalization.Get("c.TextBullying", "Bullying: ");
         internal static readonly string TextRelationshipUnknownToProducer = ModLocalization.Get("c.TextRelationshipUnknownToProducer", "Relationship unknown to producer.");
         internal static readonly string TextBullyingParticipantsUnknownToProducer = ModLocalization.Get("c.TextBullyingParticipantsUnknownToProducer", "Bullying participants unknown to producer.");
@@ -4885,7 +4885,11 @@ namespace IdolCareerDiary
                 int idolId = ReadId(payload, C.JsonIdolId);
                 p.WithWhom = ResolveIdolNameById(idolId);
                 AddTransitionLine(lines, C.TextWishType, ReadStr(payload, C.KeyWishTypeBefore), ReadStr(payload, C.KeyWishTypeAfter));
-                AddTransitionLine(lines, C.TextWishFormula, ReadStr(payload, C.KeyWishFormulaBefore), ReadStr(payload, C.KeyWishFormulaAfter));
+                AddRawTransitionLine(
+                    lines,
+                    C.TextWishFormula,
+                    BuildWishGoalText(ReadStr(payload, C.KeyWishTypeBefore), ReadStr(payload, C.KeyWishFormulaBefore)),
+                    BuildWishGoalText(ReadStr(payload, C.KeyWishTypeAfter), ReadStr(payload, C.KeyWishFormulaAfter)));
                 AddBoolTransitionLine(lines, C.LabelFulfilled, payload, C.KeyWishFulfilledBefore, C.KeyWishFulfilledAfter);
                 AddSignedLineIfNonZero(lines, C.TextInfluenceDelta, ReadLong(payload, C.KeyInfluencePointsDelta));
                 AddSignedLineIfNonZero(lines, C.TextMentalStaminaDelta, ReadLong(payload, C.KeyMentalStaminaDelta));
@@ -5360,7 +5364,7 @@ namespace IdolCareerDiary
             AddCodeLineIfKnown(lines, C.TextContractFocus, ReadStr(payload, C.JsonContractSkill));
             if (HasPayloadValue(payload, C.JsonContractIsGroup))
             {
-                lines.Add(C.TextScope + (ReadBool(payload, C.JsonContractIsGroup) ? C.TextGroupContract : C.TextIdolContract));
+                lines.Add(BuildContractScopeText(ReadBool(payload, C.JsonContractIsGroup)));
             }
 
             AddDateLineIfKnown(lines, C.TextStartDate, ReadStr(payload, C.JsonContractStartDate));
@@ -10112,9 +10116,9 @@ namespace IdolCareerDiary
                     outcomeLines.Add(C.TextContractFocusPrefix + contractSkill);
                 }
 
-                if (ReadBool(payload, C.JsonContractIsGroup))
+                if (HasPayloadValue(payload, C.JsonContractIsGroup))
                 {
-                    outcomeLines.Add(C.TextScopeGroupContract);
+                    outcomeLines.Add(BuildContractScopeText(ReadBool(payload, C.JsonContractIsGroup)));
                 }
 
                 string startDate = FormatRoundTripDateForUi(ReadStr(payload, C.JsonContractStartDate));
@@ -10223,9 +10227,9 @@ namespace IdolCareerDiary
                     outcomeLines.Add(C.TextContractFocusPrefix + contractSkill);
                 }
 
-                if (ReadBool(payload, C.JsonContractIsGroup))
+                if (HasPayloadValue(payload, C.JsonContractIsGroup))
                 {
-                    outcomeLines.Add(C.TextScopeGroupContract);
+                    outcomeLines.Add(BuildContractScopeText(ReadBool(payload, C.JsonContractIsGroup)));
                 }
 
                 int weeklyPayment = ReadInt(payload, C.JsonContractWeeklyPayment);
@@ -11485,6 +11489,239 @@ namespace IdolCareerDiary
                 {
                     return value;
                 }
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Inserts values into one base-game localization string when the key exists.
+        /// </summary>
+        private static string InsertGameLocalization(string key, params string[] values)
+        {
+            if (string.IsNullOrEmpty(GetGameLocalization(key)))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return Language.Insert(key, values);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Builds one player-facing contract scope line.
+        /// </summary>
+        private static string BuildContractScopeText(bool isGroup)
+        {
+            return C.TextScope + (isGroup ? C.TextGroupContract : C.TextIdolContract);
+        }
+
+        /// <summary>
+        /// Converts one raw wish type/formula pair into player-facing text.
+        /// </summary>
+        private static string BuildWishGoalText(string wishTypeCode, string wishFormula)
+        {
+            string type = (wishTypeCode ?? string.Empty).Trim().ToLowerInvariant();
+            string formula = (wishFormula ?? string.Empty).Trim();
+            if (type.Length == C.ZeroIndex || type == C.LabelUnknown.ToLowerInvariant())
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                switch (type)
+                {
+                    case "hiatus":
+                        return GetGameLocalization("WISH__HIATUS");
+                    case "ssk_rank":
+                        if (formula.Length == C.ZeroIndex)
+                        {
+                            return string.Empty;
+                        }
+
+                        if (formula == "1")
+                        {
+                            return GetGameLocalization("WISH__SSK_1");
+                        }
+
+                        if (formula == "10")
+                        {
+                            return GetGameLocalization("WISH__SSK_ANY");
+                        }
+
+                        if (formula == "2")
+                        {
+                            return GetGameLocalization("WISH__SSK_2");
+                        }
+
+                        if (formula == "3")
+                        {
+                            return GetGameLocalization("WISH__SSK_3");
+                        }
+
+                        return InsertGameLocalization("WISH__SSK_OTHER", formula);
+                    case "concert":
+                        if (formula.Length == C.ZeroIndex)
+                        {
+                            return string.Empty;
+                        }
+
+                        if (formula == "1")
+                        {
+                            return GetGameLocalization("WISH__CONCERT");
+                        }
+
+                        return InsertGameLocalization("WISH__CONCERT_OTHER", formula);
+                    case "biz":
+                    {
+                        string[] tokens = formula.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (tokens.Length < 2)
+                        {
+                            return string.Empty;
+                        }
+
+                        int businessTypeId;
+                        int paramTypeId;
+                        if (!TryParseInt(tokens[0], out businessTypeId) || !TryParseInt(tokens[1], out paramTypeId))
+                        {
+                            return string.Empty;
+                        }
+
+                        string typeTitle = business.GetTypeTitle((business._type)businessTypeId);
+                        string paramTitle = data_girls.GetParamName((data_girls._paramType)paramTypeId);
+                        if (string.IsNullOrEmpty(typeTitle) || string.IsNullOrEmpty(paramTitle))
+                        {
+                            return string.Empty;
+                        }
+
+                        return InsertGameLocalization("WISH__JOB", paramTitle, typeTitle);
+                    }
+                    case "show":
+                    {
+                        if (formula == "-1 -1 -1")
+                        {
+                            return GetGameLocalization("WISH__SHOW");
+                        }
+
+                        string[] tokens = formula.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (tokens.Length < 3)
+                        {
+                            return string.Empty;
+                        }
+
+                        string genreTitle = string.Empty;
+                        string mediumTitle = string.Empty;
+                        string cohostText = string.Empty;
+                        int parsedId;
+                        if (tokens[1] != "-1" && TryParseInt(tokens[1], out parsedId))
+                        {
+                            Shows._param genre = Shows.GetParamByID(Shows.Genre, parsedId);
+                            if (genre != null)
+                            {
+                                genreTitle = (genre.GetTitle() ?? string.Empty).ToLowerInvariant();
+                            }
+                        }
+
+                        if (tokens[0] != "-1" && TryParseInt(tokens[0], out parsedId))
+                        {
+                            Shows._param medium = Shows.GetParamByID(Shows.Medium, parsedId);
+                            if (medium != null)
+                            {
+                                mediumTitle = (medium.GetTitle() ?? string.Empty).ToLowerInvariant();
+                            }
+                        }
+
+                        if (tokens[2] != "-1" && TryParseInt(tokens[2], out parsedId))
+                        {
+                            Shows._param mc = Shows.GetParamByID(Shows.MC, parsedId);
+                            if (mc != null)
+                            {
+                                string mcTitle = (mc.GetTitle() ?? string.Empty).ToLowerInvariant();
+                                cohostText = InsertGameLocalization("WISH__SHOW_DETAILS_COHOST", mcTitle);
+                            }
+                        }
+
+                        string wishText = InsertGameLocalization("WISH__SHOW_DETAILS", genreTitle, mediumTitle, cohostText);
+                        return string.IsNullOrEmpty(wishText) ? string.Empty : ExtensionMethods.RemoveDoubleSpaces(wishText).Trim();
+                    }
+                    case "single":
+                    {
+                        string[] tokens = formula.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (tokens.Length < 4)
+                        {
+                            return string.Empty;
+                        }
+
+                        if (tokens[0] == "-1" || tokens[0] == "4")
+                        {
+                            return GetGameLocalization("WISH__SINGLE_ANY");
+                        }
+
+                        if (tokens[0] == "3")
+                        {
+                            return GetGameLocalization("WISH__SINGLE_4");
+                        }
+
+                        if (tokens[0] == "2")
+                        {
+                            return GetGameLocalization("WISH__SINGLE_3");
+                        }
+
+                        if (tokens[0] == "1")
+                        {
+                            return GetGameLocalization("WISH__SINGLE_2");
+                        }
+
+                        if (tokens[0] == "0" && tokens[1] == "-1" && tokens[2] == "-1" && tokens[3] == "-1")
+                        {
+                            return GetGameLocalization("WISH__SINGLE_CENTER");
+                        }
+
+                        string genreTitle = string.Empty;
+                        string lyricsText = string.Empty;
+                        string choreographyText = string.Empty;
+                        int parsedId;
+                        if (tokens[1] != "-1" && TryParseInt(tokens[1], out parsedId))
+                        {
+                            singles._param genre = singles.GetParamByID(singles._param._type.genre, parsedId);
+                            if (genre != null)
+                            {
+                                genreTitle = (genre.GetTitle() ?? string.Empty).ToLowerInvariant();
+                            }
+                        }
+
+                        if (tokens[2] != "-1" && TryParseInt(tokens[2], out parsedId))
+                        {
+                            singles._param lyrics = singles.GetParamByID(singles._param._type.lyrics, parsedId);
+                            if (lyrics != null)
+                            {
+                                lyricsText = InsertGameLocalization("WISH__SINGLE_DETAILS_LYRICS", (lyrics.GetTitle() ?? string.Empty).ToLowerInvariant());
+                            }
+                        }
+
+                        if (tokens[3] != "-1" && TryParseInt(tokens[3], out parsedId))
+                        {
+                            singles._param choreography = singles.GetParamByID(singles._param._type.choreography, parsedId);
+                            if (choreography != null)
+                            {
+                                choreographyText = InsertGameLocalization("WISH__SINGLE_DETAILS_CHOREO", (choreography.GetTitle() ?? string.Empty).ToLowerInvariant());
+                            }
+                        }
+
+                        string wishText = InsertGameLocalization("WISH__SINGLE_DETAILS", genreTitle, lyricsText, choreographyText);
+                        return string.IsNullOrEmpty(wishText) ? string.Empty : ExtensionMethods.RemoveDoubleSpaces(wishText).Trim();
+                    }
+                }
+            }
+            catch
+            {
             }
 
             return string.Empty;
@@ -13416,7 +13653,7 @@ namespace IdolCareerDiary
                 int otherId = ResolveOtherRelationshipIdolId(ev, payload);
                 if (otherId >= C.MinId && ShouldRevealSocialParticipant(ev, payload, otherId))
                 {
-                    return C.TextRelationshipWith + ResolveIdolNameById(otherId);
+                    return FormatLocalizedText(C.TextRelationshipWith, ResolveIdolNameById(otherId));
                 }
 
                 return C.LabelNotKnownToProducer;
@@ -14083,6 +14320,34 @@ namespace IdolCareerDiary
         private static string FormatSignedNumber(long value)
         {
             return value.ToString(C.FormatZeroZeroZero, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Formats one localized label with a single value while tolerating legacy non-placeholder translations.
+        /// </summary>
+        private static string FormatLocalizedText(string template, string value)
+        {
+            string safeTemplate = template ?? string.Empty;
+            string safeValue = value ?? string.Empty;
+            if (safeTemplate.Length == C.ZeroIndex)
+            {
+                return safeValue;
+            }
+
+            if (safeTemplate.IndexOf("{0", StringComparison.Ordinal) >= C.ZeroIndex)
+            {
+                try
+                {
+                    return string.Format(CultureInfo.InvariantCulture, safeTemplate, safeValue);
+                }
+                catch
+                {
+                }
+            }
+
+            return safeTemplate.EndsWith(C.SeparatorSpace, StringComparison.Ordinal)
+                ? safeTemplate + safeValue
+                : safeTemplate + C.SeparatorSpace + safeValue;
         }
 
         /// <summary>

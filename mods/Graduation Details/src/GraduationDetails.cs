@@ -2281,6 +2281,40 @@ namespace GraduationDetails
             return string.Join("\n", lines.ToArray());
         }
 
+        private static string FormatLocalizedValue(string templateOrPrefix, string value)
+        {
+            string safeTemplate = templateOrPrefix ?? string.Empty;
+            string safeValue = value ?? string.Empty;
+            if (safeTemplate.Contains("{0}"))
+            {
+                try
+                {
+                    return string.Format(safeTemplate, safeValue);
+                }
+                catch
+                {
+                }
+            }
+            return safeTemplate + safeValue;
+        }
+
+        private static string FormatLocalizedCount(string templateOrPrefix, int count, string legacySuffix)
+        {
+            string safeTemplate = templateOrPrefix ?? string.Empty;
+            string countText = count.ToString();
+            if (safeTemplate.Contains("{0}"))
+            {
+                try
+                {
+                    return string.Format(safeTemplate, countText);
+                }
+                catch
+                {
+                }
+            }
+            return safeTemplate + countText + legacySuffix + ")";
+        }
+
         private static string BuildMarriageText(data_girls.girls girl)
         {
             MarriageRecord record = MarriageRecordStore.GetRecord(girl.id);
@@ -2291,7 +2325,9 @@ namespace GraduationDetails
                 {
                     name = Language.Data["NOTIF__IDOL_REL_YOU"];
                 }
-                return ModLocalization.Get("jobs.married_to_prefix", "Married to: ") + name;
+                return FormatLocalizedValue(
+                    ModLocalization.Get("jobs.married_to_prefix", "Married to {0}"),
+                    name);
             }
             return ModLocalization.Get("jobs.married_to_none", "Married to: No");
         }
@@ -2313,17 +2349,23 @@ namespace GraduationDetails
                 : ModLocalization.Get("jobs.custody_child_plural", " children");
             if (record.Custody == CustodyOwner.Player)
             {
-                return ModLocalization.Get("jobs.custody_player_prefix", "Custody: Player (") + custodyCount + suffix + ")";
+                return FormatLocalizedCount(
+                    ModLocalization.Get("jobs.custody_player_prefix", "Children Living With: Player ({0})"),
+                    custodyCount,
+                    suffix);
             }
             if (record.Custody == CustodyOwner.Idol)
             {
-                return ModLocalization.Get("jobs.custody_idol_prefix", "Custody: Idol (") + custodyCount + suffix + ")";
+                return FormatLocalizedCount(
+                    ModLocalization.Get("jobs.custody_idol_prefix", "Children Living With: Idol ({0})"),
+                    custodyCount,
+                    suffix);
             }
             if (record.Custody == CustodyOwner.None)
             {
-                return ModLocalization.Get("jobs.custody_none", "Custody: None");
+                return ModLocalization.Get("jobs.custody_none", "Children: None");
             }
-            return ModLocalization.Get("jobs.custody_unknown", "Custody: Unknown");
+            return ModLocalization.Get("jobs.custody_unknown", "Children Living With: Unknown");
         }
     }
 

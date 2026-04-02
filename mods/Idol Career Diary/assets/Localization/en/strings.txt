@@ -12,9 +12,20 @@
 # - ddd and dddd use the base game's weekday localization keys (SUNDAY through SATURDAY).
 # - The base game currently exposes only one localized label per weekday, so ddd and dddd render the same text.
 
+# Translator note guide:
+# - Every key below has a short note describing where the text appears or what it labels.
+# - Keys ending in Prefix appear before a dynamic value on the same line.
+# - Keys ending in Format contain placeholders such as {0}; keep those placeholders exactly and move them if your language needs different word order.
+# - If a value intentionally ends with a space, colon, #, or other punctuation, preserve that joining behavior unless your language needs a different pattern.
+# - Notes are written for localizers and describe player-facing context rather than code internals.
+
+# Translator note: Date format pattern used across the diary UI; keep the format tokens unless your language needs a different date order.
 c.DateFormatUi=ddd, dd MMM yyyy
+# Translator note: Comment line written into the mod configuration file header; keep the leading # because it is part of the config comment.
 c.ConfigCommentHeader=# IdolCareerDiary configuration
+# Translator note: Comment line for the config toggle that shows unknown social-event participants; keep the leading # because it is part of the config comment.
 c.ConfigCommentShowUnknownSocialParticipants=# Show social-event participants even when producer does not know them.
+# Translator note: Tab name for the mod's main Career Diary screen.
 c.DiaryTabLabel=Career Diary
 c.LabelAccidents=Accidents
 c.LabelAction=Action
@@ -35,7 +46,7 @@ c.LabelBroadcast=Broadcast
 c.LabelCast=Cast
 c.LabelCastThisEpisodePrefix=Cast this episode: 
 c.LabelCastTypePrefix=Cast: 
-c.LabelCaught=Caught
+c.LabelCaught=Idol and Producer were caught dating
 c.LabelChoice=Choice
 c.LabelClearFilters=Clear Filters
 c.LabelCloseFallback=Close
@@ -65,20 +76,20 @@ c.LabelMainSystemsUnavailable=Main systems unavailable.
 c.LabelMc=MC
 c.LabelMedium=Medium
 c.LabelMembers=Members
-c.LabelNamespacePrefix=Namespace: 
+c.LabelNamespacePrefix=Event Namespace: 
 c.LabelNo=No
 c.LabelNoEvents=No IM Data Core events recorded for this idol yet.
 c.LabelNoEventsAfterFilters=No timeline entries match current filter toggles.
-c.LabelNoSource=No direct source popup is available for this event type.
+c.LabelNoSource=No related popup is available for this event.
 c.LabelOpenProfile=Open Profile
 c.LabelOpenSingleChart=Open Sales Chart
 c.LabelOpenSingleFormation=Open Formation Viewer
-c.LabelOpenSource=Open Source Entity
+c.LabelOpenSource=Open Related Record
 c.LabelOutcomePrefix=Outcome change: 
 c.LabelParameter=Parameter
 c.LabelParticipants=Participants
-c.LabelPatchPrefix=Source patch: 
-c.LabelPayloadPrefix=Payload: 
+c.LabelPatchPrefix=Capture Hook: 
+c.LabelPayloadPrefix=Raw Event Data: 
 c.LabelPlace=Place
 c.LabelPoints=Points
 c.LabelPolicy=Policy
@@ -124,7 +135,7 @@ c.LabelSingleSenbatsuRowPrefix=Row
 c.LabelSingleTitlePrefix=Title: 
 c.LabelSkill=Skill
 c.LabelSongs=Songs
-c.LabelSourcePrefix=Source entity: 
+c.LabelSourcePrefix=Related Record: 
 c.LabelStaff=Staff
 c.LabelStage=Stage
 c.LabelStatus=Status
@@ -141,6 +152,7 @@ c.LabelWhenPrefix=When:
 c.LabelWithWhomPrefix=With whom: 
 c.LabelYear=Year
 c.LabelYes=Yes
+# Translator note: Separator used when the UI joins multiple items into one comma-separated list; keep surrounding spacing natural in your language.
 c.ListJoinSeparator=, 
 c.MessageCoreDependencyDetected=Detected required dependency: IMDataCore.
 c.MessageCoreDependencyMissingPrefix=Hard dependency missing: IMDataCore is required for IdolCareerDiary. Details: 
@@ -190,7 +202,7 @@ c.TextAwardNominated=Award Nominated
 c.TextAwardResult=Award Result
 c.TextBlackmailQueued=Blackmail Queued
 c.TextBlackmailTriggered=Blackmail Triggered
-c.TextBreakContext=Break Context: 
+c.TextBreakContext=Contract Break Trigger: 
 c.TextBroadcast=Broadcast: 
 c.TextBullying=Bullying: 
 c.TextBullyingEnded=Bullying Ended
@@ -210,11 +222,11 @@ c.TextCareerOutcomeOne=Career Outcome 1
 c.TextCareerOutcomeTwo=Career Outcome 2
 c.TextCastMembers=Cast Members
 c.TextCastSize=Cast Size
-c.TextCastType=Cast Type
+c.TextCastType=Casting Style
 c.TextCenter=Center: 
 c.TextChange=Change: 
 c.TextChartPosition=Chart Position: #
-c.TextChoreoTrends=Choreo Trends
+c.TextChoreoTrends=Choreography Trends
 c.TextCliqueLeader=Clique Leader: 
 c.TextCliqueMembers=Clique Members
 c.TextCompletionContractReachedItsEndDate=Completion: Contract reached its end date.
@@ -262,7 +274,7 @@ c.TextDurationUnitYearSingular=year
 c.TextDurationUnitYearPlural=years
 c.TextDamagesAppliedYes=Damages Applied: Yes
 c.TextDamagesPaid=Damages Paid: 
-c.TextDateStatus=Date Status
+c.TextDateStatus=Dating Status
 c.TextDatingAnotherIdol=Dating Another Idol
 c.TextDatingEnded=Dating Ended
 c.TextDatingHistoryHasDatedAnotherIdol=Dating History: Has dated another idol
@@ -271,15 +283,19 @@ c.TextDatingNonIdolGirlfriend=Dating Non-Idol (Girlfriend)
 c.TextDatingPartnerStatusUpdated=Dating Partner Status Updated
 c.TextDatingProducer=Dating Producer
 c.TextDatingStatusUpdated=Dating Status Updated
-c.TextDaysInSlot=Days In Slot
-c.TextDaysUntilReport=Days Until Report
+# Translator note: Used for push-slot events. This is the number of in-game days the idol has occupied that push slot.
+c.TextDaysInSlot=Days in Push Slot
+# Translator note: Used for blackmail events. This is the number of days remaining until the blackmail report or result triggers.
+c.TextDaysUntilReport=Days Until Blackmail Report
 c.TextDecisionDate=Decision Date
-c.TextDelayedQueue=Delayed Queue
-c.TextDelta=Delta: 
+c.TextDelayedQueue=Delayed Substories
+# Translator note: Used for scandal-point rows. Here "delta" means the signed change in scandal points, not a total value.
+c.TextDelta=Scandal Point Change: 
 c.TextDisbandedGroups=Disbanded Groups
 c.TextDuration=Duration: 
 c.TextDurationMonths=Duration (Months)
-c.TextDynamic=Dynamic: 
+# Translator note: Used for idol-idol relationships. This means the relationship's ongoing trend or drift over time, usually positive, neutral, or negative.
+c.TextDynamic=Relationship Trend: 
 c.TextElection=Election #
 c.TextElectionCancelled=Election Cancelled
 c.TextElectionComponentUnavailable=Election component unavailable.
@@ -294,15 +310,18 @@ c.TextElectionStarted=Election Started
 c.TextElectionStatusUpdated=Election Status Updated
 c.TextEndDate=End Date
 c.TextEndDatePrefix=End Date: 
+# Translator note: First fragment of the dependency guidance sentence that asks the player to ensure IM Data Core is installed and enabled; it joins with later fragments.
 c.TextEnsureModImDataCore= Ensure mod 'IMDataCore' (
+# Translator note: First fragment of the dependency guidance sentence that asks the player to ensure IM UI Framework is installed and enabled; it joins with later fragments.
 c.TextEnsureModImUiFramework= Ensure mod 'IMUIFramework' (
 c.TextEntireGroup=Entire Group
 c.TextEventIsNull=Event is null.
-c.TextEventState=Event State
+c.TextEventState=Event Progress
 c.TextExpectedDailyBuzz=Expected Daily Buzz
 c.TextExpectedDailyFame=Expected Daily Fame
 c.TextExpectedDailyProfit=Expected Daily Profit
-c.TextExpectedHypeDelta=Expected Hype Delta
+# Translator note: Signed expected change to the hype metric, not the final total hype value.
+c.TextExpectedHypeDelta=Expected Hype Change
 c.TextFame=Fame: 
 c.TextFameChange=Fame Change
 c.TextFameOfSenbatsu=Fame of Senbatsu: 
@@ -326,7 +345,7 @@ c.TextGraduationDate=Graduation Date
 c.TextGraduationDialogue=Graduation Dialogue: 
 c.TextGroup=Group #
 c.TextGroupAppealPointsSpent=Group Appeal Points Spent
-c.TextGroupContract=Group Contract
+c.TextGroupContract=Entire Group
 c.TextGroupCreated=Group Created
 c.TextGroupDisbanded=Group Disbanded
 c.TextGroupParameterPointsUpdated=Group Parameter Points Updated
@@ -336,13 +355,13 @@ c.TextGroupStatus=Group Status
 c.TextHiatusEnd=Hiatus End: 
 c.TextHidePrefix=Hide 
 c.TextHiringDate=Hiring Date
-c.TextHypeDelta=Hype Delta
-c.TextIdolContract=Idol Contract
+c.TextHypeDelta=Hype Change
+c.TextIdolContract=One Idol
 c.TextIdolBirthday=Birthday
 c.TextIdolGraduated=Idol Graduated
 c.TextIdolGroupTransfer=Idol Group Transfer
 c.TextIdolJoinedAgency=Idol Joined Agency
-c.TextIdolPayout=Idol Payout
+c.TextIdolPayout=Total Idol Concert Earnings
 c.TextIdolStatusUpdated=Idol Status Updated
 c.TextImDataCoreApiMethodSignatureMismatch=IM Data Core API method signature mismatch.
 c.TextImDataCoreAppendCustomEventMethodIsUnavailable=IM Data Core append-custom-event method is unavailable.
@@ -372,13 +391,14 @@ c.TextImUiFrameworkReturnedNullStyledButton=IM UI Framework returned null styled
 c.TextImUiFrameworkReturnedNullUiObject=IM UI Framework returned null UI object.
 c.TextImUiFrameworkUnknownDependencyResolutionError=IMUIFramework unknown dependency resolution error.
 c.TextInfluenceAward=Influence Award
-c.TextInfluenceDelta=Influence Delta
+c.TextInfluenceDelta=Influence Change
 c.TextInfluenceLevel=Influence Level
 c.TextInvalidElectionId=Invalid election id.
 c.TextInvalidShowId=Invalid show id.
 c.TextInvalidSingleId=Invalid single id.
 c.TextInvalidTourId=Invalid tour id.
 c.TextInvolvedIdols=Involved Idols: 
+# Translator note: Final fragment of the dependency guidance sentence that completes the "Ensure mod ... is installed and enabled" message.
 c.TextIsInstalledAndEnabled=) is installed and enabled.
 c.TextIsNomination=Is Nomination: 
 c.TextJoinedClique=Joined Clique
@@ -391,37 +411,43 @@ c.TextLineup=Lineup:
 c.TextLinkedElection=Linked Election: #
 c.TextLyricsTrends=Lyrics Trends
 c.TextMarriageOutcome=Marriage Outcome
+# Translator note: Medical event title for an idol becoming depressed or having a depression-related condition.
 c.TextMedicalDepression=Medical Depression
 c.TextMedicalHiatusFinished=Medical Hiatus Finished
 c.TextMedicalHiatusStarted=Medical Hiatus Started
+# Translator note: Medical event title for an idol becoming injured.
 c.TextMedicalInjury=Medical Injury
 c.TextMedicalRecovery=Medical Recovery
-c.TextMentalStaminaDelta=Mental Stamina Delta
+c.TextMentalStaminaDelta=Mental Stamina Change
 c.TextMoneyChange=Money Change
 c.TextMoneyChangePrefix=Money Change: 
-c.TextMonthIndex=Month Index
+# Translator note: Used in rival-market recalculation. This is an internal month counter or sequence number, not a calendar month name.
+c.TextMonthIndex=Rival Market Month Number
+# Translator note: Compact month-unit suffix used in some duration displays; keep it short because it is appended after a number.
 c.TextMonthS= month(s)
 c.TextNamespaceIsEmpty=Namespace is empty.
 c.TextNewFans=New Fans
 c.TextNewFansPrefix=New Fans: 
 c.TextOpenFormationViewerForSingleSenbatsu=Open the formation viewer to inspect this single's senbatsu using the base-game UI.
 c.TextOtherIdol=Other Idol: 
+# Translator note: Fixed relationship-state label shown when the pair is currently dating.
 c.TextPairStateDating=Pair State: Dating
-c.TextParameterDelta=Parameter Delta
+c.TextParameterDelta=Parameter Point Change
 c.TextParameterPoints=Parameter Points
 c.TextParameterType=Parameter Type
 c.TextParticipantCount=Participant Count
 c.TextParticipants=Participants: 
-c.TextPartnerStatus=Partner Status
+c.TextPartnerStatus=Marriage Status
 c.TextPerIdolEarnings=Per-Idol Earnings: 
 c.TextPermanentCast=Permanent Cast
-c.TextPointsDelta=Points Delta
+c.TextPointsDelta=Point Change
 c.TextPointsRemoved=Points Removed
 c.TextPolicyCost=Policy Cost
 c.TextPolicyDecisionSelected=Policy Decision Selected
 c.TextPopupManagerIsNull=PopupManager is null.
 c.TextPosition=Position: 
 c.TextProducerDateInteraction=Producer Date Interaction
+# Translator note: Timeline event title used when the producer's relationship status changes.
 c.TextProducerRelationshipUpdated=Producer Relationship Updated
 c.TextProduct=Product: 
 c.TextProductionCost=Production Cost
@@ -432,7 +458,7 @@ c.TextProjectedRevenue=Projected Revenue
 c.TextPushSlotEnded=Push Slot Ended
 c.TextPushSlotProgressed=Push Slot Progressed
 c.TextPushSlotStarted=Push Slot Started
-c.TextQueueCount=Queue Count
+c.TextQueueCount=Ready Substories
 c.TextQueueSize=Queue Size
 c.TextRandomEventConcluded=Random Event Concluded
 c.TextRandomEventStarted=Random Event Started
@@ -441,9 +467,10 @@ c.TextRelationshipOutcome=Relationship Outcome
 c.TextRelationshipPoints=Relationship Points
 c.TextRelationshipScore=Relationship Score: 
 c.TextRelationshipStatusUpdated=Relationship Status Updated
-c.TextRelationshipType=Relationship Type
-c.TextRelationshipWith=Relationship with 
-c.TextRelaunchCount=Relaunch Count
+c.TextRelationshipType=Producer Relationship
+# Translator note: Format string for "Relationship with [Name]". Keep the {0} placeholder and move it wherever your language needs the other idol's name.
+c.TextRelationshipWith=Relationship with {0}
+c.TextRelaunchCount=Times Relaunched
 c.TextReleaseDate=Release Date
 c.TextReleasedSingles=Released Singles
 c.TextRemovedCast=Removed Cast: 
@@ -459,7 +486,7 @@ c.TextResearchPointsPurchased=Research Points Purchased
 c.TextResearchType=Research Type
 c.TextResetCost=Reset Cost
 c.TextResetType=Reset Type
-c.TextResultCount=Result Count
+c.TextResultCount=Ranked Idols
 c.TextRetryWindowActive=Retry window active.
 c.TextRevenue=Revenue: 
 c.TextRisingGroups=Rising Groups
@@ -482,8 +509,8 @@ c.TextScandalPoints=Scandal Points
 c.TextScandalPointsPrefix=Scandal Points: 
 c.TextScandalPointsUpdated=Scandal Points Updated
 c.TextScheduledTime=Scheduled Time
-c.TextScope=Scope: 
-c.TextScopeGroupContract=Scope: Group Contract
+c.TextScope=Contract Applies To: 
+c.TextScopeGroupContract=Contract Applies To: Entire Group
 c.TextSenbatsuRow=Senbatsu Row: 
 c.TextSevenDayAverageAttendance=7-Day Average Attendance: 
 c.TextSevenDayAverageRevenue=7-Day Average Revenue: 
@@ -504,9 +531,10 @@ c.TextSingleReleasePopupUnavailable=Single release popup unavailable.
 c.TextSingleSenbatsuUpdated=Single Senbatsu Updated
 c.TextSingleStatusUpdated=Single Status Updated
 c.TextSingleTitlePrefix=Single: 
-c.TextSlotIndex=Slot Index
-c.TextSourceEntityOpened=Source entity opened.
-c.TextSourceParameter=Source Parameter
+# Translator note: Used for push-slot events. This is the push slot number (the base game gives 3 slots for idols to push/promote).
+c.TextSlotIndex=Push Slot Number
+c.TextSourceEntityOpened=Related record opened.
+c.TextSourceParameter=Stat Used For This Change
 c.TextSpaRecovery=Spa Recovery: 
 c.TextSpentPoints=Spent Points
 c.TextSpyIdol=Spy Idol: 
@@ -531,7 +559,7 @@ c.TextSubstoryDelayed=Substory Delayed
 c.TextSubstoryStarted=Substory Started
 c.TextSubstoryType=Substory Type
 c.TextSuccessChance=Success Chance
-c.TextSuccessTier=Success Tier
+c.TextSuccessTier=Blackmail Result Tier
 c.TextTargetAge=Target Age
 c.TextTargetFanSegment=Target Fan Segment
 c.TextTargetGender=Target Gender
@@ -585,14 +613,18 @@ c.TextShowCastUpdated=Show Cast Updated
 c.TextShowConfigurationUpdated=Show Configuration Updated
 c.TextShowCreated=Show Created
 c.TextShowEpisodeReleased=Show Episode Released
+# Translator note: Format string that combines a show medium (such as TV show, internet show, radio show, live show) label and an event label; preserve {0} and {1} and reorder them if your language needs that.
 c.TextShowEventWithMediumFormat={0} {1}
+# Translator note: Format string that combines a show medium (such as TV show, internet show, radio show, live show) label with a numeric ID prefix; preserve {0} and any punctuation.
 c.TextShowIdWithMediumPrefixFormat={0} #
 c.TextShowRelaunchFinished=Show Relaunch Finished
 c.TextShowRelaunchStarted=Show Relaunch Started
 c.TextShowReleased=Show Released
 c.TextShowStatusUpdated=Show Status Updated
 c.TextShowTitlePrefix=Show: 
+# Translator note: Format string that combines a show medium (such as TV, internet, radio, live) label with the title prefix before the actual show name; preserve {0}.
 c.TextShowTitleWithMediumPrefixFormat={0}: 
+# Translator note: Format string that combines a medium (such as TV, internet, radio, live ) label with the word "Show"; preserve {0} and reorder if needed.
 c.TextShowTypeWithMediumFormat={0} Show
 c.TextTvShow=TV Show #
 c.TextTvShowCancelled=TV Show Cancelled
@@ -605,13 +637,15 @@ c.TextTvShowRelaunchStarted=TV Show Relaunch Started
 c.TextTvShowReleased=TV Show Released
 c.TextTvShowStatusUpdated=TV Show Status Updated
 c.TextTvShowTitlePrefix=TV Show: 
-c.TextUnableToOpenSourceEntity=Unable to open source entity: 
+c.TextUnableToOpenSourceEntity=Unable to open related record: 
 c.TextUnableToPersistSelectedEventStatePrefix=Unable to persist selected event state: 
 c.TextUnknownDependencyResolutionError=Unknown dependency resolution error.
 c.TextUnknownError=unknown error
 c.TextUnreleasedSingles=Unreleased Singles
-c.TextUsedGoodsStatusYes=Used Goods Status: Yes
-c.TextViolentExit=Violent Exit: 
+# Translator note: This comes from the base-game DatingData.Used_Goods flag. It is set when the idol is revealed to already be taken, when gossip exposes a dating history, or when a dating scandal marks that history. Use neutral wording that means the player now knows the idol has prior or current romantic history and is "not pure"
+c.TextUsedGoodsStatusYes=Has dated someone: Yes
+# Translator note: This clique flag does not mean literal physical violence. It marks a hostile clique expulsion or falling-out, so the player-facing meaning is whether the idol was kicked out rather than leaving peacefully.
+c.TextViolentExit=Kicked Out of Clique: 
 c.TextVisibleEventsForUiPerformanceSuffix= visible events for UI performance.
 c.TextWeeklyBuzz=Weekly Buzz
 c.TextWeeklyBuzzPrefix=Weekly Buzz: 
@@ -628,7 +662,7 @@ c.TextWeeklyPayPrefix=Weekly Pay:
 c.TextWeeklyStamina=Weekly Stamina
 c.TextWeeklyStaminaPrefix=Weekly Stamina: 
 c.TextWishClosed=Wish Closed
-c.TextWishFormula=Wish Formula
+c.TextWishFormula=Wish Goal
 c.TextWishFulfilled=Wish Fulfilled
 c.TextWishGenerated=Wish Generated
 c.TextWishType=Wish Type
@@ -664,7 +698,8 @@ c.LabelSingleMostPopularChoreographyPrefix=Most popular choreography:
 c.LabelSingleMostPopularGenrePrefix=Most popular genre: 
 c.LabelSingleMostPopularLyricsPrefix=Most popular lyrics: 
 c.LabelSingleNewCasualFansPrefix=New casual fans: 
-c.LabelSingleNewFansDeltaPrefix=Release/cohort delta: 
+# Translator note: Used in the single audience breakdown. This is the difference between release-time new fans and the cohort-summed new fans.
+c.LabelSingleNewFansDeltaPrefix=Release/cohort difference: 
 c.LabelSingleNewFansPrefix=New fans: 
 c.LabelSingleNewHardcoreFansPrefix=New hardcore fans: 
 c.LabelSingleOneCdCostPrefix=Cost per CD: 
@@ -686,8 +721,6 @@ c.TitleSingleFanSegmentNewFans=New Fans by Audience
 c.TitleSingleFanSegmentSales=Sales by Audience
 c.TitleSingleReleaseEconomics=Release Economics
 c.TitleSingleReleaseSnapshot=Singles Release
-# Optional per-code overrides used by HumanizeCode(...).
-# Format: c.CodeLabel.<raw_code>=<label>
 c.CodeLabel.male=Male
 c.CodeLabel.female=Female
 c.CodeLabel.casual=Casual
@@ -697,11 +730,14 @@ c.CodeLabel.youngadult=Young Adult
 c.CodeLabel.adult=Adult
 c.CodeLabel.internet=Internet
 c.CodeLabel.tv=TV
+c.CodeLabel.waiting=Waiting to Start
+c.CodeLabel.active=In Progress
+c.CodeLabel.complete=Completed
+c.CodeLabel.single_idol=Contract broken directly by idol
+c.CodeLabel.event_actors=Contract broken due to an event
 c.CodeLabel.activity.performance=Performance
 c.CodeLabel.activity.promotion=Promotion
 c.CodeLabel.activity.spatreatment=Spa Treatment
-
-# Added automatically to keep all player-facing keys localizable.
 c.LabelBullying=Bullying
 c.LabelClique=Clique
 c.LabelRelatedIdolsContextTitle=Idols Involved
@@ -750,7 +786,7 @@ c.TextLoanActive=Loan Active
 c.TextLoanAdded=Loan Added
 c.TextLoanAmount=Loan Amount
 c.TextLoanCanPayOff=Loan Can Pay Off
-c.TextLoanDaysToDevelop=Loan Days To Develop
+c.TextLoanDaysToDevelop=Loan Processing Time
 c.TextLoanDebt=Loan Debt
 c.TextLoanDuration=Loan Duration
 c.TextLoanId=Loan ID
@@ -773,7 +809,7 @@ c.TextMoneyOnHand=Money On Hand
 c.TextParentsUsed=Parents Used
 c.TextPlayerPoints=Player Points
 c.TextRemovedTaskCount=Removed Task Count
-c.TextRemovedTaskCustomList=Removed Task Customs
+c.TextRemovedTaskCustomList=Removed Story Tasks
 c.TextRequestedValue=Requested Value
 c.TextRoomTheaterId=Room Theater ID
 c.TextScandalCheck=Scandal Check
@@ -790,6 +826,7 @@ c.TextStoryRecruitUsed=Story Recruit Used
 c.TextStoryRouteLocked=Story Route Locked
 c.TextSummerGames=Summer Games
 c.TextSummerGamesFinalized=Summer Games Finalized
+# Translator note: Label for the test/debug game-over event.
 c.TextTestGameOver=Test Game Over
 c.TextTotalCost=Total Cost
 c.TextTotalDebt=Total Debt
@@ -797,10 +834,9 @@ c.TextTotalLoanCount=Total Loan Count
 c.TextTotalLoanPaymentPerWeek=Total Loan Payment Per Week
 c.TextTriggeredDialogue=Triggered Dialogue
 c.TextVocalPoints=Vocal Points
-c.TextWaitStaffCount=Wait Staff Count
+c.TextWaitStaffCount=Waitress Staff Count
 c.TextWarningUsed=Warning Used
 c.TextWorkingStaffCount=Working Staff Count
-
 c.TextRelationshipUnknownToProducer=Relationship unknown to producer.
 c.TextBullyingParticipantsUnknownToProducer=Bullying participants unknown to producer.
 c.LabelNotKnownToProducer=[Not known to producer]

@@ -157,7 +157,8 @@ mods\Idol Career Diary\assets\Localization\en\strings.txt
 4. Paste the copied file into that folder.
 5. Translate only the text on the right side of each `=` line.
 6. Do not change the keys on the left side of `=`.
-7. Save the file as:
+7. Preserve numbered placeholders such as `{0}` exactly, and move them as needed for your language's word order.
+8. Save the file as:
 
 ```text
 mods\Idol Career Diary\assets\Localization\<language-tag>\strings.txt
