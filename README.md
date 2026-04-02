@@ -26,9 +26,11 @@ Source repository for Cosmo's Idol Manager mods.
 ## Build
 
 1. Make sure the game DLLs are available in the sibling `../dll` folder, or update `dllDir` in `Directory.Build.props`.
-2. By default, builds are copied into `artifacts/mods/Debug` or `artifacts/mods/Release`. Change `ModOutputDirDebug` and `ModOutputDirRelease` in `Directory.Build.props` if you want live install output instead.
-3. Restore packages with `dotnet restore`.
-4. Build everything with `dotnet build "Cosmo Mod Library.sln" -c Release`.
+2. By default, packaged builds are copied into `artifacts/mods/Debug` or `artifacts/mods/Release`.
+3. For live developer installs, deploy the packaged artifact into `%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods` instead of pointing package output at the game folder. Use `.\scripts\Build-And-Deploy-Mods.ps1 -Configuration Debug` or `Release`.
+4. Live mod folder names may differ from repo folder names. The deploy script matches existing installs by `HarmonyID` and can also honor a project-level `DeployFolderName`.
+5. Restore packages with `dotnet restore`.
+6. Build everything with `dotnet build "Cosmo Mod Library.sln" -c Release`.
 
 You can also build an individual mod directly, for example:
 

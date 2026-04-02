@@ -31,6 +31,7 @@ function Get-ProjectMetadata {
     $propertyGroups = @($projectXml.Project.PropertyGroup)
     $modName = $null
     $assemblyName = $null
+    $deployFolderName = $null
 
     foreach ($propertyGroup in $propertyGroups) {
         if (-not $modName -and $propertyGroup.ModName) {
@@ -40,10 +41,18 @@ function Get-ProjectMetadata {
         if (-not $assemblyName -and $propertyGroup.AssemblyName) {
             $assemblyName = $propertyGroup.AssemblyName.Trim()
         }
+
+        if (-not $deployFolderName -and $propertyGroup.DeployFolderName) {
+            $deployFolderName = $propertyGroup.DeployFolderName.Trim()
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($modName) -or [string]::IsNullOrWhiteSpace($assemblyName)) {
         return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($deployFolderName)) {
+        $deployFolderName = $null
     }
 
     return [PSCustomObject]@{
@@ -51,6 +60,7 @@ function Get-ProjectMetadata {
         ProjectDir    = Split-Path -Parent $ProjectPath
         ModName       = $modName
         AssemblyName  = $assemblyName
+        DeployFolderName = $deployFolderName
         ArtifactDir   = Join-Path $RepoRoot ("artifacts\mods\{0}\{1}" -f $Configuration, $modName)
     }
 }
@@ -115,6 +125,34 @@ function Build-InstalledModMap {
     return $map
 }
 
+function Resolve-DeployTargetDir {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Project,
+
+        [Parameter(Mandatory = $true)]
+        [string]$HarmonyId,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$InstalledModMap,
+
+        [Parameter(Mandatory = $true)]
+        [string]$InstalledModsRoot
+    )
+
+    # Prefer an already-installed folder matched by HarmonyID so deploys stay aligned
+    # with the live mod directory layout, even when it differs from the repo folder name.
+    if ($InstalledModMap.ContainsKey($HarmonyId)) {
+        return $InstalledModMap[$HarmonyId]
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Project.DeployFolderName)) {
+        return Join-Path $InstalledModsRoot $Project.DeployFolderName
+    }
+
+    return $null
+}
+
 function Build-Project {
     param(
         [Parameter(Mandatory = $true)]
@@ -168,12 +206,12 @@ function Deploy-Project {
         throw "Artifact info.json is missing HarmonyID for '$($Project.ModName)': $artifactInfoPath"
     }
 
-    if (-not $InstalledModMap.ContainsKey($harmonyId)) {
-        Write-Warning ("Skipping deploy for '{0}' because no installed mod folder with HarmonyID '{1}' was found under '{2}'." -f $Project.ModName, $harmonyId, $DeployRoot)
+    $targetDir = Resolve-DeployTargetDir -Project $Project -HarmonyId $harmonyId -InstalledModMap $InstalledModMap -InstalledModsRoot $DeployRoot
+    if ([string]::IsNullOrWhiteSpace($targetDir)) {
+        Write-Warning ("Skipping deploy for '{0}' because no installed mod folder with HarmonyID '{1}' was found under '{2}', and the project does not define DeployFolderName." -f $Project.ModName, $harmonyId, $DeployRoot)
         return
     }
 
-    $targetDir = $InstalledModMap[$harmonyId]
     $sourceDll = Join-Path $Project.ArtifactDir ($Project.AssemblyName + ".dll")
     $targetDll = Join-Path $targetDir ($Project.AssemblyName + ".dll")
 
@@ -182,7 +220,12 @@ function Deploy-Project {
     }
 
     $copiedFiles = 0
-    $skippedFiles = 0
+
+    if (-not (Test-Path -LiteralPath $targetDir -PathType Container)) {
+        if ($PSCmdlet.ShouldProcess($targetDir, "Create deploy directory for $($Project.ModName)")) {
+            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+        }
+    }
 
     if ($PSCmdlet.ShouldProcess($targetDll, "Copy mod DLL from $sourceDll")) {
         Copy-Item -LiteralPath $sourceDll -Destination $targetDll -Force
@@ -200,10 +243,12 @@ function Deploy-Project {
 
         $relativePath = Get-RelativePath -BasePath $Project.ArtifactDir -ChildPath $_.FullName
         $targetPath = Join-Path $targetDir $relativePath
+        $targetPathParent = Split-Path -Parent $targetPath
 
-        if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
-            $skippedFiles++
-            return
+        if (-not (Test-Path -LiteralPath $targetPathParent -PathType Container)) {
+            if ($PSCmdlet.ShouldProcess($targetPathParent, "Create directory for $relativePath")) {
+                New-Item -ItemType Directory -Path $targetPathParent -Force | Out-Null
+            }
         }
 
         if ($PSCmdlet.ShouldProcess($targetPath, "Update from $($_.FullName)")) {
@@ -213,7 +258,7 @@ function Deploy-Project {
     }
 
     $statusLabel = if ($WhatIfPreference) { "Prepared deploy" } else { "Deployed" }
-    Write-Host ("{0} {1} -> {2} ({3} copied, {4} skipped)" -f $statusLabel, $Project.ModName, $targetDir, $copiedFiles, $skippedFiles)
+    Write-Host ("{0} {1} -> {2} ({3} copied)" -f $statusLabel, $Project.ModName, $targetDir, $copiedFiles)
 }
 
 $modsRoot = Join-Path $RepoRoot "mods"

@@ -14,8 +14,8 @@ Minimal example mod project that integrates with IM Data Core.
 
 1. Copy this folder to your own mod workspace.
 2. Rename assembly and namespace as needed.
-3. Build `IM Data Core` first so `com.cosmo.imdatacore.dll` exists under `..\..\bin\<Configuration>\net46\`.
-4. Keep the IM Data Core DLL reference pointing to that built DLL, or replace it with your own local path.
+3. Build `IM Data Core` first so the packaged artifact exists under `..\..\..\..\artifacts\mods\<Configuration>\IM Data Core\`.
+4. Keep the IM Data Core DLL reference pointing to that packaged artifact, or override `IMDataCoreArtifactDir` if your workspace uses a different artifacts root.
 
 ## Required references
 
@@ -25,6 +25,13 @@ Minimal example mod project that integrates with IM Data Core.
 - `com.cosmo.imdatacore.dll`
 
 All are wired in the template `.csproj` using `HintPath`, with the IM Data Core reference targeting the local build output.
+In this repo, "local build output" means the packaged artifact folder under `artifacts\mods\<Configuration>`, not the raw per-project `bin` folder.
+
+## Live deploy note
+
+Packaged builds stay under `artifacts\mods\<Configuration>`.
+For a live install into Idol Manager, deploy the packaged artifact into `%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods` instead of redirecting package output into the game folder.
+This repo's `scripts\Build-And-Deploy-Mods.ps1` does that and can target a live mod folder name that differs from the repo folder name.
 
 ## First things to customize
 
