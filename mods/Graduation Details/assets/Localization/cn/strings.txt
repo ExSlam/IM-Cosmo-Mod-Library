@@ -2,15 +2,15 @@
 # Generated from the English source and may contain errors or awkward phrasing.
 # Format: key=value
 
-context_menu.profile.tooltip_ready=显示偶像简介
-context_menu.profile.tooltip_pending=显示偶像简介（数据待定）
-context_menu.profile.label=公司简介
-jobs.total_earnings_prefix=总收入： 
-jobs.married_to_prefix=结婚对象：{0}
-jobs.married_to_none=已婚对象： 否
-jobs.custody_unknown=监护权：未知
-jobs.custody_child_singular= 孩子
-jobs.custody_child_plural= 儿童
-jobs.custody_player_prefix=监护人：玩家 ({0})
-jobs.custody_idol_prefix=监护人：偶像（{0}）
-jobs.custody_none=监护权：无
+context_menu.profile.tooltip_ready=显示偶像资料
+context_menu.profile.tooltip_pending=显示偶像资料（资料数据尚未就绪）
+context_menu.profile.label=资料
+jobs.total_earnings_prefix=总收入：
+jobs.married_to_prefix=与{0}结婚
+jobs.married_to_none=未婚
+jobs.custody_unknown=孩子由谁抚养：未知
+jobs.custody_child_singular=个孩子
+jobs.custody_child_plural=个孩子
+jobs.custody_player_prefix=与制作人共同生活的孩子：{0}个
+jobs.custody_idol_prefix=与偶像共同生活的孩子：{0}个
+jobs.custody_none=没有孩子
