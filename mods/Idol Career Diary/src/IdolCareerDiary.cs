@@ -1865,7 +1865,7 @@ namespace IdolCareerDiary
         internal static readonly string TextTheaterOpened = ModLocalization.Get("c.TextTheaterOpened", "Theater Opened");
         internal static readonly string TextTheaterClosed = ModLocalization.Get("c.TextTheaterClosed", "Theater Closed");
         internal static readonly string TextTheater = ModLocalization.Get("c.TextTheater", "Theater #");
-        internal static readonly string TextProgramType = ModLocalization.Get("c.TextProgramType", "Theater Schedule: ");
+        internal static readonly string TextProgramType = ModLocalization.Get("c.TextProgramType", "Theater Schedule: {0}");
         internal static readonly string TextAttendance = ModLocalization.Get("c.TextAttendance", "Attendance: ");
         internal static readonly string TextRevenue = ModLocalization.Get("c.TextRevenue", "Revenue: ");
         internal static readonly string TextSubscriberChange = ModLocalization.Get("c.TextSubscriberChange", "Subscriber Change: ");
