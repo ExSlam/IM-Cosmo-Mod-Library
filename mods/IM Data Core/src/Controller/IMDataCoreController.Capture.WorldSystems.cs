@@ -2817,6 +2817,73 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Captures pre-mutation state for one task-addition request.
+        /// </summary>
+        internal TaskAddedSnapshot CreateTaskAddedSnapshot(string taskCustom)
+        {
+            return new TaskAddedSnapshot
+            {
+                RequestedTaskCustom = taskCustom ?? string.Empty,
+                TaskExistedBefore = !string.IsNullOrEmpty(taskCustom) && tasks.GetCustomTask(taskCustom) != null
+            };
+        }
+
+        /// <summary>
+        /// Captures one newly added story/custom task.
+        /// </summary>
+        internal void CaptureTaskAdded(TaskAddedSnapshot snapshotBefore, string sourcePatch)
+        {
+            if (snapshotBefore == null
+                || snapshotBefore.TaskExistedBefore
+                || string.IsNullOrEmpty(snapshotBefore.RequestedTaskCustom))
+            {
+                return;
+            }
+
+            tasks._task task = tasks.GetCustomTask(snapshotBefore.RequestedTaskCustom);
+            if (task == null)
+            {
+                return;
+            }
+
+            int taskGirlId = task.Girl != null ? task.Girl.id : CoreConstants.InvalidIdValue;
+            bool activeAfter = tasks.ActiveTasks != null && tasks.ActiveTasks.Contains(task);
+            TaskLifecycleEventPayload payload = BuildTaskLifecyclePayload(
+                task,
+                CoreConstants.TaskLifecycleActionAdded,
+                false,
+                task.Fulfilled,
+                false,
+                activeAfter,
+                false,
+                CoreEnumNameMapping.ToTaskRouteCode(tasks.Story_Data != null ? tasks.Story_Data.Route : tasks._route.NONE),
+                task.AvailableFrom.HasValue
+                    ? CoreDateTimeUtility.ToRoundTripString(task.AvailableFrom.Value)
+                    : string.Empty);
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                EnqueueEventRecordLocked(
+                    staticVars.dateTime,
+                    taskGirlId >= CoreConstants.MinimumValidIdolIdentifier ? taskGirlId : CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindTask,
+                    BuildTaskIdentifier(task, null),
+                    CoreConstants.EventTypeTaskAdded,
+                    sourcePatch,
+                    CoreJsonUtility.SerializeObjectPayload(payload));
+
+                FlushAfterCaptureLocked();
+            }
+        }
+
+        /// <summary>
         /// Captures one task completion event.
         /// </summary>
         internal void CaptureTaskCompleted(tasks._task task, TaskLifecycleSnapshot snapshotBefore)
@@ -2909,25 +2976,16 @@ namespace IMDataCore
             bool activeAfter = tasks.ActiveTasks != null && tasks.ActiveTasks.Contains(task);
             int taskGirlId = task.Girl != null ? task.Girl.id : snapshotBefore.TaskGirlId;
 
-            TaskLifecycleEventPayload payload = new TaskLifecycleEventPayload
-            {
-                task_action = actionCode ?? string.Empty,
-                task_custom = task.Custom ?? snapshotBefore.TaskCustom ?? string.Empty,
-                task_type = CoreEnumNameMapping.ToTaskTypeCode(task.Type),
-                task_goal = CoreEnumNameMapping.ToTaskGoalCode(task.Goal),
-                task_substory = task.Substory,
-                task_girl_id = taskGirlId,
-                task_skill = CoreEnumNameMapping.ToIdolParameterCode(task.Skill),
-                task_agent_name = task.AgentName ?? string.Empty,
-                fulfilled_before = snapshotBefore.FulfilledBefore,
-                fulfilled_after = task.Fulfilled,
-                active_before = snapshotBefore.WasActiveBefore,
-                active_after = activeAfter,
-                skip_lock = skipLock,
-                route = CoreEnumNameMapping.ToTaskRouteCode(tasks.Story_Data != null ? tasks.Story_Data.Route : tasks._route.NONE),
-                available_from = snapshotBefore.AvailableFrom ?? string.Empty,
-                event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
-            };
+            TaskLifecycleEventPayload payload = BuildTaskLifecyclePayload(
+                task,
+                actionCode,
+                snapshotBefore.FulfilledBefore,
+                task.Fulfilled,
+                snapshotBefore.WasActiveBefore,
+                activeAfter,
+                skipLock,
+                CoreEnumNameMapping.ToTaskRouteCode(tasks.Story_Data != null ? tasks.Story_Data.Route : tasks._route.NONE),
+                snapshotBefore.AvailableFrom ?? string.Empty);
 
             string entityIdentifier = BuildTaskIdentifier(task, snapshotBefore);
             int idolIdForEvent = taskGirlId >= CoreConstants.MinimumValidIdolIdentifier
@@ -2954,6 +3012,212 @@ namespace IMDataCore
 
                 FlushAfterCaptureLocked();
             }
+        }
+
+        /// <summary>
+        /// Builds one normalized task payload shared by task-added and task-lifecycle event rows.
+        /// </summary>
+        private static TaskLifecycleEventPayload BuildTaskLifecyclePayload(
+            tasks._task task,
+            string actionCode,
+            bool fulfilledBefore,
+            bool fulfilledAfter,
+            bool activeBefore,
+            bool activeAfter,
+            bool skipLock,
+            string routeCode,
+            string availableFrom)
+        {
+            int taskGirlId = task != null && task.Girl != null
+                ? task.Girl.id
+                : CoreConstants.InvalidIdValue;
+
+            return new TaskLifecycleEventPayload
+            {
+                task_action = actionCode ?? string.Empty,
+                task_custom = task != null ? task.Custom ?? string.Empty : string.Empty,
+                task_title = GetTaskTitleSafe(task),
+                task_description = GetTaskDescriptionSafe(task),
+                task_type = task != null ? CoreEnumNameMapping.ToTaskTypeCode(task.Type) : CoreConstants.StatusCodeUnknown,
+                task_goal = task != null ? CoreEnumNameMapping.ToTaskGoalCode(task.Goal) : CoreConstants.StatusCodeUnknown,
+                task_substory = task != null && task.Substory,
+                task_girl_id = taskGirlId,
+                task_skill = task != null ? CoreEnumNameMapping.ToIdolParameterCode(task.Skill) : CoreConstants.StatusCodeUnknown,
+                task_agent_name = task != null ? task.AgentName ?? string.Empty : string.Empty,
+                fulfilled_before = fulfilledBefore,
+                fulfilled_after = fulfilledAfter,
+                active_before = activeBefore,
+                active_after = activeAfter,
+                skip_lock = skipLock,
+                route = routeCode ?? CoreConstants.StatusCodeUnknown,
+                available_from = availableFrom ?? string.Empty,
+                event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
+            };
+        }
+
+        /// <summary>
+        /// Safely resolves one player-facing task title, including Harmony-overridden custom titles.
+        /// </summary>
+        private static string GetTaskTitleSafe(tasks._task task)
+        {
+            if (task == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return task.GetTitle() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Safely resolves one player-facing task description, including Harmony-overridden custom descriptions.
+        /// </summary>
+        private static string GetTaskDescriptionSafe(tasks._task task)
+        {
+            if (task == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return task.GetDescription() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Creates one pre-mutation outfit snapshot when one supported idol outfit action is about to run.
+        /// </summary>
+        private static IdolOutfitChangeSnapshot CreateIdolOutfitChangeSnapshot(data_girls.girls idol, string actionCode)
+        {
+            IdolOutfitChangeSnapshot snapshot = new IdolOutfitChangeSnapshot();
+            if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier || !IsTrackedOutfitChangeAction(actionCode))
+            {
+                return snapshot;
+            }
+
+            data_girls_textures._textureAsset bodyAsset = ResolveCurrentBodyAsset(idol);
+            if (bodyAsset == null)
+            {
+                return snapshot;
+            }
+
+            snapshot.IdolId = idol.id;
+            snapshot.ActionCode = actionCode ?? string.Empty;
+            snapshot.PreviousOutfitPartId = bodyAsset.part_id;
+            snapshot.PreviousOutfitAssetId = bodyAsset.GetID() ?? string.Empty;
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Emits one idol outfit-change event when the body asset actually changes.
+        /// </summary>
+        private void CaptureIdolOutfitChanged(data_girls.girls idol, IdolOutfitChangeSnapshot snapshotBefore, string sourcePatch)
+        {
+            if (idol == null
+                || snapshotBefore == null
+                || snapshotBefore.IdolId < CoreConstants.MinimumValidIdolIdentifier
+                || idol.id != snapshotBefore.IdolId
+                || string.IsNullOrEmpty(snapshotBefore.ActionCode))
+            {
+                return;
+            }
+
+            data_girls_textures._textureAsset currentBodyAsset = ResolveCurrentBodyAsset(idol);
+            if (currentBodyAsset == null)
+            {
+                return;
+            }
+
+            string currentAssetId = currentBodyAsset.GetID() ?? string.Empty;
+            if (string.Equals(snapshotBefore.PreviousOutfitAssetId, currentAssetId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            IdolOutfitChangedEventPayload payload = new IdolOutfitChangedEventPayload
+            {
+                idol_id = idol.id,
+                outfit_change_action = snapshotBefore.ActionCode,
+                previous_outfit_part_id = snapshotBefore.PreviousOutfitPartId,
+                new_outfit_part_id = currentBodyAsset.part_id,
+                previous_outfit_asset_id = snapshotBefore.PreviousOutfitAssetId ?? string.Empty,
+                new_outfit_asset_id = currentAssetId,
+                event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
+            };
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                EnqueueEventRecordLocked(
+                    staticVars.dateTime,
+                    idol.id,
+                    CoreConstants.EventEntityKindIdolOutfit,
+                    idol.id.ToString(CultureInfo.InvariantCulture),
+                    CoreConstants.EventTypeIdolOutfitChanged,
+                    sourcePatch,
+                    CoreJsonUtility.SerializeObjectPayload(payload));
+
+                FlushAfterCaptureLocked();
+            }
+        }
+
+        /// <summary>
+        /// Returns true when one dialogue action code corresponds to a tracked EroEvents outfit mutation.
+        /// </summary>
+        private static bool IsTrackedOutfitChangeAction(string actionCode)
+        {
+            string normalizedAction = actionCode ?? string.Empty;
+            return string.Equals(normalizedAction, CoreConstants.OutfitChangeActionChangeOutfit, StringComparison.Ordinal)
+                || string.Equals(normalizedAction, CoreConstants.OutfitChangeActionSetOutfit, StringComparison.Ordinal)
+                || string.Equals(normalizedAction, CoreConstants.OutfitChangeActionRevertOutfit, StringComparison.Ordinal)
+                || string.Equals(normalizedAction, CoreConstants.OutfitChangeActionStopLewd, StringComparison.Ordinal)
+                || string.Equals(normalizedAction, CoreConstants.OutfitChangeActionDateOutfitImproved, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Resolves the current body-asset selection for one idol.
+        /// </summary>
+        private static data_girls_textures._textureAsset ResolveCurrentBodyAsset(data_girls.girls idol)
+        {
+            if (idol == null)
+            {
+                return null;
+            }
+
+            data_girls.girls._textureAsset bodyTexture = idol.GetTextureAsset(data_girls_textures._spriteType.body);
+            return bodyTexture != null ? bodyTexture.asset : null;
+        }
+
+        /// <summary>
+        /// Resolves the idol currently shown in the base-game date popup.
+        /// </summary>
+        private static data_girls.girls ResolveCurrentDatePopupGirl()
+        {
+            GameObject popupObject = PopupManager.GetObject(PopupManager._type.girl_date);
+            if (popupObject == null)
+            {
+                return null;
+            }
+
+            Date_Popup datePopup = popupObject.GetComponent<Date_Popup>();
+            return datePopup != null ? datePopup.Girl : null;
         }
 
         /// <summary>
@@ -4473,6 +4737,7 @@ namespace IMDataCore
                 buzz_delta = buzzAfter - buzzBefore,
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
+            List<int> idolIds = ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
 
             lock (runtimeLock)
             {
@@ -4483,9 +4748,9 @@ namespace IMDataCore
                     return;
                 }
 
-                EnqueueEventRecordLocked(
+                EnqueueNarrativeEventForIdolsOrGlobalLocked(
                     staticVars.dateTime,
-                    CoreConstants.InvalidIdValue,
+                    idolIds,
                     CoreConstants.EventEntityKindRandomEvent,
                     payload.random_event_id,
                     CoreConstants.EventTypeRandomEventStarted,
@@ -4582,6 +4847,7 @@ namespace IMDataCore
                 buzz_delta = buzzAfter - snapshotBefore.BuzzBefore,
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
+            List<int> idolIds = ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
 
             lock (runtimeLock)
             {
@@ -4592,9 +4858,9 @@ namespace IMDataCore
                     return;
                 }
 
-                EnqueueEventRecordLocked(
+                EnqueueNarrativeEventForIdolsOrGlobalLocked(
                     staticVars.dateTime,
-                    CoreConstants.InvalidIdValue,
+                    idolIds,
                     CoreConstants.EventEntityKindRandomEvent,
                     payload.random_event_id,
                     CoreConstants.EventTypeRandomEventConcluded,
@@ -4641,7 +4907,6 @@ namespace IMDataCore
             bool usedAfter = Substories_Manager.IsUsed(dialogue.id);
             bool delayedAfter = Substories_Manager.Delayed_Queue != null && Substories_Manager.Delayed_Queue.Contains(dialogue.id);
             bool queuedAfter = QueueContainsSubstoryId(dialogue.id);
-
             bool started = queuedAfter && (snapshotBefore == null || queueCountAfter > snapshotBefore.QueueCountBefore || !snapshotBefore.WasQueuedBefore);
             bool delayed = delayedAfter && (snapshotBefore == null || delayedCountAfter > snapshotBefore.DelayedCountBefore || !snapshotBefore.WasDelayedBefore);
             if (!started && !delayed)
@@ -4649,10 +4914,17 @@ namespace IMDataCore
                 return;
             }
 
+            Substories_Manager._substoryData substoryData = queuedAfter
+                ? Substories_Manager.GetSubstoryData(dialogue.id)
+                : null;
+            string actorSummary = BuildSubstoryActorSummary(substoryData);
+            List<int> idolIds = ResolveDistinctSubstoryIdolIdentifiers(substoryData);
+
             SubstoryLifecycleEventPayload payload = new SubstoryLifecycleEventPayload
             {
                 substory_id = dialogue.id ?? string.Empty,
                 substory_parent_id = dialogue.parent ?? string.Empty,
+                actors_summary = actorSummary,
                 substory_type = ResolveSubstoryTypeCode(dialogue),
                 debug_mode = debug,
                 had_before_start_callback = beforeStart != null,
@@ -4678,9 +4950,9 @@ namespace IMDataCore
                 if (started)
                 {
                     payload.substory_lifecycle_action = CoreConstants.SubstoryLifecycleActionStarted;
-                    EnqueueEventRecordLocked(
+                    EnqueueNarrativeEventForIdolsOrGlobalLocked(
                         staticVars.dateTime,
-                        CoreConstants.InvalidIdValue,
+                        idolIds,
                         CoreConstants.EventEntityKindSubstory,
                         payload.substory_id,
                         CoreConstants.EventTypeSubstoryStarted,
@@ -4696,9 +4968,9 @@ namespace IMDataCore
                 if (delayed)
                 {
                     payload.substory_lifecycle_action = CoreConstants.SubstoryLifecycleActionDelayed;
-                    EnqueueEventRecordLocked(
+                    EnqueueNarrativeEventForIdolsOrGlobalLocked(
                         staticVars.dateTime,
-                        CoreConstants.InvalidIdValue,
+                        idolIds,
                         CoreConstants.EventEntityKindSubstory,
                         payload.substory_id,
                         CoreConstants.EventTypeSubstoryDelayed,
@@ -4730,6 +5002,10 @@ namespace IMDataCore
                 return snapshot;
             }
 
+            Substories_Manager._substoryData substoryData = dialogueController.substoryData ?? Substories_Manager.GetSubstoryData(snapshot.DialogueId);
+            snapshot.ActorSummary = BuildSubstoryActorSummary(substoryData);
+            snapshot.IdolIds = ResolveDistinctSubstoryIdolIdentifiers(substoryData);
+
             lock (runtimeLock)
             {
                 int pendingCount;
@@ -4759,6 +5035,10 @@ namespace IMDataCore
                 snapshot.SourceParentDialogueId = sourceDialogue.parent ?? string.Empty;
                 snapshot.SourceDialogueTypeCode = ResolveSubstoryTypeCode(sourceDialogue);
             }
+
+            Substories_Manager._substoryData sourceSubstoryData = dialogueController.substoryData;
+            snapshot.SourceActorSummary = BuildSubstoryActorSummary(sourceSubstoryData);
+            snapshot.SourceIdolIds = ResolveDistinctSubstoryIdolIdentifiers(sourceSubstoryData);
 
             snapshot.RequestedTargetDialogueId = dialogueController.InstantTransition ?? string.Empty;
             snapshot.TargetWasUsedBefore =
@@ -4814,6 +5094,7 @@ namespace IMDataCore
                 SubstoryLifecycleEventPayload payload = BuildSubstoryLifecyclePayload(
                     snapshotBefore.DialogueId,
                     snapshotBefore.ParentDialogueId,
+                    snapshotBefore.ActorSummary,
                     snapshotBefore.DialogueTypeCode,
                     CoreConstants.SubstoryLifecycleActionCompleted,
                     Substories_Manager.IsUsed(snapshotBefore.DialogueId),
@@ -4828,10 +5109,56 @@ namespace IMDataCore
                 EnqueueSubstoryLifecycleEventLocked(
                     payload,
                     CoreConstants.EventTypeSubstoryCompleted,
-                    CoreConstants.EventSourceSubstoriesStartDialoguePatch);
+                    CoreConstants.EventSourceSubstoriesStartDialoguePatch,
+                    snapshotBefore.IdolIds);
 
                 FlushAfterCaptureLocked();
             }
+        }
+
+        /// <summary>
+        /// Creates one pre-mutation snapshot for a tracked direct outfit/body change action.
+        /// </summary>
+        internal IdolOutfitChangeSnapshot CreateDialogueOutfitChangeSnapshot(data_dialogues._action action, vn_requirements._target target)
+        {
+            if (action == null || target == null)
+            {
+                return new IdolOutfitChangeSnapshot();
+            }
+
+            return CreateIdolOutfitChangeSnapshot(
+                target.target_girl,
+                action.parameter ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Captures one direct outfit/body change performed through `vn_actions.DoActor`.
+        /// </summary>
+        internal void CaptureDialogueOutfitChange(data_dialogues._action action, vn_requirements._target target, IdolOutfitChangeSnapshot snapshotBefore)
+        {
+            data_girls.girls idol = target != null ? target.target_girl : null;
+            CaptureIdolOutfitChanged(idol, snapshotBefore, CoreConstants.EventSourceVnActionsDoActorPatch);
+        }
+
+        /// <summary>
+        /// Creates one pre-mutation snapshot for the EroEvents coffee-date outfit-improve flow.
+        /// </summary>
+        internal IdolOutfitChangeSnapshot CreateDatePopupOutfitChangeSnapshot()
+        {
+            return CreateIdolOutfitChangeSnapshot(
+                ResolveCurrentDatePopupGirl(),
+                CoreConstants.OutfitChangeActionDateOutfitImproved);
+        }
+
+        /// <summary>
+        /// Captures one direct outfit/body change performed through the EroEvents coffee-date menu.
+        /// </summary>
+        internal void CaptureDatePopupOutfitChange(IdolOutfitChangeSnapshot snapshotBefore)
+        {
+            CaptureIdolOutfitChanged(
+                ResolveCurrentDatePopupGirl(),
+                snapshotBefore,
+                CoreConstants.EventSourceEroEventsCoffeeDateMenuSaveOutfitPatch);
         }
 
         /// <summary>
@@ -4881,6 +5208,7 @@ namespace IMDataCore
                     SubstoryLifecycleEventPayload completionPayload = BuildSubstoryLifecyclePayload(
                         snapshotBefore.SourceDialogueId,
                         snapshotBefore.SourceParentDialogueId,
+                        snapshotBefore.SourceActorSummary,
                         snapshotBefore.SourceDialogueTypeCode,
                         CoreConstants.SubstoryLifecycleActionCompleted,
                         Substories_Manager.IsUsed(snapshotBefore.SourceDialogueId),
@@ -4895,12 +5223,17 @@ namespace IMDataCore
                     EnqueueSubstoryLifecycleEventLocked(
                         completionPayload,
                         CoreConstants.EventTypeSubstoryCompleted,
-                        CoreConstants.EventSourceActiveDialogueInstantTransitionPatch);
+                        CoreConstants.EventSourceActiveDialogueInstantTransitionPatch,
+                        snapshotBefore.SourceIdolIds);
                 }
 
+                Substories_Manager._substoryData targetSubstoryData = dialogueController.substoryData ?? Substories_Manager.GetSubstoryData(targetDialogue.id);
+                string targetActorSummary = BuildSubstoryActorSummary(targetSubstoryData);
+                List<int> targetIdolIds = ResolveDistinctSubstoryIdolIdentifiers(targetSubstoryData);
                 SubstoryLifecycleEventPayload startedPayload = BuildSubstoryLifecyclePayload(
                     targetDialogue.id ?? string.Empty,
                     targetDialogue.parent ?? string.Empty,
+                    targetActorSummary,
                     ResolveSubstoryTypeCode(targetDialogue),
                     CoreConstants.SubstoryLifecycleActionStarted,
                     snapshotBefore.TargetWasUsedBefore,
@@ -4915,7 +5248,8 @@ namespace IMDataCore
                 EnqueueSubstoryLifecycleEventLocked(
                     startedPayload,
                     CoreConstants.EventTypeSubstoryStarted,
-                    CoreConstants.EventSourceActiveDialogueInstantTransitionPatch);
+                    CoreConstants.EventSourceActiveDialogueInstantTransitionPatch,
+                    targetIdolIds);
                 if (targetDialogue.type == data_dialogues._dialogue._type.dialogue)
                 {
                     TrackSubstoryQueuedLocked(startedPayload.substory_id);
@@ -4931,6 +5265,7 @@ namespace IMDataCore
         private static SubstoryLifecycleEventPayload BuildSubstoryLifecyclePayload(
             string substoryId,
             string parentSubstoryId,
+            string actorSummary,
             string substoryTypeCode,
             string lifecycleAction,
             bool usedBefore,
@@ -4947,6 +5282,7 @@ namespace IMDataCore
             {
                 substory_id = substoryId ?? string.Empty,
                 substory_parent_id = parentSubstoryId ?? string.Empty,
+                actors_summary = actorSummary ?? string.Empty,
                 substory_type = substoryTypeCode ?? string.Empty,
                 substory_lifecycle_action = lifecycleAction ?? string.Empty,
                 debug_mode = debugMode,
@@ -4965,16 +5301,16 @@ namespace IMDataCore
         /// <summary>
         /// Enqueues one normalized substory lifecycle event.
         /// </summary>
-        private void EnqueueSubstoryLifecycleEventLocked(SubstoryLifecycleEventPayload payload, string eventType, string sourcePatch)
+        private void EnqueueSubstoryLifecycleEventLocked(SubstoryLifecycleEventPayload payload, string eventType, string sourcePatch, List<int> idolIds)
         {
             if (payload == null || string.IsNullOrEmpty(payload.substory_id))
             {
                 return;
             }
 
-            EnqueueEventRecordLocked(
+            EnqueueNarrativeEventForIdolsOrGlobalLocked(
                 staticVars.dateTime,
-                CoreConstants.InvalidIdValue,
+                idolIds,
                 CoreConstants.EventEntityKindSubstory,
                 payload.substory_id,
                 eventType,
@@ -5886,6 +6222,182 @@ namespace IMDataCore
                 summaryBuilder.Append(actor.data != null ? actor.data.name ?? string.Empty : string.Empty);
                 summaryBuilder.Append(CoreConstants.SingleFanSegmentValueSeparator);
                 summaryBuilder.Append(actor.GetName(true));
+            }
+
+            return summaryBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Enqueues one narrative event once per involved idol, or once globally when no idol can be resolved.
+        /// </summary>
+        private void EnqueueNarrativeEventForIdolsOrGlobalLocked(
+            DateTime gameDate,
+            List<int> idolIds,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string sourcePatch,
+            string payloadJson)
+        {
+            if (idolIds == null || idolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    entityKind,
+                    entityId,
+                    eventType,
+                    sourcePatch,
+                    payloadJson);
+                return;
+            }
+
+            HashSet<int> emittedIdolIds = new HashSet<int>();
+            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < idolIds.Count; idolIndex++)
+            {
+                int idolId = idolIds[idolIndex];
+                if (idolId < CoreConstants.MinimumValidIdolIdentifier || !emittedIdolIds.Add(idolId))
+                {
+                    continue;
+                }
+
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    idolId,
+                    entityKind,
+                    entityId,
+                    eventType,
+                    sourcePatch,
+                    payloadJson);
+            }
+
+            if (emittedIdolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    entityKind,
+                    entityId,
+                    eventType,
+                    sourcePatch,
+                    payloadJson);
+            }
+        }
+
+        /// <summary>
+        /// Resolves distinct idol ids from one random-event actor list.
+        /// </summary>
+        private static List<int> ResolveDistinctRandomEventIdolIdentifiers(IReadOnlyList<Event_Manager._activeEvent._actor> actors)
+        {
+            List<int> idolIds = new List<int>();
+            if (actors == null || actors.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return idolIds;
+            }
+
+            HashSet<int> uniqueIdentifiers = new HashSet<int>();
+            for (int actorIndex = CoreConstants.ZeroBasedListStartIndex; actorIndex < actors.Count; actorIndex++)
+            {
+                Event_Manager._activeEvent._actor actor = actors[actorIndex];
+                if (actor == null || actor.girl == null)
+                {
+                    continue;
+                }
+
+                int idolId = actor.girl.id;
+                if (idolId >= CoreConstants.MinimumValidIdolIdentifier && uniqueIdentifiers.Add(idolId))
+                {
+                    idolIds.Add(idolId);
+                }
+            }
+
+            return idolIds;
+        }
+
+        /// <summary>
+        /// Resolves distinct idol ids from one substory actor list.
+        /// </summary>
+        private static List<int> ResolveDistinctSubstoryIdolIdentifiers(Substories_Manager._substoryData substoryData)
+        {
+            List<int> idolIds = new List<int>();
+            if (substoryData == null || substoryData.actors == null || substoryData.actors.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return idolIds;
+            }
+
+            HashSet<int> uniqueIdentifiers = new HashSet<int>();
+            for (int actorIndex = CoreConstants.ZeroBasedListStartIndex; actorIndex < substoryData.actors.Count; actorIndex++)
+            {
+                Substories_Manager._substoryData._actor actor = substoryData.actors[actorIndex];
+                if (actor == null || actor.girl == null)
+                {
+                    continue;
+                }
+
+                int idolId = actor.girl.id;
+                if (idolId >= CoreConstants.MinimumValidIdolIdentifier && uniqueIdentifiers.Add(idolId))
+                {
+                    idolIds.Add(idolId);
+                }
+            }
+
+            return idolIds;
+        }
+
+        /// <summary>
+        /// Builds compact actor summary for one substory using the same structured format as random events.
+        /// </summary>
+        private static string BuildSubstoryActorSummary(Substories_Manager._substoryData substoryData)
+        {
+            if (substoryData == null || substoryData.actors == null || substoryData.actors.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder summaryBuilder = new StringBuilder();
+            for (int actorIndex = CoreConstants.ZeroBasedListStartIndex; actorIndex < substoryData.actors.Count; actorIndex++)
+            {
+                Substories_Manager._substoryData._actor actor = substoryData.actors[actorIndex];
+                if (actor == null)
+                {
+                    continue;
+                }
+
+                if (summaryBuilder.Length > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    summaryBuilder.Append(CoreConstants.SingleFanSegmentEntrySeparator);
+                }
+
+                string actorKind = actor.type.ToString().ToLowerInvariant();
+                int actorId = CoreConstants.InvalidIdValue;
+                if (actor.girl != null && actor.girl.id >= CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    actorKind = CoreConstants.EventEntityKindIdol;
+                    actorId = actor.girl.id;
+                }
+                else if (actor.staff != null && actor.staff.id >= CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    actorKind = CoreConstants.EventEntityKindStaff;
+                    actorId = actor.staff.id;
+                }
+
+                string actorDisplayName;
+                try
+                {
+                    actorDisplayName = actor.GetName(true) ?? string.Empty;
+                }
+                catch
+                {
+                    actorDisplayName = string.Empty;
+                }
+
+                summaryBuilder.Append(actorKind);
+                summaryBuilder.Append(CoreConstants.SingleFanSegmentValueSeparator);
+                summaryBuilder.Append(actorId.ToString(CultureInfo.InvariantCulture));
+                summaryBuilder.Append(CoreConstants.SingleFanSegmentValueSeparator);
+                summaryBuilder.Append(actor.tag ?? string.Empty);
+                summaryBuilder.Append(CoreConstants.SingleFanSegmentValueSeparator);
+                summaryBuilder.Append(actorDisplayName);
             }
 
             return summaryBuilder.ToString();

@@ -538,6 +538,103 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Captures newly added custom tasks so mod-defined task menus appear in the timeline when they become available.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks), nameof(tasks.AddTask), new Type[] { typeof(string), typeof(bool) })]
+    internal static class tasks_AddTask_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(string str, out TaskAddedSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateTaskAddedSnapshot(str);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(TaskAddedSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureTaskAdded(__state, CoreConstants.EventSourceTasksAddTaskPatch);
+        }
+    }
+
+    /// <summary>
+    /// Captures newly added continue-story tasks, including delayed custom follow-ups created by dialogue actions.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks), nameof(tasks.AddTaskContinue), new Type[] { typeof(string), typeof(int), typeof(bool) })]
+    internal static class tasks_AddTaskContinue_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(string dialogue_id, out TaskAddedSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateTaskAddedSnapshot(dialogue_id);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(TaskAddedSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureTaskAdded(__state, CoreConstants.EventSourceTasksAddTaskContinuePatch);
+        }
+    }
+
+    /// <summary>
+    /// Captures direct idol outfit/body mutations performed by EroEvents dialogue actions.
+    /// </summary>
+    [HarmonyPatch(typeof(vn_actions), "DoActor")]
+    internal static class vn_actions_DoActor_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(data_dialogues._action action, vn_requirements._target target, out IdolOutfitChangeSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateDialogueOutfitChangeSnapshot(action, target);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(data_dialogues._action action, vn_requirements._target target, IdolOutfitChangeSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureDialogueOutfitChange(action, target, __state);
+        }
+    }
+
+    /// <summary>
+    /// Captures the EroEvents coffee-date outfit-improve flow, which mutates the girl's body asset outside the vanilla dialogue action path.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class EroEvents_Coffee_Date_Menu_SaveOutfit_IMDataCoreCapture_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.TypeByName(CoreConstants.OptionalTypeNameEroEventsCoffeeDateMenu) != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            Type targetType = AccessTools.TypeByName(CoreConstants.OptionalTypeNameEroEventsCoffeeDateMenu);
+            return targetType != null
+                ? AccessTools.Method(targetType, CoreConstants.OptionalMethodNameEroEventsCoffeeDateMenuSaveOutfit)
+                : null;
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(out IdolOutfitChangeSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateDatePopupOutfitChangeSnapshot();
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(IdolOutfitChangeSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureDatePopupOutfitChange(__state);
+        }
+    }
+
+    /// <summary>
     /// Captures tactical concert card usage outcomes.
     /// </summary>
     [HarmonyPatch(typeof(SEvent_Concerts), nameof(SEvent_Concerts.UseCard))]

@@ -193,9 +193,11 @@ namespace IMDataCore
         internal const string EventTypeResearchPointsPurchased = "research_points_purchased";
         internal const string EventTypeResearchParamLevelUp = "research_param_level_up";
         internal const string EventTypeStoryRouteLocked = "story_route_locked";
+        internal const string EventTypeTaskAdded = "task_added";
         internal const string EventTypeTaskCompleted = "task_completed";
         internal const string EventTypeTaskFailed = "task_failed";
         internal const string EventTypeTaskDone = "task_done";
+        internal const string EventTypeIdolOutfitChanged = "idol_outfit_changed";
         internal const string EventTypeConcertCardUsed = "concert_card_used";
         internal const string EventTypeConcertCrisisDecision = "concert_crisis_decision";
         internal const string EventTypeConcertCrisisApplied = "concert_crisis_applied";
@@ -258,6 +260,7 @@ namespace IMDataCore
         internal const string EventEntityKindStaff = "staff";
         internal const string EventEntityKindResearch = "research";
         internal const string EventEntityKindTask = "task";
+        internal const string EventEntityKindIdolOutfit = "idol_outfit";
         internal const string EventEntityKindWish = "wish";
         internal const string EventEntityKindAgencyRoom = "agency_room";
         internal const string EventEntityKindAudition = "audition";
@@ -395,10 +398,14 @@ namespace IMDataCore
         internal const string EventSourceAgencyDestroyRoomPatch = "patch.agency.DestroyRoom.Postfix";
         internal const string EventSourceAuditionsGeneratePatch = "patch.Auditions.GenerateAudition.Postfix";
         internal const string EventSourceAuditionsResetCooldownPatch = "patch.Auditions.ResetCooldown.Postfix";
+        internal const string EventSourceTasksAddTaskPatch = "patch.tasks.AddTask.Postfix";
+        internal const string EventSourceTasksAddTaskContinuePatch = "patch.tasks.AddTaskContinue.Postfix";
         internal const string EventSourceEventManagerStartEventPatch = "patch.Event_Manager.StartEvent.Postfix";
         internal const string EventSourceEventManagerConcludeEventPatch = "patch.Event_Manager.ConcludeEvent.Postfix";
         internal const string EventSourceSubstoriesStartDialoguePatch = "patch.Substories_Manager.StartDialogue.Postfix";
         internal const string EventSourceActiveDialogueInstantTransitionPatch = "patch.ActiveDialogueController.DoIntstantTransition.Postfix";
+        internal const string EventSourceVnActionsDoActorPatch = "patch.vn_actions.DoActor.Postfix";
+        internal const string EventSourceEroEventsCoffeeDateMenuSaveOutfitPatch = "patch.EroEvents.Coffee_Date_Menu.SaveOutfit.Postfix";
         internal const string EventSourceResourcesOnNewWeekPatch = "patch.resources.OnNewWeek.Postfix";
         internal const string EventSourceResourcesOnNewDayPatch = "patch.resources.OnNewDay.Postfix";
         internal const string EventSourceDateInfluenceAddBlackmailPatch = "patch.Date_Influence.AddBlackmail.Postfix";
@@ -454,6 +461,7 @@ namespace IMDataCore
         internal const string CafeLifecycleActionCreated = "created";
         internal const string CafeLifecycleActionDestroyed = "destroyed";
         internal const string ElectionLifecycleActionStarted = "started";
+        internal const string TaskLifecycleActionAdded = "added";
         internal const string TaskLifecycleActionCompleted = "completed";
         internal const string TaskLifecycleActionFailed = "failed";
         internal const string TaskLifecycleActionDone = "done";
@@ -469,6 +477,11 @@ namespace IMDataCore
         internal const string SubstoryLifecycleActionStarted = "started";
         internal const string SubstoryLifecycleActionDelayed = "delayed";
         internal const string SubstoryLifecycleActionCompleted = "completed";
+        internal const string OutfitChangeActionChangeOutfit = "change_outfit";
+        internal const string OutfitChangeActionSetOutfit = "set_outfit";
+        internal const string OutfitChangeActionRevertOutfit = "revert_outfit";
+        internal const string OutfitChangeActionStopLewd = "stop_lewd";
+        internal const string OutfitChangeActionDateOutfitImproved = "date_outfit_improved";
         internal const string MentorshipLifecycleActionStarted = "started";
         internal const string MentorshipLifecycleActionEnded = "ended";
         internal const string MentorshipLifecycleActionWeeklyTick = "weekly_tick";
@@ -951,6 +964,8 @@ namespace IMDataCore
         internal const string HarmonyAuditionsResetCooldownMethodName = "ResetCooldown";
         internal const string HarmonySubstoriesStartDialogueMethodName = "StartDialogue";
         internal const string HarmonyActiveDialogueInstantTransitionMethodName = "DoIntstantTransition";
+        internal const string OptionalTypeNameEroEventsCoffeeDateMenu = "EroEvents.Coffee_Date_Menu";
+        internal const string OptionalMethodNameEroEventsCoffeeDateMenuSaveOutfit = "SaveOutfit";
         internal const string HarmonyResourcesOnNewWeekMethodName = "OnNewWeek";
         internal const string HarmonyResourcesOnNewDayMethodName = "OnNewDay";
         internal const string HarmonyDateInfluenceBlackmailTriggerMethodName = "Blackmail_Trigger";
@@ -9493,6 +9508,8 @@ namespace IMDataCore
     {
         public string task_action = string.Empty;
         public string task_custom = string.Empty;
+        public string task_title = string.Empty;
+        public string task_description = string.Empty;
         public string task_type = string.Empty;
         public string task_goal = string.Empty;
         public bool task_substory;
@@ -9506,6 +9523,21 @@ namespace IMDataCore
         public bool skip_lock;
         public string route = string.Empty;
         public string available_from = string.Empty;
+        public string event_date = string.Empty;
+    }
+
+    /// <summary>
+    /// JSON payload emitted for idol outfit/body appearance changes triggered by dialogue or date-menu actions.
+    /// </summary>
+    [Serializable]
+    internal sealed class IdolOutfitChangedEventPayload
+    {
+        public int idol_id = CoreConstants.InvalidIdValue;
+        public string outfit_change_action = string.Empty;
+        public int previous_outfit_part_id = CoreConstants.InvalidIdValue;
+        public int new_outfit_part_id = CoreConstants.InvalidIdValue;
+        public string previous_outfit_asset_id = string.Empty;
+        public string new_outfit_asset_id = string.Empty;
         public string event_date = string.Empty;
     }
 
@@ -9825,6 +9857,7 @@ namespace IMDataCore
     {
         public string substory_id = string.Empty;
         public string substory_parent_id = string.Empty;
+        public string actors_summary = string.Empty;
         public string substory_type = string.Empty;
         public string substory_lifecycle_action = string.Empty;
         public bool debug_mode;
@@ -10798,6 +10831,26 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Snapshot captured before one task-addition request mutates the active task list.
+    /// </summary>
+    internal sealed class TaskAddedSnapshot
+    {
+        internal string RequestedTaskCustom = string.Empty;
+        internal bool TaskExistedBefore;
+    }
+
+    /// <summary>
+    /// Snapshot captured before one direct idol outfit/body mutation.
+    /// </summary>
+    internal sealed class IdolOutfitChangeSnapshot
+    {
+        internal int IdolId = CoreConstants.InvalidIdValue;
+        internal string ActionCode = string.Empty;
+        internal int PreviousOutfitPartId = CoreConstants.InvalidIdValue;
+        internal string PreviousOutfitAssetId = string.Empty;
+    }
+
+    /// <summary>
     /// Snapshot captured before one concert card usage mutation.
     /// </summary>
     internal sealed class ConcertCardUseSnapshot
@@ -11051,6 +11104,8 @@ namespace IMDataCore
         internal bool WasUsedBefore;
         internal bool WasDelayedBefore;
         internal bool WasQueuedBefore;
+        internal string ActorSummary = string.Empty;
+        internal List<int> IdolIds = new List<int>();
     }
 
     /// <summary>
@@ -11062,6 +11117,8 @@ namespace IMDataCore
         internal string ParentDialogueId = string.Empty;
         internal string DialogueTypeCode = string.Empty;
         internal bool ShouldEmit;
+        internal string ActorSummary = string.Empty;
+        internal List<int> IdolIds = new List<int>();
     }
 
     /// <summary>
@@ -11073,6 +11130,8 @@ namespace IMDataCore
         internal string SourceParentDialogueId = string.Empty;
         internal string SourceDialogueTypeCode = string.Empty;
         internal bool SourceShouldEmit;
+        internal string SourceActorSummary = string.Empty;
+        internal List<int> SourceIdolIds = new List<int>();
         internal string RequestedTargetDialogueId = string.Empty;
         internal bool TargetWasUsedBefore;
         internal int QueueCountBefore;

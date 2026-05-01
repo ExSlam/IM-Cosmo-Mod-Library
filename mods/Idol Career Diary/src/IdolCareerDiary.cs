@@ -472,9 +472,11 @@ namespace IdolCareerDiary
         internal const string EventSubstoryStarted = "substory_started";
         internal const string EventSubstoryDelayed = "substory_delayed";
         internal const string EventSubstoryCompleted = "substory_completed";
+        internal const string EventTaskAdded = "task_added";
         internal const string EventTaskCompleted = "task_completed";
         internal const string EventTaskFailed = "task_failed";
         internal const string EventTaskDone = "task_done";
+        internal const string EventIdolOutfitChanged = "idol_outfit_changed";
         internal const string EventWishGenerated = "wish_generated";
         internal const string EventWishFulfilled = "wish_fulfilled";
         internal const string EventWishDone = "wish_done";
@@ -1273,9 +1275,13 @@ namespace IdolCareerDiary
         internal static readonly string TextTaskCompleted = ModLocalization.Get("c.TextTaskCompleted", "Task Completed");
         internal static readonly string TextTaskFailed = ModLocalization.Get("c.TextTaskFailed", "Task Failed");
         internal static readonly string TextTaskClosed = ModLocalization.Get("c.TextTaskClosed", "Task Closed");
+        internal static readonly string TextTaskAdded = ModLocalization.Get("c.TextTaskAdded", "Task Added");
         internal const string KeyTaskCustom = "task_custom";
+        internal const string KeyTaskTitle = "task_title";
+        internal const string KeyTaskDescription = "task_description";
         internal const string KeyTaskType = "task_type";
         internal static readonly string TextTaskType = ModLocalization.Get("c.TextTaskType", "Task Category");
+        internal static readonly string TextTaskDescription = ModLocalization.Get("c.TextTaskDescription", "Task Description");
         internal static readonly string TextTaskSummary = ModLocalization.Get("c.TextTaskSummary", "Task Summary");
         internal static readonly string TextTaskSummaryTypePart = ModLocalization.Get("c.TextTaskSummaryTypePart", "category {0}");
         internal static readonly string TextTaskSummaryGoalPart = ModLocalization.Get("c.TextTaskSummaryGoalPart", "goal {0}");
@@ -1304,6 +1310,15 @@ namespace IdolCareerDiary
         internal const string KeyActiveAfter = "active_after";
         internal static readonly string TextAvailableFrom = ModLocalization.Get("c.TextAvailableFrom", "Available From");
         internal const string KeyAvailableFrom = "available_from";
+        internal static readonly string TextOutfitChanged = ModLocalization.Get("c.TextOutfitChanged", "Outfit Changed");
+        internal static readonly string TextOutfitChangeAction = ModLocalization.Get("c.TextOutfitChangeAction", "Outfit Change");
+        internal const string KeyOutfitChangeAction = "outfit_change_action";
+        internal const string KeyPreviousOutfitPartId = "previous_outfit_part_id";
+        internal const string KeyNewOutfitPartId = "new_outfit_part_id";
+        internal const string KeyPreviousOutfitAssetId = "previous_outfit_asset_id";
+        internal const string KeyNewOutfitAssetId = "new_outfit_asset_id";
+        internal static readonly string TextPreviousOutfitId = ModLocalization.Get("c.TextPreviousOutfitId", "Previous Outfit ID");
+        internal static readonly string TextNewOutfitId = ModLocalization.Get("c.TextNewOutfitId", "New Outfit ID");
         internal static readonly string TextResearchAssigned = ModLocalization.Get("c.TextResearchAssigned", "Research Assigned");
         internal static readonly string TextResearchPointsPurchased = ModLocalization.Get("c.TextResearchPointsPurchased", "Research Points Purchased");
         internal static readonly string TextResearchParameterLeveledUp = ModLocalization.Get("c.TextResearchParameterLeveledUp", "Research Parameter Leveled Up");
@@ -4970,12 +4985,20 @@ namespace IdolCareerDiary
 
                 string substoryDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryId, C.KeySubstoryDisplayName);
                 string parentDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryParentId, C.KeySubstoryParentDisplayName);
+                string involvedIdols = BuildActorSummary(ReadStr(payload, C.KeyActorsSummary));
                 p.WithWhom = substoryDisplayName != C.LabelUnknown
                     ? substoryDisplayName
-                    : (parentDisplayName != C.LabelUnknown ? parentDisplayName : C.LabelStory);
+                    : (parentDisplayName != C.LabelUnknown
+                        ? parentDisplayName
+                        : (!string.IsNullOrEmpty(involvedIdols) ? involvedIdols : C.LabelStory));
                 if (parentDisplayName != C.LabelUnknown && !string.Equals(parentDisplayName, p.WithWhom, StringComparison.OrdinalIgnoreCase))
                 {
                     lines.Add(C.TextParentStory + C.SeparatorColonSpace + parentDisplayName);
+                }
+
+                if (!string.IsNullOrEmpty(involvedIdols))
+                {
+                    lines.Add(C.TextInvolvedIdols + involvedIdols);
                 }
 
                 if (C.ShowTechnicalEventMetadata)
@@ -4990,14 +5013,20 @@ namespace IdolCareerDiary
                 return;
             }
 
-            p.Title = type == C.EventTaskCompleted
-                ? C.TextTaskCompleted
-                : (type == C.EventTaskFailed ? C.TextTaskFailed : C.TextTaskClosed);
+            p.Title = type == C.EventTaskAdded
+                ? C.TextTaskAdded
+                : (type == C.EventTaskCompleted
+                    ? C.TextTaskCompleted
+                    : (type == C.EventTaskFailed ? C.TextTaskFailed : C.TextTaskClosed));
             string taskSummary = BuildTaskSummary(payload);
+            string taskTitle = NormalizeRawText(ReadStr(payload, C.KeyTaskTitle));
             string taskName = NormalizeRawText(ReadStr(payload, C.KeyTaskCustom));
-            p.WithWhom = taskName != C.LabelUnknown
-                ? HumanizeUnknown(taskName)
-                : (!string.IsNullOrEmpty(taskSummary) ? taskSummary : HumanizeUnknown(ReadStr(payload, C.KeyTaskType)));
+            p.WithWhom = taskTitle != C.LabelUnknown
+                ? taskTitle
+                : (taskName != C.LabelUnknown
+                    ? HumanizeUnknown(taskName)
+                    : (!string.IsNullOrEmpty(taskSummary) ? taskSummary : HumanizeUnknown(ReadStr(payload, C.KeyTaskType))));
+            AddRawLineIfKnown(lines, C.TextTaskDescription, ReadStr(payload, C.KeyTaskDescription));
             if (!string.IsNullOrEmpty(taskSummary))
             {
                 lines.Add(C.TextTaskSummary + C.SeparatorColonSpace + taskSummary);
@@ -5006,6 +5035,62 @@ namespace IdolCareerDiary
             AddBoolTransitionLine(lines, C.LabelFulfilled, payload, C.KeyFulfilledBefore, C.KeyFulfilledAfter);
             AddBoolTransitionLine(lines, C.LabelActive, payload, C.KeyActiveBefore, C.KeyActiveAfter);
             AddDateLineIfKnown(lines, C.TextAvailableFrom, ReadStr(payload, C.KeyAvailableFrom));
+        }
+
+        /// <summary>
+        /// Builds player-facing output for idol outfit/body appearance changes captured from external mods.
+        /// </summary>
+        private void BuildOutfitPresentation(IMDataCoreEvent ev, JSONNode payload, Presentation p, List<string> lines)
+        {
+            p.Title = C.TextOutfitChanged;
+
+            string actionDisplay = HumanizeUnknown(ReadStr(payload, C.KeyOutfitChangeAction));
+            int idolId = ReadId(payload, C.JsonIdolId);
+            if (idolId < C.MinId)
+            {
+                idolId = ResolveIdFromEvent(ev);
+            }
+
+            p.WithWhom = actionDisplay != C.LabelUnknown
+                ? actionDisplay
+                : ResolveIdolNameById(idolId);
+
+            AddCodeLineIfKnown(lines, C.TextOutfitChangeAction, ReadStr(payload, C.KeyOutfitChangeAction));
+
+            if (!C.ShowTechnicalEventMetadata)
+            {
+                return;
+            }
+
+            string previousOutfitId = NormalizeRawText(ReadStr(payload, C.KeyPreviousOutfitAssetId));
+            if (previousOutfitId == C.LabelUnknown)
+            {
+                int previousPartId = ReadInt(payload, C.KeyPreviousOutfitPartId);
+                if (previousPartId >= C.MinId)
+                {
+                    previousOutfitId = previousPartId.ToString(CultureInfo.InvariantCulture);
+                }
+            }
+
+            string newOutfitId = NormalizeRawText(ReadStr(payload, C.KeyNewOutfitAssetId));
+            if (newOutfitId == C.LabelUnknown)
+            {
+                int newPartId = ReadInt(payload, C.KeyNewOutfitPartId);
+                if (newPartId >= C.MinId)
+                {
+                    newOutfitId = newPartId.ToString(CultureInfo.InvariantCulture);
+                }
+            }
+
+            if (previousOutfitId != C.LabelUnknown)
+            {
+                lines.Add(C.TextPreviousOutfitId + C.SeparatorColonSpace + previousOutfitId);
+            }
+
+            if (newOutfitId != C.LabelUnknown)
+            {
+                lines.Add(C.TextNewOutfitId + C.SeparatorColonSpace + newOutfitId);
+            }
         }
 
         /// <summary>
@@ -11016,6 +11101,9 @@ namespace IdolCareerDiary
                 case C.EventConcertCancelled:
                 case C.EventRandomEventConcluded:
                 case C.EventSubstoryCompleted:
+                case C.EventTaskCompleted:
+                case C.EventTaskFailed:
+                case C.EventTaskDone:
                     return true;
             }
 
@@ -11086,6 +11174,11 @@ namespace IdolCareerDiary
 
                 case C.EventSubstoryCompleted:
                     return string.Equals(candidateType, C.EventSubstoryStarted, StringComparison.Ordinal);
+
+                case C.EventTaskCompleted:
+                case C.EventTaskFailed:
+                case C.EventTaskDone:
+                    return string.Equals(candidateType, C.EventTaskAdded, StringComparison.Ordinal);
             }
 
             return false;
@@ -12143,10 +12236,15 @@ namespace IdolCareerDiary
                 case C.EventSubstoryStarted:
                 case C.EventSubstoryDelayed:
                 case C.EventSubstoryCompleted:
+                case C.EventTaskAdded:
                 case C.EventTaskCompleted:
                 case C.EventTaskFailed:
                 case C.EventTaskDone:
                     BuildNarrativePresentation(type, ev, payload, p, outcomeLines);
+                    return true;
+
+                case C.EventIdolOutfitChanged:
+                    BuildOutfitPresentation(ev, payload, p, outcomeLines);
                     return true;
 
                 case C.EventStoryRouteLocked:
@@ -13406,7 +13504,7 @@ namespace IdolCareerDiary
                 return string.Empty;
             }
 
-            string[] entries = raw.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] entries = raw.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
             List<string> names = new List<string>();
             for (int i = C.ZeroIndex; i < entries.Length; i++)
             {
@@ -13416,18 +13514,20 @@ namespace IdolCareerDiary
                     continue;
                 }
 
-                string[] fields = entry.Split(':');
-                if (fields.Length >= C.RelationshipMetadataMinimumFieldCount && string.Equals(fields[C.MinId], C.KindIdol, StringComparison.OrdinalIgnoreCase))
+                string[] fields = entry.Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.ActorSummaryFieldCount)
                 {
-                    string parsedName = NormalizeRawText(fields[fields.Length - C.LastFromCount]);
+                    continue;
+                }
+
+                if (string.Equals(fields[C.ActorSummaryKindField], C.KindIdol, StringComparison.OrdinalIgnoreCase))
+                {
+                    string parsedName = NormalizeRawText(fields[C.ActorSummaryDisplayNameField]);
                     if (parsedName != C.LabelUnknown)
                     {
                         names.Add(parsedName);
                     }
-                    continue;
                 }
-
-                names.Add(entry);
             }
 
             if (names.Count == C.ZeroIndex)
