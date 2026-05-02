@@ -41,6 +41,28 @@ namespace IdolCareerDiary
         internal const string ConfigCommentPrefixHash = "#";
         internal const string ConfigCommentPrefixSemicolon = ";";
         internal const string ConfigCommentPrefixSlashSlash = "//";
+        internal const string CustomEntriesFolderName = "Idol Career Diary";
+        internal const string CustomEntriesFolderNameCompact = "IdolCareerDiary";
+        internal const string CustomEntriesArrayField = "entries";
+        internal const string CustomEntryEventTypeField = "event_type";
+        internal const string CustomEntryEventTypesField = "event_types";
+        internal const string CustomEntryEntityKindField = "entity_kind";
+        internal const string CustomEntryEntityIdField = "entity_id";
+        internal const string CustomEntryEntityIdsField = "entity_ids";
+        internal const string CustomEntrySubstoryIdField = "substory_id";
+        internal const string CustomEntrySubstoryIdsField = "substory_ids";
+        internal const string CustomEntryTitleField = "title";
+        internal const string CustomEntryWithWhomField = "with_whom";
+        internal const string CustomEntryDescriptionField = "description";
+        internal const string CustomEntryDetailsField = "details";
+        internal const string CustomEntryOutcomeLinesField = "outcome_lines";
+        internal const string CustomTokenIdols = "{idols}";
+        internal const string CustomTokenIdol = "{idol}";
+        internal const string CustomTokenFocusedIdol = "{focused_idol}";
+        internal const string CustomTokenStory = "{story}";
+        internal const string CustomTokenSubstory = "{substory}";
+        internal const string CustomTokenParentStory = "{parent_story}";
+        internal const string CustomTokenAction = "{action}";
         internal static readonly string ConfigCommentHeader = ModLocalization.Get("c.ConfigCommentHeader", "# IdolCareerDiary configuration");
         internal static readonly string ConfigCommentShowUnknownSocialParticipants = ModLocalization.Get("c.ConfigCommentShowUnknownSocialParticipants", "# Show social-event participants even when producer does not know them.");
         internal static readonly string[] DefaultConfigTemplateLines = new[]
@@ -3677,6 +3699,479 @@ namespace IdolCareerDiary
     }
 
     /// <summary>
+    /// Optional player-facing diary text supplied by JSON-only content mods.
+    /// </summary>
+    internal sealed class CustomDiaryEntry
+    {
+        internal readonly List<string> EventTypes = new List<string>();
+        internal readonly List<string> EntityIds = new List<string>();
+        internal string EntityKind = string.Empty;
+        internal string Title = string.Empty;
+        internal string WithWhom = string.Empty;
+        internal string Description = string.Empty;
+        internal readonly List<string> OutcomeLines = new List<string>();
+
+        internal bool Matches(IMDataCoreEvent ev, JSONNode payload)
+        {
+            if (ev == null)
+            {
+                return false;
+            }
+
+            if (EventTypes.Count > C.ZeroIndex && !ContainsOrdinal(EventTypes, ev.EventType ?? string.Empty))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(EntityKind) && !string.Equals(EntityKind, ev.EntityKind ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (EntityIds.Count == C.ZeroIndex)
+            {
+                return true;
+            }
+
+            if (ContainsOrdinal(EntityIds, ev.EntityId ?? string.Empty))
+            {
+                return true;
+            }
+
+            string substoryId = payload != null ? ReadJsonField(payload, C.KeySubstoryId) : string.Empty;
+            return ContainsOrdinal(EntityIds, substoryId);
+        }
+
+        private static string ReadJsonField(JSONNode payload, string field)
+        {
+            if (payload == null || string.IsNullOrEmpty(field))
+            {
+                return string.Empty;
+            }
+
+            JSONNode node = payload[field];
+            if (node == null || IsLazyCreatorNode(node))
+            {
+                return string.Empty;
+            }
+
+            return node.Value ?? string.Empty;
+        }
+
+        private static bool IsLazyCreatorNode(JSONNode node)
+        {
+            return node != null && string.Equals(node.GetType().Name, C.JsonLazyCreatorRuntimeTypeName, StringComparison.Ordinal);
+        }
+
+        private static bool ContainsOrdinal(List<string> values, string candidate)
+        {
+            if (values == null || string.IsNullOrEmpty(candidate))
+            {
+                return false;
+            }
+
+            for (int i = C.ZeroIndex; i < values.Count; i++)
+            {
+                if (string.Equals(values[i], candidate, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Loads optional diary text from content mod folders.
+    /// </summary>
+    internal static class CustomDiaryCatalog
+    {
+        private static readonly object Sync = new object();
+        private static readonly List<CustomDiaryEntry> Entries = new List<CustomDiaryEntry>();
+        private static bool loaded;
+
+        internal static void EnsureLoaded()
+        {
+            lock (Sync)
+            {
+                if (loaded)
+                {
+                    return;
+                }
+
+                loaded = true;
+                LoadUnsafe();
+            }
+        }
+
+        internal static bool TryFind(IMDataCoreEvent ev, JSONNode payload, out CustomDiaryEntry entry)
+        {
+            EnsureLoaded();
+            lock (Sync)
+            {
+                for (int i = C.ZeroIndex; i < Entries.Count; i++)
+                {
+                    if (Entries[i].Matches(ev, payload))
+                    {
+                        entry = Entries[i];
+                        return true;
+                    }
+                }
+            }
+
+            entry = null;
+            return false;
+        }
+
+        private static void LoadUnsafe()
+        {
+            HashSet<string> scannedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> modRoots = ResolveCandidateModRoots();
+            for (int i = C.ZeroIndex; i < modRoots.Count; i++)
+            {
+                LoadFromModRootUnsafe(modRoots[i], scannedFolders);
+            }
+
+            if (Entries.Count > C.ZeroIndex)
+            {
+                Log.Info("Loaded custom diary entries: " + Entries.Count.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        private static List<string> ResolveCandidateModRoots()
+        {
+            List<string> roots = new List<string>();
+            string assemblyDirectory = GetAssemblyDirectory();
+            AddDirectory(roots, assemblyDirectory);
+
+            string parent = SafeGetParent(assemblyDirectory);
+            if (!string.IsNullOrEmpty(parent))
+            {
+                AddDirectory(roots, parent);
+                AddChildDirectories(roots, parent);
+            }
+
+            string grandParent = SafeGetParent(parent);
+            if (!string.IsNullOrEmpty(grandParent))
+            {
+                AddChildDirectories(roots, grandParent);
+            }
+
+            try
+            {
+                AddChildDirectories(roots, Path.Combine(Application.persistentDataPath, "Mods"));
+            }
+            catch
+            {
+            }
+
+            return roots;
+        }
+
+        private static void LoadFromModRootUnsafe(string modRoot, HashSet<string> scannedFolders)
+        {
+            if (string.IsNullOrEmpty(modRoot) || scannedFolders == null)
+            {
+                return;
+            }
+
+            LoadFromFolderUnsafe(Path.Combine(modRoot, C.CustomEntriesFolderName), scannedFolders);
+            LoadFromFolderUnsafe(Path.Combine(modRoot, C.CustomEntriesFolderNameCompact), scannedFolders);
+        }
+
+        private static void LoadFromFolderUnsafe(string folder, HashSet<string> scannedFolders)
+        {
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                return;
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(folder);
+            }
+            catch
+            {
+                fullPath = folder;
+            }
+
+            if (!scannedFolders.Add(fullPath))
+            {
+                return;
+            }
+
+            string[] files;
+            try
+            {
+                files = Directory.GetFiles(fullPath, "*.json", SearchOption.TopDirectoryOnly);
+            }
+            catch (Exception exception)
+            {
+                Log.Warn("Custom diary folder scan failed: " + exception.Message);
+                return;
+            }
+
+            for (int i = C.ZeroIndex; i < files.Length; i++)
+            {
+                LoadFileUnsafe(files[i]);
+            }
+        }
+
+        private static void LoadFileUnsafe(string path)
+        {
+            try
+            {
+                JSONNode root = ParseJson(File.ReadAllText(path));
+                JSONArray entries = root != null ? root[C.CustomEntriesArrayField].AsArray : null;
+                if (entries == null && root is JSONArray)
+                {
+                    entries = root.AsArray;
+                }
+
+                if (entries == null)
+                {
+                    return;
+                }
+
+                for (int i = C.ZeroIndex; i < entries.Count; i++)
+                {
+                    CustomDiaryEntry entry = ParseEntry(entries[i]);
+                    if (entry != null)
+                    {
+                        Entries.Add(entry);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.Warn("Custom diary file load failed: " + path + " " + exception.Message);
+            }
+        }
+
+        private static CustomDiaryEntry ParseEntry(JSONNode node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            CustomDiaryEntry entry = new CustomDiaryEntry();
+            AddStringOrArray(entry.EventTypes, node, C.CustomEntryEventTypeField);
+            AddStringOrArray(entry.EventTypes, node, C.CustomEntryEventTypesField);
+            AddStringOrArray(entry.EntityIds, node, C.CustomEntryEntityIdField);
+            AddStringOrArray(entry.EntityIds, node, C.CustomEntryEntityIdsField);
+            AddStringOrArray(entry.EntityIds, node, C.CustomEntrySubstoryIdField);
+            AddStringOrArray(entry.EntityIds, node, C.CustomEntrySubstoryIdsField);
+            AddStringOrArray(entry.OutcomeLines, node, C.CustomEntryOutcomeLinesField);
+            entry.EntityKind = NormalizeEntryText(ReadJsonField(node, C.CustomEntryEntityKindField));
+            if (entry.EntityKind == C.LabelUnknown)
+            {
+                entry.EntityKind = string.Empty;
+            }
+
+            entry.Title = NormalizeEntryText(ReadJsonField(node, C.CustomEntryTitleField));
+            entry.WithWhom = NormalizeEntryText(ReadJsonField(node, C.CustomEntryWithWhomField));
+            entry.Description = NormalizeEntryText(ReadJsonField(node, C.CustomEntryDescriptionField));
+            if (entry.Description == C.LabelUnknown)
+            {
+                entry.Description = NormalizeEntryText(ReadJsonField(node, C.CustomEntryDetailsField));
+            }
+
+            if (entry.EventTypes.Count == C.ZeroIndex && entry.EntityIds.Count == C.ZeroIndex)
+            {
+                return null;
+            }
+
+            return entry;
+        }
+
+        private static void AddStringOrArray(List<string> destination, JSONNode node, string field)
+        {
+            if (destination == null || node == null || string.IsNullOrEmpty(field))
+            {
+                return;
+            }
+
+            JSONNode valueNode = node[field];
+            if (valueNode == null || IsLazyCreatorNode(valueNode))
+            {
+                return;
+            }
+
+            JSONArray array = valueNode.AsArray;
+            if (array != null)
+            {
+                for (int i = C.ZeroIndex; i < array.Count; i++)
+                {
+                    AddValue(destination, ReadNodeString(array[i]));
+                }
+
+                return;
+            }
+
+            AddValue(destination, ReadNodeString(valueNode));
+        }
+
+        private static void AddValue(List<string> destination, string value)
+        {
+            string normalized = NormalizeEntryText(value);
+            if (normalized == C.LabelUnknown)
+            {
+                return;
+            }
+
+            destination.Add(normalized);
+        }
+
+        private static JSONNode ParseJson(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JSON.Parse(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string ReadJsonField(JSONNode payload, string field)
+        {
+            if (payload == null || string.IsNullOrEmpty(field))
+            {
+                return string.Empty;
+            }
+
+            JSONNode node = payload[field];
+            if (node == null || IsLazyCreatorNode(node))
+            {
+                return string.Empty;
+            }
+
+            return ReadNodeString(node);
+        }
+
+        private static string ReadNodeString(JSONNode node)
+        {
+            if (node == null || IsLazyCreatorNode(node))
+            {
+                return string.Empty;
+            }
+
+            return node.Value ?? string.Empty;
+        }
+
+        private static string NormalizeEntryText(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return C.LabelUnknown;
+            }
+
+            string normalized = raw.Trim();
+            return normalized.Length == C.ZeroIndex ? C.LabelUnknown : normalized;
+        }
+
+        private static bool IsLazyCreatorNode(JSONNode node)
+        {
+            return node != null && string.Equals(node.GetType().Name, C.JsonLazyCreatorRuntimeTypeName, StringComparison.Ordinal);
+        }
+
+        private static void AddChildDirectories(List<string> destination, string root)
+        {
+            if (destination == null || string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            {
+                return;
+            }
+
+            string[] directories;
+            try
+            {
+                directories = Directory.GetDirectories(root);
+            }
+            catch
+            {
+                return;
+            }
+
+            for (int i = C.ZeroIndex; i < directories.Length; i++)
+            {
+                AddDirectory(destination, directories[i]);
+            }
+        }
+
+        private static void AddDirectory(List<string> destination, string path)
+        {
+            if (destination == null || string.IsNullOrEmpty(path) || !Directory.Exists(path))
+            {
+                return;
+            }
+
+            string fullPath;
+            try
+            {
+                fullPath = Path.GetFullPath(path);
+            }
+            catch
+            {
+                fullPath = path;
+            }
+
+            for (int i = C.ZeroIndex; i < destination.Count; i++)
+            {
+                if (string.Equals(destination[i], fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            destination.Add(fullPath);
+        }
+
+        private static string GetAssemblyDirectory()
+        {
+            try
+            {
+                string path = Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(path))
+                {
+                    return Path.GetDirectoryName(path);
+                }
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
+        }
+
+        private static string SafeGetParent(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                DirectoryInfo parent = Directory.GetParent(path);
+                return parent != null ? parent.FullName : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+    }
+
+    /// <summary>
     /// Profile popup controller for injected Career Diary UI.
     /// </summary>
     internal sealed class CareerDiaryController : MonoBehaviour
@@ -4986,17 +5481,31 @@ namespace IdolCareerDiary
                 string substoryDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryId, C.KeySubstoryDisplayName);
                 string parentDisplayName = ResolveSubstoryDisplayName(payload, C.KeySubstoryParentId, C.KeySubstoryParentDisplayName);
                 string involvedIdols = BuildActorSummary(ReadStr(payload, C.KeyActorsSummary));
-                p.WithWhom = substoryDisplayName != C.LabelUnknown
-                    ? substoryDisplayName
-                    : (parentDisplayName != C.LabelUnknown
-                        ? parentDisplayName
-                        : (!string.IsNullOrEmpty(involvedIdols) ? involvedIdols : C.LabelStory));
-                if (parentDisplayName != C.LabelUnknown && !string.Equals(parentDisplayName, p.WithWhom, StringComparison.OrdinalIgnoreCase))
+
+                CustomDiaryEntry customEntry;
+                if (CustomDiaryCatalog.TryFind(ev, payload, out customEntry))
+                {
+                    ApplyCustomDiaryEntry(customEntry, payload, p, lines, substoryDisplayName, parentDisplayName, involvedIdols);
+                    return;
+                }
+
+                p.WithWhom = !string.IsNullOrEmpty(involvedIdols)
+                    ? involvedIdols
+                    : (substoryDisplayName != C.LabelUnknown
+                        ? substoryDisplayName
+                        : (parentDisplayName != C.LabelUnknown ? parentDisplayName : C.LabelStory));
+
+                if (substoryDisplayName != C.LabelUnknown)
+                {
+                    lines.Add(C.LabelStory + C.SeparatorColonSpace + substoryDisplayName);
+                }
+
+                if (parentDisplayName != C.LabelUnknown && !string.Equals(parentDisplayName, substoryDisplayName, StringComparison.OrdinalIgnoreCase))
                 {
                     lines.Add(C.TextParentStory + C.SeparatorColonSpace + parentDisplayName);
                 }
 
-                if (!string.IsNullOrEmpty(involvedIdols))
+                if (!string.IsNullOrEmpty(involvedIdols) && !string.Equals(involvedIdols, p.WithWhom, StringComparison.OrdinalIgnoreCase))
                 {
                     lines.Add(C.TextInvolvedIdols + involvedIdols);
                 }
@@ -5004,12 +5513,12 @@ namespace IdolCareerDiary
                 if (C.ShowTechnicalEventMetadata)
                 {
                     AddCodeLineIfKnown(lines, C.TextSubstoryType, ReadStr(payload, C.KeySubstoryType));
+                    AddCodeLineIfKnown(lines, C.LabelAction, ReadStr(payload, C.KeySubstoryLifecycleAction));
+                    AddDateLineIfKnown(lines, C.TextScheduledTime, ReadStr(payload, C.KeyScheduledLaunchTime));
+                    AddIntTransitionLine(lines, C.TextQueueCount, payload, C.KeyQueueCountBefore, C.KeyQueueCountAfter);
+                    AddIntTransitionLine(lines, C.TextDelayedQueue, payload, C.KeyDelayedQueueCountBefore, C.KeyDelayedQueueCountAfter);
                 }
 
-                AddCodeLineIfKnown(lines, C.LabelAction, ReadStr(payload, C.KeySubstoryLifecycleAction));
-                AddDateLineIfKnown(lines, C.TextScheduledTime, ReadStr(payload, C.KeyScheduledLaunchTime));
-                AddIntTransitionLine(lines, C.TextQueueCount, payload, C.KeyQueueCountBefore, C.KeyQueueCountAfter);
-                AddIntTransitionLine(lines, C.TextDelayedQueue, payload, C.KeyDelayedQueueCountBefore, C.KeyDelayedQueueCountAfter);
                 return;
             }
 
@@ -5035,6 +5544,197 @@ namespace IdolCareerDiary
             AddBoolTransitionLine(lines, C.LabelFulfilled, payload, C.KeyFulfilledBefore, C.KeyFulfilledAfter);
             AddBoolTransitionLine(lines, C.LabelActive, payload, C.KeyActiveBefore, C.KeyActiveAfter);
             AddDateLineIfKnown(lines, C.TextAvailableFrom, ReadStr(payload, C.KeyAvailableFrom));
+        }
+
+        /// <summary>
+        /// Applies JSON-supplied player-facing diary text to one presentation.
+        /// </summary>
+        private void ApplyCustomDiaryEntry(
+            CustomDiaryEntry entry,
+            JSONNode payload,
+            Presentation p,
+            List<string> lines,
+            string substoryDisplayName,
+            string parentDisplayName,
+            string involvedIdols)
+        {
+            if (entry == null || p == null || lines == null)
+            {
+                return;
+            }
+
+            string title = FormatCustomDiaryTemplate(entry.Title, substoryDisplayName, parentDisplayName, involvedIdols, payload);
+            if (title != C.LabelUnknown)
+            {
+                p.Title = title;
+            }
+
+            string withWhom = FormatCustomDiaryTemplate(entry.WithWhom, substoryDisplayName, parentDisplayName, involvedIdols, payload);
+            if (withWhom != C.LabelUnknown)
+            {
+                p.WithWhom = withWhom;
+            }
+            else if (!string.IsNullOrEmpty(involvedIdols))
+            {
+                p.WithWhom = involvedIdols;
+            }
+            else if (substoryDisplayName != C.LabelUnknown)
+            {
+                p.WithWhom = substoryDisplayName;
+            }
+
+            string description = FormatCustomDiaryTemplate(entry.Description, substoryDisplayName, parentDisplayName, involvedIdols, payload);
+            if (description != C.LabelUnknown)
+            {
+                lines.Add(description);
+            }
+
+            for (int i = C.ZeroIndex; i < entry.OutcomeLines.Count; i++)
+            {
+                string line = FormatCustomDiaryTemplate(entry.OutcomeLines[i], substoryDisplayName, parentDisplayName, involvedIdols, payload);
+                if (line != C.LabelUnknown)
+                {
+                    lines.Add(line);
+                }
+            }
+
+            if (lines.Count == C.ZeroIndex)
+            {
+                if (substoryDisplayName != C.LabelUnknown)
+                {
+                    lines.Add(C.LabelStory + C.SeparatorColonSpace + substoryDisplayName);
+                }
+
+                if (C.ShowTechnicalEventMetadata)
+                {
+                    AddCodeLineIfKnown(lines, C.LabelAction, ReadStr(payload, C.KeySubstoryLifecycleAction));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Expands simple runtime tokens for JSON-supplied diary text.
+        /// </summary>
+        private string FormatCustomDiaryTemplate(
+            string template,
+            string substoryDisplayName,
+            string parentDisplayName,
+            string involvedIdols,
+            JSONNode payload)
+        {
+            string value = NormalizeRawText(template);
+            if (value == C.LabelUnknown)
+            {
+                return C.LabelUnknown;
+            }
+
+            string focusedName = ResolveIdolName(idol);
+            string storyName = substoryDisplayName != C.LabelUnknown ? substoryDisplayName : C.LabelStory;
+            string parentName = parentDisplayName != C.LabelUnknown ? parentDisplayName : storyName;
+            string action = HumanizeUnknown(ReadStr(payload, C.KeySubstoryLifecycleAction));
+            string idolNames = !string.IsNullOrEmpty(involvedIdols)
+                ? involvedIdols
+                : (focusedName != C.LabelUnknown ? focusedName : C.LabelUnknown);
+
+            value = value.Replace(C.CustomTokenIdols, idolNames);
+            value = value.Replace(C.CustomTokenIdol, focusedName);
+            value = value.Replace(C.CustomTokenFocusedIdol, focusedName);
+            value = value.Replace(C.CustomTokenStory, storyName);
+            value = value.Replace(C.CustomTokenSubstory, storyName);
+            value = value.Replace(C.CustomTokenParentStory, parentName);
+            value = value.Replace(C.CustomTokenAction, action);
+            value = ReplaceCustomDiaryActorTokens(value, ReadStr(payload, C.KeyActorsSummary));
+            return NormalizeRawText(value);
+        }
+
+        /// <summary>
+        /// Expands actor-tag and positional-idol tokens in JSON-supplied diary text.
+        /// </summary>
+        private static string ReplaceCustomDiaryActorTokens(string template, string actorsSummary)
+        {
+            string value = NormalizeRawText(template);
+            if (value == C.LabelUnknown)
+            {
+                return template;
+            }
+
+            string normalizedSummary = NormalizeRawText(actorsSummary);
+            if (normalizedSummary == C.LabelUnknown)
+            {
+                return value;
+            }
+
+            string[] entries = normalizedSummary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            int idolIndex = C.ZeroIndex;
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.ActorSummaryFieldCount)
+                {
+                    continue;
+                }
+
+                string actorToken = NormalizeCodeToken(fields[C.ActorSummaryTokenField]);
+                string actorDisplayName = NormalizeRawText(fields[C.ActorSummaryDisplayNameField]);
+                if (string.IsNullOrEmpty(actorToken) || actorDisplayName == C.LabelUnknown)
+                {
+                    continue;
+                }
+
+                value = ReplaceActorTokenFamily(value, actorToken, actorDisplayName);
+                value = ReplaceActorTokenFamily(value, "actor:" + actorToken, actorDisplayName);
+
+                if (string.Equals(fields[C.ActorSummaryKindField], C.KindIdol, StringComparison.OrdinalIgnoreCase))
+                {
+                    idolIndex += C.LastFromCount;
+                    string positionalToken = "idol" + idolIndex.ToString(CultureInfo.InvariantCulture);
+                    value = ReplaceActorTokenFamily(value, positionalToken, actorDisplayName);
+                    value = ReplaceActorTokenFamily(value, "idol_" + idolIndex.ToString(CultureInfo.InvariantCulture), actorDisplayName);
+                }
+            }
+
+            return value;
+        }
+
+        /// <summary>
+        /// Replaces one actor token and its common name/possessive variants.
+        /// </summary>
+        private static string ReplaceActorTokenFamily(string template, string token, string actorDisplayName)
+        {
+            if (string.IsNullOrEmpty(template) || string.IsNullOrEmpty(token) || string.IsNullOrEmpty(actorDisplayName))
+            {
+                return template;
+            }
+
+            string possessiveName = FormatPossessiveName(actorDisplayName);
+            string value = template;
+            value = value.Replace("{" + token + "}", actorDisplayName);
+            value = value.Replace("{" + token + "_name}", actorDisplayName);
+            value = value.Replace("{" + token + "_possessive}", possessiveName);
+            value = value.Replace("{" + token + "'s}", possessiveName);
+            if (token.StartsWith("actor:", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Replace("{" + token + ":name}", actorDisplayName);
+                value = value.Replace("{" + token + ":possessive}", possessiveName);
+            }
+
+            return value;
+        }
+
+        /// <summary>
+        /// Formats a display name as an English possessive for custom diary prose.
+        /// </summary>
+        private static string FormatPossessiveName(string name)
+        {
+            string normalized = NormalizeRawText(name);
+            if (normalized == C.LabelUnknown)
+            {
+                return C.LabelUnknown;
+            }
+
+            return normalized.EndsWith("s", StringComparison.OrdinalIgnoreCase)
+                ? normalized + "'"
+                : normalized + "'s";
         }
 
         /// <summary>
@@ -12363,11 +13063,51 @@ namespace IdolCareerDiary
                         AddRelatedId(destination, listIds[idIndex]);
                     }
                 }
+
+                AddRelatedIdolsFromActorSummary(destination, ReadStr(payload, C.KeyActorsSummary));
             }
 
             AddCliqueRelatedIdolsForTimeline(destination, ev, payload);
             AddShowCastRelatedIdolsForTimeline(destination, ev, payload);
             FilterHiddenSocialRelatedIds(destination, ev, payload);
+        }
+
+        /// <summary>
+        /// Adds idol ids from narrative actor-summary payloads.
+        /// </summary>
+        private void AddRelatedIdolsFromActorSummary(List<int> destination, string actorsSummary)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            string raw = NormalizeRawText(actorsSummary);
+            if (raw == C.LabelUnknown)
+            {
+                return;
+            }
+
+            string[] entries = raw.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = C.ZeroIndex; i < entries.Length; i++)
+            {
+                string[] fields = entries[i].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < C.ActorSummaryFieldCount)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(fields[C.ActorSummaryKindField], C.KindIdol, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int idolId;
+                if (TryParseInt(fields[C.ActorSummaryIdField], out idolId))
+                {
+                    AddRelatedId(destination, idolId);
+                }
+            }
         }
 
         /// <summary>
@@ -17817,6 +18557,7 @@ namespace IdolCareerDiary
 
             Runtime.BootstrapSessionIfNeeded();
             DiarySettings.EnsureLoaded();
+            CustomDiaryCatalog.EnsureLoaded();
         }
     }
 

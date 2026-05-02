@@ -15,6 +15,60 @@ This mod does not ship a separate persistence backend. It reads timeline events 
 - Reads recent timeline events for the selected idol.
 - Groups and formats event types (career, contracts, singles, shows, finance, relationships, and more).
 - Keeps timeline rendering stable when dependencies are present; shows dependency errors when required mods are missing.
+- Lets content-only mods override diary text by shipping JSON files in an `Idol Career Diary` folder.
+
+## Custom Diary Entries For Content Mods
+
+JSON-only mods can add player-facing diary text without Harmony or an IM Data Core DLL reference.
+
+Put one or more `.json` files in either folder inside your mod:
+
+- `Idol Career Diary`
+- `IdolCareerDiary`
+
+Example:
+
+```json
+{
+  "entries": [
+    {
+      "event_types": ["substory_completed"],
+      "substory_ids": ["ee_culture_1a"],
+      "title": "Personal Story Completed",
+      "with_whom": "{idols}",
+      "description": "{idols} finished {story}.",
+      "outcome_lines": ["Story progress recorded for {focused_idol}."]
+    },
+    {
+      "event_types": ["substory_completed"],
+      "substory_ids": ["party_after_rehearsal"],
+      "title": "Party Together",
+      "with_whom": "{idols}",
+      "description": "{idols} went to a party together."
+    },
+    {
+      "event_types": ["substory_completed"],
+      "substory_ids": ["house_invite"],
+      "title": "Visit After Work",
+      "with_whom": "{girl2}",
+      "description": "{girl1} invited {girl2} over to {girl1_possessive} house."
+    }
+  ]
+}
+```
+
+Supported match fields: `event_type`, `event_types`, `entity_kind`, `entity_id`, `entity_ids`, `substory_id`, `substory_ids`.
+
+Supported text fields: `title`, `with_whom`, `description` or `details`, `outcome_lines`.
+
+Supported general tokens: `{idols}`, `{idol}`, `{focused_idol}`, `{story}`, `{substory}`, `{parent_story}`, `{action}`.
+
+Supported actor tokens:
+
+- `{girl1}`, `{girl2}`, `{girl3}` when those actor tags exist in the captured story event
+- `{girl1_possessive}` or `{girl1's}` for possessive prose
+- `{actor:girl1}` and `{actor:girl1:possessive}` as explicit actor-tag forms
+- `{idol1}`, `{idol2}`, `{idol3}` for first/second/third idol actors in capture order
 
 ## Installation
 
