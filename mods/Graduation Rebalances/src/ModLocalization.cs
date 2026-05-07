@@ -10,10 +10,10 @@ namespace GraduationRebalances
         private const string LocalizationDirectoryName = "Localization";
         private const string EnglishFolderName = "en";
         private const string StringsFileName = "strings.txt";
-        private const string PrimaryKeyPrefix = "c.";
         private const int MaxLanguageCodeLength = 16;
         private const int MaxLocalizationEntries = 4096;
         private const int MaxLineLength = 8192;
+        private const int MinKeyLength = 1;
         private const int MaxKeyLength = 96;
         private const int MaxValueLength = 4096;
 
@@ -374,7 +374,7 @@ namespace GraduationRebalances
             }
 
             string key = rawKey.Trim();
-            if (key.Length < 3 || key.Length > MaxKeyLength || !key.StartsWith(PrimaryKeyPrefix, StringComparison.Ordinal))
+            if (key.Length < MinKeyLength || key.Length > MaxKeyLength)
             {
                 return string.Empty;
             }
