@@ -288,12 +288,12 @@ namespace GraduationCalendar
         private const string ModFolderFallback = "Graduation Calendar";
         private const int GridColumns = 6;
         private const float GridCellWidth = 110f;
-        private const float GridCellHeight = 84f;
+        private const float GridCellHeight = 88f;
         private const float PortraitSize = 64f;
-        private const float NameHeight = 12f;
+        private const float NameHeight = 16f;
         private const int CalendarColumns = 7;
-        private const float CalendarCellWidth = 96f;
-        private const float CalendarCellHeight = 86f;
+        private const float CalendarCellWidth = 100f;
+        private const float CalendarCellHeight = 90f;
         private const float CalendarHeaderHeight = 22f;
         private const float CalendarPortraitSize = 22f;
         private const int SelectorFontSize = 22;
