@@ -12,15 +12,27 @@ namespace AssitantManagerMod
     {
         internal const staff._type AssistantManagerStaffType = (staff._type)12010;
         internal const agency._type AssistantManagerOfficeRoomType = (agency._type)12011;
+        internal const staff._type AssistantManagerStaffType2 = (staff._type)12012;
+        
         internal const int MaximumAssistantManagersPerAgency = 2;
         internal const int AssistantManagerOfficeRoomCost = 500000;
         internal const int AssistantManagerOfficeRoomSpace = 1;
+        
+        // Type 1 (Production Focused)
         internal const int AssistantManagerNoviceProductionLevel = 2;
         internal const int AssistantManagerProfessionalProductionLevel = 4;
         internal const int AssistantManagerExpertProductionLevel = 6;
         internal const int AssistantManagerNoviceInfluenceLevel = 0;
         internal const int AssistantManagerProfessionalInfluenceLevel = 1;
         internal const int AssistantManagerExpertInfluenceLevel = 2;
+
+        // Type 2 (Influence Focused)
+        internal const int AssistantManagerType2NoviceProductionLevel = 0;
+        internal const int AssistantManagerType2ProfessionalProductionLevel = 1;
+        internal const int AssistantManagerType2ExpertProductionLevel = 2;
+        internal const int AssistantManagerType2NoviceInfluenceLevel = 2;
+        internal const int AssistantManagerType2ProfessionalInfluenceLevel = 4;
+        internal const int AssistantManagerType2ExpertInfluenceLevel = 6;
 
         internal const string AssistantManagerOfficeBuildButtonObjectName = "AssistantManagerOffice_BuildRoomButton";
         internal const string AssistantManagerHireButtonObjectName = "AssistantManager_StaffHireButton";
@@ -149,7 +161,8 @@ namespace AssitantManagerMod
 
         internal static bool IsAssistantManagerStaffType(staff._type staffType)
         {
-            return staffType == AssistantManagerConstants.AssistantManagerStaffType;
+            return staffType == AssistantManagerConstants.AssistantManagerStaffType ||
+                   staffType == AssistantManagerConstants.AssistantManagerStaffType2;
         }
 
         internal static bool IsAssistantManager(staff._staff staffMember)
@@ -226,54 +239,52 @@ namespace AssitantManagerMod
             return CountAssistantManagerOffices(agencyInstance) < AssistantManagerConstants.MaximumAssistantManagersPerAgency;
         }
 
-        internal static int GetAssistantManagerProductionSkillLevel(staff._expertise expertise)
+        internal static int GetAssistantManagerProductionSkillLevel(staff._type type, staff._expertise expertise)
         {
-            if (expertise == staff._expertise.professional)
+            if (type == AssistantManagerConstants.AssistantManagerStaffType2)
             {
-                return AssistantManagerConstants.AssistantManagerProfessionalProductionLevel;
+                if (expertise == staff._expertise.professional) return AssistantManagerConstants.AssistantManagerType2ProfessionalProductionLevel;
+                if (expertise == staff._expertise.expert) return AssistantManagerConstants.AssistantManagerType2ExpertProductionLevel;
+                return AssistantManagerConstants.AssistantManagerType2NoviceProductionLevel;
             }
 
-            if (expertise == staff._expertise.expert)
-            {
-                return AssistantManagerConstants.AssistantManagerExpertProductionLevel;
-            }
-
+            if (expertise == staff._expertise.professional) return AssistantManagerConstants.AssistantManagerProfessionalProductionLevel;
+            if (expertise == staff._expertise.expert) return AssistantManagerConstants.AssistantManagerExpertProductionLevel;
             return AssistantManagerConstants.AssistantManagerNoviceProductionLevel;
         }
 
-        internal static int GetAssistantManagerInfluenceSkillLevel(staff._expertise expertise)
+        internal static int GetAssistantManagerInfluenceSkillLevel(staff._type type, staff._expertise expertise)
         {
-            if (expertise == staff._expertise.professional)
+            if (type == AssistantManagerConstants.AssistantManagerStaffType2)
             {
-                return AssistantManagerConstants.AssistantManagerProfessionalInfluenceLevel;
+                if (expertise == staff._expertise.professional) return AssistantManagerConstants.AssistantManagerType2ProfessionalInfluenceLevel;
+                if (expertise == staff._expertise.expert) return AssistantManagerConstants.AssistantManagerType2ExpertInfluenceLevel;
+                return AssistantManagerConstants.AssistantManagerType2NoviceInfluenceLevel;
             }
 
-            if (expertise == staff._expertise.expert)
-            {
-                return AssistantManagerConstants.AssistantManagerExpertInfluenceLevel;
-            }
-
+            if (expertise == staff._expertise.professional) return AssistantManagerConstants.AssistantManagerProfessionalInfluenceLevel;
+            if (expertise == staff._expertise.expert) return AssistantManagerConstants.AssistantManagerExpertInfluenceLevel;
             return AssistantManagerConstants.AssistantManagerNoviceInfluenceLevel;
         }
 
-        internal static List<staff._staff._skill> CreateAssistantManagerSkills(staff._expertise expertise)
+        internal static List<staff._staff._skill> CreateAssistantManagerSkills(staff._type type, staff._expertise expertise)
         {
             List<staff._staff._skill> skills = new List<staff._staff._skill>();
             skills.Add(new staff._staff._skill
             {
                 skill_type = staff._skill_type.production,
-                level = GetAssistantManagerProductionSkillLevel(expertise),
+                level = GetAssistantManagerProductionSkillLevel(type, expertise),
                 primary = true
             });
             skills.Add(new staff._staff._skill
             {
                 skill_type = staff._skill_type.influence,
-                level = GetAssistantManagerInfluenceSkillLevel(expertise)
+                level = GetAssistantManagerInfluenceSkillLevel(type, expertise)
             });
             return skills;
         }
 
-        internal static staff._staff GenerateAssistantManagerStaff(staff staffFactory, staff._expertise expertise)
+        internal static staff._staff GenerateAssistantManagerStaff(staff staffFactory, staff._type type, staff._expertise expertise)
         {
             if (staffFactory == null)
             {
@@ -284,7 +295,7 @@ namespace AssitantManagerMod
             generatedStaff.firstName = nameGenerator.firstName(!IsPlayerMale());
             generatedStaff.lastName = nameGenerator.lastName();
             generatedStaff.id = staff.GetNewStaffID();
-            generatedStaff.type = AssistantManagerConstants.AssistantManagerStaffType;
+            generatedStaff.type = type;
             generatedStaff.skills = staffFactory.GetSkillsByType(generatedStaff.type, expertise, false);
             generatedStaff.SetParentRefs();
             return generatedStaff;
@@ -453,13 +464,12 @@ namespace AssitantManagerMod
 
         internal static void EnsureStaffHireButton(Staff_Hire_Popup popup)
         {
-            if (popup == null || popup.Container == null)
-            {
-                return;
-            }
+            if (popup == null || popup.Container == null) return;
 
             Staff_Hire_Button[] buttons = popup.Container.GetComponentsInChildren<Staff_Hire_Button>(true);
             Staff_Hire_Button cloneSource = null;
+            bool foundType1 = false;
+            bool foundType2 = false;
 
             for (int i = 0; i < buttons.Length; i++)
             {
@@ -469,34 +479,62 @@ namespace AssitantManagerMod
                 {
                     buttons[i].Set(popup.Expertise);
                     ApplyAssistantManagerHireButtonPresentation(buttons[i]);
-                    return;
+                    foundType1 = true;
                 }
-
-                if (buttons[i].Type == staff._type.production_manager)
+                else if (buttons[i].Type == AssistantManagerConstants.AssistantManagerStaffType2)
+                {
+                    buttons[i].Set(popup.Expertise);
+                    ApplyAssistantManagerHireButtonPresentation(buttons[i]);
+                    foundType2 = true;
+                }
+                else if (buttons[i].Type == staff._type.production_manager)
                 {
                     cloneSource = buttons[i];
                 }
             }
 
+            if (foundType1 && foundType2) return;
             if (cloneSource == null) return;
 
             Transform sourceRow = cloneSource.transform.parent;
-            GameObject newRow = UnityEngine.Object.Instantiate<GameObject>(sourceRow.gameObject, sourceRow.parent, false);
-            newRow.name = "AssistantManagerRow";
-            newRow.transform.SetAsLastSibling();
-
-            Staff_Hire_Button[] newButtons = newRow.GetComponentsInChildren<Staff_Hire_Button>(true);
-            Staff_Hire_Button hireButton = newButtons[0];
+            Transform existingRow = sourceRow.parent.Find("AssistantManagerRow");
+            GameObject newRow;
             
-            for (int i = 1; i < newButtons.Length; i++)
+            if (existingRow != null)
             {
-                UnityEngine.Object.Destroy(newButtons[i].gameObject);
+                newRow = existingRow.gameObject;
+            }
+            else
+            {
+                newRow = UnityEngine.Object.Instantiate<GameObject>(sourceRow.gameObject, sourceRow.parent, false);
+                newRow.name = "AssistantManagerRow";
+                newRow.transform.SetAsLastSibling();
             }
 
-            hireButton.name = AssistantManagerConstants.AssistantManagerHireButtonObjectName;
-            hireButton.Type = AssistantManagerConstants.AssistantManagerStaffType;
-            hireButton.Set(popup.Expertise);
-            ApplyAssistantManagerHireButtonPresentation(hireButton);
+            Staff_Hire_Button[] newButtons = newRow.GetComponentsInChildren<Staff_Hire_Button>(true);
+            
+            // We expect standard cloned rows to have at least 2 buttons (like production & sales manager).
+            if (newButtons.Length >= 2)
+            {
+                Staff_Hire_Button hireButton1 = newButtons[0];
+                Staff_Hire_Button hireButton2 = newButtons[1];
+                
+                // Ensure only 2 variants exist
+                for (int i = 2; i < newButtons.Length; i++)
+                {
+                    UnityEngine.Object.Destroy(newButtons[i].gameObject);
+                }
+
+                hireButton1.name = AssistantManagerConstants.AssistantManagerHireButtonObjectName + "_1";
+                hireButton1.Type = AssistantManagerConstants.AssistantManagerStaffType;
+                hireButton1.Set(popup.Expertise);
+                ApplyAssistantManagerHireButtonPresentation(hireButton1);
+
+                hireButton2.name = AssistantManagerConstants.AssistantManagerHireButtonObjectName + "_2";
+                hireButton2.Type = AssistantManagerConstants.AssistantManagerStaffType2;
+                hireButton2.Set(popup.Expertise);
+                ApplyAssistantManagerHireButtonPresentation(hireButton2);
+            }
         }
 
         internal static void ApplyAssistantManagerOfficeBuildButtonPresentation(BuildRoomButton buildRoomButton, agency agencyInstance)
@@ -514,7 +552,7 @@ namespace AssitantManagerMod
 
         internal static void ApplyAssistantManagerHireButtonPresentation(Staff_Hire_Button hireButton)
         {
-            if (hireButton == null || hireButton.Type != AssistantManagerConstants.AssistantManagerStaffType)
+            if (hireButton == null || !IsAssistantManagerStaffType(hireButton.Type))
             {
                 return;
             }
@@ -525,7 +563,7 @@ namespace AssitantManagerMod
 
         internal static void SetStaffHireButtonAvailability(Staff_Hire_Button hireButton)
         {
-            if (hireButton == null || hireButton.Type != AssistantManagerConstants.AssistantManagerStaffType)
+            if (hireButton == null || !IsAssistantManagerStaffType(hireButton.Type))
             {
                 return;
             }
@@ -1212,7 +1250,7 @@ namespace AssitantManagerMod
     {
         private static bool Prefix(Staff_Hire_Button __instance)
         {
-            if (__instance == null || __instance.Type != AssistantManagerConstants.AssistantManagerStaffType)
+            if (__instance == null || !AssistantManagerRules.IsAssistantManagerStaffType(__instance.Type))
             {
                 return true;
             }
@@ -1261,7 +1299,7 @@ namespace AssitantManagerMod
                 return true;
             }
 
-            __result = AssistantManagerRules.CreateAssistantManagerSkills(expertise);
+            __result = AssistantManagerRules.CreateAssistantManagerSkills(type, expertise);
             return false;
         }
     }
@@ -1276,7 +1314,7 @@ namespace AssitantManagerMod
                 return true;
             }
 
-            __result = AssistantManagerRules.GenerateAssistantManagerStaff(__instance, expertise);
+            __result = AssistantManagerRules.GenerateAssistantManagerStaff(__instance, type, expertise);
             return false;
         }
     }
