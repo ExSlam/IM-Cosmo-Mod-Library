@@ -1366,7 +1366,7 @@ namespace AssitantManagerMod
                        _girl != null &&
                        __instance.girl == null &&
                        __instance.status == agency._room._status.normal &&
-                       (Dating.DEBUG || Dating.GetDaysCooldown(_girl) <= 0);
+                       (Dating.DEBUG || AssistantManagerDateTracking.GetCooldownDays(__instance.id, _girl.id) <= 0);
             return false;
         }
     }
@@ -1391,18 +1391,69 @@ namespace AssitantManagerMod
     {
         private static bool Prefix(agency._room __instance, data_girls.girls _girl)
         {
-            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance))
-            {
-                return true;
-            }
+            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance)) return true;
 
-            if (_girl == null || __instance.staffer == null)
-            {
-                return false;
-            }
+            if (_girl == null || __instance.staffer == null) return false;
 
             __instance.assign_date(_girl);
             AssistantManagerRules.PlayManagerOfficeDateVoice(_girl);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.GoOnDate))]
+    internal static class RoomGoOnDatePatch
+    {
+        private static bool Prefix(agency._room __instance)
+        {
+            if (AssistantManagerRules.IsAssistantManagerOffice(__instance))
+            {
+                PopupManager component = Camera.main.GetComponent<mainScript>().Data.GetComponent<PopupManager>();
+                Date_Popup component2 = component.GetByType(PopupManager._type.girl_date).obj.GetComponent<Date_Popup>();
+                component.Open(PopupManager._type.girl_date, true);
+                component2.Set(__instance.girl);
+
+                if (__instance.staffer.LevelledUp)
+                {
+                    __instance.girl.addParam(data_girls._paramType.physicalStamina, 5f, false);
+                    int relationshipLevel = __instance.girl.GetRelationshipLevel(Relationships_Player._type.Friendship);
+                    if (relationshipLevel > 0)
+                    {
+                        __instance.girl.addParam(data_girls._paramType.mentalStamina, (float)relationshipLevel, false);
+                    }
+                }
+                
+                // Track date cooldown locally instead of the global .AddDate() trigger
+                AssistantManagerDateTracking.AddDate(__instance.id, __instance.girl.id);
+
+                __instance.girl = null;
+                __instance.status = agency._room._status.normal;
+                __instance.staffer.StopWorking(StatusButton._state.normal);
+                return false;
+            }
+                return true;
+            }
+    }
+
+    [HarmonyPatch(typeof(Room), nameof(Room.SetTitle_Date))]
+    internal static class RoomSetTitleDatePatch
+    {
+        private static bool Prefix(Room __instance, data_girls.girls Girl)
+        {
+            if (__instance == null || !AssistantManagerRules.IsAssistantManagerOffice(__instance.room)) return true;
+
+            int daysCooldown = AssistantManagerDateTracking.GetCooldownDays(__instance.room.id, Girl.id);
+            string str;
+            if (daysCooldown > 1)
+            {
+                str = Language.Insert("AGENCY__DAYS_LEFT", new string[] { daysCooldown.ToString() });
+            }
+            else
+            {
+                str = Language.Data["AGENCY__DAY_LEFT"];
+            }
+            
+            __instance.ShowTitle(ExtensionMethods.color(str, mainScript.red), null);
             return false;
         }
     }
