@@ -107,6 +107,33 @@ namespace AssitantManagerMod
         }
     }
 
+    internal static class AssistantManagerDateTracking
+    {
+        private static Dictionary<int, Dictionary<int, DateTime>> roomGirlCooldowns = new Dictionary<int, Dictionary<int, DateTime>>();
+
+        internal static int GetCooldownDays(int roomId, int girlId)
+        {
+            if (roomGirlCooldowns.TryGetValue(roomId, out var girlCooldowns))
+            {
+                if (girlCooldowns.TryGetValue(girlId, out DateTime cooldownDate))
+                {
+                    int daysLeft = Mathf.CeilToInt((float)(cooldownDate - staticVars.dateTime).TotalDays);
+                    return Mathf.Max(0, daysLeft);
+                }
+            }
+            return 0;
+        }
+
+        internal static void AddDate(int roomId, int girlId)
+        {
+            if (!roomGirlCooldowns.ContainsKey(roomId))
+            {
+                roomGirlCooldowns[roomId] = new Dictionary<int, DateTime>();
+            }
+            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(7.0);
+        }
+    }
+
     internal static class AssistantManagerRules
     {
         private const float ManagerOfficeSecondaryTaskPointMultiplier = 0.2f;
