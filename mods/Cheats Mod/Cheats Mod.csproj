@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Cheats Mod</ModName>
+    <RootNamespace>CheatsMod</RootNamespace>
+    <AssemblyName>com.cosmo.cheatsmod</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\CheatsMod.cs" />
+    <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+</Project>

@@ -6,6 +6,7 @@ Source repository for Cosmo's Idol Manager mods.
 
 ## Mods Included
 
+- [Cheats Mod](mods/Cheats%20Mod/README.md) - Adds cheat actions to the Mod Buttons action hub.
 - [Divorce Fix](mods/Divorce%20Fix/README.md) - Clears marriage state on divorce events so flirting works again.
 - [Graduation Calendar](mods/Graduation%20Calendar/README.md) - Shows graduation dates in Extras and adds a calendar popup.
 - [Graduation Details](mods/Graduation%20Details/README.md) - Adds a graduated idol details popup with earnings, singles, and marriage info.
