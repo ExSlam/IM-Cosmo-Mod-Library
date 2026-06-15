@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
+using UnityEngine.Events;
 
 namespace ModButtons
 {
@@ -205,8 +206,18 @@ namespace ModButtons
         private const string UIPanelName = "Panel";
         private const string UISettingsContainerName = "Settings_Container";
         private const string UICancelButtonName = "Cancel";
+        private const string UIApplyButtonName = "Apply";
+        private const string UIScrollRectName = "ActionHubScrollRect";
+        private const string UIViewportName = "Viewport";
         private const string UIVerticalContainerName = "VerticalContainer";
+        private const string UIScrollbarName = "Scrollbar";
+        private const string UIScrollbarSlidingAreaName = "Sliding Area";
+        private const string UIScrollbarHandleName = "Handle";
         private const string UIDividerName = "Divider";
+        private const string UILineName = "Line";
+        private const string UIIconName = "Icon";
+        private const string UITextName = "Text";
+        private const string UIFallbackCancelLabel = "Cancel";
         
         private const string TargetDirectory = "ModButtons";
         private const string JsonFileName = "buttons.json";
@@ -230,7 +241,10 @@ namespace ModButtons
         private static readonly string[] PreferredButtonTemplateNames = { FallbackSettingsName, FallbackGraphicsName, FallbackMainMenuName };
         
         private const int CustomPopupID = 998;
+        private const int NotFoundIndex = -1;
         private const int TitleFontSize = 24;
+        private const int MinimumButtonCount = 1;
+        private const int ScrollbarButtonCountThreshold = 12;
         
         private const float MaxCellSize = 72f; 
         private const float MinButtonSize = 64f;
@@ -238,18 +252,73 @@ namespace ModButtons
 
         private const float GridCellSpacing = 10f;
         private const float VerticalLayoutSpacing = 15f;
+        private const float ContentTopPadding = 12f;
+        private const float ContentBottomPadding = 4f;
         private const float DividerHeight = 1f;
         private const float DividerWidth = 420f;
-        private const float DividerHorizontalPadding = 24f;
+        private const float SectionTitleHeight = 44f;
         private const float FallbackBtnMinWidth = 200f;
         private const float FallbackBtnMinHeight = 40f;
-        private const int IconButtonsPerRow = 6;
-        private const int FallbackTextButtonsPerRow = 3;
+        private const int IconButtonsPerRow = 2;
+        private const int FallbackTextButtonsPerRow = 2;
+        private const float PopupMinimumWidth = 520f;
+        private const float PopupMinimumHeight = 360f;
+        private const float PopupMaximumScreenWidthRatio = 0.86f;
+        private const float PopupMaximumScreenHeightRatio = 0.72f;
+        private const float PopupScrollableMaximumScreenHeightRatio = 0.58f;
+        private const float PopupScrollableMaximumHeight = 560f;
+        private const float PopupHorizontalPadding = 48f;
+        private const float PopupScrollbarRightPadding = 12f;
+        private const float PopupTopPadding = 58f;
+        private const float PopupBottomPadding = 96f;
+        private const float ScrollbarWidth = 14f;
+        private const float ScrollbarSpacing = 18f;
+        private const float ScrollbarInset = 2f;
+        private const float ScrollbarRightOffset = -6f;
+        private const float ScrollbarMinimumHandleSize = 0.12f;
+        private const float ScrollSensitivity = 36f;
+        private const float CancelButtonBottomOffset = 24f;
+        private const float CancelButtonHeight = 48f;
+        private const float CancelButtonPreferredWidth = 360f;
+        private const float CancelButtonHorizontalPadding = 48f;
+        private const float OpaqueAlpha = 1f;
+        private const float TransparentAlpha = 0f;
 
         private static readonly Color DividerColor = new Color(0.7215686f, 0.6784314f, 0.6509804f, 1f);
+        private static readonly Color ScrollbarTrackColor = new Color(0.7215686f, 0.6784314f, 0.6509804f, 0.35f);
+        private static readonly Color ScrollbarHandleColor = new Color(0.4078f, 0.4118f, 0.6706f, 0.85f);
+        private static readonly Color HiddenMaskColor = new Color(1f, 1f, 1f, OpaqueAlpha);
 
         // This is the purple color assigned to the action buttons
         private static readonly Color GeneratedButtonColor = new Color(0.4078f, 0.4118f, 0.6706f, 1f);
+
+        private sealed class ButtonSectionLayout
+        {
+            internal Mods._mod Mod;
+            internal JSONArray JsonArray;
+            internal string LocalizedTitle;
+            internal bool HasFallbackTextButtons;
+            internal int ButtonCount;
+            internal int ColumnCount;
+            internal int RowCount;
+            internal float CellWidth;
+            internal float CellHeight;
+            internal float GridWidth;
+            internal float GridHeight;
+        }
+
+        private sealed class PopupLayoutMetrics
+        {
+            internal float ContentWidth;
+            internal float ContentHeight;
+            internal float PanelWidth;
+            internal float PanelHeight;
+            internal float ViewportWidth;
+            internal float ViewportHeight;
+            internal float DividerWidth;
+            internal float RightPadding;
+            internal bool RequiresScrollbar;
+        }
 
         public static bool TryInstallActionHubButton()
         {
@@ -493,43 +562,39 @@ namespace ModButtons
         {
             PopupManager pm = Camera.main?.GetComponent<mainScript>()?.Data?.GetComponent<PopupManager>();
             if (pm == null) return null;
-            if (pm.GetByType((PopupManager._type)CustomPopupID) != null) return pm.GetByType((PopupManager._type)CustomPopupID).obj;
 
-            GameObject originalPopup = pm.GetByType(PopupManager._type.settings_difficulty).obj;
-            GameObject modButtonsObj = UnityEngine.Object.Instantiate(originalPopup, originalPopup.transform.parent, false);
-            modButtonsObj.name = PopupObjName;
+            RemoveExistingActionHubPopup(pm);
 
-            Transform panel = modButtonsObj.transform.Find(UIPanelName);
-            
-            Transform settingsContainer = panel.Find(UISettingsContainerName);
-            if (settingsContainer != null) UnityEngine.Object.DestroyImmediate(settingsContainer.gameObject);
-            
-            GameObject cancelButton = modButtonsObj.transform.Find(UICancelButtonName)?.gameObject;
+            GameObject originalPopup = pm.GetByType(PopupManager._type.settings_difficulty)?.obj;
+            if (originalPopup == null) return null;
+
             GameObject actionTemplateButton = FindActionButtonTemplate();
+            List<ButtonSectionLayout> sections = CollectButtonSections();
+            PopupLayoutMetrics metrics = CalculatePopupLayoutMetrics(sections);
+
+            Scrollbar scrollbarTemplate = FindScrollbarTemplate(originalPopup);
+            GameObject modButtonsObj = CreateActionHubPopupRoot(originalPopup);
+            Transform panel = CreateActionHubPanel(originalPopup, modButtonsObj.transform, metrics);
+            GameObject cancelButton = CreateCancelButton(originalPopup, actionTemplateButton, panel);
+
             if (cancelButton != null)
             {
                 Button btn = cancelButton.GetComponent<Button>();
+                if (btn == null)
+                {
+                    btn = cancelButton.AddComponent<Button>();
+                }
                 btn.onClick = new Button.ButtonClickedEvent();
                 btn.onClick.AddListener(() => PopupManager.Close_());
+                PositionCancelButton(cancelButton, metrics);
             }
 
-            GameObject vContainer = new GameObject(UIVerticalContainerName, typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-            vContainer.transform.SetParent(panel, false);
-            
-            RectTransform rect = vContainer.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.1f, 1f);
-            rect.anchorMax = new Vector2(0.9f, 1f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0, -30f);
+            ScrollRect scrollRect;
+            RectTransform contentRect;
+            CreateScrollArea(panel, metrics, scrollbarTemplate, out scrollRect, out contentRect);
 
-            VerticalLayoutGroup vLayout = vContainer.GetComponent<VerticalLayoutGroup>();
-            vLayout.spacing = VerticalLayoutSpacing;
-            vLayout.childAlignment = TextAnchor.UpperCenter;
-            vLayout.childControlHeight = false;
-
-            vContainer.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            PopulateCustomButtons(vContainer.transform, actionTemplateButton);
+            PopulateCustomButtons(contentRect, actionTemplateButton, sections, metrics.DividerWidth);
+            FinalizeScrollLayout(contentRect, scrollRect, metrics);
 
             PopupManager._popup newPopup = new() { type = (PopupManager._type)CustomPopupID, obj = modButtonsObj, BGBlur = true, BGDarken = true };
             Array.Resize(ref pm.popups, pm.popups.Length + 1);
@@ -538,10 +603,185 @@ namespace ModButtons
             return modButtonsObj;
         }
 
-        private static void PopulateCustomButtons(Transform verticalContainer, GameObject templateButton)
+        private static GameObject CreateActionHubPopupRoot(GameObject sourcePopup)
         {
+            GameObject popupRoot = new GameObject(PopupObjName, typeof(RectTransform), typeof(CanvasGroup));
+            popupRoot.transform.SetParent(sourcePopup.transform.parent, false);
+            popupRoot.SetActive(false);
+
+            RectTransform sourceRect = sourcePopup.GetComponent<RectTransform>();
+            RectTransform targetRect = popupRoot.GetComponent<RectTransform>();
+            CopyRectTransform(sourceRect, targetRect);
+
+            CanvasGroup canvasGroup = popupRoot.GetComponent<CanvasGroup>();
+            canvasGroup.alpha = TransparentAlpha;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+
+            Popup sourcePopupComponent = sourcePopup.GetComponent<Popup>();
+            Popup targetPopupComponent = popupRoot.AddComponent<Popup>();
+            if (sourcePopupComponent != null)
+            {
+                targetPopupComponent.ShowAnimation = sourcePopupComponent.ShowAnimation;
+                targetPopupComponent.HideAnimation = sourcePopupComponent.HideAnimation;
+                targetPopupComponent.HideFast = sourcePopupComponent.HideFast;
+                targetPopupComponent.Increase_Popup_Counter = sourcePopupComponent.Increase_Popup_Counter;
+            }
+            targetPopupComponent.OnOpen = new UnityEvent();
+
+            return popupRoot;
+        }
+
+        private static Transform CreateActionHubPanel(GameObject sourcePopup, Transform parent, PopupLayoutMetrics metrics)
+        {
+            GameObject panelObj = new GameObject(UIPanelName, typeof(RectTransform), typeof(Image));
+            panelObj.transform.SetParent(parent, false);
+
+            Transform sourcePanel = sourcePopup != null ? sourcePopup.transform.Find(UIPanelName) : null;
+            Image sourceImage = sourcePanel != null ? sourcePanel.GetComponent<Image>() : null;
+            Image panelImage = panelObj.GetComponent<Image>();
+            CopyImageStyle(sourceImage, panelImage);
+
+            ApplyPopupPanelLayout(panelObj.transform, metrics);
+            return panelObj.transform;
+        }
+
+        private static GameObject CreateCancelButton(GameObject sourcePopup, GameObject actionTemplateButton, Transform panel)
+        {
+            if (panel == null) return null;
+
+            Transform sourceCancel = sourcePopup != null ? sourcePopup.transform.Find(UICancelButtonName) : null;
+            GameObject cancelButton = null;
+            if (sourceCancel != null)
+            {
+                cancelButton = UnityEngine.Object.Instantiate(sourceCancel.gameObject, panel, false);
+            }
+            else if (actionTemplateButton != null)
+            {
+                cancelButton = UnityEngine.Object.Instantiate(actionTemplateButton, panel, false);
+            }
+            else
+            {
+                cancelButton = new GameObject(UICancelButtonName, typeof(RectTransform), typeof(Image), typeof(Button), typeof(ButtonDefault));
+                cancelButton.transform.SetParent(panel, false);
+            }
+
+            cancelButton.name = UICancelButtonName;
+            cancelButton.SetActive(true);
+            SetLayerRecursively(cancelButton, panel.gameObject.layer);
+            SetCanvasGroupsVisible(cancelButton);
+            ResetActionButtonLanguageBindings(cancelButton, UIFallbackCancelLabel);
+
+            TextMeshProUGUI text = cancelButton.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
+            if (text == null)
+            {
+                text = CreateActionButtonText(cancelButton);
+            }
+            if (text != null)
+            {
+                text.gameObject.SetActive(true);
+                text.text = UIFallbackCancelLabel;
+            }
+
+            ButtonDefault buttonDefault = cancelButton.GetComponent<ButtonDefault>();
+            if (buttonDefault != null)
+            {
+                buttonDefault.DefaultTooltip = string.Empty;
+                buttonDefault.SetTooltip(string.Empty);
+                buttonDefault.Activate(true, false);
+            }
+
+            return cancelButton;
+        }
+
+        private static void CopyRectTransform(RectTransform source, RectTransform target)
+        {
+            if (target == null) return;
+
+            if (source != null)
+            {
+                target.anchorMin = source.anchorMin;
+                target.anchorMax = source.anchorMax;
+                target.pivot = source.pivot;
+                target.anchoredPosition = source.anchoredPosition;
+                target.sizeDelta = source.sizeDelta;
+                target.localScale = source.localScale;
+                target.localRotation = source.localRotation;
+                return;
+            }
+
+            target.anchorMin = Vector2.zero;
+            target.anchorMax = Vector2.one;
+            target.pivot = new Vector2(0.5f, 0.5f);
+            target.anchoredPosition = Vector2.zero;
+            target.sizeDelta = Vector2.zero;
+            target.localScale = Vector3.one;
+            target.localRotation = Quaternion.identity;
+        }
+
+        private static void CopyImageStyle(Image source, Image target)
+        {
+            if (target == null) return;
+
+            if (source == null)
+            {
+                target.color = Color.white;
+                target.raycastTarget = true;
+                return;
+            }
+
+            target.sprite = source.sprite;
+            target.overrideSprite = source.overrideSprite;
+            target.type = source.type;
+            target.preserveAspect = source.preserveAspect;
+            target.fillCenter = source.fillCenter;
+            target.fillMethod = source.fillMethod;
+            target.fillOrigin = source.fillOrigin;
+            target.fillAmount = source.fillAmount;
+            target.fillClockwise = source.fillClockwise;
+            target.color = source.color;
+            target.material = source.material;
+            target.raycastTarget = source.raycastTarget;
+            target.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
+        }
+
+        private static void RemoveExistingActionHubPopup(PopupManager manager)
+        {
+            if (manager == null || manager.popups == null) return;
+
+            int existingIndex = NotFoundIndex;
+            for (int i = 0; i < manager.popups.Length; i++)
+            {
+                PopupManager._popup popup = manager.popups[i];
+                if (popup != null && popup.type == (PopupManager._type)CustomPopupID)
+                {
+                    existingIndex = i;
+                    if (popup.obj != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(popup.obj);
+                    }
+                    break;
+                }
+            }
+
+            if (existingIndex == NotFoundIndex) return;
+
+            List<PopupManager._popup> retainedPopups = new List<PopupManager._popup>();
+            for (int i = 0; i < manager.popups.Length; i++)
+            {
+                if (i != existingIndex)
+                {
+                    retainedPopups.Add(manager.popups[i]);
+                }
+            }
+
+            manager.popups = retainedPopups.ToArray();
+        }
+
+        private static List<ButtonSectionLayout> CollectButtonSections()
+        {
+            List<ButtonSectionLayout> sections = new List<ButtonSectionLayout>();
             string relativePath = Path.Combine(TargetDirectory, JsonFileName);
-            float dividerWidth = GetDividerWidth(verticalContainer);
 
             foreach (Mods._mod mod in Mods._Mods)
             {
@@ -550,47 +790,491 @@ namespace ModButtons
                 string filepath = Path.Combine(mod.Path, relativePath).Replace("\\", "/");
                 if (!File.Exists(filepath)) continue;
 
-                JSONArray jsonArray = JSON.Parse(File.ReadAllText(filepath)).AsArray;
-                if (jsonArray.Count == 0) continue;
+                JSONNode parsed;
+                try
+                {
+                    parsed = JSON.Parse(File.ReadAllText(filepath));
+                }
+                catch
+                {
+                    continue;
+                }
+
+                JSONArray jsonArray = parsed?.AsArray;
+                if (jsonArray == null || jsonArray.Count == 0) continue;
 
                 ModButtonsLocalization.EnsureLoaded(mod.Path);
                 string localizedTitle = ModButtonsLocalization.Get(mod.Path, LocKeyModTitle, mod.Title);
 
-                GameObject titleObj = new GameObject(PrefixTitle + mod.Title, typeof(RectTransform), typeof(TextMeshProUGUI));
+                bool hasFallbackTextButtons = HasFallbackTextButtons(mod.Path, jsonArray);
+                int buttonCount = jsonArray.Count;
+                int columnCount = Math.Min(hasFallbackTextButtons ? FallbackTextButtonsPerRow : IconButtonsPerRow, Math.Max(MinimumButtonCount, buttonCount));
+                float cellWidth = hasFallbackTextButtons ? FallbackBtnMinWidth : MaxCellSize;
+                float cellHeight = hasFallbackTextButtons ? FallbackBtnMinHeight : MaxCellSize;
+                int rowCount = Mathf.CeilToInt((float)buttonCount / (float)columnCount);
+                float gridWidth = columnCount * cellWidth + Math.Max(0, columnCount - 1) * GridCellSpacing;
+                float gridHeight = rowCount * cellHeight + Math.Max(0, rowCount - 1) * GridCellSpacing;
+
+                sections.Add(new ButtonSectionLayout
+                {
+                    Mod = mod,
+                    JsonArray = jsonArray,
+                    LocalizedTitle = localizedTitle,
+                    HasFallbackTextButtons = hasFallbackTextButtons,
+                    ButtonCount = buttonCount,
+                    ColumnCount = columnCount,
+                    RowCount = rowCount,
+                    CellWidth = cellWidth,
+                    CellHeight = cellHeight,
+                    GridWidth = gridWidth,
+                    GridHeight = gridHeight
+                });
+            }
+
+            return sections;
+        }
+
+        private static PopupLayoutMetrics CalculatePopupLayoutMetrics(List<ButtonSectionLayout> sections)
+        {
+            float contentWidth = DividerWidth;
+            float contentHeight = ContentTopPadding + ContentBottomPadding;
+            int childCount = 0;
+            int buttonCount = 0;
+
+            if (sections != null)
+            {
+                for (int i = 0; i < sections.Count; i++)
+                {
+                    ButtonSectionLayout section = sections[i];
+                    if (section == null) continue;
+
+                    contentWidth = Mathf.Max(contentWidth, section.GridWidth);
+                    contentHeight += SectionTitleHeight + section.GridHeight + DividerHeight;
+                    childCount += 3;
+                    buttonCount += section.ButtonCount;
+                }
+            }
+
+            if (childCount > 1)
+            {
+                contentHeight += (childCount - 1) * VerticalLayoutSpacing;
+            }
+
+            float maxPanelWidth = Screen.width * PopupMaximumScreenWidthRatio;
+            float maxPanelHeight = Screen.height * PopupMaximumScreenHeightRatio;
+            if (maxPanelWidth <= 0f) maxPanelWidth = PopupMinimumWidth;
+            if (maxPanelHeight <= 0f) maxPanelHeight = PopupMinimumHeight;
+            if (buttonCount > ScrollbarButtonCountThreshold)
+            {
+                float scrollableMaxPanelHeight = Screen.height * PopupScrollableMaximumScreenHeightRatio;
+                if (scrollableMaxPanelHeight > PopupScrollableMaximumHeight)
+                {
+                    scrollableMaxPanelHeight = PopupScrollableMaximumHeight;
+                }
+                if (scrollableMaxPanelHeight > PopupMinimumHeight)
+                {
+                    maxPanelHeight = Mathf.Min(maxPanelHeight, scrollableMaxPanelHeight);
+                }
+            }
+
+            float unconstrainedPanelHeight = contentHeight + PopupTopPadding + PopupBottomPadding;
+            float panelHeight = Mathf.Clamp(unconstrainedPanelHeight, PopupMinimumHeight, maxPanelHeight);
+            float viewportHeight = Mathf.Max(0f, panelHeight - PopupTopPadding - PopupBottomPadding);
+            bool requiresScrollbar = contentHeight > viewportHeight || buttonCount > ScrollbarButtonCountThreshold;
+            float rightPadding = requiresScrollbar ? PopupScrollbarRightPadding : PopupHorizontalPadding;
+            float scrollbarReserve = requiresScrollbar ? ScrollbarWidth + ScrollbarSpacing : 0f;
+
+            float unconstrainedPanelWidth = contentWidth + PopupHorizontalPadding + rightPadding + scrollbarReserve;
+            float panelWidth = Mathf.Clamp(unconstrainedPanelWidth, PopupMinimumWidth, maxPanelWidth);
+            float viewportWidth = Mathf.Max(0f, panelWidth - PopupHorizontalPadding - rightPadding - scrollbarReserve);
+
+            return new PopupLayoutMetrics
+            {
+                ContentWidth = contentWidth,
+                ContentHeight = contentHeight,
+                PanelWidth = panelWidth,
+                PanelHeight = panelHeight,
+                ViewportWidth = viewportWidth,
+                ViewportHeight = viewportHeight,
+                DividerWidth = Mathf.Min(DividerWidth, Mathf.Max(contentWidth, viewportWidth)),
+                RightPadding = rightPadding,
+                RequiresScrollbar = requiresScrollbar
+            };
+        }
+
+        private static void ApplyPopupPanelLayout(Transform panel, PopupLayoutMetrics metrics)
+        {
+            RectTransform panelRect = panel as RectTransform;
+            if (panelRect == null || metrics == null) return;
+
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = new Vector2(metrics.PanelWidth, metrics.PanelHeight);
+        }
+
+        private static void PositionCancelButton(GameObject cancelButton, PopupLayoutMetrics metrics)
+        {
+            if (cancelButton == null || metrics == null) return;
+
+            RectTransform rect = cancelButton.GetComponent<RectTransform>();
+            if (rect == null) return;
+
+            rect.anchorMin = new Vector2(0.5f, 0f);
+            rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = new Vector2(0f, CancelButtonBottomOffset);
+
+            float width = Mathf.Min(CancelButtonPreferredWidth, Mathf.Max(0f, metrics.PanelWidth - CancelButtonHorizontalPadding * 2f));
+            rect.sizeDelta = new Vector2(width, CancelButtonHeight);
+        }
+
+        private static void HideApplyButton(Transform popupRoot)
+        {
+            if (popupRoot == null) return;
+
+            Transform namedApplyButton = FindNamedChild(popupRoot, UIApplyButtonName);
+            if (namedApplyButton != null)
+            {
+                namedApplyButton.gameObject.SetActive(false);
+                return;
+            }
+
+            Button[] buttons = popupRoot.GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (button == null) continue;
+                if (ButtonMatches(button.transform, UIApplyButtonName))
+                {
+                    button.gameObject.SetActive(false);
+                    return;
+                }
+            }
+        }
+
+        private static void CreateScrollArea(
+            Transform panel,
+            PopupLayoutMetrics metrics,
+            Scrollbar scrollbarTemplate,
+            out ScrollRect scrollRect,
+            out RectTransform contentRect)
+        {
+            GameObject scrollObj = new GameObject(UIScrollRectName, typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            scrollObj.transform.SetParent(panel, false);
+
+            RectTransform scrollAreaRect = scrollObj.GetComponent<RectTransform>();
+            scrollAreaRect.anchorMin = Vector2.zero;
+            scrollAreaRect.anchorMax = Vector2.one;
+            scrollAreaRect.offsetMin = new Vector2(PopupHorizontalPadding, PopupBottomPadding);
+            scrollAreaRect.offsetMax = new Vector2(-(metrics != null ? metrics.RightPadding : PopupHorizontalPadding), -PopupTopPadding);
+
+            Image scrollImage = scrollObj.GetComponent<Image>();
+            scrollImage.color = new Color(1f, 1f, 1f, TransparentAlpha);
+            scrollImage.raycastTarget = true;
+
+            scrollRect = scrollObj.GetComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = metrics != null && metrics.RequiresScrollbar;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.scrollSensitivity = ScrollSensitivity;
+
+            GameObject viewportObj = new GameObject(UIViewportName, typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewportObj.transform.SetParent(scrollObj.transform, false);
+
+            RectTransform viewportRect = viewportObj.GetComponent<RectTransform>();
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = metrics != null && metrics.RequiresScrollbar
+                ? new Vector2(-(ScrollbarWidth + ScrollbarSpacing), 0f)
+                : Vector2.zero;
+
+            Image viewportImage = viewportObj.GetComponent<Image>();
+            viewportImage.color = HiddenMaskColor;
+            viewportImage.raycastTarget = true;
+            Mask viewportMask = viewportObj.GetComponent<Mask>();
+            viewportMask.showMaskGraphic = false;
+
+            GameObject contentObj = new GameObject(UIVerticalContainerName, typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            contentObj.transform.SetParent(viewportObj.transform, false);
+
+            contentRect = contentObj.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.anchoredPosition = Vector2.zero;
+            contentRect.sizeDelta = new Vector2(0f, metrics != null ? metrics.ContentHeight : 0f);
+
+            VerticalLayoutGroup vLayout = contentObj.GetComponent<VerticalLayoutGroup>();
+            vLayout.spacing = VerticalLayoutSpacing;
+            vLayout.childAlignment = TextAnchor.UpperCenter;
+            vLayout.childControlHeight = false;
+            vLayout.childControlWidth = false;
+            vLayout.childForceExpandHeight = false;
+            vLayout.childForceExpandWidth = false;
+            vLayout.padding = new RectOffset(0, 0, Mathf.RoundToInt(ContentTopPadding), Mathf.RoundToInt(ContentBottomPadding));
+
+            ContentSizeFitter fitter = contentObj.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+
+            if (metrics != null && metrics.RequiresScrollbar)
+            {
+                CreateScrollbar(scrollObj.transform, scrollRect, metrics, scrollbarTemplate);
+            }
+        }
+
+        private static Scrollbar CreateScrollbar(Transform parent, ScrollRect target, PopupLayoutMetrics metrics, Scrollbar template)
+        {
+            GameObject scrollbarObj;
+            Scrollbar scrollbar;
+            if (template != null)
+            {
+                scrollbarObj = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+                scrollbarObj.name = UIScrollbarName;
+                SetLayerRecursively(scrollbarObj, parent.gameObject.layer);
+                scrollbarObj.SetActive(true);
+                scrollbar = scrollbarObj.GetComponent<Scrollbar>() ?? scrollbarObj.AddComponent<Scrollbar>();
+
+                CanvasGroup canvasGroup = scrollbarObj.GetComponent<CanvasGroup>();
+                if (canvasGroup != null)
+                {
+                    canvasGroup.alpha = 1f;
+                    canvasGroup.interactable = true;
+                    canvasGroup.blocksRaycasts = true;
+                }
+            }
+            else
+            {
+                scrollbarObj = new GameObject(UIScrollbarName, typeof(RectTransform), typeof(Image), typeof(Scrollbar));
+                scrollbar = scrollbarObj.GetComponent<Scrollbar>();
+            }
+
+            scrollbarObj.transform.SetParent(parent, false);
+
+            RectTransform scrollbarRect = scrollbarObj.GetComponent<RectTransform>();
+            scrollbarRect.anchorMin = new Vector2(1f, 0f);
+            scrollbarRect.anchorMax = new Vector2(1f, 1f);
+            scrollbarRect.pivot = new Vector2(1f, 1f);
+            scrollbarRect.sizeDelta = new Vector2(ScrollbarWidth, 0f);
+            scrollbarRect.anchoredPosition = new Vector2(ScrollbarRightOffset, 0f);
+
+            Image trackImage = scrollbarObj.GetComponent<Image>();
+            if (trackImage != null)
+            {
+                trackImage.color = template != null ? trackImage.color : ScrollbarTrackColor;
+                trackImage.raycastTarget = true;
+            }
+
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+            if (scrollbar.handleRect == null)
+            {
+                GameObject slidingAreaObj = new GameObject(UIScrollbarSlidingAreaName, typeof(RectTransform));
+                slidingAreaObj.transform.SetParent(scrollbarObj.transform, false);
+
+                RectTransform slidingAreaRect = slidingAreaObj.GetComponent<RectTransform>();
+                slidingAreaRect.anchorMin = Vector2.zero;
+                slidingAreaRect.anchorMax = Vector2.one;
+                slidingAreaRect.offsetMin = new Vector2(ScrollbarInset, ScrollbarInset);
+                slidingAreaRect.offsetMax = new Vector2(-ScrollbarInset, -ScrollbarInset);
+
+                GameObject handleObj = new GameObject(UIScrollbarHandleName, typeof(RectTransform), typeof(Image));
+                handleObj.transform.SetParent(slidingAreaObj.transform, false);
+
+                RectTransform handleRect = handleObj.GetComponent<RectTransform>();
+                handleRect.anchorMin = Vector2.zero;
+                handleRect.anchorMax = Vector2.one;
+                handleRect.offsetMin = Vector2.zero;
+                handleRect.offsetMax = Vector2.zero;
+
+                Image handleImage = handleObj.GetComponent<Image>();
+                handleImage.color = ScrollbarHandleColor;
+
+                scrollbar.targetGraphic = handleImage;
+                scrollbar.handleRect = handleRect;
+            }
+
+            if (scrollbar.targetGraphic == null && scrollbar.handleRect != null)
+            {
+                scrollbar.targetGraphic = scrollbar.handleRect.GetComponent<Graphic>();
+            }
+
+            if (metrics != null && metrics.ContentHeight > 0f)
+            {
+                scrollbar.size = Mathf.Clamp(metrics.ViewportHeight / metrics.ContentHeight, ScrollbarMinimumHandleSize, 1f);
+            }
+
+            target.verticalScrollbar = scrollbar;
+            target.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            target.verticalScrollbarSpacing = ScrollbarSpacing;
+
+            return scrollbar;
+        }
+
+        private static Scrollbar FindScrollbarTemplate(GameObject sourcePopup)
+        {
+            Scrollbar template = FindScrollbarInRoot(sourcePopup);
+            if (template != null) return template;
+
+            PopupManager._type[] preferredPopupTypes = new PopupManager._type[]
+            {
+                PopupManager._type.settings_difficulty,
+                PopupManager._type.notifications,
+                PopupManager._type.awards,
+                PopupManager._type.single_senbatsu,
+                PopupManager._type.single_chart
+            };
+
+            for (int i = 0; i < preferredPopupTypes.Length; i++)
+            {
+                GameObject popup = PopupManager.GetObject(preferredPopupTypes[i]);
+                template = FindScrollbarInRoot(popup);
+                if (template != null) return template;
+            }
+
+            Scrollbar[] sceneScrollbars = UnityEngine.Object.FindObjectsOfType<Scrollbar>();
+            for (int i = 0; i < sceneScrollbars.Length; i++)
+            {
+                Scrollbar scrollbar = sceneScrollbars[i];
+                if (scrollbar != null && scrollbar.gameObject.activeInHierarchy)
+                {
+                    return scrollbar;
+                }
+            }
+
+            return null;
+        }
+
+        private static Scrollbar FindScrollbarInRoot(GameObject root)
+        {
+            if (root == null) return null;
+
+            Scrollbar[] scrollbars = root.GetComponentsInChildren<Scrollbar>(true);
+            for (int i = 0; i < scrollbars.Length; i++)
+            {
+                Scrollbar scrollbar = scrollbars[i];
+                if (scrollbar != null && scrollbar.handleRect != null)
+                {
+                    return scrollbar;
+                }
+            }
+
+            return scrollbars.Length > 0 ? scrollbars[0] : null;
+        }
+
+        private static void SetLayerRecursively(GameObject root, int layer)
+        {
+            if (root == null) return;
+
+            root.layer = layer;
+            Transform transform = root.transform;
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                SetLayerRecursively(transform.GetChild(i).gameObject, layer);
+            }
+        }
+
+        private static void SetCanvasGroupsVisible(GameObject root)
+        {
+            if (root == null) return;
+
+            CanvasGroup[] canvasGroups = root.GetComponentsInChildren<CanvasGroup>(true);
+            for (int i = 0; i < canvasGroups.Length; i++)
+            {
+                CanvasGroup canvasGroup = canvasGroups[i];
+                if (canvasGroup == null) continue;
+
+                canvasGroup.alpha = OpaqueAlpha;
+                canvasGroup.interactable = true;
+                canvasGroup.blocksRaycasts = true;
+            }
+        }
+
+        private static void FinalizeScrollLayout(RectTransform contentRect, ScrollRect scrollRect, PopupLayoutMetrics metrics)
+        {
+            if (contentRect == null) return;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+            if (metrics != null)
+            {
+                contentRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, metrics.ContentHeight);
+            }
+
+            Canvas.ForceUpdateCanvases();
+            if (scrollRect != null)
+            {
+                scrollRect.StopMovement();
+                scrollRect.verticalNormalizedPosition = 1f;
+                if (scrollRect.verticalScrollbar != null)
+                {
+                    scrollRect.verticalScrollbar.value = 1f;
+                }
+            }
+
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private static void PopulateCustomButtons(
+            Transform verticalContainer,
+            GameObject templateButton,
+            List<ButtonSectionLayout> sections,
+            float dividerWidth)
+        {
+            if (verticalContainer == null || sections == null) return;
+
+            for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
+            {
+                ButtonSectionLayout section = sections[sectionIndex];
+                if (section == null || section.Mod == null || section.JsonArray == null) continue;
+
+                Mods._mod mod = section.Mod;
+                JSONArray jsonArray = section.JsonArray;
+                float sectionTitleWidth = Mathf.Max(section.GridWidth, dividerWidth);
+
+                GameObject titleObj = new GameObject(PrefixTitle + mod.Title, typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
                 titleObj.transform.SetParent(verticalContainer, false);
+
+                RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+                titleRect.sizeDelta = new Vector2(sectionTitleWidth, SectionTitleHeight);
+
+                LayoutElement titleLayout = titleObj.GetComponent<LayoutElement>();
+                titleLayout.minHeight = SectionTitleHeight;
+                titleLayout.preferredHeight = SectionTitleHeight;
+                titleLayout.minWidth = sectionTitleWidth;
+                titleLayout.preferredWidth = sectionTitleWidth;
+
                 TextMeshProUGUI titleText = titleObj.GetComponent<TextMeshProUGUI>();
-                titleText.text = localizedTitle;
+                titleText.text = section.LocalizedTitle;
                 titleText.fontSize = TitleFontSize;
                 titleText.alignment = TextAlignmentOptions.Center;
                 titleText.color = Color.black;
-
-                bool hasFallbackTextButtons = HasFallbackTextButtons(mod.Path, jsonArray);
-                int columnCount = Math.Min(hasFallbackTextButtons ? FallbackTextButtonsPerRow : IconButtonsPerRow, Math.Max(1, jsonArray.Count));
-                float cellWidth = hasFallbackTextButtons ? FallbackBtnMinWidth : MaxCellSize;
-                float cellHeight = hasFallbackTextButtons ? FallbackBtnMinHeight : MaxCellSize;
-                int rowCount = Mathf.CeilToInt((float)jsonArray.Count / (float)columnCount);
-                float gridWidth = columnCount * cellWidth + Math.Max(0, columnCount - 1) * GridCellSpacing;
-                float gridHeight = rowCount * cellHeight + Math.Max(0, rowCount - 1) * GridCellSpacing;
 
                 GameObject gridContainer = new GameObject(PrefixGrid + mod.Title, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
                 gridContainer.transform.SetParent(verticalContainer, false);
 
                 RectTransform gridRect = gridContainer.GetComponent<RectTransform>();
-                gridRect.sizeDelta = new Vector2(gridWidth, gridHeight);
+                gridRect.sizeDelta = new Vector2(section.GridWidth, section.GridHeight);
                 
                 GridLayoutGroup grid = gridContainer.GetComponent<GridLayoutGroup>();
-                grid.cellSize = new Vector2(cellWidth, cellHeight);
+                grid.cellSize = new Vector2(section.CellWidth, section.CellHeight);
                 grid.spacing = new Vector2(GridCellSpacing, GridCellSpacing);
                 grid.startAxis = GridLayoutGroup.Axis.Horizontal;
                 grid.childAlignment = TextAnchor.UpperCenter;
                 grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                grid.constraintCount = columnCount;
+                grid.constraintCount = section.ColumnCount;
 
                 LayoutElement gridLayout = gridContainer.GetComponent<LayoutElement>();
-                gridLayout.minWidth = gridWidth;
-                gridLayout.minHeight = gridHeight;
-                gridLayout.preferredWidth = gridWidth;
-                gridLayout.preferredHeight = gridHeight;
+                gridLayout.minWidth = section.GridWidth;
+                gridLayout.minHeight = section.GridHeight;
+                gridLayout.preferredWidth = section.GridWidth;
+                gridLayout.preferredHeight = section.GridHeight;
 
                 for (int i = 0; i < jsonArray.Count; i++)
                 {
@@ -618,7 +1302,17 @@ namespace ModButtons
                     string localizedTooltip = ModButtonsLocalization.Get(mod.Path, codeTooltip, fallbackTooltip);
                     string iconPath = string.IsNullOrEmpty(iconName) ? string.Empty : Path.Combine(mod.Path, TargetDirectory, iconName);
                     
-                    CreateActionButton(gridContainer.transform, templateButton, localizedLabel, localizedTooltip, iconPath, targetAssembly, targetClass, targetMethod);
+                    CreateActionButton(
+                        gridContainer.transform,
+                        templateButton,
+                        localizedLabel,
+                        localizedTooltip,
+                        iconPath,
+                        targetAssembly,
+                        targetClass,
+                        targetMethod,
+                        section.CellWidth,
+                        section.CellHeight);
                 }
 
                 GameObject divider = new GameObject(UIDividerName, typeof(RectTransform), typeof(LayoutElement));
@@ -632,7 +1326,7 @@ namespace ModButtons
                 divLayout.preferredHeight = DividerHeight;
                 divLayout.preferredWidth = dividerWidth;
 
-                GameObject dividerLine = new GameObject("Line", typeof(RectTransform), typeof(Image));
+                GameObject dividerLine = new GameObject(UILineName, typeof(RectTransform), typeof(Image));
                 dividerLine.transform.SetParent(divider.transform, false);
                 dividerLine.GetComponent<Image>().color = DividerColor;
 
@@ -644,22 +1338,6 @@ namespace ModButtons
                 lineRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, dividerWidth);
                 lineRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, DividerHeight);
             }
-        }
-
-        private static float GetDividerWidth(Transform verticalContainer)
-        {
-            float width = DividerWidth;
-            RectTransform panelRect = verticalContainer?.parent as RectTransform;
-            if (panelRect != null)
-            {
-                float availableWidth = panelRect.rect.width - DividerHorizontalPadding * 2f;
-                if (availableWidth > 0f)
-                {
-                    width = Mathf.Min(width, availableWidth);
-                }
-            }
-
-            return Mathf.Max(0f, width);
         }
 
         private static bool HasFallbackTextButtons(string modPath, JSONArray jsonArray)
@@ -676,19 +1354,37 @@ namespace ModButtons
             return false;
         }
 
-        private static void CreateActionButton(Transform parentGrid, GameObject templateBtn, string label, string tooltip, string iconPath, string asmName, string className, string methodName)
+        private static void CreateActionButton(
+            Transform parentGrid,
+            GameObject templateBtn,
+            string label,
+            string tooltip,
+            string iconPath,
+            string asmName,
+            string className,
+            string methodName,
+            float cellWidth,
+            float cellHeight)
         {
             bool hasIcon = !string.IsNullOrEmpty(iconPath) && File.Exists(iconPath);
 
             GameObject cellObj = new GameObject(PrefixCell + label, typeof(RectTransform));
             cellObj.transform.SetParent(parentGrid, false);
 
+            RectTransform cellRect = cellObj.GetComponent<RectTransform>();
+            cellRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cellRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cellRect.pivot = new Vector2(0.5f, 0.5f);
+            cellRect.sizeDelta = new Vector2(cellWidth, cellHeight);
+
             GameObject btnObj = templateBtn != null
-                ? UnityEngine.Object.Instantiate(templateBtn, cellObj.transform)
+                ? UnityEngine.Object.Instantiate(templateBtn, cellObj.transform, false)
                 : new GameObject(PrefixButton + label, typeof(RectTransform), typeof(Image), typeof(Button), typeof(ButtonDefault));
             if (templateBtn == null) btnObj.transform.SetParent(cellObj.transform, false);
             btnObj.name = PrefixButton + label;
             btnObj.SetActive(true);
+            SetLayerRecursively(btnObj, parentGrid.gameObject.layer);
+            SetCanvasGroupsVisible(btnObj);
 
             RectTransform rect = btnObj.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -721,7 +1417,7 @@ namespace ModButtons
             {
                 if (textComp != null) textComp.gameObject.SetActive(false);
 
-                GameObject iconObj = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+                GameObject iconObj = new GameObject(UIIconName, typeof(RectTransform), typeof(Image));
                 iconObj.transform.SetParent(btnObj.transform, false);
                 
                 RectTransform iconRect = iconObj.GetComponent<RectTransform>();
@@ -822,7 +1518,7 @@ namespace ModButtons
         {
             if (button == null) return null;
 
-            GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            GameObject textObj = new GameObject(UITextName, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObj.transform.SetParent(button.transform, false);
 
             RectTransform textRect = textObj.GetComponent<RectTransform>();
