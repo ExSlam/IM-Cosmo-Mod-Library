@@ -158,5 +158,95 @@
     "assembly": "com.cosmo.cheatsmod",
     "class": "CheatsMod.Cheats",
     "method": "AddResearchPoints"
+  },
+  {
+    "label": "All idol stats 100",
+    "codeLabel": "cheat.button.set_idol_stats",
+    "tooltip": "Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols.",
+    "codeTooltip": "cheat.tooltip.set_idol_stats",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "SetIdolStatsToMaximum"
+  },
+  {
+    "label": "+1 idol fame level",
+    "codeLabel": "cheat.button.increase_idol_fame",
+    "tooltip": "Increase every idol's fame by one level.",
+    "codeTooltip": "cheat.tooltip.increase_idol_fame",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "IncreaseIdolFameLevel"
+  },
+  {
+    "label": "Reveal friends",
+    "codeLabel": "cheat.button.reveal_friends",
+    "tooltip": "Reveal idol friend relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealFriends"
+  },
+  {
+    "label": "Reveal best friends",
+    "codeLabel": "cheat.button.reveal_best_friends",
+    "tooltip": "Reveal idol best friend relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_best_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealBestFriends"
+  },
+  {
+    "label": "Reveal disliked idols",
+    "codeLabel": "cheat.button.reveal_disliked_idols",
+    "tooltip": "Reveal idol dislike and hate relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_disliked_idols",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDislikedIdols"
+  },
+  {
+    "label": "Reveal cliques",
+    "codeLabel": "cheat.button.reveal_cliques",
+    "tooltip": "Reveal all idol cliques.",
+    "codeTooltip": "cheat.tooltip.reveal_cliques",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealCliques"
+  },
+  {
+    "label": "Reveal bullies",
+    "codeLabel": "cheat.button.reveal_bullies",
+    "tooltip": "Reveal all known bullying targets.",
+    "codeTooltip": "cheat.tooltip.reveal_bullies",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealBullies"
+  },
+  {
+    "label": "Research level 10",
+    "codeLabel": "cheat.button.max_research",
+    "tooltip": "Unlock all research and set every research level to 10.",
+    "codeTooltip": "cheat.tooltip.max_research",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutResearch"
+  },
+  {
+    "label": "Staff level 20",
+    "codeLabel": "cheat.button.max_staff_levels",
+    "tooltip": "Set every staff skill level to 20.",
+    "codeTooltip": "cheat.tooltip.max_staff_levels",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutStaffLevels"
   }
 ]

@@ -24,3 +24,12 @@ Adds cheat actions to the Mod Buttons action hub.
 - Increase active idol romance by one level
 - Add 25k EXP to all staff skills
 - Add 1k points to every research type
+- Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
+- Increase idol fame by one level
+- Reveal friend relationships
+- Reveal best friend relationships
+- Reveal disliked idol relationships
+- Reveal cliques
+- Reveal bullying targets
+- Unlock all research and set research levels to 10
+- Set all staff skill levels to 20

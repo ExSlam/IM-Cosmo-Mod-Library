@@ -19,6 +19,10 @@ namespace CheatsMod
         internal const float StaffExperienceGrant = 25000f;
         internal const int RelationshipLevelIncrement = 1;
         internal const int MaximumPositiveRelationshipLevel = 5;
+        internal const int IdolFameLevelIncrement = 1;
+        internal const int MaximumIdolFameLevel = 10;
+        internal const int TargetResearchLevel = 10;
+        internal const int TargetStaffLevel = 20;
         internal const int MinimumRelationshipPointIncrease = 1;
         internal const int ZeroCount = 0;
         internal const int ZeroPoints = 0;
@@ -42,10 +46,22 @@ namespace CheatsMod
         internal const string NotificationIncreaseRomance = "notification.increase_romance";
         internal const string NotificationAddStaffExperience = "notification.add_staff_experience";
         internal const string NotificationAddResearchPoints = "notification.add_research_points";
+        internal const string NotificationSetIdolStats = "notification.set_idol_stats";
+        internal const string NotificationIncreaseIdolFame = "notification.increase_idol_fame";
+        internal const string NotificationRevealFriends = "notification.reveal_friends";
+        internal const string NotificationRevealBestFriends = "notification.reveal_best_friends";
+        internal const string NotificationRevealDislikedIdols = "notification.reveal_disliked_idols";
+        internal const string NotificationRevealCliques = "notification.reveal_cliques";
+        internal const string NotificationRevealBullies = "notification.reveal_bullies";
+        internal const string NotificationMaxResearch = "notification.max_research";
+        internal const string NotificationMaxStaffLevels = "notification.max_staff_levels";
         internal const string NotificationNoActiveIdols = "notification.no_active_idols";
         internal const string NotificationNoIdols = "notification.no_idols";
         internal const string NotificationNoStaff = "notification.no_staff";
         internal const string NotificationNoResearch = "notification.no_research";
+        internal const string NotificationNoRelationships = "notification.no_relationships";
+        internal const string NotificationNoCliques = "notification.no_cliques";
+        internal const string NotificationNoBullying = "notification.no_bullying";
         internal const string NotificationGameUnavailable = "notification.game_unavailable";
         internal const string NotificationCheatFailed = "notification.cheat_failed";
     }
@@ -68,10 +84,22 @@ namespace CheatsMod
         internal const string NotificationIncreaseRomance = "Active idol romance increased.";
         internal const string NotificationAddStaffExperience = "Added 25k EXP to all staff.";
         internal const string NotificationAddResearchPoints = "Added 1k points to every research type.";
+        internal const string NotificationSetIdolStats = "All idol stats set to 100.";
+        internal const string NotificationIncreaseIdolFame = "Idol fame increased by one level.";
+        internal const string NotificationRevealFriends = "Friend relationships revealed.";
+        internal const string NotificationRevealBestFriends = "Best friend relationships revealed.";
+        internal const string NotificationRevealDislikedIdols = "Disliked idol relationships revealed.";
+        internal const string NotificationRevealCliques = "Cliques revealed.";
+        internal const string NotificationRevealBullies = "Bullying targets revealed.";
+        internal const string NotificationMaxResearch = "All research unlocked and set to level 10.";
+        internal const string NotificationMaxStaffLevels = "All staff levels set to 20.";
         internal const string NotificationNoActiveIdols = "No active idols found.";
         internal const string NotificationNoIdols = "No idols found.";
         internal const string NotificationNoStaff = "No staff found.";
         internal const string NotificationNoResearch = "Research categories are not available yet.";
+        internal const string NotificationNoRelationships = "No matching relationships found.";
+        internal const string NotificationNoCliques = "No cliques found.";
+        internal const string NotificationNoBullying = "No bullying targets found.";
         internal const string NotificationGameUnavailable = "Game data is not available yet.";
         internal const string NotificationCheatFailed = "Cheat action failed.";
     }
@@ -90,6 +118,34 @@ namespace CheatsMod
             Research.type.office,
             Research.type.dance,
             Research.type.vocal
+        };
+
+        private static readonly data_girls._paramType[] IdolCoreStatTypes = new data_girls._paramType[]
+        {
+            data_girls._paramType.cute,
+            data_girls._paramType.cool,
+            data_girls._paramType.sexy,
+            data_girls._paramType.pretty,
+            data_girls._paramType.dance,
+            data_girls._paramType.vocal,
+            data_girls._paramType.funny,
+            data_girls._paramType.smart
+        };
+
+        private static readonly Relationships._relationship._status[] FriendRelationshipStatuses = new Relationships._relationship._status[]
+        {
+            Relationships._relationship._status.friends
+        };
+
+        private static readonly Relationships._relationship._status[] BestFriendRelationshipStatuses = new Relationships._relationship._status[]
+        {
+            Relationships._relationship._status.best_friends
+        };
+
+        private static readonly Relationships._relationship._status[] DislikedRelationshipStatuses = new Relationships._relationship._status[]
+        {
+            Relationships._relationship._status.dislikes,
+            Relationships._relationship._status.hates
         };
 
         public static void AddOneBillionYen()
@@ -170,6 +226,51 @@ namespace CheatsMod
         public static void AddResearchPoints()
         {
             Execute(AddResearchPointsCore);
+        }
+
+        public static void SetIdolStatsToMaximum()
+        {
+            Execute(SetIdolStatsToMaximumCore);
+        }
+
+        public static void IncreaseIdolFameLevel()
+        {
+            Execute(IncreaseIdolFameLevelCore);
+        }
+
+        public static void RevealFriends()
+        {
+            Execute(RevealFriendsCore);
+        }
+
+        public static void RevealBestFriends()
+        {
+            Execute(RevealBestFriendsCore);
+        }
+
+        public static void RevealDislikedIdols()
+        {
+            Execute(RevealDislikedIdolsCore);
+        }
+
+        public static void RevealCliques()
+        {
+            Execute(RevealCliquesCore);
+        }
+
+        public static void RevealBullies()
+        {
+            Execute(RevealBulliesCore);
+        }
+
+        public static void MaxOutResearch()
+        {
+            Execute(MaxOutResearchCore);
+        }
+
+        public static void MaxOutStaffLevels()
+        {
+            Execute(MaxOutStaffLevelsCore);
         }
 
         private static void AddOneBillionYenCore()
@@ -412,6 +513,274 @@ namespace CheatsMod
                 NotificationManager._notification._type.resource_change);
         }
 
+        private static void SetIdolStatsToMaximumCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                for (int statIndex = 0; statIndex < IdolCoreStatTypes.Length; statIndex++)
+                {
+                    idol.setParam(IdolCoreStatTypes[statIndex], CheatAmounts.IdolParameterMaximumValue);
+                }
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoIdols, CheatFallbackText.NotificationNoIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationSetIdolStats,
+                CheatFallbackText.NotificationSetIdolStats,
+                NotificationManager._notification._type.idol_stat_change);
+        }
+
+        private static void IncreaseIdolFameLevelCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                int currentLevel = idol.GetFameLevel();
+                int targetLevel = Math.Min(
+                    CheatAmounts.MaximumIdolFameLevel,
+                    currentLevel + CheatAmounts.IdolFameLevelIncrement);
+                float currentPoints = idol.GetFamePoints();
+                float targetPoints = resources.FameLevelToPoints(targetLevel);
+                float pointDelta = Math.Max(CheatAmounts.ZeroPoints, targetPoints - currentPoints);
+                if (pointDelta > CheatAmounts.ZeroPoints)
+                {
+                    idol.addParam(data_girls._paramType.famePoints, pointDelta, true);
+                }
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoIdols, CheatFallbackText.NotificationNoIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationIncreaseIdolFame,
+                CheatFallbackText.NotificationIncreaseIdolFame,
+                NotificationManager._notification._type.idol_stat_change);
+        }
+
+        private static void RevealFriendsCore()
+        {
+            RevealRelationshipsByStatus(
+                FriendRelationshipStatuses,
+                CheatLocalizationKeys.NotificationRevealFriends,
+                CheatFallbackText.NotificationRevealFriends);
+        }
+
+        private static void RevealBestFriendsCore()
+        {
+            RevealRelationshipsByStatus(
+                BestFriendRelationshipStatuses,
+                CheatLocalizationKeys.NotificationRevealBestFriends,
+                CheatFallbackText.NotificationRevealBestFriends);
+        }
+
+        private static void RevealDislikedIdolsCore()
+        {
+            RevealRelationshipsByStatus(
+                DislikedRelationshipStatuses,
+                CheatLocalizationKeys.NotificationRevealDislikedIdols,
+                CheatFallbackText.NotificationRevealDislikedIdols);
+        }
+
+        private static void RevealCliquesCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            if (Relationships.Cliques == null || Relationships.Cliques.Count == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoCliques, CheatFallbackText.NotificationNoCliques);
+                return;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int cliqueIndex = 0; cliqueIndex < Relationships.Cliques.Count; cliqueIndex++)
+            {
+                Relationships._clique clique = Relationships.Cliques[cliqueIndex];
+                if (clique == null)
+                {
+                    continue;
+                }
+
+                clique.Known = true;
+                appliedCount++;
+            }
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoCliques, CheatFallbackText.NotificationNoCliques);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationRevealCliques,
+                CheatFallbackText.NotificationRevealCliques,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void RevealBulliesCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            if (Relationships.Cliques == null || Relationships.Cliques.Count == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoBullying, CheatFallbackText.NotificationNoBullying);
+                return;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int cliqueIndex = 0; cliqueIndex < Relationships.Cliques.Count; cliqueIndex++)
+            {
+                Relationships._clique clique = Relationships.Cliques[cliqueIndex];
+                if (clique == null || clique.Bullied_Girls == null)
+                {
+                    continue;
+                }
+
+                for (int targetIndex = 0; targetIndex < clique.Bullied_Girls.Count; targetIndex++)
+                {
+                    data_girls.girls target = clique.Bullied_Girls[targetIndex];
+                    if (target == null)
+                    {
+                        continue;
+                    }
+
+                    if (clique.KnownBulliedGirls == null)
+                    {
+                        clique.KnownBulliedGirls = new List<data_girls.girls>();
+                    }
+
+                    if (!clique.KnownBulliedGirls.Contains(target))
+                    {
+                        clique.AddKnownBulliedGirl(target);
+                    }
+
+                    appliedCount++;
+                }
+            }
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoBullying, CheatFallbackText.NotificationNoBullying);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationRevealBullies,
+                CheatFallbackText.NotificationRevealBullies,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void MaxOutResearchCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            List<singles._param> researchParameters = GetResearchParameters();
+            if (researchParameters.Count == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoResearch, CheatFallbackText.NotificationNoResearch);
+                return;
+            }
+
+            float targetExperience = resources.FameLevelToPoints(CheatAmounts.TargetResearchLevel);
+            for (int parameterIndex = 0; parameterIndex < researchParameters.Count; parameterIndex++)
+            {
+                singles._param parameter = researchParameters[parameterIndex];
+                if (parameter == null)
+                {
+                    continue;
+                }
+
+                parameter.unlocked = true;
+                if (parameter.max_level < CheatAmounts.TargetResearchLevel)
+                {
+                    parameter.max_level = CheatAmounts.TargetResearchLevel;
+                }
+
+                if (parameter.exp < targetExperience)
+                {
+                    parameter.exp = targetExperience;
+                }
+
+                Research.category category = parameter.GetResearchCategory();
+                if (category != null && category.Button != null)
+                {
+                    category.RenderButton();
+                }
+            }
+
+            RefreshResearchUi();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationMaxResearch,
+                CheatFallbackText.NotificationMaxResearch,
+                NotificationManager._notification._type.resource_change);
+        }
+
+        private static void MaxOutStaffLevelsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllStaff(delegate(staff._staff staffMember)
+            {
+                if (staffMember.skills == null)
+                {
+                    return;
+                }
+
+                for (int skillIndex = 0; skillIndex < staffMember.skills.Count; skillIndex++)
+                {
+                    staff._staff._skill skill = staffMember.skills[skillIndex];
+                    if (skill != null)
+                    {
+                        skill.SetLevel(CheatAmounts.TargetStaffLevel);
+                    }
+                }
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoStaff, CheatFallbackText.NotificationNoStaff);
+                return;
+            }
+
+            RefreshStaffList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationMaxStaffLevels,
+                CheatFallbackText.NotificationMaxStaffLevels,
+                NotificationManager._notification._type.staff_stat_change);
+        }
+
         private static void Execute(Action cheatAction)
         {
             if (cheatAction == null)
@@ -514,6 +883,122 @@ namespace CheatsMod
             int targetPoints = Relationships_Player.GetPointsByLevel(targetLevel);
             int pointDelta = targetPoints - currentPoints;
             return Math.Max(CheatAmounts.MinimumRelationshipPointIncrease, pointDelta);
+        }
+
+        private static void RevealRelationshipsByStatus(
+            Relationships._relationship._status[] relationshipStatuses,
+            string notificationKey,
+            string notificationFallback)
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            if (Relationships.RelationshipsData == null || relationshipStatuses == null)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoRelationships, CheatFallbackText.NotificationNoRelationships);
+                return;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int relationshipIndex = 0; relationshipIndex < Relationships.RelationshipsData.Count; relationshipIndex++)
+            {
+                Relationships._relationship relationship = Relationships.RelationshipsData[relationshipIndex];
+                if (relationship == null || !RelationshipStatusMatches(relationship.Status, relationshipStatuses))
+                {
+                    continue;
+                }
+
+                appliedCount += MarkRelationshipKnown(relationship);
+            }
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoRelationships, CheatFallbackText.NotificationNoRelationships);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(notificationKey, notificationFallback, NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static bool RelationshipStatusMatches(
+            Relationships._relationship._status currentStatus,
+            Relationships._relationship._status[] targetStatuses)
+        {
+            for (int statusIndex = 0; statusIndex < targetStatuses.Length; statusIndex++)
+            {
+                if (currentStatus == targetStatuses[statusIndex])
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int MarkRelationshipKnown(Relationships._relationship relationship)
+        {
+            if (relationship == null || relationship.Girls == null || relationship.Girls.Count < 2)
+            {
+                return CheatAmounts.ZeroCount;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int girlIndex = 0; girlIndex < relationship.Girls.Count; girlIndex++)
+            {
+                data_girls.girls idol = relationship.Girls[girlIndex];
+                if (idol == null)
+                {
+                    continue;
+                }
+
+                idol.RelationshipsKnown = true;
+                appliedCount++;
+            }
+
+            return appliedCount;
+        }
+
+        private static List<singles._param> GetResearchParameters()
+        {
+            List<singles._param> researchParameters = new List<singles._param>();
+            AddResearchParameters(researchParameters, singles.Genres);
+            AddResearchParameters(researchParameters, singles.Lyrics);
+            AddResearchParameters(researchParameters, singles.Choreography);
+            AddResearchParameters(researchParameters, singles.Marketing);
+
+            if (Research.Categories != null)
+            {
+                for (int categoryIndex = 0; categoryIndex < Research.Categories.Count; categoryIndex++)
+                {
+                    Research.category category = Research.Categories[categoryIndex];
+                    if (category != null && category.Param != null && !researchParameters.Contains(category.Param))
+                    {
+                        researchParameters.Add(category.Param);
+                    }
+                }
+            }
+
+            return researchParameters;
+        }
+
+        private static void AddResearchParameters(List<singles._param> target, List<singles._param> source)
+        {
+            if (target == null || source == null)
+            {
+                return;
+            }
+
+            for (int parameterIndex = 0; parameterIndex < source.Count; parameterIndex++)
+            {
+                singles._param parameter = source[parameterIndex];
+                if (parameter != null && !target.Contains(parameter))
+                {
+                    target.Add(parameter);
+                }
+            }
         }
 
         private static int ApplyToActiveIdols(Action<data_girls.girls> action)
