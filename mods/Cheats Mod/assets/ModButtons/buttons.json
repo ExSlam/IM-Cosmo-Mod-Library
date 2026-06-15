@@ -248,5 +248,45 @@
     "assembly": "com.cosmo.cheatsmod",
     "class": "CheatsMod.Cheats",
     "method": "MaxOutStaffLevels"
+  },
+  {
+    "label": "Reveal dating status",
+    "codeLabel": "cheat.button.reveal_dating_status",
+    "tooltip": "Reveal every idol's current dating status.",
+    "codeTooltip": "cheat.tooltip.reveal_dating_status",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDatingStatus"
+  },
+  {
+    "label": "Reveal dating preference",
+    "codeLabel": "cheat.button.reveal_dating_preference",
+    "tooltip": "Reveal every idol's dating preference.",
+    "codeTooltip": "cheat.tooltip.reveal_dating_preference",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDatingPreference"
+  },
+  {
+    "label": "Heal & end hiatus",
+    "codeLabel": "cheat.button.heal_and_end_hiatus",
+    "tooltip": "Set idol stamina to 100, cure depression and injuries, and return idols from hiatus.",
+    "codeTooltip": "cheat.tooltip.heal_and_end_hiatus",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "HealAndEndHiatus"
+  },
+  {
+    "label": "Max relationships",
+    "codeLabel": "cheat.button.max_player_relationships",
+    "tooltip": "Max active idol influence, friendship, and romance.",
+    "codeTooltip": "cheat.tooltip.max_player_relationships",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutActiveIdolPlayerRelationships"
   }
 ]

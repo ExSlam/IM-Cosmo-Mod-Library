@@ -33,3 +33,7 @@ Adds cheat actions to the Mod Buttons action hub.
 - Reveal bullying targets
 - Unlock all research and set research levels to 10
 - Set all staff skill levels to 20
+- Reveal dating status
+- Reveal dating preference
+- Heal idols, cure injuries/depression, and return idols from hiatus
+- Max active idol influence, friendship, and romance

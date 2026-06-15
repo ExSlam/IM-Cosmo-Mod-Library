@@ -24,6 +24,7 @@ namespace CheatsMod
         internal const int TargetResearchLevel = 10;
         internal const int TargetStaffLevel = 20;
         internal const int MinimumRelationshipPointIncrease = 1;
+        internal const int MinimumRelationshipPointDelta = 0;
         internal const int ZeroCount = 0;
         internal const int ZeroPoints = 0;
     }
@@ -55,6 +56,10 @@ namespace CheatsMod
         internal const string NotificationRevealBullies = "notification.reveal_bullies";
         internal const string NotificationMaxResearch = "notification.max_research";
         internal const string NotificationMaxStaffLevels = "notification.max_staff_levels";
+        internal const string NotificationRevealDatingStatus = "notification.reveal_dating_status";
+        internal const string NotificationRevealDatingPreference = "notification.reveal_dating_preference";
+        internal const string NotificationHealAndEndHiatus = "notification.heal_and_end_hiatus";
+        internal const string NotificationMaxPlayerRelationships = "notification.max_player_relationships";
         internal const string NotificationNoActiveIdols = "notification.no_active_idols";
         internal const string NotificationNoIdols = "notification.no_idols";
         internal const string NotificationNoStaff = "notification.no_staff";
@@ -93,6 +98,10 @@ namespace CheatsMod
         internal const string NotificationRevealBullies = "Bullying targets revealed.";
         internal const string NotificationMaxResearch = "All research unlocked and set to level 10.";
         internal const string NotificationMaxStaffLevels = "All staff levels set to 20.";
+        internal const string NotificationRevealDatingStatus = "Dating statuses revealed.";
+        internal const string NotificationRevealDatingPreference = "Dating preferences revealed.";
+        internal const string NotificationHealAndEndHiatus = "All idols healed and returned from hiatus.";
+        internal const string NotificationMaxPlayerRelationships = "Active idol influence, friendship, and romance maxed.";
         internal const string NotificationNoActiveIdols = "No active idols found.";
         internal const string NotificationNoIdols = "No idols found.";
         internal const string NotificationNoStaff = "No staff found.";
@@ -146,6 +155,13 @@ namespace CheatsMod
         {
             Relationships._relationship._status.dislikes,
             Relationships._relationship._status.hates
+        };
+
+        private static readonly Relationships_Player._type[] PlayerRelationshipTypes = new Relationships_Player._type[]
+        {
+            Relationships_Player._type.Influence,
+            Relationships_Player._type.Friendship,
+            Relationships_Player._type.Romance
         };
 
         public static void AddOneBillionYen()
@@ -271,6 +287,26 @@ namespace CheatsMod
         public static void MaxOutStaffLevels()
         {
             Execute(MaxOutStaffLevelsCore);
+        }
+
+        public static void RevealDatingStatus()
+        {
+            Execute(RevealDatingStatusCore);
+        }
+
+        public static void RevealDatingPreference()
+        {
+            Execute(RevealDatingPreferenceCore);
+        }
+
+        public static void HealAndEndHiatus()
+        {
+            Execute(HealAndEndHiatusCore);
+        }
+
+        public static void MaxOutActiveIdolPlayerRelationships()
+        {
+            Execute(MaxOutActiveIdolPlayerRelationshipsCore);
         }
 
         private static void AddOneBillionYenCore()
@@ -781,6 +817,132 @@ namespace CheatsMod
                 NotificationManager._notification._type.staff_stat_change);
         }
 
+        private static void RevealDatingStatusCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                if (idol.DatingData == null)
+                {
+                    return;
+                }
+
+                idol.DatingData.Is_Partner_Status_Known = true;
+                idol.DatingData.Partner_Status_Known_To_Player = idol.DatingData.Partner_Status;
+                idol.DatingData.Used_Goods = true;
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoIdols, CheatFallbackText.NotificationNoIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationRevealDatingStatus,
+                CheatFallbackText.NotificationRevealDatingStatus,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void RevealDatingPreferenceCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                if (idol.DatingData != null)
+                {
+                    idol.DatingData.Is_Sexuality_Known = true;
+                }
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoIdols, CheatFallbackText.NotificationNoIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationRevealDatingPreference,
+                CheatFallbackText.NotificationRevealDatingPreference,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void HealAndEndHiatusCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                idol.setParam(data_girls._paramType.physicalStamina, CheatAmounts.IdolParameterMaximumValue);
+                idol.setParam(data_girls._paramType.mentalStamina, CheatAmounts.IdolParameterMaximumValue);
+
+                if (idol.status == data_girls._status.hiatus)
+                {
+                    idol.FinishHiatus(false);
+                }
+                else if (idol.status == data_girls._status.depressed || idol.status == data_girls._status.injured)
+                {
+                    idol.Heal();
+                }
+
+                idol.setParam(data_girls._paramType.physicalStamina, CheatAmounts.IdolParameterMaximumValue);
+                idol.setParam(data_girls._paramType.mentalStamina, CheatAmounts.IdolParameterMaximumValue);
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoIdols, CheatFallbackText.NotificationNoIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationHealAndEndHiatus,
+                CheatFallbackText.NotificationHealAndEndHiatus,
+                NotificationManager._notification._type.idol_status_change);
+        }
+
+        private static void MaxOutActiveIdolPlayerRelationshipsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToActiveIdols(delegate(data_girls.girls idol)
+            {
+                for (int relationshipIndex = 0; relationshipIndex < PlayerRelationshipTypes.Length; relationshipIndex++)
+                {
+                    SetPlayerRelationshipToMaximum(idol, PlayerRelationshipTypes[relationshipIndex]);
+                }
+            });
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoActiveIdols, CheatFallbackText.NotificationNoActiveIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationMaxPlayerRelationships,
+                CheatFallbackText.NotificationMaxPlayerRelationships,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
         private static void Execute(Action cheatAction)
         {
             if (cheatAction == null)
@@ -883,6 +1045,24 @@ namespace CheatsMod
             int targetPoints = Relationships_Player.GetPointsByLevel(targetLevel);
             int pointDelta = targetPoints - currentPoints;
             return Math.Max(CheatAmounts.MinimumRelationshipPointIncrease, pointDelta);
+        }
+
+        private static void SetPlayerRelationshipToMaximum(
+            data_girls.girls idol,
+            Relationships_Player._type relationshipType)
+        {
+            if (idol == null)
+            {
+                return;
+            }
+
+            int currentPoints = idol.GetRelationshipWithPlayer_Points(relationshipType);
+            int targetPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
+            int pointDelta = Math.Max(CheatAmounts.MinimumRelationshipPointDelta, targetPoints - currentPoints);
+            if (pointDelta > CheatAmounts.MinimumRelationshipPointDelta)
+            {
+                Relationships_Player.AddPoints(relationshipType, idol, pointDelta);
+            }
         }
 
         private static void RevealRelationshipsByStatus(
