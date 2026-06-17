@@ -13,7 +13,7 @@ namespace CheatsMod
         internal const long GeneralScandalPointDelta = 1L;
         internal const float IdolScandalPointDelta = 1f;
         internal const float IdolParameterMaximumValue = 100f;
-        internal const float VisibleResearchPointGrant = 1000f;
+        internal const float VisibleResearchPointGrant = 10000f;
         internal const float ResearchStorageMultiplier = 10f;
         internal const float RawResearchPointGrant = VisibleResearchPointGrant * ResearchStorageMultiplier;
         internal const float StaffExperienceGrant = 25000f;
@@ -88,7 +88,7 @@ namespace CheatsMod
         internal const string NotificationIncreaseFriendship = "Active idol friendship increased.";
         internal const string NotificationIncreaseRomance = "Active idol romance increased.";
         internal const string NotificationAddStaffExperience = "Added 25k EXP to all staff.";
-        internal const string NotificationAddResearchPoints = "Added 1k points to every research type.";
+        internal const string NotificationAddResearchPoints = "Added 10k points to every research type.";
         internal const string NotificationSetIdolStats = "All idol stats set to 100.";
         internal const string NotificationIncreaseIdolFame = "Idol fame increased by one level.";
         internal const string NotificationRevealFriends = "Friend relationships revealed.";

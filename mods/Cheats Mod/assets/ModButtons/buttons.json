@@ -160,9 +160,9 @@
 		"method": "MaxOutStaffLevels"
 	},
 	{
-		"label": "+1k all research",
+		"label": "+10k all research",
 		"codeLabel": "cheat.button.add_research_points",
-		"tooltip": "Add 1k points to every research type.",
+		"tooltip": "Add 10k points to every research type.",
 		"codeTooltip": "cheat.tooltip.add_research_points",
 		"icon": "",
 		"assembly": "com.cosmo.cheatsmod",
