@@ -3,12 +3,22 @@
     <ModName>IM UI Framework</ModName>
     <RootNamespace>IMUiFramework</RootNamespace>
     <AssemblyName>com.cosmo.imuiframework</AssemblyName>
-    <Version>1.0.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\IMUiFramework.cs" />
     <Compile Include="src\IMUiBridges.cs" />
+    <Compile Include="src\IMUiTween.cs" />
     <Compile Include="src\ModLocalization.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="DOTween" Private="false">
+      <HintPath>$(dllDir)\DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

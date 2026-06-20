@@ -15,8 +15,12 @@ Main class: `IMUiKit`
 
 Core methods:
 - `TryAddTopMenuButton(...)`
+- `TryAddSettingsButton(...)`
+- `QueueSettingsButton(...)`
 - `TryCreatePopupScaffold(...)`
+- `TryCreateRegisteredPopupScaffold(...)`
 - `TryRegisterPopup(...)`
+- `TryOpenRegisteredPopup(...)`
 - `CreateStagedVariablesState()`
 - `BindStagedApplyCancelButtons(...)`
 - `TryCreateSettingsSlider(...)`
@@ -31,11 +35,15 @@ Core methods:
 - `TryAppendProfileExtra(...)`
 - `CreateText(...)`
 - `CreateLegacyText(...)`
+- `GetOrCreateUiObject(...)`
+- `FindUiElement(...)`
 - `SetText(...)`
 - `ClearChildren(...)`
 - `RebuildLayout(...)`
 - `CreateVerticalLayoutContainer(...)`
 - `CreateHorizontalLayoutContainer(...)`
+- `CreateGridLayoutContainer(...)`
+- `TryCreateStyledScrollView(...)`
 - `CreateDivider(...)`
 - `TryCreateProfileText(...)`
 - `TryCreateProfileDivider(...)`
@@ -69,8 +77,16 @@ Low-level bridge methods:
 - `EnsureCinematicLensAberrations(...)`
 - `EnsureImageEffectsAntialiasing(...)`
 - `EnsureImageEffectsBloom(...)`
+- `TryFindModernTemplate<T>(...)`
+- `TryCloneModernControl<T>(...)`
+- `TryCreateModernButton(...)`
+- `ConfigureModernButton(...)`
 - `TryCreateModernDropdown(...)`
 - `TryCloneModernWindowManager(...)`
+- `TryCreateModernModalWindow(...)`
+- `ConfigureModernModalWindow(...)`
+- `TryCreateModernProgressBar(...)`
+- `SetModernProgress(...)`
 - `AddSoftMask(...)`
 - `TryEnsureBoundTooltipItem(...)`
 - `AddBoundTooltipTrigger(...)`
@@ -81,10 +97,20 @@ Low-level bridge methods:
 - `AddUiGradient(...)`
 - `AddTwoColorUiGradient(...)`
 
+DOTween UI animation class: `IMUiTween`
+
+- `Fade(...)` for `CanvasGroup`, `Graphic`, and `TMP_Text`
+- `Color(...)` for `Graphic` and `TMP_Text`
+- `MoveAnchored(...)`, `Resize(...)`, and `ResizeMinimum(...)`
+- `PunchAnchored(...)` and `ShakeAnchored(...)`
+- `RevealText(...)`
+- `Kill(...)`
+
 Supported namespaces:
 - `UnityStandardAssets.CinematicEffects`
 - `UnityStandardAssets.ImageEffects`
 - `Michsky.UI.ModernUIPack`
+- `DG.Tweening`
 - `UnityEngine.UI.Extensions`
 - `UnityEngine.UI.Michsky.UI.ModernUIPack`
 
@@ -149,6 +175,95 @@ internal static class DemoPatch
     }
 }
 ```
+
+## Harmony-safe Settings button
+
+`QueueSettingsButton` folds the retry pattern used by UI-heavy mods into the
+framework. It is safe to invoke from `PopupManager.Start`, `Tabs_Manager.Awake`,
+or a tab-open postfix: repeated calls update the existing button rather than
+cloning another one.
+
+```csharp
+using HarmonyLib;
+using IMUiFramework;
+
+[HarmonyPatch(typeof(PopupManager), "Start")]
+internal static class SettingsButtonPatch
+{
+    private static void Postfix()
+    {
+        IMUiKit.QueueSettingsButton(
+            "MyMod_SettingsButton",
+            "My Mod",
+            "Open My Mod settings",
+            OpenMyModSettings);
+    }
+
+    private static void OpenMyModSettings()
+    {
+        // IMUiKit.TryOpenRegisteredPopup((PopupManager._type)9001);
+    }
+}
+```
+
+## One-call registered popup
+
+Use this form for a custom popup that should participate in the game's popup
+manager, including its backdrop and close handling.
+
+```csharp
+using TMPro;
+using UnityEngine;
+
+PopupScaffold scaffold;
+if (IMUiKit.TryCreateRegisteredPopupScaffold(
+    (PopupManager._type)9001,
+    "MyModPopup",
+    "My Mod",
+    new Vector2(860f, 520f),
+    true,
+    true,
+    out scaffold))
+{
+    IMUiKit.CreateText(scaffold.ContentRoot, "Body", "Hello", 22,
+        TextAlignmentOptions.Center, mainScript.black32);
+}
+```
+
+## Modern UI Pack controls and DOTween animation
+
+The framework clones a control from an existing Idol Manager template, rather
+than constructing a partial Modern UI Pack prefab at runtime. This preserves its
+serialized references, animator, and style. `TryCloneModernControl<T>` is the
+generic entry point for any installed Modern UI Pack component.
+
+```csharp
+using IMUiFramework;
+using Michsky.UI.ModernUIPack;
+using UnityEngine;
+
+GameObject modernButton;
+ButtonManager buttonManager;
+if (IMUiBridges.TryCreateModernButton(
+    scaffold.ContentRoot,
+    "MyModernButton",
+    "Refresh",
+    RefreshContent,
+    out modernButton,
+    out buttonManager))
+{
+    CanvasGroup group = modernButton.GetComponent<CanvasGroup>();
+    if (group != null)
+    {
+        IMUiTween.Fade(group, 1f, 0.20f);
+    }
+}
+```
+
+`IMUiTween` uses the game's bundled DOTween assembly and configures animations
+to use unscaled time by default. That keeps custom UI responsive while a popup
+has paused simulation. Call `IMUiTween.Kill(target)` before replacing an
+animation on the same target when that is the intended behavior.
 
 ## Minimal usage: profile Extras line
 
@@ -241,9 +356,9 @@ internal static class BridgeShowcasePatch
 }
 ```
 
-## 1.0 API stability contract
+## 1.x API stability contract
 
-- `IMUiKit`, `IMUiBridges`, `PopupScaffold`, `ToolTipTriggerBridge`, and `HoverTooltipTriggerBridge` public members are the supported API for `1.x`.
+- `IMUiKit`, `IMUiBridges`, `IMUiTween`, `PopupScaffold`, `ToolTipTriggerBridge`, and `HoverTooltipTriggerBridge` public members are the supported API for `1.x`.
 - Method names and signatures in that public surface are treated as stable across `1.x` patch/minor updates.
 - Internal classes (`internal` visibility) are runtime implementation details and may change without notice.
 
@@ -257,6 +372,8 @@ internal static class BridgeShowcasePatch
 - Default release behavior keeps `enable_bridge_showcase=false` so dependency installs are non-intrusive.
 - `HoverTooltip` requires a `GUICamera` object in scene.
 - `ToolTip` works only for `ScreenSpaceCamera` canvases (UI Extensions behavior).
+- Modern UI Pack helpers require a matching control template to exist in the game's UI. The bridge searches registered popup prefabs, including inactive ones, before active scene objects.
+- DOTween is supplied by Idol Manager at runtime; it is referenced with `Private=false`, so the framework does not ship a competing copy.
 - It is intentionally utility-focused, not a forced architecture.
 
 ## Build

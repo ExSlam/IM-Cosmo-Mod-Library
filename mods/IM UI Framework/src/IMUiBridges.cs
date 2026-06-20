@@ -13,6 +13,7 @@ using CinematicLensAberrations = UnityStandardAssets.CinematicEffects.LensAberra
 using ImageEffectsAntialiasing = UnityStandardAssets.ImageEffects.Antialiasing;
 using ImageEffectsBloom = UnityStandardAssets.ImageEffects.Bloom;
 using ImageEffectsAAMode = UnityStandardAssets.ImageEffects.AAMode;
+using ModernProgressBar = Michsky.UI.ModernUIPack.ProgressBar;
 
 namespace IMUiFramework
 {
@@ -24,6 +25,295 @@ namespace IMUiFramework
         {
             camera = Camera.main;
             return camera != null;
+        }
+
+        /// <summary>
+        /// Finds an existing Modern UI Pack control, including controls in inactive game
+        /// popup prefabs. This is the preferred template source for new MUI controls.
+        /// </summary>
+        public static bool TryFindModernTemplate<T>(out T template) where T : Component
+        {
+            template = null;
+
+            PopupManager manager;
+            if (IMUiKit.TryGetPopupManager(out manager) && manager != null && manager.popups != null)
+            {
+                for (int i = 0; i < manager.popups.Length; i++)
+                {
+                    PopupManager._popup entry = manager.popups[i];
+                    if (entry == null || entry.obj == null)
+                    {
+                        continue;
+                    }
+
+                    T found = entry.obj.GetComponentInChildren<T>(true);
+                    if (found != null)
+                    {
+                        template = found;
+                        return true;
+                    }
+                }
+            }
+
+            template = UnityEngine.Object.FindObjectOfType<T>();
+            return template != null;
+        }
+
+        /// <summary>
+        /// Clones a Modern UI Pack control from the game's UI. It supports any public MUI
+        /// component type, including ButtonManager, CustomInputField, SliderManager,
+        /// SwitchManager, ToggleAnim, ModalWindowManager, and ProgressBar.
+        /// </summary>
+        public static bool TryCloneModernControl<T>(
+            Transform parent,
+            string objectName,
+            out GameObject controlObject,
+            out T control) where T : Component
+        {
+            controlObject = null;
+            control = null;
+            if (parent == null)
+            {
+                return false;
+            }
+
+            T template;
+            if (!TryFindModernTemplate(out template) || template == null)
+            {
+                Log("TryCloneModernControl failed: no " + typeof(T).Name + " template found.");
+                return false;
+            }
+
+            controlObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+            controlObject.name = string.IsNullOrEmpty(objectName)
+                ? "IMUiFramework_" + typeof(T).Name
+                : objectName;
+            controlObject.SetActive(true);
+            IMUiKit.ApplyLayerRecursively(controlObject, parent.gameObject.layer);
+
+            control = controlObject.GetComponent<T>();
+            if (control == null)
+            {
+                control = controlObject.GetComponentInChildren<T>(true);
+            }
+
+            if (control != null)
+            {
+                return true;
+            }
+
+            UnityEngine.Object.Destroy(controlObject);
+            controlObject = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Clones and configures a Modern UI Pack button while removing template click
+        /// listeners and localization bindings from the source control.
+        /// </summary>
+        public static bool TryCreateModernButton(
+            Transform parent,
+            string objectName,
+            string label,
+            UnityAction onClick,
+            out GameObject buttonObject,
+            out ButtonManager buttonManager)
+        {
+            if (!TryCloneModernControl(parent, objectName, out buttonObject, out buttonManager))
+            {
+                return false;
+            }
+
+            if (ConfigureModernButton(buttonManager, label, onClick))
+            {
+                return true;
+            }
+
+            UnityEngine.Object.Destroy(buttonObject);
+            buttonObject = null;
+            buttonManager = null;
+            return false;
+        }
+
+        public static bool ConfigureModernButton(
+            ButtonManager buttonManager,
+            string label,
+            UnityAction onClick)
+        {
+            if (buttonManager == null)
+            {
+                return false;
+            }
+
+            GameObject root = buttonManager.gameObject;
+            IMUiKit.ClearLocalizationComponents(root);
+            buttonManager.useCustomContent = true;
+            buttonManager.buttonText = label ?? string.Empty;
+            buttonManager.clickEvent = new UnityEvent();
+
+            if (buttonManager.normalText != null)
+            {
+                buttonManager.normalText.text = buttonManager.buttonText;
+            }
+
+            if (buttonManager.highlightedText != null)
+            {
+                buttonManager.highlightedText.text = buttonManager.buttonText;
+            }
+
+            Button button = root.GetComponent<Button>();
+            if (button == null)
+            {
+                button = root.GetComponentInChildren<Button>(true);
+            }
+
+            if (button == null)
+            {
+                return false;
+            }
+
+            button.onClick = new Button.ButtonClickedEvent();
+            if (onClick != null)
+            {
+                button.onClick.AddListener(onClick);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Clones a Modern UI Pack modal and configures its content and callbacks. The
+        /// returned ModalWindowManager can be opened with OpenWindow or AnimateWindow.
+        /// </summary>
+        public static bool TryCreateModernModalWindow(
+            Transform parent,
+            string objectName,
+            string title,
+            string description,
+            Sprite icon,
+            UnityAction onConfirm,
+            UnityAction onCancel,
+            out GameObject windowObject,
+            out ModalWindowManager windowManager)
+        {
+            if (!TryCloneModernControl(parent, objectName, out windowObject, out windowManager))
+            {
+                return false;
+            }
+
+            ConfigureModernModalWindow(windowManager, title, description, icon, onConfirm, onCancel);
+            return true;
+        }
+
+        public static void ConfigureModernModalWindow(
+            ModalWindowManager windowManager,
+            string title,
+            string description,
+            Sprite icon,
+            UnityAction onConfirm,
+            UnityAction onCancel)
+        {
+            if (windowManager == null)
+            {
+                return;
+            }
+
+            windowManager.useCustomValues = true;
+            windowManager.titleText = title ?? string.Empty;
+            windowManager.descriptionText = description ?? string.Empty;
+            windowManager.icon = icon;
+            windowManager.onConfirm = new UnityEvent();
+            windowManager.onCancel = new UnityEvent();
+            if (onConfirm != null)
+            {
+                windowManager.onConfirm.AddListener(onConfirm);
+            }
+
+            if (onCancel != null)
+            {
+                windowManager.onCancel.AddListener(onCancel);
+            }
+
+            if (windowManager.confirmButton != null)
+            {
+                windowManager.confirmButton.onClick = new Button.ButtonClickedEvent();
+            }
+
+            if (windowManager.cancelButton != null)
+            {
+                windowManager.cancelButton.onClick = new Button.ButtonClickedEvent();
+            }
+
+            if (windowManager.windowIcon != null)
+            {
+                windowManager.windowIcon.sprite = icon;
+            }
+
+            if (windowManager.windowTitle != null)
+            {
+                windowManager.windowTitle.text = windowManager.titleText;
+            }
+
+            if (windowManager.windowDescription != null)
+            {
+                windowManager.windowDescription.text = windowManager.descriptionText;
+            }
+        }
+
+        /// <summary>
+        /// Clones a Modern UI Pack progress bar and sets a stable, non-automatic value.
+        /// </summary>
+        public static bool TryCreateModernProgressBar(
+            Transform parent,
+            string objectName,
+            float currentValue,
+            float maximumValue,
+            out GameObject progressObject,
+            out ModernProgressBar progressBar)
+        {
+            if (!TryCloneModernControl(parent, objectName, out progressObject, out progressBar))
+            {
+                return false;
+            }
+
+            if (SetModernProgress(progressBar, currentValue, maximumValue))
+            {
+                return true;
+            }
+
+            UnityEngine.Object.Destroy(progressObject);
+            progressObject = null;
+            progressBar = null;
+            return false;
+        }
+
+        public static bool SetModernProgress(
+            ModernProgressBar progressBar,
+            float currentValue,
+            float maximumValue = 100f)
+        {
+            if (progressBar == null || maximumValue <= 0f)
+            {
+                return false;
+            }
+
+            progressBar.isOn = false;
+            progressBar.maxValue = maximumValue;
+            progressBar.currentPercent = Mathf.Clamp(currentValue, 0f, maximumValue);
+
+            if (progressBar.loadingBar != null)
+            {
+                progressBar.loadingBar.fillAmount = progressBar.currentPercent / progressBar.maxValue;
+            }
+
+            if (progressBar.textPercent != null)
+            {
+                progressBar.textPercent.text = progressBar.isPercent
+                    ? Mathf.RoundToInt(progressBar.currentPercent).ToString() + "%"
+                    : Mathf.RoundToInt(progressBar.currentPercent).ToString();
+            }
+
+            return true;
         }
 
         public static CinematicBloom EnsureCinematicBloom(

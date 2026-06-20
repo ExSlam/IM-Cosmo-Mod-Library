@@ -648,6 +648,137 @@ namespace IMUiFramework
     {
     }
 
+    /// <summary>
+    /// Retries UI work on the Unity main thread while the game's UI is still being built.
+    /// This keeps Harmony postfixes small and avoids every consumer implementing its own
+    /// MonoBehaviour retry loop.
+    /// </summary>
+    internal sealed class IMUiDeferredWorkRunner : MonoBehaviour
+    {
+        private sealed class WorkItem
+        {
+            internal Func<bool> Operation;
+            internal int Attempts;
+            internal int MaxAttempts;
+            internal float RetryIntervalSeconds;
+            internal float NextAttemptAt;
+        }
+
+        private static readonly Dictionary<string, WorkItem> PendingWork =
+            new Dictionary<string, WorkItem>(StringComparer.Ordinal);
+        private static readonly List<string> CompletedKeys = new List<string>();
+        private static IMUiDeferredWorkRunner instance;
+
+        internal static bool TryQueue(
+            string operationKey,
+            Func<bool> operation,
+            int maxAttempts,
+            float retryIntervalSeconds)
+        {
+            if (string.IsNullOrEmpty(operationKey) || operation == null)
+            {
+                return false;
+            }
+
+            GameObject host = ResolveHost();
+            if (host == null)
+            {
+                return false;
+            }
+
+            if (instance == null)
+            {
+                instance = host.GetComponent<IMUiDeferredWorkRunner>();
+                if (instance == null)
+                {
+                    instance = host.AddComponent<IMUiDeferredWorkRunner>();
+                }
+            }
+
+            PendingWork[operationKey] = new WorkItem
+            {
+                Operation = operation,
+                Attempts = 0,
+                MaxAttempts = Mathf.Max(1, maxAttempts),
+                RetryIntervalSeconds = Mathf.Max(0.01f, retryIntervalSeconds),
+                NextAttemptAt = Time.unscaledTime
+            };
+            return true;
+        }
+
+        private static GameObject ResolveHost()
+        {
+            if (Camera.main != null)
+            {
+                return Camera.main.gameObject;
+            }
+
+            PopupManager manager;
+            if (IMUiKit.TryGetPopupManager(out manager) && manager != null)
+            {
+                return manager.gameObject;
+            }
+
+            return null;
+        }
+
+        private void OnEnable()
+        {
+            instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (instance == this)
+            {
+                instance = null;
+            }
+        }
+
+        private void Update()
+        {
+            if (PendingWork.Count == 0)
+            {
+                return;
+            }
+
+            float now = Time.unscaledTime;
+            CompletedKeys.Clear();
+            foreach (KeyValuePair<string, WorkItem> pair in PendingWork)
+            {
+                WorkItem item = pair.Value;
+                if (item == null || now < item.NextAttemptAt)
+                {
+                    continue;
+                }
+
+                item.Attempts++;
+                bool completed = false;
+                try
+                {
+                    completed = item.Operation();
+                }
+                catch
+                {
+                    completed = false;
+                }
+
+                if (completed || item.Attempts >= item.MaxAttempts)
+                {
+                    CompletedKeys.Add(pair.Key);
+                    continue;
+                }
+
+                item.NextAttemptAt = now + item.RetryIntervalSeconds;
+            }
+
+            for (int i = 0; i < CompletedKeys.Count; i++)
+            {
+                PendingWork.Remove(CompletedKeys[i]);
+            }
+        }
+    }
+
     public sealed class PopupScaffold
     {
         public GameObject Root;
@@ -946,10 +1077,12 @@ namespace IMUiFramework
         private const string BlurComponentTypeFallback = "SuperBlurFast";
         private const string BlurInterpolationPropertyName = "interpolation";
         private const string LogMessageAddTopMenuButtonMissingAwards = "TryAddTopMenuButton failed: awards button not found.";
+        private const string LogMessageAddSettingsButtonMissingTab = "TryAddSettingsButton failed: settings tab or button template not found.";
         private const string LogMessageCreatePopupScaffoldMissingParent = "TryCreatePopupScaffold failed: popup parent not found.";
         private const string LogMessageCreateSliderMissingTemplate = "TryCreateSettingsSlider failed: no Settings_Slider template found.";
         private const string LogMessageCreateCheckboxMissingTemplate = "TryCreateSettingsCheckbox failed: no Checkbox_Text template found.";
         private const string TopMenuButtonDefaultObjectName = "IMUiFramework_Button";
+        private const string SettingsButtonDefaultObjectName = "IMUiFramework_SettingsButton";
         private const string PopupDefaultObjectName = "IMUiFramework_Popup";
         private const string PopupPanelObjectName = "Panel";
         private const string PopupTitleObjectName = "Title";
@@ -970,6 +1103,11 @@ namespace IMUiFramework
         private const string ScrollbarObjectName = "Scrollbar";
         private const string ScrollbarHandleObjectName = "Handle";
         private const string CloseButtonObjectName = "Close";
+        private const string SettingsContainerPath = "ScrollRect/Container";
+        private const string SettingsContainerObjectName = "Container";
+        private const string SettingsModMenuButtonObjectName = "ModMenuButton";
+        private const string SettingsTemplateName = "Settings";
+        private const string MainMenuTemplateName = "Main Menu";
         private const string LabelValueSeparator = ": ";
         private const string SpaceSeparator = " ";
         private const string EmptyText = "";
@@ -1674,6 +1812,101 @@ namespace IMUiFramework
             return true;
         }
 
+        /// <summary>
+        /// Adds or refreshes a game-styled button in the Settings tab.
+        /// The method is idempotent: calling it from repeated Harmony postfixes updates the
+        /// existing button instead of creating a duplicate.
+        /// </summary>
+        public static bool TryAddSettingsButton(
+            string objectName,
+            string label,
+            string tooltip,
+            UnityAction onClick,
+            out GameObject createdButton)
+        {
+            createdButton = null;
+            TryCaptureTheme();
+
+            string resolvedName = string.IsNullOrEmpty(objectName)
+                ? SettingsButtonDefaultObjectName
+                : objectName;
+
+            Transform settingsRoot;
+            Transform settingsContainer;
+            if (!TryGetSettingsRoot(out settingsRoot) ||
+                !TryFindSettingsContainer(settingsRoot, out settingsContainer))
+            {
+                Log(LogMessageAddSettingsButtonMissingTab);
+                return false;
+            }
+
+            Transform existing = FindUiElement(settingsRoot, resolvedName);
+            if (existing != null)
+            {
+                createdButton = existing.gameObject;
+                ConfigureInjectedButton(createdButton, label, tooltip, onClick);
+                PositionSettingsButton(createdButton.transform, settingsRoot, settingsContainer);
+                return true;
+            }
+
+            GameObject template = FindSettingsButtonTemplate(settingsContainer, resolvedName);
+            if (template == null)
+            {
+                template = FindSettingsButtonTemplate(settingsRoot, resolvedName);
+            }
+
+            if (template == null || template.transform.parent == null)
+            {
+                Log(LogMessageAddSettingsButtonMissingTab);
+                return false;
+            }
+
+            GameObject clone = UnityEngine.Object.Instantiate(template, settingsContainer, false);
+            clone.name = resolvedName;
+            clone.AddComponent<IMUiFrameworkMarker>();
+            clone.SetActive(true);
+            SetLayerRecursively(clone, settingsContainer.gameObject.layer);
+
+            ConfigureInjectedButton(clone, label, tooltip, onClick);
+            PositionSettingsButton(clone.transform, settingsRoot, settingsContainer);
+            createdButton = clone;
+            return true;
+        }
+
+        /// <summary>
+        /// Queues a Settings-tab injection until the game has finished building its UI.
+        /// Returns false only when the request could not be queued; it does not indicate
+        /// that the button is already visible.
+        /// </summary>
+        public static bool QueueSettingsButton(
+            string objectName,
+            string label,
+            string tooltip,
+            UnityAction onClick,
+            int maxAttempts = 240,
+            float retryIntervalSeconds = 0.10f)
+        {
+            string resolvedName = string.IsNullOrEmpty(objectName)
+                ? SettingsButtonDefaultObjectName
+                : objectName;
+
+            GameObject createdButton;
+            if (TryAddSettingsButton(resolvedName, label, tooltip, onClick, out createdButton))
+            {
+                return true;
+            }
+
+            return IMUiDeferredWorkRunner.TryQueue(
+                "settings-button:" + resolvedName,
+                delegate
+                {
+                    GameObject ignored;
+                    return TryAddSettingsButton(resolvedName, label, tooltip, onClick, out ignored);
+                },
+                maxAttempts,
+                retryIntervalSeconds);
+        }
+
         public static bool TryCreatePopupScaffold(
             string popupName,
             string title,
@@ -1766,6 +1999,41 @@ namespace IMUiFramework
             return true;
         }
 
+        /// <summary>
+        /// Creates a popup scaffold and registers it with PopupManager as one operation.
+        /// If registration fails, the temporary root is destroyed and no partial popup is
+        /// returned to the caller.
+        /// </summary>
+        public static bool TryCreateRegisteredPopupScaffold(
+            PopupManager._type type,
+            string popupName,
+            string title,
+            Vector2 panelSize,
+            bool blurBackground,
+            bool darkenBackground,
+            out PopupScaffold scaffold)
+        {
+            scaffold = null;
+            PopupScaffold created;
+            if (!TryCreatePopupScaffold(popupName, title, panelSize, out created))
+            {
+                return false;
+            }
+
+            if (TryRegisterPopup(type, created.Root, blurBackground, darkenBackground))
+            {
+                scaffold = created;
+                return true;
+            }
+
+            if (created.Root != null)
+            {
+                UnityEngine.Object.Destroy(created.Root);
+            }
+
+            return false;
+        }
+
         public static bool TryRegisterPopup(
             PopupManager._type type,
             GameObject popupRoot,
@@ -1803,6 +2071,29 @@ namespace IMUiFramework
             Array.Resize(ref manager.popups, manager.popups.Length + 1);
             manager.popups[manager.popups.Length - 1] = newPopup;
             return true;
+        }
+
+        /// <summary>
+        /// Opens a popup previously registered through TryRegisterPopup or
+        /// TryCreateRegisteredPopupScaffold.
+        /// </summary>
+        public static bool TryOpenRegisteredPopup(PopupManager._type type)
+        {
+            PopupManager manager;
+            if (!TryGetPopupManager(out manager) || manager.GetByType(type) == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                PopupManager.OpenPopup(type);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static StagedVariablesState CreateStagedVariablesState()
@@ -2237,6 +2528,57 @@ namespace IMUiFramework
             return obj;
         }
 
+        /// <summary>
+        /// Returns a direct child by name, or creates it with a RectTransform when absent.
+        /// This is useful for idempotent Harmony UI patches that can run more than once.
+        /// </summary>
+        public static GameObject GetOrCreateUiObject(string name, Transform parent)
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            string resolvedName = string.IsNullOrEmpty(name) ? "UIObject" : name;
+            Transform existing = parent.Find(resolvedName);
+            return existing != null ? existing.gameObject : CreateUiObject(resolvedName, parent);
+        }
+
+        /// <summary>
+        /// Finds an existing UI element by hierarchy path first, then by descendant name.
+        /// Inactive objects are included in the name fallback.
+        /// </summary>
+        public static Transform FindUiElement(Transform root, string pathOrName)
+        {
+            if (root == null || string.IsNullOrEmpty(pathOrName))
+            {
+                return null;
+            }
+
+            Transform byPath = root.Find(pathOrName);
+            if (byPath != null)
+            {
+                return byPath;
+            }
+
+            if (string.Equals(root.name, pathOrName, StringComparison.Ordinal))
+            {
+                return root;
+            }
+
+            Transform[] descendants = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < descendants.Length; i++)
+            {
+                Transform candidate = descendants[i];
+                if (candidate != null && string.Equals(candidate.name, pathOrName, StringComparison.Ordinal))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
         public static TextMeshProUGUI CreateText(
             Transform parent,
             string name,
@@ -2371,6 +2713,71 @@ namespace IMUiFramework
             }
 
             return container;
+        }
+
+        /// <summary>
+        /// Creates a fixed-column grid with sane defaults for dynamically generated UI.
+        /// Add a LayoutElement to the returned object when its parent needs an explicit
+        /// preferred height.
+        /// </summary>
+        public static GameObject CreateGridLayoutContainer(
+            Transform parent,
+            string name,
+            Vector2 cellSize,
+            int columnCount,
+            Vector2 spacing,
+            TextAnchor childAlignment = TextAnchor.UpperLeft,
+            int paddingLeft = 0,
+            int paddingRight = 0,
+            int paddingTop = 0,
+            int paddingBottom = 0)
+        {
+            GameObject container = CreateUiObject(
+                string.IsNullOrEmpty(name) ? "GridContainer" : name,
+                parent);
+            GridLayoutGroup layout = AddOrGetComponent<GridLayoutGroup>(container);
+            layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            layout.constraintCount = Mathf.Max(1, columnCount);
+            layout.cellSize = new Vector2(Mathf.Max(0f, cellSize.x), Mathf.Max(0f, cellSize.y));
+            layout.spacing = new Vector2(Mathf.Max(0f, spacing.x), Mathf.Max(0f, spacing.y));
+            layout.padding = new RectOffset(paddingLeft, paddingRight, paddingTop, paddingBottom);
+            layout.startAxis = GridLayoutGroup.Axis.Horizontal;
+            layout.childAlignment = childAlignment;
+            return container;
+        }
+
+        /// <summary>
+        /// Creates a styled vertical ScrollRect suitable for a custom panel or a patched
+        /// game panel. The content root uses a vertical layout and grows with its children.
+        /// </summary>
+        public static bool TryCreateStyledScrollView(
+            Transform parent,
+            string objectName,
+            Vector2 offsetMin,
+            Vector2 offsetMax,
+            out ScrollRect scrollRect,
+            out Transform contentRoot)
+        {
+            scrollRect = null;
+            contentRoot = null;
+            if (parent == null)
+            {
+                return false;
+            }
+
+            TryCaptureTheme();
+            CreateStyledScrollView(parent, offsetMin, offsetMax, out scrollRect, out contentRoot);
+            if (scrollRect == null || contentRoot == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(objectName))
+            {
+                scrollRect.gameObject.name = objectName;
+            }
+
+            return true;
         }
 
         public static GameObject CreateDivider(
@@ -2964,6 +3371,238 @@ namespace IMUiFramework
             target.verticalScrollbar = scrollbar;
             target.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             target.verticalScrollbarSpacing = DefaultScrollbarSpacing;
+        }
+
+        private static bool TryGetSettingsRoot(out Transform settingsRoot)
+        {
+            settingsRoot = null;
+
+            mainScript main;
+            if (!TryGetMain(out main) || main.Data == null)
+            {
+                return false;
+            }
+
+            Tabs_Manager tabsManager = main.Data.GetComponent<Tabs_Manager>();
+            if (tabsManager == null)
+            {
+                return false;
+            }
+
+            Tabs_Manager._tab settingsTab = tabsManager.GetTab(Tabs_Manager._tab._type.settings);
+            if (settingsTab == null || settingsTab.Tab == null)
+            {
+                return false;
+            }
+
+            settingsRoot = settingsTab.Tab.transform;
+            return settingsRoot != null;
+        }
+
+        private static bool TryFindSettingsContainer(Transform settingsRoot, out Transform settingsContainer)
+        {
+            settingsContainer = null;
+            if (settingsRoot == null)
+            {
+                return false;
+            }
+
+            Transform directPath = settingsRoot.Find(SettingsContainerPath);
+            if (directPath != null)
+            {
+                settingsContainer = directPath;
+                return true;
+            }
+
+            Transform[] descendants = settingsRoot.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < descendants.Length; i++)
+            {
+                Transform candidate = descendants[i];
+                if (candidate == null || !string.Equals(candidate.name, SettingsContainerObjectName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (candidate.GetComponent<LayoutGroup>() != null)
+                {
+                    settingsContainer = candidate;
+                    return true;
+                }
+            }
+
+            Button[] buttons = settingsRoot.GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button candidate = buttons[i];
+                if (candidate == null || candidate.transform.parent == null || !HasButtonLabel(candidate.transform))
+                {
+                    continue;
+                }
+
+                Transform parent = candidate.transform.parent;
+                if (parent.GetComponent<LayoutGroup>() != null)
+                {
+                    settingsContainer = parent;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static GameObject FindSettingsButtonTemplate(Transform root, string excludedObjectName)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            for (int preferredIndex = 0; preferredIndex < 2; preferredIndex++)
+            {
+                string preferredName = preferredIndex == 0 ? SettingsTemplateName : MainMenuTemplateName;
+                for (int childIndex = 0; childIndex < root.childCount; childIndex++)
+                {
+                    Transform child = root.GetChild(childIndex);
+                    if (child == null || IsWithinNamedElement(child, excludedObjectName))
+                    {
+                        continue;
+                    }
+
+                    if (MatchesButtonLabel(child, preferredName))
+                    {
+                        return child.gameObject;
+                    }
+                }
+            }
+
+            Button[] buttons = root.GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button candidate = buttons[i];
+                if (candidate == null || candidate.gameObject == null ||
+                    IsWithinNamedElement(candidate.transform, excludedObjectName) ||
+                    !HasButtonLabel(candidate.transform))
+                {
+                    continue;
+                }
+
+                return candidate.gameObject;
+            }
+
+            return null;
+        }
+
+        private static void ConfigureInjectedButton(
+            GameObject buttonRoot,
+            string label,
+            string tooltip,
+            UnityAction onClick)
+        {
+            if (buttonRoot == null)
+            {
+                return;
+            }
+
+            buttonRoot.SetActive(true);
+            ClearLocalizationComponents(buttonRoot);
+            RebindButtonClick(buttonRoot, onClick);
+            SetButtonLabel(buttonRoot, label);
+            SetTooltip(buttonRoot, tooltip);
+            EnsureButtonDefaultState(buttonRoot);
+        }
+
+        private static void PositionSettingsButton(
+            Transform button,
+            Transform settingsRoot,
+            Transform settingsContainer)
+        {
+            if (button == null || settingsContainer == null)
+            {
+                return;
+            }
+
+            Transform parent = settingsContainer;
+            Transform modMenuButton = FindUiElement(settingsRoot, SettingsModMenuButtonObjectName);
+            if (modMenuButton != null && modMenuButton.parent != null)
+            {
+                parent = modMenuButton.parent;
+            }
+
+            if (button.parent != parent)
+            {
+                button.SetParent(parent, false);
+            }
+
+            if (modMenuButton != null && modMenuButton.parent == parent)
+            {
+                button.SetSiblingIndex(Mathf.Min(modMenuButton.GetSiblingIndex() + 1, parent.childCount - 1));
+            }
+            else
+            {
+                button.SetAsLastSibling();
+            }
+
+            RebuildLayout(parent);
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private static bool HasButtonLabel(Transform root)
+        {
+            if (root == null)
+            {
+                return false;
+            }
+
+            return root.GetComponentsInChildren<TextMeshProUGUI>(true).Length > 0 ||
+                root.GetComponentsInChildren<Text>(true).Length > 0;
+        }
+
+        private static bool MatchesButtonLabel(Transform root, string text)
+        {
+            if (root == null || string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(root.name) &&
+                root.name.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            TextMeshProUGUI[] tmps = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+            TextMeshProUGUI tmp = tmps.Length > 0 ? tmps[0] : null;
+            if (tmp != null && !string.IsNullOrEmpty(tmp.text) &&
+                tmp.text.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            Text[] legacyTexts = root.GetComponentsInChildren<Text>(true);
+            Text legacy = legacyTexts.Length > 0 ? legacyTexts[0] : null;
+            return legacy != null && !string.IsNullOrEmpty(legacy.text) &&
+                legacy.text.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsWithinNamedElement(Transform candidate, string name)
+        {
+            if (candidate == null || string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            Transform current = candidate;
+            while (current != null)
+            {
+                if (string.Equals(current.name, name, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
         }
 
         private static GameObject FindAwardsButton()
