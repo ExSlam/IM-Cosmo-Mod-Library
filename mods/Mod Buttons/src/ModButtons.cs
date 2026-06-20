@@ -199,7 +199,6 @@ namespace ModButtons
         private const string HubButtonLabel = "Action Hub";
         private const string TargetModMenuButton = "ModMenuButton";
         private const string FallbackSettingsName = "Settings";
-        private const string FallbackGraphicsName = "Graphics";
         private const string FallbackMainMenuName = "Main Menu";
         
         private const string PopupObjName = "ModButtonsPopup";
@@ -238,7 +237,7 @@ namespace ModButtons
         private const string PrefixButton = "Btn_";
         private const string DotSeparator = ".";
         private const string LogErrorPrefix = "[ModButtons] Execution failed:";
-        private static readonly string[] PreferredButtonTemplateNames = { FallbackSettingsName, FallbackGraphicsName, FallbackMainMenuName };
+        private static readonly string[] PreferredButtonTemplateNames = { FallbackSettingsName, FallbackMainMenuName };
         
         private const int CustomPopupID = 998;
         private const int NotFoundIndex = -1;
@@ -523,7 +522,7 @@ namespace ModButtons
             }
             else
             {
-                Transform standardSettingsBtn = parent.Cast<Transform>().FirstOrDefault(t => ButtonMatches(t, FallbackSettingsName) || ButtonMatches(t, FallbackGraphicsName));
+                Transform standardSettingsBtn = parent.Cast<Transform>().FirstOrDefault(t => ButtonMatches(t, FallbackSettingsName));
                 if (standardSettingsBtn != null)
                 {
                     hubButton.SetSiblingIndex(Mathf.Min(standardSettingsBtn.GetSiblingIndex() + 1, parent.childCount - 1));
