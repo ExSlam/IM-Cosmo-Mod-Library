@@ -1,8 +1,10 @@
 using HarmonyLib;
 using System;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Michsky.UI.ModernUIPack;
 using SimpleJSON;
 using System.IO;
 using System.Linq;
@@ -229,12 +231,25 @@ namespace ModButtons
         private const string JsonKeyAssembly = "assembly";
         private const string JsonKeyClass = "class";
         private const string JsonKeyMethod = "method";
+        private const string JsonKeyInputs = "inputs";
+        private const string JsonKeyInputId = "id";
+        private const string JsonKeyInputType = "type";
+        private const string JsonKeyInputValueType = "valueType";
+        private const string JsonKeyInputDefault = "default";
+        private const string JsonKeyInputMinimum = "min";
+        private const string JsonKeyInputMaximum = "max";
+        private const string JsonKeyInputOptions = "options";
+        private const string JsonKeyInputValue = "value";
+        private const string JsonKeyInputPlaceholder = "placeholder";
+        private const string JsonKeyInputCodePlaceholder = "codePlaceholder";
         private const string LocKeyModTitle = "mod.title";
         
         private const string PrefixTitle = "Title_";
         private const string PrefixGrid = "Grid_";
         private const string PrefixCell = "Cell_";
         private const string PrefixButton = "Btn_";
+        private const string PrefixForm = "Form_";
+        private const string PrefixInput = "Input_";
         private const string DotSeparator = ".";
         private const string LogErrorPrefix = "[ModButtons] Execution failed:";
         private static readonly string[] PreferredButtonTemplateNames = { FallbackSettingsName, FallbackMainMenuName };
@@ -258,6 +273,16 @@ namespace ModButtons
         private const float SectionTitleHeight = 44f;
         private const float FallbackBtnMinWidth = 200f;
         private const float FallbackBtnMinHeight = 40f;
+        private const float FormPreferredWidth = 440f;
+        private const float FormActionButtonHeight = 38f;
+        private const float FormActionButtonWidth = 150f;
+        private const float FormFieldLabelHeight = 18f;
+        private const float FormControlHeight = 32f;
+        private const float FormFieldHeight = 54f;
+        private const float FormFieldWidth = 200f;
+        private const float FormSpacing = 8f;
+        private const float FormValidationHeight = 18f;
+        private const int FormInputsPerRow = 2;
         private const int IconButtonsPerRow = 2;
         private const int FallbackTextButtonsPerRow = 2;
         private const float PopupMinimumWidth = 520f;
@@ -294,16 +319,81 @@ namespace ModButtons
         private sealed class ButtonSectionLayout
         {
             internal Mods._mod Mod;
-            internal JSONArray JsonArray;
+            internal List<ActionDefinition> Actions;
             internal string LocalizedTitle;
             internal bool HasFallbackTextButtons;
             internal int ButtonCount;
+            internal int SimpleButtonCount;
+            internal int FormActionCount;
             internal int ColumnCount;
             internal int RowCount;
             internal float CellWidth;
             internal float CellHeight;
             internal float GridWidth;
             internal float GridHeight;
+            internal float FormHeight;
+        }
+
+        private enum ActionInputKind
+        {
+            Text,
+            Integer,
+            Float,
+            Slider,
+            Dropdown
+        }
+
+        private enum ActionValueKind
+        {
+            String,
+            Integer,
+            Float
+        }
+
+        private sealed class ActionInputOption
+        {
+            internal string Label;
+            internal string Value;
+        }
+
+        private sealed class ActionInputDefinition
+        {
+            internal string Id;
+            internal string Label;
+            internal string Placeholder;
+            internal ActionInputKind InputKind;
+            internal ActionValueKind ValueKind;
+            internal string DefaultValue;
+            internal float Minimum;
+            internal float Maximum;
+            internal bool HasMinimum;
+            internal bool HasMaximum;
+            internal List<ActionInputOption> Options = new List<ActionInputOption>();
+        }
+
+        private sealed class ActionDefinition
+        {
+            internal string Label;
+            internal string Tooltip;
+            internal string IconPath;
+            internal string AssemblyName;
+            internal string ClassName;
+            internal string MethodName;
+            internal List<ActionInputDefinition> Inputs = new List<ActionInputDefinition>();
+
+            internal bool HasInputs
+            {
+                get { return Inputs != null && Inputs.Count > 0; }
+            }
+        }
+
+        private sealed class ActionInputBinding
+        {
+            internal ActionInputDefinition Definition;
+            internal TMP_InputField TextInput;
+            internal Slider Slider;
+            internal CustomDropdown Dropdown;
+            internal int DropdownIndex;
         }
 
         private sealed class PopupLayoutMetrics
@@ -805,32 +895,268 @@ namespace ModButtons
                 ModButtonsLocalization.EnsureLoaded(mod.Path);
                 string localizedTitle = ModButtonsLocalization.Get(mod.Path, LocKeyModTitle, mod.Title);
 
-                bool hasFallbackTextButtons = HasFallbackTextButtons(mod.Path, jsonArray);
-                int buttonCount = jsonArray.Count;
-                int columnCount = Math.Min(hasFallbackTextButtons ? FallbackTextButtonsPerRow : IconButtonsPerRow, Math.Max(MinimumButtonCount, buttonCount));
+                List<ActionDefinition> actions = new List<ActionDefinition>();
+                for (int i = 0; i < jsonArray.Count; i++)
+                {
+                    ActionDefinition action = ParseActionDefinition(mod.Path, jsonArray[i]);
+                    if (action != null)
+                    {
+                        actions.Add(action);
+                    }
+                }
+
+                if (actions.Count == 0) continue;
+
+                int simpleButtonCount = actions.Count(action => action != null && !action.HasInputs);
+                int formActionCount = actions.Count(action => action != null && action.HasInputs);
+                bool hasFallbackTextButtons = HasFallbackTextButtons(actions);
+                int columnCount = simpleButtonCount > 0
+                    ? Math.Min(hasFallbackTextButtons ? FallbackTextButtonsPerRow : IconButtonsPerRow, Math.Max(MinimumButtonCount, simpleButtonCount))
+                    : 0;
                 float cellWidth = hasFallbackTextButtons ? FallbackBtnMinWidth : MaxCellSize;
                 float cellHeight = hasFallbackTextButtons ? FallbackBtnMinHeight : MaxCellSize;
-                int rowCount = Mathf.CeilToInt((float)buttonCount / (float)columnCount);
-                float gridWidth = columnCount * cellWidth + Math.Max(0, columnCount - 1) * GridCellSpacing;
-                float gridHeight = rowCount * cellHeight + Math.Max(0, rowCount - 1) * GridCellSpacing;
+                int rowCount = columnCount > 0 ? Mathf.CeilToInt((float)simpleButtonCount / (float)columnCount) : 0;
+                float gridWidth = columnCount > 0
+                    ? columnCount * cellWidth + Math.Max(0, columnCount - 1) * GridCellSpacing
+                    : 0f;
+                float gridHeight = rowCount > 0
+                    ? rowCount * cellHeight + Math.Max(0, rowCount - 1) * GridCellSpacing
+                    : 0f;
+                float formHeight = 0f;
+                for (int i = 0; i < actions.Count; i++)
+                {
+                    ActionDefinition action = actions[i];
+                    if (action != null && action.HasInputs)
+                    {
+                        formHeight += GetActionFormHeight(action);
+                    }
+                }
+                if (formActionCount > 1)
+                {
+                    formHeight += (formActionCount - 1) * VerticalLayoutSpacing;
+                }
 
                 sections.Add(new ButtonSectionLayout
                 {
                     Mod = mod,
-                    JsonArray = jsonArray,
+                    Actions = actions,
                     LocalizedTitle = localizedTitle,
                     HasFallbackTextButtons = hasFallbackTextButtons,
-                    ButtonCount = buttonCount,
+                    ButtonCount = actions.Count,
+                    SimpleButtonCount = simpleButtonCount,
+                    FormActionCount = formActionCount,
                     ColumnCount = columnCount,
                     RowCount = rowCount,
                     CellWidth = cellWidth,
                     CellHeight = cellHeight,
                     GridWidth = gridWidth,
-                    GridHeight = gridHeight
+                    GridHeight = gridHeight,
+                    FormHeight = formHeight
                 });
             }
 
             return sections;
+        }
+
+        private static ActionDefinition ParseActionDefinition(string modPath, JSONNode item)
+        {
+            if (item == null)
+            {
+                return null;
+            }
+
+            string fallbackLabel = item[JsonKeyLabel];
+            string codeLabel = item[JsonKeyCodeLabel];
+            string fallbackTooltip = item[JsonKeyTooltip];
+            string codeTooltip = item[JsonKeyCodeTooltip];
+            string targetAssembly = item[JsonKeyAssembly];
+            string targetClass = item[JsonKeyClass];
+            string targetMethod = item[JsonKeyMethod];
+
+            if (string.IsNullOrEmpty(targetAssembly) || string.IsNullOrEmpty(targetClass) || string.IsNullOrEmpty(targetMethod))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrEmpty(codeLabel)) codeLabel = targetClass + DotSeparator + targetMethod;
+            if (string.IsNullOrEmpty(fallbackLabel)) fallbackLabel = targetMethod;
+            if (string.IsNullOrEmpty(fallbackTooltip)) fallbackTooltip = fallbackLabel;
+            if (string.IsNullOrEmpty(codeTooltip)) codeTooltip = codeLabel + "_tooltip";
+
+            ActionDefinition action = new ActionDefinition
+            {
+                Label = ModButtonsLocalization.Get(modPath, codeLabel, fallbackLabel),
+                Tooltip = ModButtonsLocalization.Get(modPath, codeTooltip, fallbackTooltip),
+                IconPath = string.IsNullOrEmpty(item[JsonKeyIcon])
+                    ? string.Empty
+                    : Path.Combine(modPath, TargetDirectory, item[JsonKeyIcon]),
+                AssemblyName = targetAssembly,
+                ClassName = targetClass,
+                MethodName = targetMethod
+            };
+
+            JSONArray inputs = item[JsonKeyInputs].AsArray;
+            if (inputs == null)
+            {
+                return action;
+            }
+
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                ActionInputDefinition input = ParseActionInputDefinition(modPath, inputs[i], i);
+                if (input != null)
+                {
+                    action.Inputs.Add(input);
+                }
+            }
+
+            return action;
+        }
+
+        private static ActionInputDefinition ParseActionInputDefinition(string modPath, JSONNode item, int index)
+        {
+            if (item == null)
+            {
+                return null;
+            }
+
+            string rawType = item[JsonKeyInputType];
+            rawType = (rawType ?? string.Empty).Trim().ToLowerInvariant();
+            ActionInputKind inputKind;
+            switch (rawType)
+            {
+                case "text":
+                case "string":
+                    inputKind = ActionInputKind.Text;
+                    break;
+                case "integer":
+                case "int":
+                    inputKind = ActionInputKind.Integer;
+                    break;
+                case "float":
+                case "number":
+                    inputKind = ActionInputKind.Float;
+                    break;
+                case "slider":
+                    inputKind = ActionInputKind.Slider;
+                    break;
+                case "dropdown":
+                case "select":
+                    inputKind = ActionInputKind.Dropdown;
+                    break;
+                default:
+                    return null;
+            }
+
+            string id = item[JsonKeyInputId];
+            if (string.IsNullOrEmpty(id))
+            {
+                id = "arg" + index.ToString(CultureInfo.InvariantCulture);
+            }
+
+            string fallbackLabel = item[JsonKeyLabel];
+            string codeLabel = item[JsonKeyCodeLabel];
+            if (string.IsNullOrEmpty(fallbackLabel)) fallbackLabel = id;
+            if (string.IsNullOrEmpty(codeLabel)) codeLabel = id;
+
+            string fallbackPlaceholder = item[JsonKeyInputPlaceholder];
+            string codePlaceholder = item[JsonKeyInputCodePlaceholder];
+            if (string.IsNullOrEmpty(codePlaceholder)) codePlaceholder = fallbackPlaceholder;
+
+            ActionInputDefinition definition = new ActionInputDefinition
+            {
+                Id = id,
+                Label = ModButtonsLocalization.Get(modPath, codeLabel, fallbackLabel),
+                Placeholder = ModButtonsLocalization.Get(modPath, codePlaceholder, fallbackPlaceholder),
+                InputKind = inputKind,
+                ValueKind = ParseActionValueKind(item[JsonKeyInputValueType], inputKind),
+                DefaultValue = item[JsonKeyInputDefault]
+            };
+
+            definition.HasMinimum = TryParseFloat(item[JsonKeyInputMinimum], out definition.Minimum);
+            definition.HasMaximum = TryParseFloat(item[JsonKeyInputMaximum], out definition.Maximum);
+            if (definition.HasMinimum && definition.HasMaximum && definition.Maximum < definition.Minimum)
+            {
+                float temp = definition.Minimum;
+                definition.Minimum = definition.Maximum;
+                definition.Maximum = temp;
+            }
+
+            JSONArray options = item[JsonKeyInputOptions].AsArray;
+            if (inputKind == ActionInputKind.Dropdown && options != null)
+            {
+                for (int i = 0; i < options.Count; i++)
+                {
+                    JSONNode optionNode = options[i];
+                    if (optionNode == null) continue;
+
+                    string optionLabel = optionNode[JsonKeyLabel];
+                    string optionValue = optionNode[JsonKeyInputValue];
+                    if (string.IsNullOrEmpty(optionLabel)) optionLabel = optionNode.Value;
+                    if (string.IsNullOrEmpty(optionValue)) optionValue = optionNode.Value;
+                    if (string.IsNullOrEmpty(optionValue)) optionValue = optionLabel;
+                    if (string.IsNullOrEmpty(optionLabel)) optionLabel = optionValue;
+                    definition.Options.Add(new ActionInputOption { Label = optionLabel, Value = optionValue });
+                }
+            }
+
+            if (inputKind == ActionInputKind.Dropdown && definition.Options.Count == 0)
+            {
+                return null;
+            }
+
+            return definition;
+        }
+
+        private static ActionValueKind ParseActionValueKind(string rawValueType, ActionInputKind inputKind)
+        {
+            string normalized = (rawValueType ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "int" || normalized == "integer") return ActionValueKind.Integer;
+            if (normalized == "float" || normalized == "number") return ActionValueKind.Float;
+            if (normalized == "string" || normalized == "text") return ActionValueKind.String;
+
+            switch (inputKind)
+            {
+                case ActionInputKind.Integer: return ActionValueKind.Integer;
+                case ActionInputKind.Float: return ActionValueKind.Float;
+                case ActionInputKind.Slider: return ActionValueKind.Float;
+                default: return ActionValueKind.String;
+            }
+        }
+
+        private static bool TryParseFloat(string raw, out float value)
+        {
+            value = 0f;
+            if (string.IsNullOrEmpty(raw)) return false;
+            return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value) ||
+                float.TryParse(raw, NumberStyles.Float, CultureInfo.CurrentCulture, out value) ||
+                float.TryParse(raw, out value);
+        }
+
+        private static bool HasFallbackTextButtons(List<ActionDefinition> actions)
+        {
+            if (actions == null) return true;
+
+            for (int i = 0; i < actions.Count; i++)
+            {
+                ActionDefinition action = actions[i];
+                if (action == null || action.HasInputs) continue;
+                if (string.IsNullOrEmpty(action.IconPath) || !File.Exists(action.IconPath)) return true;
+            }
+
+            return false;
+        }
+
+        private static float GetActionFormHeight(ActionDefinition action)
+        {
+            if (action == null || !action.HasInputs) return 0f;
+            const float FormVerticalPadding = 12f;
+            if (action.Inputs.Count == 1) return FormVerticalPadding + FormFieldHeight + FormSpacing + FormValidationHeight;
+
+            int rows = Mathf.CeilToInt((float)action.Inputs.Count / FormInputsPerRow);
+            return FormVerticalPadding + FormActionButtonHeight + FormSpacing +
+                rows * FormFieldHeight + Mathf.Max(0, rows - 1) * FormSpacing +
+                FormSpacing + FormValidationHeight;
         }
 
         private static PopupLayoutMetrics CalculatePopupLayoutMetrics(List<ButtonSectionLayout> sections)
@@ -847,9 +1173,9 @@ namespace ModButtons
                     ButtonSectionLayout section = sections[i];
                     if (section == null) continue;
 
-                    contentWidth = Mathf.Max(contentWidth, section.GridWidth);
-                    contentHeight += SectionTitleHeight + section.GridHeight + DividerHeight;
-                    childCount += 3;
+                    contentWidth = Mathf.Max(contentWidth, Mathf.Max(section.GridWidth, section.FormActionCount > 0 ? FormPreferredWidth : 0f));
+                    contentHeight += SectionTitleHeight + section.GridHeight + section.FormHeight + DividerHeight;
+                    childCount += 2 + (section.GridHeight > 0f ? 1 : 0) + section.FormActionCount;
                     buttonCount += section.ButtonCount;
                 }
             }
@@ -1231,11 +1557,13 @@ namespace ModButtons
             for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
             {
                 ButtonSectionLayout section = sections[sectionIndex];
-                if (section == null || section.Mod == null || section.JsonArray == null) continue;
+                if (section == null || section.Mod == null || section.Actions == null) continue;
 
                 Mods._mod mod = section.Mod;
-                JSONArray jsonArray = section.JsonArray;
-                float sectionTitleWidth = Mathf.Max(section.GridWidth, dividerWidth);
+                List<ActionDefinition> actions = section.Actions;
+                float sectionTitleWidth = Mathf.Max(
+                    Mathf.Max(section.GridWidth, section.FormActionCount > 0 ? FormPreferredWidth : 0f),
+                    dividerWidth);
 
                 GameObject titleObj = new GameObject(PrefixTitle + mod.Title, typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
                 titleObj.transform.SetParent(verticalContainer, false);
@@ -1255,63 +1583,46 @@ namespace ModButtons
                 titleText.alignment = TextAlignmentOptions.Center;
                 titleText.color = Color.black;
 
-                GameObject gridContainer = new GameObject(PrefixGrid + mod.Title, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
-                gridContainer.transform.SetParent(verticalContainer, false);
-
-                RectTransform gridRect = gridContainer.GetComponent<RectTransform>();
-                gridRect.sizeDelta = new Vector2(section.GridWidth, section.GridHeight);
-                
-                GridLayoutGroup grid = gridContainer.GetComponent<GridLayoutGroup>();
-                grid.cellSize = new Vector2(section.CellWidth, section.CellHeight);
-                grid.spacing = new Vector2(GridCellSpacing, GridCellSpacing);
-                grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-                grid.childAlignment = TextAnchor.UpperCenter;
-                grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                grid.constraintCount = section.ColumnCount;
-
-                LayoutElement gridLayout = gridContainer.GetComponent<LayoutElement>();
-                gridLayout.minWidth = section.GridWidth;
-                gridLayout.minHeight = section.GridHeight;
-                gridLayout.preferredWidth = section.GridWidth;
-                gridLayout.preferredHeight = section.GridHeight;
-
-                for (int i = 0; i < jsonArray.Count; i++)
+                if (section.SimpleButtonCount > 0)
                 {
-                    JSONNode item = jsonArray[i];
-                    if (item == null) continue;
+                    GameObject gridContainer = new GameObject(PrefixGrid + mod.Title, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+                    gridContainer.transform.SetParent(verticalContainer, false);
 
-                    string fallbackLabel = item[JsonKeyLabel];
-                    string codeLabel = item[JsonKeyCodeLabel];
-
-                    // Added independent Tooltip parsing
-                    string fallbackTooltip = item[JsonKeyTooltip];
-                    string codeTooltip = item[JsonKeyCodeTooltip];
-
-                    string iconName = item[JsonKeyIcon]; 
-                    string targetAssembly = item[JsonKeyAssembly]; 
-                    string targetClass = item[JsonKeyClass]; 
-                    string targetMethod = item[JsonKeyMethod]; 
-
-                    // Ensure fallbacks are properly populated
-                    if (string.IsNullOrEmpty(codeLabel)) codeLabel = targetClass + DotSeparator + targetMethod;
-                    if (string.IsNullOrEmpty(fallbackTooltip)) fallbackTooltip = fallbackLabel;
-                    if (string.IsNullOrEmpty(codeTooltip)) codeTooltip = codeLabel + "_tooltip";
+                    RectTransform gridRect = gridContainer.GetComponent<RectTransform>();
+                    gridRect.sizeDelta = new Vector2(section.GridWidth, section.GridHeight);
                     
-                    string localizedLabel = ModButtonsLocalization.Get(mod.Path, codeLabel, fallbackLabel);
-                    string localizedTooltip = ModButtonsLocalization.Get(mod.Path, codeTooltip, fallbackTooltip);
-                    string iconPath = string.IsNullOrEmpty(iconName) ? string.Empty : Path.Combine(mod.Path, TargetDirectory, iconName);
-                    
-                    CreateActionButton(
-                        gridContainer.transform,
-                        templateButton,
-                        localizedLabel,
-                        localizedTooltip,
-                        iconPath,
-                        targetAssembly,
-                        targetClass,
-                        targetMethod,
-                        section.CellWidth,
-                        section.CellHeight);
+                    GridLayoutGroup grid = gridContainer.GetComponent<GridLayoutGroup>();
+                    grid.cellSize = new Vector2(section.CellWidth, section.CellHeight);
+                    grid.spacing = new Vector2(GridCellSpacing, GridCellSpacing);
+                    grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+                    grid.childAlignment = TextAnchor.UpperCenter;
+                    grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                    grid.constraintCount = section.ColumnCount;
+
+                    LayoutElement gridLayout = gridContainer.GetComponent<LayoutElement>();
+                    gridLayout.minWidth = section.GridWidth;
+                    gridLayout.minHeight = section.GridHeight;
+                    gridLayout.preferredWidth = section.GridWidth;
+                    gridLayout.preferredHeight = section.GridHeight;
+
+                    for (int i = 0; i < actions.Count; i++)
+                    {
+                        ActionDefinition action = actions[i];
+                        if (action == null || action.HasInputs) continue;
+                        CreateActionButton(
+                            gridContainer.transform,
+                            templateButton,
+                            action,
+                            section.CellWidth,
+                            section.CellHeight);
+                    }
+                }
+
+                for (int i = 0; i < actions.Count; i++)
+                {
+                    ActionDefinition action = actions[i];
+                    if (action == null || !action.HasInputs) continue;
+                    CreateActionForm(verticalContainer, templateButton, action);
                 }
 
                 GameObject divider = new GameObject(UIDividerName, typeof(RectTransform), typeof(LayoutElement));
@@ -1356,15 +1667,15 @@ namespace ModButtons
         private static void CreateActionButton(
             Transform parentGrid,
             GameObject templateBtn,
-            string label,
-            string tooltip,
-            string iconPath,
-            string asmName,
-            string className,
-            string methodName,
+            ActionDefinition action,
             float cellWidth,
             float cellHeight)
         {
+            if (action == null) return;
+
+            string label = action.Label;
+            string tooltip = action.Tooltip;
+            string iconPath = action.IconPath;
             bool hasIcon = !string.IsNullOrEmpty(iconPath) && File.Exists(iconPath);
 
             GameObject cellObj = new GameObject(PrefixCell + label, typeof(RectTransform));
@@ -1464,25 +1775,745 @@ namespace ModButtons
 
             DisableChildRaycastTargets(btnObj);
 
-            btn?.onClick.AddListener(() =>
-            {
-                try
-                {
-                    Assembly targetAsm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == asmName);
-                    if (targetAsm == null) return;
-                    Type targetType = targetAsm.GetType(className);
-                    if (targetType == null) return;
-                    MethodInfo method = targetType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
-                    if (method == null) return;
+            btn?.onClick.AddListener(() => TryInvokeAction(action, null, null));
+        }
 
-                    CloseActionPopup();
-                    method.Invoke(null, null);
-                }
-                catch (Exception e)
+        private static void CreateActionForm(
+            Transform parent,
+            GameObject templateButton,
+            ActionDefinition action)
+        {
+            if (parent == null || action == null || !action.HasInputs) return;
+
+            GameObject form = new GameObject(
+                PrefixForm + action.Label,
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(VerticalLayoutGroup),
+                typeof(LayoutElement));
+            form.transform.SetParent(parent, false);
+            SetLayerRecursively(form, parent.gameObject.layer);
+
+            Image background = form.GetComponent<Image>();
+            background.color = new Color(1f, 1f, 1f, 0.14f);
+            background.raycastTarget = false;
+
+            LayoutElement formLayout = form.GetComponent<LayoutElement>();
+            formLayout.minWidth = FormPreferredWidth;
+            formLayout.preferredWidth = FormPreferredWidth;
+            float formHeight = GetActionFormHeight(action);
+            formLayout.minHeight = formHeight;
+            formLayout.preferredHeight = formHeight;
+
+            VerticalLayoutGroup formGroup = form.GetComponent<VerticalLayoutGroup>();
+            formGroup.padding = new RectOffset(8, 8, 6, 6);
+            formGroup.spacing = FormSpacing;
+            formGroup.childAlignment = TextAnchor.UpperCenter;
+            formGroup.childControlWidth = false;
+            formGroup.childControlHeight = false;
+            formGroup.childForceExpandWidth = false;
+            formGroup.childForceExpandHeight = false;
+
+            List<ActionInputBinding> bindings = new List<ActionInputBinding>();
+            Button actionButton;
+            if (action.Inputs.Count == 1)
+            {
+                GameObject row = CreateFormRow(form.transform, "ActionRow", FormFieldHeight);
+                HorizontalLayoutGroup rowGroup = row.AddComponent<HorizontalLayoutGroup>();
+                rowGroup.spacing = FormSpacing;
+                rowGroup.childAlignment = TextAnchor.MiddleCenter;
+                rowGroup.childControlWidth = false;
+                rowGroup.childControlHeight = false;
+                rowGroup.childForceExpandWidth = false;
+                rowGroup.childForceExpandHeight = false;
+
+                actionButton = CreateFormActionButton(row.transform, templateButton, action, FormActionButtonWidth, FormActionButtonHeight);
+                ActionInputBinding binding = CreateActionInputControl(
+                    row.transform,
+                    templateButton,
+                    action.Inputs[0],
+                    FormPreferredWidth - FormActionButtonWidth - FormSpacing - 16f);
+                if (binding != null) bindings.Add(binding);
+            }
+            else
+            {
+                actionButton = CreateFormActionButton(
+                    form.transform,
+                    templateButton,
+                    action,
+                    FormPreferredWidth - 16f,
+                    FormActionButtonHeight);
+
+                GameObject grid = CreateFormRow(
+                    form.transform,
+                    "Inputs",
+                    Mathf.CeilToInt((float)action.Inputs.Count / FormInputsPerRow) * FormFieldHeight +
+                    Mathf.Max(0, Mathf.CeilToInt((float)action.Inputs.Count / FormInputsPerRow) - 1) * FormSpacing);
+                GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
+                gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                gridLayout.constraintCount = FormInputsPerRow;
+                gridLayout.cellSize = new Vector2((FormPreferredWidth - 16f - FormSpacing) / FormInputsPerRow, FormFieldHeight);
+                gridLayout.spacing = new Vector2(FormSpacing, FormSpacing);
+                gridLayout.childAlignment = TextAnchor.UpperCenter;
+
+                for (int i = 0; i < action.Inputs.Count; i++)
                 {
-                    Debug.LogError($"{LogErrorPrefix} {className}.{methodName}: {e.Message}");
+                    ActionInputBinding binding = CreateActionInputControl(
+                        grid.transform,
+                        templateButton,
+                        action.Inputs[i],
+                        gridLayout.cellSize.x);
+                    if (binding != null) bindings.Add(binding);
                 }
+            }
+
+            TextMeshProUGUI validation = CreateFormValidationText(form.transform);
+            if (actionButton != null)
+            {
+                actionButton.onClick.AddListener(() => TryInvokeAction(action, bindings, validation));
+            }
+        }
+
+        private static GameObject CreateFormRow(Transform parent, string name, float height)
+        {
+            GameObject row = new GameObject(name, typeof(RectTransform), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            LayoutElement layout = row.GetComponent<LayoutElement>();
+            layout.minWidth = FormPreferredWidth - 16f;
+            layout.preferredWidth = FormPreferredWidth - 16f;
+            layout.minHeight = height;
+            layout.preferredHeight = height;
+            return row;
+        }
+
+        private static Button CreateFormActionButton(
+            Transform parent,
+            GameObject templateButton,
+            ActionDefinition action,
+            float width,
+            float height)
+        {
+            GameObject buttonObject = templateButton != null
+                ? UnityEngine.Object.Instantiate(templateButton, parent, false)
+                : new GameObject(PrefixButton + action.Label, typeof(RectTransform), typeof(Image), typeof(Button), typeof(ButtonDefault));
+            if (templateButton == null) buttonObject.transform.SetParent(parent, false);
+
+            buttonObject.name = PrefixButton + action.Label;
+            buttonObject.SetActive(true);
+            SetLayerRecursively(buttonObject, parent.gameObject.layer);
+            SetCanvasGroupsVisible(buttonObject);
+
+            Button button = buttonObject.GetComponent<Button>() ?? buttonObject.GetComponentInChildren<Button>(true);
+            if (button != null)
+            {
+                button.onClick = new Button.ButtonClickedEvent();
+            }
+
+            ButtonDefault buttonDefault = buttonObject.GetComponent<ButtonDefault>();
+            if (buttonDefault != null)
+            {
+                buttonDefault.DefaultTooltip = action.Tooltip;
+                buttonDefault.SetTooltip(action.Tooltip);
+                buttonDefault.Activate(true, false);
+            }
+
+            ResetActionButtonLanguageBindings(buttonObject, action.Label);
+            TextMeshProUGUI text = buttonObject.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
+            if (text == null) text = CreateActionButtonText(buttonObject);
+            if (text != null)
+            {
+                text.gameObject.SetActive(true);
+                text.text = action.Label;
+                text.enableWordWrapping = false;
+                text.overflowMode = TextOverflowModes.Ellipsis;
+            }
+
+            RectTransform rect = buttonObject.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.sizeDelta = new Vector2(width, height);
+            }
+
+            LayoutElement layout = buttonObject.GetComponent<LayoutElement>() ?? buttonObject.AddComponent<LayoutElement>();
+            layout.ignoreLayout = false;
+            layout.minWidth = width;
+            layout.preferredWidth = width;
+            layout.minHeight = height;
+            layout.preferredHeight = height;
+            DisableChildRaycastTargets(buttonObject);
+            return button;
+        }
+
+        private static ActionInputBinding CreateActionInputControl(
+            Transform parent,
+            GameObject templateButton,
+            ActionInputDefinition definition,
+            float width)
+        {
+            if (parent == null || definition == null) return null;
+
+            GameObject group = new GameObject(
+                PrefixInput + definition.Id,
+                typeof(RectTransform),
+                typeof(VerticalLayoutGroup),
+                typeof(LayoutElement));
+            group.transform.SetParent(parent, false);
+            SetLayerRecursively(group, parent.gameObject.layer);
+
+            LayoutElement groupLayout = group.GetComponent<LayoutElement>();
+            groupLayout.minWidth = width;
+            groupLayout.preferredWidth = width;
+            groupLayout.minHeight = FormFieldHeight;
+            groupLayout.preferredHeight = FormFieldHeight;
+
+            VerticalLayoutGroup layout = group.GetComponent<VerticalLayoutGroup>();
+            layout.spacing = 2f;
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            TextMeshProUGUI label = CreateFormLabel(group.transform, definition.Label, width);
+            ActionInputBinding binding = new ActionInputBinding { Definition = definition };
+
+            switch (definition.InputKind)
+            {
+                case ActionInputKind.Slider:
+                    binding.Slider = CreateSliderControl(group.transform, definition, width);
+                    break;
+                case ActionInputKind.Dropdown:
+                    binding.Dropdown = CreateDropdownControl(group.transform, definition, width, binding, templateButton);
+                    break;
+                default:
+                    binding.TextInput = CreateTextInputControl(group.transform, definition, width);
+                    break;
+            }
+
+            if (binding.TextInput == null && binding.Slider == null && binding.Dropdown == null &&
+                definition.InputKind != ActionInputKind.Dropdown)
+            {
+                UnityEngine.Object.Destroy(group);
+                return null;
+            }
+
+            return binding;
+        }
+
+        private static TextMeshProUGUI CreateFormLabel(Transform parent, string value, float width)
+        {
+            GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+            labelObject.transform.SetParent(parent, false);
+            TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+            label.text = value ?? string.Empty;
+            label.fontSize = 14f;
+            label.alignment = TextAlignmentOptions.BottomLeft;
+            label.color = Color.black;
+            label.enableWordWrapping = false;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.raycastTarget = false;
+            LayoutElement layout = labelObject.GetComponent<LayoutElement>();
+            layout.minWidth = width;
+            layout.preferredWidth = width;
+            layout.minHeight = FormFieldLabelHeight;
+            layout.preferredHeight = FormFieldLabelHeight;
+            return label;
+        }
+
+        private static TextMeshProUGUI CreateFormValidationText(Transform parent)
+        {
+            GameObject statusObject = new GameObject("Validation", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+            statusObject.transform.SetParent(parent, false);
+            TextMeshProUGUI status = statusObject.GetComponent<TextMeshProUGUI>();
+            status.text = string.Empty;
+            status.fontSize = 12f;
+            status.alignment = TextAlignmentOptions.Center;
+            status.color = new Color(0.65f, 0.05f, 0.05f, 1f);
+            status.enableWordWrapping = false;
+            status.overflowMode = TextOverflowModes.Ellipsis;
+            status.raycastTarget = false;
+            LayoutElement layout = statusObject.GetComponent<LayoutElement>();
+            layout.minWidth = FormPreferredWidth - 16f;
+            layout.preferredWidth = FormPreferredWidth - 16f;
+            layout.minHeight = FormValidationHeight;
+            layout.preferredHeight = FormValidationHeight;
+            return status;
+        }
+
+        private static TMP_InputField CreateTextInputControl(
+            Transform parent,
+            ActionInputDefinition definition,
+            float width)
+        {
+            TMP_InputField template = FindTemplate<TMP_InputField>();
+            GameObject inputObject;
+            TMP_InputField input;
+            if (template != null)
+            {
+                inputObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+                input = inputObject.GetComponent<TMP_InputField>() ?? inputObject.GetComponentInChildren<TMP_InputField>(true);
+            }
+            else
+            {
+                inputObject = CreateFallbackTextInput(parent, out input);
+            }
+
+            if (inputObject == null || input == null) return null;
+
+            inputObject.name = "Text";
+            inputObject.SetActive(true);
+            SetLayerRecursively(inputObject, parent.gameObject.layer);
+            input.onValueChanged = new TMP_InputField.OnChangeEvent();
+            input.onEndEdit = new TMP_InputField.SubmitEvent();
+            input.contentType = definition.InputKind == ActionInputKind.Integer
+                ? TMP_InputField.ContentType.IntegerNumber
+                : definition.InputKind == ActionInputKind.Float
+                    ? TMP_InputField.ContentType.DecimalNumber
+                    : TMP_InputField.ContentType.Standard;
+            input.text = definition.DefaultValue ?? string.Empty;
+            if (input.placeholder is TextMeshProUGUI)
+            {
+                ((TextMeshProUGUI)input.placeholder).text = definition.Placeholder ?? string.Empty;
+            }
+
+            ConfigureControlLayout(inputObject, width, FormControlHeight);
+            return input;
+        }
+
+        private static GameObject CreateFallbackTextInput(Transform parent, out TMP_InputField input)
+        {
+            GameObject root = new GameObject("TextInput", typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
+            root.transform.SetParent(parent, false);
+            Image background = root.GetComponent<Image>();
+            background.color = new Color(1f, 1f, 1f, 0.92f);
+            input = root.GetComponent<TMP_InputField>();
+            input.targetGraphic = background;
+
+            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(root.transform, false);
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(8f, 2f);
+            textRect.offsetMax = new Vector2(-8f, -2f);
+            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+            text.fontSize = 16f;
+            text.color = Color.black;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            input.textComponent = text;
+
+            GameObject placeholderObject = new GameObject("Placeholder", typeof(RectTransform), typeof(TextMeshProUGUI));
+            placeholderObject.transform.SetParent(root.transform, false);
+            RectTransform placeholderRect = placeholderObject.GetComponent<RectTransform>();
+            placeholderRect.anchorMin = Vector2.zero;
+            placeholderRect.anchorMax = Vector2.one;
+            placeholderRect.offsetMin = new Vector2(8f, 2f);
+            placeholderRect.offsetMax = new Vector2(-8f, -2f);
+            TextMeshProUGUI placeholder = placeholderObject.GetComponent<TextMeshProUGUI>();
+            placeholder.fontSize = 16f;
+            placeholder.color = new Color(0.35f, 0.35f, 0.35f, 0.8f);
+            placeholder.alignment = TextAlignmentOptions.MidlineLeft;
+            input.placeholder = placeholder;
+            return root;
+        }
+
+        private static Slider CreateSliderControl(Transform parent, ActionInputDefinition definition, float width)
+        {
+            Slider template = FindTemplate<Slider>();
+            GameObject sliderObject;
+            Slider slider;
+            if (template != null)
+            {
+                sliderObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+                slider = sliderObject.GetComponent<Slider>() ?? sliderObject.GetComponentInChildren<Slider>(true);
+                Settings_Slider settingsSlider = sliderObject.GetComponent<Settings_Slider>() ?? sliderObject.GetComponentInChildren<Settings_Slider>(true);
+                if (settingsSlider != null) settingsSlider.enabled = false;
+            }
+            else
+            {
+                sliderObject = CreateFallbackSlider(parent, out slider);
+            }
+
+            if (sliderObject == null || slider == null) return null;
+
+            float minimum = definition.HasMinimum ? definition.Minimum : 0f;
+            float maximum = definition.HasMaximum ? definition.Maximum : 100f;
+            if (maximum < minimum) maximum = minimum;
+            float defaultValue;
+            if (!TryParseFloat(definition.DefaultValue, out defaultValue)) defaultValue = minimum;
+
+            sliderObject.name = "Slider";
+            sliderObject.SetActive(true);
+            SetLayerRecursively(sliderObject, parent.gameObject.layer);
+            slider.minValue = minimum;
+            slider.maxValue = maximum;
+            slider.wholeNumbers = definition.ValueKind == ActionValueKind.Integer;
+            slider.onValueChanged = new Slider.SliderEvent();
+            slider.value = Mathf.Clamp(defaultValue, minimum, maximum);
+            ConfigureControlLayout(sliderObject, width, FormControlHeight);
+            return slider;
+        }
+
+        private static GameObject CreateFallbackSlider(Transform parent, out Slider slider)
+        {
+            GameObject root = new GameObject("Slider", typeof(RectTransform), typeof(Image), typeof(Slider));
+            root.transform.SetParent(parent, false);
+            root.GetComponent<Image>().color = new Color(0.8f, 0.8f, 0.8f, 1f);
+            slider = root.GetComponent<Slider>();
+
+            GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(root.transform, false);
+            Image fillImage = fill.GetComponent<Image>();
+            fillImage.color = GeneratedButtonColor;
+            RectTransform fillRect = fill.GetComponent<RectTransform>();
+            fillRect.anchorMin = new Vector2(0f, 0f);
+            fillRect.anchorMax = new Vector2(0f, 1f);
+            fillRect.sizeDelta = new Vector2(8f, 0f);
+            slider.fillRect = fillRect;
+
+            GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+            handle.transform.SetParent(root.transform, false);
+            Image handleImage = handle.GetComponent<Image>();
+            handleImage.color = GeneratedButtonColor;
+            RectTransform handleRect = handle.GetComponent<RectTransform>();
+            handleRect.sizeDelta = new Vector2(14f, 24f);
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handleImage;
+            return root;
+        }
+
+        private static CustomDropdown CreateDropdownControl(
+            Transform parent,
+            ActionInputDefinition definition,
+            float width,
+            ActionInputBinding binding,
+            GameObject templateButton)
+        {
+            CustomDropdown template = FindTemplate<CustomDropdown>();
+            if (template == null)
+            {
+                CreateDropdownFallback(parent, definition, width, binding, templateButton);
+                return null;
+            }
+
+            GameObject dropdownObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+            CustomDropdown dropdown = dropdownObject.GetComponent<CustomDropdown>() ?? dropdownObject.GetComponentInChildren<CustomDropdown>(true);
+            if (dropdown == null)
+            {
+                UnityEngine.Object.Destroy(dropdownObject);
+                return null;
+            }
+
+            dropdownObject.name = "Dropdown";
+            dropdownObject.SetActive(true);
+            SetLayerRecursively(dropdownObject, parent.gameObject.layer);
+            dropdown.saveSelected = false;
+            dropdown.invokeAtStart = false;
+            dropdown.dropdownItems.Clear();
+            for (int i = 0; i < definition.Options.Count; i++)
+            {
+                dropdown.CreateNewItemFast(definition.Options[i].Label, null);
+            }
+
+            binding.DropdownIndex = GetDefaultDropdownIndex(definition);
+            dropdown.dropdownEvent = new CustomDropdown.DropdownEvent();
+            dropdown.dropdownEvent.AddListener(index => binding.DropdownIndex = Mathf.Clamp(index, 0, definition.Options.Count - 1));
+            dropdown.SetupDropdown();
+            dropdown.ChangeDropdownInfo(binding.DropdownIndex);
+            dropdown.selectedItemIndex = binding.DropdownIndex;
+            ConfigureControlLayout(dropdownObject, width, FormControlHeight);
+            return dropdown;
+        }
+
+        private static void CreateDropdownFallback(
+            Transform parent,
+            ActionInputDefinition definition,
+            float width,
+            ActionInputBinding binding,
+            GameObject templateButton)
+        {
+            GameObject selectorObject = templateButton != null
+                ? UnityEngine.Object.Instantiate(templateButton, parent, false)
+                : new GameObject("Dropdown", typeof(RectTransform), typeof(Image), typeof(Button));
+            if (templateButton == null) selectorObject.transform.SetParent(parent, false);
+            selectorObject.name = "Dropdown";
+            selectorObject.SetActive(true);
+            SetLayerRecursively(selectorObject, parent.gameObject.layer);
+            binding.DropdownIndex = GetDefaultDropdownIndex(definition);
+
+            Button selector = selectorObject.GetComponent<Button>() ?? selectorObject.GetComponentInChildren<Button>(true);
+            if (selector == null) return;
+            selector.onClick = new Button.ButtonClickedEvent();
+            TextMeshProUGUI text = selectorObject.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
+            if (text == null) text = CreateActionButtonText(selectorObject);
+            Action refresh = () =>
+            {
+                if (text != null && definition.Options.Count > 0)
+                {
+                    text.text = definition.Options[binding.DropdownIndex].Label;
+                }
+            };
+            selector.onClick.AddListener(() =>
+            {
+                binding.DropdownIndex = (binding.DropdownIndex + 1) % definition.Options.Count;
+                refresh();
             });
+            refresh();
+            ConfigureControlLayout(selectorObject, width, FormControlHeight);
+        }
+
+        private static int GetDefaultDropdownIndex(ActionInputDefinition definition)
+        {
+            if (definition == null || definition.Options == null || definition.Options.Count == 0) return 0;
+            for (int i = 0; i < definition.Options.Count; i++)
+            {
+                if (string.Equals(definition.Options[i].Value, definition.DefaultValue, StringComparison.Ordinal)) return i;
+            }
+
+            return 0;
+        }
+
+        private static void ConfigureControlLayout(GameObject control, float width, float height)
+        {
+            if (control == null) return;
+            RectTransform rect = control.GetComponent<RectTransform>();
+            if (rect != null) rect.sizeDelta = new Vector2(width, height);
+            LayoutElement layout = control.GetComponent<LayoutElement>() ?? control.AddComponent<LayoutElement>();
+            layout.ignoreLayout = false;
+            layout.minWidth = width;
+            layout.preferredWidth = width;
+            layout.minHeight = height;
+            layout.preferredHeight = height;
+        }
+
+        private static T FindTemplate<T>() where T : Component
+        {
+            PopupManager manager = Camera.main?.GetComponent<mainScript>()?.Data?.GetComponent<PopupManager>();
+            if (manager != null && manager.popups != null)
+            {
+                for (int i = 0; i < manager.popups.Length; i++)
+                {
+                    PopupManager._popup popup = manager.popups[i];
+                    if (popup == null || popup.obj == null) continue;
+                    T found = popup.obj.GetComponentInChildren<T>(true);
+                    if (found != null) return found;
+                }
+            }
+
+            return UnityEngine.Object.FindObjectOfType<T>();
+        }
+
+        private static bool TryInvokeAction(
+            ActionDefinition action,
+            List<ActionInputBinding> bindings,
+            TextMeshProUGUI validationText)
+        {
+            if (action == null) return false;
+
+            object[] arguments;
+            string error;
+            if (!TryReadArguments(action, bindings, out arguments, out error))
+            {
+                SetValidationMessage(validationText, error);
+                return false;
+            }
+
+            try
+            {
+                Assembly targetAssembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(
+                    assembly => assembly != null && string.Equals(assembly.GetName().Name, action.AssemblyName, StringComparison.Ordinal));
+                if (targetAssembly == null)
+                {
+                    SetValidationMessage(validationText, "Target assembly is not loaded.");
+                    return false;
+                }
+
+                Type targetType = targetAssembly.GetType(action.ClassName, false);
+                if (targetType == null)
+                {
+                    SetValidationMessage(validationText, "Target class was not found.");
+                    return false;
+                }
+
+                MethodInfo method = FindActionMethod(targetType, action.MethodName, arguments);
+                if (method == null)
+                {
+                    SetValidationMessage(validationText, "No matching public static method was found.");
+                    return false;
+                }
+
+                method.Invoke(null, arguments);
+                CloseActionPopup();
+                return true;
+            }
+            catch (TargetInvocationException exception)
+            {
+                Exception inner = exception.InnerException ?? exception;
+                SetValidationMessage(validationText, inner.Message);
+                Debug.LogError($"{LogErrorPrefix} {action.ClassName}.{action.MethodName}: {inner.Message}");
+                return false;
+            }
+            catch (Exception exception)
+            {
+                SetValidationMessage(validationText, exception.Message);
+                Debug.LogError($"{LogErrorPrefix} {action.ClassName}.{action.MethodName}: {exception.Message}");
+                return false;
+            }
+        }
+
+        private static bool TryReadArguments(
+            ActionDefinition action,
+            List<ActionInputBinding> bindings,
+            out object[] arguments,
+            out string error)
+        {
+            arguments = new object[0];
+            error = string.Empty;
+            if (!action.HasInputs)
+            {
+                return true;
+            }
+
+            if (bindings == null || bindings.Count != action.Inputs.Count)
+            {
+                error = "The action inputs could not be created.";
+                return false;
+            }
+
+            arguments = new object[bindings.Count];
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                object value;
+                if (!TryReadInputValue(bindings[i], out value, out error))
+                {
+                    return false;
+                }
+
+                arguments[i] = value;
+            }
+
+            return true;
+        }
+
+        private static bool TryReadInputValue(ActionInputBinding binding, out object value, out string error)
+        {
+            value = null;
+            error = string.Empty;
+            if (binding == null || binding.Definition == null)
+            {
+                error = "An action input is unavailable.";
+                return false;
+            }
+
+            string raw;
+            if (binding.Dropdown != null || binding.Definition.InputKind == ActionInputKind.Dropdown)
+            {
+                List<ActionInputOption> options = binding.Definition.Options;
+                if (options == null || options.Count == 0)
+                {
+                    error = binding.Definition.Label + " has no options.";
+                    return false;
+                }
+
+                int index = Mathf.Clamp(binding.DropdownIndex, 0, options.Count - 1);
+                raw = options[index].Value;
+            }
+            else if (binding.Slider != null)
+            {
+                raw = binding.Slider.value.ToString(CultureInfo.InvariantCulture);
+            }
+            else if (binding.TextInput != null)
+            {
+                raw = binding.TextInput.text ?? string.Empty;
+            }
+            else
+            {
+                error = binding.Definition.Label + " is unavailable.";
+                return false;
+            }
+
+            switch (binding.Definition.ValueKind)
+            {
+                case ActionValueKind.Integer:
+                    int integerValue;
+                    if (!int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out integerValue) &&
+                        !int.TryParse(raw, NumberStyles.Integer, CultureInfo.CurrentCulture, out integerValue))
+                    {
+                        error = binding.Definition.Label + " must be a whole number.";
+                        return false;
+                    }
+                    if (binding.Definition.HasMinimum && integerValue < Mathf.CeilToInt(binding.Definition.Minimum))
+                    {
+                        error = binding.Definition.Label + " is below the minimum.";
+                        return false;
+                    }
+                    if (binding.Definition.HasMaximum && integerValue > Mathf.FloorToInt(binding.Definition.Maximum))
+                    {
+                        error = binding.Definition.Label + " is above the maximum.";
+                        return false;
+                    }
+                    value = integerValue;
+                    return true;
+
+                case ActionValueKind.Float:
+                    float floatValue;
+                    if (!TryParseFloat(raw, out floatValue))
+                    {
+                        error = binding.Definition.Label + " must be a number.";
+                        return false;
+                    }
+                    if (binding.Definition.HasMinimum && floatValue < binding.Definition.Minimum)
+                    {
+                        error = binding.Definition.Label + " is below the minimum.";
+                        return false;
+                    }
+                    if (binding.Definition.HasMaximum && floatValue > binding.Definition.Maximum)
+                    {
+                        error = binding.Definition.Label + " is above the maximum.";
+                        return false;
+                    }
+                    value = floatValue;
+                    return true;
+
+                default:
+                    value = raw;
+                    return true;
+            }
+        }
+
+        private static MethodInfo FindActionMethod(Type targetType, string methodName, object[] arguments)
+        {
+            if (targetType == null || string.IsNullOrEmpty(methodName)) return null;
+            MethodInfo[] methods = targetType.GetMethods(BindingFlags.Public | BindingFlags.Static);
+            for (int i = 0; i < methods.Length; i++)
+            {
+                MethodInfo candidate = methods[i];
+                if (candidate == null || !string.Equals(candidate.Name, methodName, StringComparison.Ordinal)) continue;
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (parameters.Length != arguments.Length) continue;
+
+                bool matches = true;
+                for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
+                {
+                    if (arguments[parameterIndex] == null || parameters[parameterIndex].ParameterType != arguments[parameterIndex].GetType())
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches) return candidate;
+            }
+
+            return null;
+        }
+
+        private static void SetValidationMessage(TextMeshProUGUI validationText, string message)
+        {
+            if (validationText != null)
+            {
+                validationText.text = message ?? string.Empty;
+            }
         }
 
         private static void DisableChildRaycastTargets(GameObject button)

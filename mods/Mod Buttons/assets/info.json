@@ -1,8 +1,8 @@
 {
   "Title": "Mod Buttons",
-  "Description": "Adds a popup menu where mods can provide their own buttons and logic onto.",
+  "Description": "Adds an action hub where mods can provide buttons and typed action inputs.",
   "Author": "Cosmo",
-  "Version": "1.0.0",
+  "Version": "1.1.0",
   "Tags": ["ui", "modding"],
   "HarmonyID": "com.cosmo.modbuttons"
 }

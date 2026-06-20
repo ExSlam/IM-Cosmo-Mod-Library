@@ -24,17 +24,28 @@ YourModFolder/
 ```
 
 ### 2. The `buttons.json` File
-This JSON file is a simple array of objects. Every object represents one button you want to add to the menu under your mod's name.
+This JSON file is a simple array of actions. An action with no `inputs` remains a compact button. An action with inputs is rendered as an associated form, so the player can choose values before pressing its button.
 
 ```json
 [
   {
-    "label": "Add 1,000,000 Yen",
+    "label": "Add Yen",
     "codeLabel": "YourMod.Cheat.AddMoney",
-    "icon": "money_icon.png",
+    "tooltip": "Add the selected amount of yen.",
+    "icon": "",
     "assembly": "YourAwesomeMod",
     "class": "YourAwesomeMod.CheatManager",
-    "method": "AddMoney"
+    "method": "AddMoney",
+    "inputs": [
+      {
+        "id": "amount",
+        "type": "integer",
+        "label": "Amount",
+        "default": 1000000,
+        "min": 1,
+        "max": 1000000000
+      }
+    ]
   },
   {
     "label": "Restore Idol Stamina",
@@ -54,30 +65,86 @@ This JSON file is a simple array of objects. Every object represents one button 
 * **`assembly`**: (Required) The name of your compiled DLL (without the `.dll` extension).
 * **`class`**: (Required) The full namespace and class name where your target method lives.
 * **`method`**: (Required) The exact name of the C# method to execute.
+* **`inputs`**: (Optional) An ordered array of typed values passed to the target method. Omitting it preserves the original parameterless-button behavior.
 
 ### 3. Your Target C# Method
-The method you specify in your JSON **must be both `public` and `static`**, and it must take zero arguments.
+The method you specify in your JSON **must be both `public` and `static`**. Its parameters must exactly match the `inputs` array, in the same order. Mod Buttons resolves a public static overload by parameter count and exact parameter types.
 
 ```csharp
 namespace YourAwesomeMod
 {
     public class CheatManager
     {
-        // This is perfectly valid!
-        public static void AddMoney()
+        // The integer input in the JSON above is passed here.
+        public static void AddMoney(int amount)
         {
-            staticVars.company.money += 1000000;
-            Debug.Log("Added 1,000,000 Yen!");
+            staticVars.company.money += amount;
+            Debug.Log("Added " + amount + " yen!");
         }
 
-        // This will FAIL (Not static)
-        public void RestoreStamina() { } 
+        // This will fail: not static.
+        public void RestoreStamina() { }
 
-        // This will FAIL (Requires arguments)
-        public static void FireStaff(string staffID) { } 
+        // This will fail for the example above: the JSON declares int, not string.
+        public static void AddMoney(string amount) { }
     }
 }
 ```
+
+### 4. Action Inputs
+
+Each input has an `id`, `type`, and optional label/default/range properties. Inputs are passed to the method in their JSON order; `id` is for UI/debugging and does not change argument order.
+
+| `type` | C# parameter type by default | Notes |
+| --- | --- | --- |
+| `text` / `string` | `string` | A text field. |
+| `integer` / `int` | `int` | A whole-number field. `min` and `max` are validated before invocation. |
+| `float` / `number` | `float` | A decimal-number field. `min` and `max` are validated before invocation. |
+| `slider` | `float` | Uses a game slider template. Defaults to `0`–`100` when no range is supplied. Set `"valueType": "integer"` for an `int` parameter. |
+| `dropdown` / `select` | `string` | Uses a Modern UI Pack dropdown template when available. Supply `options`; set `valueType` to `integer` or `float` when its values should be converted. |
+
+Example with a slider and dropdown:
+
+```json
+{
+  "label": "Configure Promotion",
+  "assembly": "YourAwesomeMod",
+  "class": "YourAwesomeMod.PromotionActions",
+  "method": "ApplyPromotion",
+  "inputs": [
+    {
+      "id": "budget",
+      "type": "slider",
+      "valueType": "integer",
+      "label": "Budget",
+      "default": 25000,
+      "min": 1000,
+      "max": 100000
+    },
+    {
+      "id": "audience",
+      "type": "dropdown",
+      "label": "Audience",
+      "default": "general",
+      "options": [
+        { "label": "General public", "value": "general" },
+        { "label": "Core fans", "value": "fans" }
+      ]
+    }
+  ]
+}
+```
+
+```csharp
+public static void ApplyPromotion(int budget, string audience)
+{
+    // Use both values here.
+}
+```
+
+For a dropdown, an option may also be a simple string such as `"general"`. Object options allow the player-facing `label` and method argument `value` to differ. If no Modern UI Pack dropdown template is available, Mod Buttons provides a game-styled selector fallback that cycles through the configured options.
+
+Input actions stay open when validation or method resolution fails and show the failure under the action. They close after the reflected method completes successfully.
 
 ---
 
