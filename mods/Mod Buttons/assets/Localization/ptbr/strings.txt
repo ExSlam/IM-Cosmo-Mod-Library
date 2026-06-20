@@ -1,0 +1,15 @@
+# Mod Buttons UI strings
+actionhub.search.placeholder=Pesquisar Central de Ações
+actionhub.error.inputs_unavailable=Não foi possível criar os campos da ação.
+actionhub.error.input_unavailable=Um campo da ação não está disponível.
+actionhub.error.input_no_options={0} não possui opções.
+actionhub.error.input_value_unavailable={0} não está disponível.
+actionhub.error.input_whole_number={0} deve ser um número inteiro.
+actionhub.error.input_below_minimum={0} está abaixo do mínimo.
+actionhub.error.input_above_maximum={0} está acima do máximo.
+actionhub.error.input_number={0} deve ser um número.
+actionhub.error.target_assembly=O assembly de destino não foi carregado.
+actionhub.error.target_class=A classe de destino não foi encontrada.
+actionhub.error.target_method=Nenhum método public static correspondente foi encontrado.
+actionhub.error.invocation_failed=A ação falhou: {0}
+actionhub.error.log_prefix=[ModButtons] A ação falhou: {0}

@@ -1,0 +1,15 @@
+# Mod Buttons UI strings
+actionhub.search.placeholder=搜索操作中心
+actionhub.error.inputs_unavailable=无法创建操作输入项。
+actionhub.error.input_unavailable=一个操作输入项不可用。
+actionhub.error.input_no_options={0}没有可用选项。
+actionhub.error.input_value_unavailable={0}不可用。
+actionhub.error.input_whole_number={0}必须是整数。
+actionhub.error.input_below_minimum={0}低于最小值。
+actionhub.error.input_above_maximum={0}高于最大值。
+actionhub.error.input_number={0}必须是数字。
+actionhub.error.target_assembly=目标程序集未加载。
+actionhub.error.target_class=未找到目标类。
+actionhub.error.target_method=未找到匹配的公共静态方法。
+actionhub.error.invocation_failed=操作失败：{0}
+actionhub.error.log_prefix=[ModButtons] 操作失败：{0}

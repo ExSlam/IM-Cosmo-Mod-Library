@@ -103,6 +103,24 @@ namespace ModButtons
             return fallback;
         }
 
+        internal static string GetOwn(string key, string fallback)
+        {
+            string assemblyPath;
+            try
+            {
+                assemblyPath = Assembly.GetExecutingAssembly().Location;
+            }
+            catch
+            {
+                assemblyPath = string.Empty;
+            }
+
+            string modPath = string.IsNullOrEmpty(assemblyPath)
+                ? string.Empty
+                : Path.GetDirectoryName(assemblyPath);
+            return Get(modPath, key, fallback);
+        }
+
         internal static void EnsureLoaded(string modPath)
         {
             if (string.IsNullOrEmpty(modPath) || ModDictionaries.ContainsKey(modPath)) return;
@@ -214,6 +232,7 @@ namespace ModButtons
         private const string UIScrollbarName = "Scrollbar";
         private const string UIScrollbarSlidingAreaName = "Sliding Area";
         private const string UIScrollbarHandleName = "Handle";
+        private const string UISearchInputName = "ActionHubSearch";
         private const string UIDividerName = "Divider";
         private const string UILineName = "Line";
         private const string UIIconName = "Icon";
@@ -251,7 +270,6 @@ namespace ModButtons
         private const string PrefixForm = "Form_";
         private const string PrefixInput = "Input_";
         private const string DotSeparator = ".";
-        private const string LogErrorPrefix = "[ModButtons] Execution failed:";
         private static readonly string[] PreferredButtonTemplateNames = { FallbackSettingsName, FallbackMainMenuName };
         
         private const int CustomPopupID = 998;
@@ -305,6 +323,8 @@ namespace ModButtons
         private const float CancelButtonHeight = 48f;
         private const float CancelButtonPreferredWidth = 360f;
         private const float CancelButtonHorizontalPadding = 48f;
+        private const float SearchBarTopOffset = -10f;
+        private const float SearchBarBottomOffset = -42f;
         private const float OpaqueAlpha = 1f;
         private const float TransparentAlpha = 0f;
 
@@ -394,6 +414,139 @@ namespace ModButtons
             internal Slider Slider;
             internal CustomDropdown Dropdown;
             internal int DropdownIndex;
+        }
+
+        private sealed class ActionHubSearchEntry
+        {
+            internal GameObject Root;
+            internal string SearchText;
+            internal bool IsGridAction;
+        }
+
+        private sealed class ActionHubSearchSection
+        {
+            internal string HeaderText;
+            internal GameObject Header;
+            internal GameObject Grid;
+            internal GridLayoutGroup GridLayout;
+            internal LayoutElement GridElement;
+            internal GameObject Divider;
+            internal List<ActionHubSearchEntry> Entries = new List<ActionHubSearchEntry>();
+        }
+
+        private sealed class ActionHubSearchIndex
+        {
+            private readonly RectTransform content;
+            private readonly ScrollRect scrollRect;
+            private readonly List<ActionHubSearchSection> sections = new List<ActionHubSearchSection>();
+
+            internal ActionHubSearchIndex(RectTransform contentRoot, ScrollRect targetScrollRect)
+            {
+                content = contentRoot;
+                scrollRect = targetScrollRect;
+            }
+
+            internal ActionHubSearchSection AddSection(
+                string headerText,
+                GameObject header,
+                GameObject grid,
+                GridLayoutGroup gridLayout,
+                LayoutElement gridElement,
+                GameObject divider)
+            {
+                ActionHubSearchSection section = new ActionHubSearchSection
+                {
+                    HeaderText = headerText ?? string.Empty,
+                    Header = header,
+                    Grid = grid,
+                    GridLayout = gridLayout,
+                    GridElement = gridElement,
+                    Divider = divider
+                };
+                sections.Add(section);
+                return section;
+            }
+
+            internal void AddEntry(ActionHubSearchSection section, GameObject root, string searchText, bool isGridAction)
+            {
+                if (section == null || root == null) return;
+                section.Entries.Add(new ActionHubSearchEntry
+                {
+                    Root = root,
+                    SearchText = searchText ?? string.Empty,
+                    IsGridAction = isGridAction
+                });
+            }
+
+            internal void Apply(string query)
+            {
+                string normalizedQuery = (query ?? string.Empty).Trim();
+                for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
+                {
+                    ActionHubSearchSection section = sections[sectionIndex];
+                    if (section == null) continue;
+
+                    bool headerMatches = ContainsIgnoreCase(section.HeaderText, normalizedQuery);
+                    bool sectionVisible = headerMatches;
+                    int visibleGridActions = 0;
+                    for (int entryIndex = 0; entryIndex < section.Entries.Count; entryIndex++)
+                    {
+                        ActionHubSearchEntry entry = section.Entries[entryIndex];
+                        if (entry == null || entry.Root == null) continue;
+
+                        bool visible = string.IsNullOrEmpty(normalizedQuery) || headerMatches ||
+                            ContainsIgnoreCase(entry.SearchText, normalizedQuery);
+                        entry.Root.SetActive(visible);
+                        if (visible)
+                        {
+                            sectionVisible = true;
+                            if (entry.IsGridAction) visibleGridActions++;
+                        }
+                    }
+
+                    if (section.Header != null) section.Header.SetActive(sectionVisible);
+                    if (section.Divider != null) section.Divider.SetActive(sectionVisible);
+
+                    if (section.Grid != null)
+                    {
+                        bool showGrid = sectionVisible && visibleGridActions > 0;
+                        section.Grid.SetActive(showGrid);
+                        if (showGrid && section.GridLayout != null && section.GridElement != null)
+                        {
+                            int columns = Mathf.Max(1, section.GridLayout.constraintCount);
+                            int rows = Mathf.CeilToInt((float)visibleGridActions / columns);
+                            float height = rows * section.GridLayout.cellSize.y +
+                                Mathf.Max(0, rows - 1) * section.GridLayout.spacing.y;
+                            section.GridElement.minHeight = height;
+                            section.GridElement.preferredHeight = height;
+                            RectTransform gridRect = section.Grid.GetComponent<RectTransform>();
+                            if (gridRect != null)
+                            {
+                                gridRect.sizeDelta = new Vector2(gridRect.sizeDelta.x, height);
+                            }
+                        }
+                    }
+                }
+
+                if (content != null)
+                {
+                    Canvas.ForceUpdateCanvases();
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+                }
+
+                if (scrollRect != null)
+                {
+                    scrollRect.StopMovement();
+                    scrollRect.verticalNormalizedPosition = 1f;
+                }
+            }
+
+            private static bool ContainsIgnoreCase(string value, string query)
+            {
+                if (string.IsNullOrEmpty(query)) return true;
+                return !string.IsNullOrEmpty(value) &&
+                    value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
         }
 
         private sealed class PopupLayoutMetrics
@@ -682,7 +835,17 @@ namespace ModButtons
             RectTransform contentRect;
             CreateScrollArea(panel, metrics, scrollbarTemplate, out scrollRect, out contentRect);
 
-            PopulateCustomButtons(contentRect, actionTemplateButton, sections, metrics.DividerWidth);
+            ActionHubSearchIndex searchIndex = PopulateCustomButtons(
+                contentRect,
+                scrollRect,
+                actionTemplateButton,
+                sections,
+                metrics.DividerWidth);
+            CreateActionHubSearchBar(panel, searchIndex);
+            if (searchIndex != null)
+            {
+                searchIndex.Apply(string.Empty);
+            }
             FinalizeScrollLayout(contentRect, scrollRect, metrics);
 
             PopupManager._popup newPopup = new() { type = (PopupManager._type)CustomPopupID, obj = modButtonsObj, BGBlur = true, BGDarken = true };
@@ -1546,13 +1709,16 @@ namespace ModButtons
             Canvas.ForceUpdateCanvases();
         }
 
-        private static void PopulateCustomButtons(
+        private static ActionHubSearchIndex PopulateCustomButtons(
             Transform verticalContainer,
+            ScrollRect scrollRect,
             GameObject templateButton,
             List<ButtonSectionLayout> sections,
             float dividerWidth)
         {
-            if (verticalContainer == null || sections == null) return;
+            RectTransform contentRect = verticalContainer as RectTransform;
+            ActionHubSearchIndex searchIndex = new ActionHubSearchIndex(contentRect, scrollRect);
+            if (verticalContainer == null || sections == null) return searchIndex;
 
             for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
             {
@@ -1583,15 +1749,19 @@ namespace ModButtons
                 titleText.alignment = TextAlignmentOptions.Center;
                 titleText.color = Color.black;
 
+                GameObject gridContainer = null;
+                GridLayoutGroup grid = null;
+                LayoutElement gridLayout = null;
+                List<KeyValuePair<GameObject, ActionDefinition>> createdEntries = new List<KeyValuePair<GameObject, ActionDefinition>>();
                 if (section.SimpleButtonCount > 0)
                 {
-                    GameObject gridContainer = new GameObject(PrefixGrid + mod.Title, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+                    gridContainer = new GameObject(PrefixGrid + mod.Title, typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
                     gridContainer.transform.SetParent(verticalContainer, false);
 
                     RectTransform gridRect = gridContainer.GetComponent<RectTransform>();
                     gridRect.sizeDelta = new Vector2(section.GridWidth, section.GridHeight);
                     
-                    GridLayoutGroup grid = gridContainer.GetComponent<GridLayoutGroup>();
+                    grid = gridContainer.GetComponent<GridLayoutGroup>();
                     grid.cellSize = new Vector2(section.CellWidth, section.CellHeight);
                     grid.spacing = new Vector2(GridCellSpacing, GridCellSpacing);
                     grid.startAxis = GridLayoutGroup.Axis.Horizontal;
@@ -1599,7 +1769,7 @@ namespace ModButtons
                     grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
                     grid.constraintCount = section.ColumnCount;
 
-                    LayoutElement gridLayout = gridContainer.GetComponent<LayoutElement>();
+                    gridLayout = gridContainer.GetComponent<LayoutElement>();
                     gridLayout.minWidth = section.GridWidth;
                     gridLayout.minHeight = section.GridHeight;
                     gridLayout.preferredWidth = section.GridWidth;
@@ -1609,20 +1779,29 @@ namespace ModButtons
                     {
                         ActionDefinition action = actions[i];
                         if (action == null || action.HasInputs) continue;
-                        CreateActionButton(
+                        GameObject actionRoot = CreateActionButton(
                             gridContainer.transform,
                             templateButton,
                             action,
                             section.CellWidth,
                             section.CellHeight);
+                        if (actionRoot != null)
+                        {
+                            createdEntries.Add(new KeyValuePair<GameObject, ActionDefinition>(actionRoot, action));
+                        }
                     }
                 }
 
+                List<KeyValuePair<GameObject, ActionDefinition>> createdForms = new List<KeyValuePair<GameObject, ActionDefinition>>();
                 for (int i = 0; i < actions.Count; i++)
                 {
                     ActionDefinition action = actions[i];
                     if (action == null || !action.HasInputs) continue;
-                    CreateActionForm(verticalContainer, templateButton, action);
+                    GameObject form = CreateActionForm(verticalContainer, templateButton, action);
+                    if (form != null)
+                    {
+                        createdForms.Add(new KeyValuePair<GameObject, ActionDefinition>(form, action));
+                    }
                 }
 
                 GameObject divider = new GameObject(UIDividerName, typeof(RectTransform), typeof(LayoutElement));
@@ -1647,6 +1826,103 @@ namespace ModButtons
                 lineRect.anchoredPosition = Vector2.zero;
                 lineRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, dividerWidth);
                 lineRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, DividerHeight);
+
+                ActionHubSearchSection searchSection = searchIndex.AddSection(
+                    section.LocalizedTitle,
+                    titleObj,
+                    gridContainer,
+                    grid,
+                    gridLayout,
+                    divider);
+                for (int i = 0; i < createdEntries.Count; i++)
+                {
+                    KeyValuePair<GameObject, ActionDefinition> entry = createdEntries[i];
+                    searchIndex.AddEntry(searchSection, entry.Key, BuildActionSearchText(entry.Value), true);
+                }
+                for (int i = 0; i < createdForms.Count; i++)
+                {
+                    KeyValuePair<GameObject, ActionDefinition> entry = createdForms[i];
+                    searchIndex.AddEntry(searchSection, entry.Key, BuildActionSearchText(entry.Value), false);
+                }
+            }
+
+            return searchIndex;
+        }
+
+        private static void CreateActionHubSearchBar(Transform panel, ActionHubSearchIndex searchIndex)
+        {
+            if (panel == null || searchIndex == null) return;
+
+            TMP_InputField input;
+            GameObject searchObject = CreateFallbackTextInput(panel, out input);
+            if (searchObject == null || input == null) return;
+
+            searchObject.name = UISearchInputName;
+            SetLayerRecursively(searchObject, panel.gameObject.layer);
+            RectTransform searchRect = searchObject.GetComponent<RectTransform>();
+            if (searchRect != null)
+            {
+                searchRect.anchorMin = new Vector2(0f, 1f);
+                searchRect.anchorMax = new Vector2(1f, 1f);
+                searchRect.pivot = new Vector2(0.5f, 1f);
+                searchRect.offsetMin = new Vector2(PopupHorizontalPadding, SearchBarBottomOffset);
+                searchRect.offsetMax = new Vector2(-PopupHorizontalPadding, SearchBarTopOffset);
+            }
+
+            input.text = string.Empty;
+            input.contentType = TMP_InputField.ContentType.Standard;
+            if (input.placeholder is TextMeshProUGUI)
+            {
+                ((TextMeshProUGUI)input.placeholder).text = GetActionHubText(
+                    "actionhub.search.placeholder",
+                    "Search Action Hub");
+            }
+
+            input.onValueChanged = new TMP_InputField.OnChangeEvent();
+            input.onValueChanged.AddListener(searchIndex.Apply);
+        }
+
+        private static string BuildActionSearchText(ActionDefinition action)
+        {
+            if (action == null) return string.Empty;
+
+            string text = (action.Label ?? string.Empty) + " " + (action.Tooltip ?? string.Empty);
+            if (action.Inputs == null) return text;
+
+            for (int i = 0; i < action.Inputs.Count; i++)
+            {
+                ActionInputDefinition input = action.Inputs[i];
+                if (input == null) continue;
+                text += " " + (input.Label ?? string.Empty) + " " + (input.Placeholder ?? string.Empty);
+                if (input.Options == null) continue;
+                for (int optionIndex = 0; optionIndex < input.Options.Count; optionIndex++)
+                {
+                    ActionInputOption option = input.Options[optionIndex];
+                    if (option != null)
+                    {
+                        text += " " + (option.Label ?? string.Empty);
+                    }
+                }
+            }
+
+            return text;
+        }
+
+        private static string GetActionHubText(string key, string fallback, params object[] formatArguments)
+        {
+            string value = ModButtonsLocalization.GetOwn(key, fallback);
+            if (formatArguments == null || formatArguments.Length == 0)
+            {
+                return value;
+            }
+
+            try
+            {
+                return string.Format(CultureInfo.CurrentCulture, value, formatArguments);
+            }
+            catch
+            {
+                return fallback;
             }
         }
 
@@ -1664,14 +1940,14 @@ namespace ModButtons
             return false;
         }
 
-        private static void CreateActionButton(
+        private static GameObject CreateActionButton(
             Transform parentGrid,
             GameObject templateBtn,
             ActionDefinition action,
             float cellWidth,
             float cellHeight)
         {
-            if (action == null) return;
+            if (action == null) return null;
 
             string label = action.Label;
             string tooltip = action.Tooltip;
@@ -1776,14 +2052,15 @@ namespace ModButtons
             DisableChildRaycastTargets(btnObj);
 
             btn?.onClick.AddListener(() => TryInvokeAction(action, null, null));
+            return cellObj;
         }
 
-        private static void CreateActionForm(
+        private static GameObject CreateActionForm(
             Transform parent,
             GameObject templateButton,
             ActionDefinition action)
         {
-            if (parent == null || action == null || !action.HasInputs) return;
+            if (parent == null || action == null || !action.HasInputs) return null;
 
             GameObject form = new GameObject(
                 PrefixForm + action.Label,
@@ -1827,13 +2104,13 @@ namespace ModButtons
                 rowGroup.childForceExpandWidth = false;
                 rowGroup.childForceExpandHeight = false;
 
-                actionButton = CreateFormActionButton(row.transform, templateButton, action, FormActionButtonWidth, FormActionButtonHeight);
                 ActionInputBinding binding = CreateActionInputControl(
                     row.transform,
                     templateButton,
                     action.Inputs[0],
                     FormPreferredWidth - FormActionButtonWidth - FormSpacing - 16f);
                 if (binding != null) bindings.Add(binding);
+                actionButton = CreateFormActionButton(row.transform, templateButton, action, FormActionButtonWidth, FormActionButtonHeight);
             }
             else
             {
@@ -1872,6 +2149,8 @@ namespace ModButtons
             {
                 actionButton.onClick.AddListener(() => TryInvokeAction(action, bindings, validation));
             }
+
+            return form;
         }
 
         private static GameObject CreateFormRow(Transform parent, string name, float height)
@@ -2100,6 +2379,7 @@ namespace ModButtons
             text.fontSize = 16f;
             text.color = Color.black;
             text.alignment = TextAlignmentOptions.MidlineLeft;
+            text.raycastTarget = false;
             input.textComponent = text;
 
             GameObject placeholderObject = new GameObject("Placeholder", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -2113,6 +2393,7 @@ namespace ModButtons
             placeholder.fontSize = 16f;
             placeholder.color = new Color(0.35f, 0.35f, 0.35f, 0.8f);
             placeholder.alignment = TextAlignmentOptions.MidlineLeft;
+            placeholder.raycastTarget = false;
             input.placeholder = placeholder;
             return root;
         }
@@ -2324,21 +2605,27 @@ namespace ModButtons
                     assembly => assembly != null && string.Equals(assembly.GetName().Name, action.AssemblyName, StringComparison.Ordinal));
                 if (targetAssembly == null)
                 {
-                    SetValidationMessage(validationText, "Target assembly is not loaded.");
+                    SetValidationMessage(validationText, GetActionHubText(
+                        "actionhub.error.target_assembly",
+                        "Target assembly is not loaded."));
                     return false;
                 }
 
                 Type targetType = targetAssembly.GetType(action.ClassName, false);
                 if (targetType == null)
                 {
-                    SetValidationMessage(validationText, "Target class was not found.");
+                    SetValidationMessage(validationText, GetActionHubText(
+                        "actionhub.error.target_class",
+                        "Target class was not found."));
                     return false;
                 }
 
                 MethodInfo method = FindActionMethod(targetType, action.MethodName, arguments);
                 if (method == null)
                 {
-                    SetValidationMessage(validationText, "No matching public static method was found.");
+                    SetValidationMessage(validationText, GetActionHubText(
+                        "actionhub.error.target_method",
+                        "No matching public static method was found."));
                     return false;
                 }
 
@@ -2349,14 +2636,28 @@ namespace ModButtons
             catch (TargetInvocationException exception)
             {
                 Exception inner = exception.InnerException ?? exception;
-                SetValidationMessage(validationText, inner.Message);
-                Debug.LogError($"{LogErrorPrefix} {action.ClassName}.{action.MethodName}: {inner.Message}");
+                string message = GetActionHubText(
+                    "actionhub.error.invocation_failed",
+                    "The action failed: {0}",
+                    inner.Message);
+                SetValidationMessage(validationText, message);
+                Debug.LogError(GetActionHubText(
+                    "actionhub.error.log_prefix",
+                    "[ModButtons] Action failed: {0}",
+                    action.ClassName + DotSeparator + action.MethodName + ": " + inner.Message));
                 return false;
             }
             catch (Exception exception)
             {
-                SetValidationMessage(validationText, exception.Message);
-                Debug.LogError($"{LogErrorPrefix} {action.ClassName}.{action.MethodName}: {exception.Message}");
+                string message = GetActionHubText(
+                    "actionhub.error.invocation_failed",
+                    "The action failed: {0}",
+                    exception.Message);
+                SetValidationMessage(validationText, message);
+                Debug.LogError(GetActionHubText(
+                    "actionhub.error.log_prefix",
+                    "[ModButtons] Action failed: {0}",
+                    action.ClassName + DotSeparator + action.MethodName + ": " + exception.Message));
                 return false;
             }
         }
@@ -2376,7 +2677,9 @@ namespace ModButtons
 
             if (bindings == null || bindings.Count != action.Inputs.Count)
             {
-                error = "The action inputs could not be created.";
+                error = GetActionHubText(
+                    "actionhub.error.inputs_unavailable",
+                    "The action inputs could not be created.");
                 return false;
             }
 
@@ -2401,7 +2704,9 @@ namespace ModButtons
             error = string.Empty;
             if (binding == null || binding.Definition == null)
             {
-                error = "An action input is unavailable.";
+                error = GetActionHubText(
+                    "actionhub.error.input_unavailable",
+                    "An action input is unavailable.");
                 return false;
             }
 
@@ -2411,7 +2716,10 @@ namespace ModButtons
                 List<ActionInputOption> options = binding.Definition.Options;
                 if (options == null || options.Count == 0)
                 {
-                    error = binding.Definition.Label + " has no options.";
+                    error = GetActionHubText(
+                        "actionhub.error.input_no_options",
+                        "{0} has no options.",
+                        binding.Definition.Label);
                     return false;
                 }
 
@@ -2428,7 +2736,10 @@ namespace ModButtons
             }
             else
             {
-                error = binding.Definition.Label + " is unavailable.";
+                error = GetActionHubText(
+                    "actionhub.error.input_value_unavailable",
+                    "{0} is unavailable.",
+                    binding.Definition.Label);
                 return false;
             }
 
@@ -2439,17 +2750,26 @@ namespace ModButtons
                     if (!int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out integerValue) &&
                         !int.TryParse(raw, NumberStyles.Integer, CultureInfo.CurrentCulture, out integerValue))
                     {
-                        error = binding.Definition.Label + " must be a whole number.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_whole_number",
+                            "{0} must be a whole number.",
+                            binding.Definition.Label);
                         return false;
                     }
                     if (binding.Definition.HasMinimum && integerValue < Mathf.CeilToInt(binding.Definition.Minimum))
                     {
-                        error = binding.Definition.Label + " is below the minimum.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_below_minimum",
+                            "{0} is below the minimum.",
+                            binding.Definition.Label);
                         return false;
                     }
                     if (binding.Definition.HasMaximum && integerValue > Mathf.FloorToInt(binding.Definition.Maximum))
                     {
-                        error = binding.Definition.Label + " is above the maximum.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_above_maximum",
+                            "{0} is above the maximum.",
+                            binding.Definition.Label);
                         return false;
                     }
                     value = integerValue;
@@ -2459,17 +2779,26 @@ namespace ModButtons
                     float floatValue;
                     if (!TryParseFloat(raw, out floatValue))
                     {
-                        error = binding.Definition.Label + " must be a number.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_number",
+                            "{0} must be a number.",
+                            binding.Definition.Label);
                         return false;
                     }
                     if (binding.Definition.HasMinimum && floatValue < binding.Definition.Minimum)
                     {
-                        error = binding.Definition.Label + " is below the minimum.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_below_minimum",
+                            "{0} is below the minimum.",
+                            binding.Definition.Label);
                         return false;
                     }
                     if (binding.Definition.HasMaximum && floatValue > binding.Definition.Maximum)
                     {
-                        error = binding.Definition.Label + " is above the maximum.";
+                        error = GetActionHubText(
+                            "actionhub.error.input_above_maximum",
+                            "{0} is above the maximum.",
+                            binding.Definition.Label);
                         return false;
                     }
                     value = floatValue;

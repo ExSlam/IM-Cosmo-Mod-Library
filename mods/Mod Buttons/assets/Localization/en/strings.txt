@@ -1,0 +1,15 @@
+# Mod Buttons UI strings
+actionhub.search.placeholder=Search
+actionhub.error.inputs_unavailable=The action inputs could not be created.
+actionhub.error.input_unavailable=An action input is unavailable.
+actionhub.error.input_no_options={0} has no options.
+actionhub.error.input_value_unavailable={0} is unavailable.
+actionhub.error.input_whole_number={0} must be a whole number.
+actionhub.error.input_below_minimum={0} is below the minimum.
+actionhub.error.input_above_maximum={0} is above the maximum.
+actionhub.error.input_number={0} must be a number.
+actionhub.error.target_assembly=Target assembly is not loaded.
+actionhub.error.target_class=Target class was not found.
+actionhub.error.target_method=No matching public static method was found.
+actionhub.error.invocation_failed=The action failed: {0}
+actionhub.error.log_prefix=[ModButtons] Action failed: {0}

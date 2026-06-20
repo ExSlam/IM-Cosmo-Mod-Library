@@ -1,0 +1,15 @@
+# Mod Buttons UI strings
+actionhub.search.placeholder=Поиск в центре действий
+actionhub.error.inputs_unavailable=Не удалось создать поля действия.
+actionhub.error.input_unavailable=Поле действия недоступно.
+actionhub.error.input_no_options=Для {0} нет вариантов.
+actionhub.error.input_value_unavailable={0} недоступно.
+actionhub.error.input_whole_number={0} должно быть целым числом.
+actionhub.error.input_below_minimum={0} ниже минимального значения.
+actionhub.error.input_above_maximum={0} выше максимального значения.
+actionhub.error.input_number={0} должно быть числом.
+actionhub.error.target_assembly=Целевая сборка не загружена.
+actionhub.error.target_class=Целевой класс не найден.
+actionhub.error.target_method=Подходящий открытый статический метод не найден.
+actionhub.error.invocation_failed=Действие не выполнено: {0}
+actionhub.error.log_prefix=[ModButtons] Действие не выполнено: {0}

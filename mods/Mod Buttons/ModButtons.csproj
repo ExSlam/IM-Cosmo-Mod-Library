@@ -4,7 +4,7 @@
     <DeployFolderName>Mod Buttons</DeployFolderName>
     <RootNamespace>Mod Buttons</RootNamespace>
     <AssemblyName>com.cosmo.modbuttons</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

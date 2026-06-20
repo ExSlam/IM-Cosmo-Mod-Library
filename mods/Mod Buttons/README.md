@@ -146,6 +146,8 @@ For a dropdown, an option may also be a simple string such as `"general"`. Objec
 
 Input actions stay open when validation or method resolution fails and show the failure under the action. They close after the reflected method completes successfully.
 
+The Action Hub includes a search field at the top. It filters sections by the localized mod header and filters actions by their localized button text, tooltip, input label, placeholder, and dropdown option text.
+
 ---
 
 ## 🌍 How to Add Localizations
@@ -190,6 +192,8 @@ YourMod.Cheat.RestoreStamina=アイドルのスタミナを回復
 ### 3. Localization Logic
 * **No `codeLabel` provided in JSON?** `ModButtons` will automatically generate a translation key using `YourClass.YourMethod`.
 * **Missing Translations?** The manager will always load `Localization/en/strings.txt` as a baseline. If the user plays in Japanese but you haven't translated a specific button, it will safely fall back to your English baseline, or ultimately the `label` provided in your JSON.
+
+Mod Buttons localizes its own Action Hub search text and validation errors from `Mod Buttons/Localization/<language>/strings.txt`. The bundled English file is the baseline and can be extended with the same `key=value` format.
 
 ---
 

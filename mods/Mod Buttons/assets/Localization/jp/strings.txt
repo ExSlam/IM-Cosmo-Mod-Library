@@ -1,0 +1,15 @@
+# Mod Buttons UI strings
+actionhub.search.placeholder=アクションハブを検索
+actionhub.error.inputs_unavailable=アクション入力を作成できませんでした。
+actionhub.error.input_unavailable=アクション入力を利用できません。
+actionhub.error.input_no_options={0}には選択肢がありません。
+actionhub.error.input_value_unavailable={0}を利用できません。
+actionhub.error.input_whole_number={0}には整数を入力してください。
+actionhub.error.input_below_minimum={0}が最小値を下回っています。
+actionhub.error.input_above_maximum={0}が最大値を上回っています。
+actionhub.error.input_number={0}には数値を入力してください。
+actionhub.error.target_assembly=対象のアセンブリが読み込まれていません。
+actionhub.error.target_class=対象のクラスが見つかりませんでした。
+actionhub.error.target_method=一致する public static メソッドが見つかりませんでした。
+actionhub.error.invocation_failed=アクションに失敗しました: {0}
+actionhub.error.log_prefix=[ModButtons] アクションに失敗しました: {0}
