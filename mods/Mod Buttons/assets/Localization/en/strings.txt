@@ -1,4 +1,5 @@
 # Mod Buttons UI strings
+actionhub.button.label=Action Hub
 actionhub.search.placeholder=Search
 actionhub.error.inputs_unavailable=The action inputs could not be created.
 actionhub.error.input_unavailable=An action input is unavailable.

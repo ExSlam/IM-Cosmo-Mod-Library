@@ -1,4 +1,5 @@
 # Mod Buttons UI strings
+actionhub.button.label=Центр действий
 actionhub.search.placeholder=Поиск в центре действий
 actionhub.error.inputs_unavailable=Не удалось создать поля действия.
 actionhub.error.input_unavailable=Поле действия недоступно.

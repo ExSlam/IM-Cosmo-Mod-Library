@@ -1,4 +1,5 @@
 # Mod Buttons UI strings
+actionhub.button.label=Central de Ações
 actionhub.search.placeholder=Pesquisar Central de Ações
 actionhub.error.inputs_unavailable=Não foi possível criar os campos da ação.
 actionhub.error.input_unavailable=Um campo da ação não está disponível.

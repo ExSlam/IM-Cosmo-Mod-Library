@@ -1,4 +1,5 @@
 # Mod Buttons UI strings
+actionhub.button.label=アクションハブ
 actionhub.search.placeholder=アクションハブを検索
 actionhub.error.inputs_unavailable=アクション入力を作成できませんでした。
 actionhub.error.input_unavailable=アクション入力を利用できません。

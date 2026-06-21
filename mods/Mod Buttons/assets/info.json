@@ -2,7 +2,7 @@
   "Title": "Mod Buttons",
   "Description": "Adds an action hub where mods can provide buttons and typed action inputs.",
   "Author": "Cosmo",
-  "Version": "1.2.0",
+  "Version": "1.4.0",
   "Tags": ["ui", "modding"],
   "HarmonyID": "com.cosmo.modbuttons"
 }

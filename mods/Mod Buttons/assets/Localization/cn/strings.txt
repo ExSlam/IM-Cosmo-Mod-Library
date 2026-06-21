@@ -1,4 +1,5 @@
 # Mod Buttons UI strings
+actionhub.button.label=操作中心
 actionhub.search.placeholder=搜索操作中心
 actionhub.error.inputs_unavailable=无法创建操作输入项。
 actionhub.error.input_unavailable=一个操作输入项不可用。
