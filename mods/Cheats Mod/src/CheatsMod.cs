@@ -33,6 +33,7 @@ namespace CheatsMod
     {
         internal const string NotificationAddMoney = "notification.add_money";
         internal const string NotificationAddFans = "notification.add_fans";
+        internal const string NotificationAddCustomFans = "notification.add_custom_fans";
         internal const string NotificationAddFame = "notification.add_fame";
         internal const string NotificationAddBuzz = "notification.add_buzz";
         internal const string NotificationResetSpecialEventCooldowns = "notification.reset_special_event_cooldowns";
@@ -75,6 +76,7 @@ namespace CheatsMod
     {
         internal const string NotificationAddMoney = "Added 1B yen.";
         internal const string NotificationAddFans = "Added 10k fans.";
+        internal const string NotificationAddCustomFans = "Fans added.";
         internal const string NotificationAddFame = "Added 10k fame.";
         internal const string NotificationAddBuzz = "Added 100 buzz.";
         internal const string NotificationResetSpecialEventCooldowns = "Special event cooldowns reset.";
@@ -172,6 +174,12 @@ namespace CheatsMod
         public static void AddTenThousandFans()
         {
             Execute(AddTenThousandFansCore);
+        }
+
+        public static void AddFans(int amount)
+        {
+            if (amount <= 0) return;
+            Execute(() => AddFansCore(amount));
         }
 
         public static void AddTenThousandFame()
@@ -325,6 +333,15 @@ namespace CheatsMod
                 CheatAmounts.FanGrant,
                 CheatLocalizationKeys.NotificationAddFans,
                 CheatFallbackText.NotificationAddFans);
+        }
+
+        private static void AddFansCore(int amount)
+        {
+            AddResource(
+                resources.type.fans,
+                amount,
+                CheatLocalizationKeys.NotificationAddCustomFans,
+                CheatFallbackText.NotificationAddCustomFans);
         }
 
         private static void AddTenThousandFameCore()

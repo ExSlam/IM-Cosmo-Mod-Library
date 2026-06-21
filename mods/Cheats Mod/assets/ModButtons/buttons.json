@@ -288,5 +288,26 @@
 		"assembly": "com.cosmo.cheatsmod",
 		"class": "CheatsMod.Cheats",
 		"method": "HealAndEndHiatus"
+	},
+	{
+		"label": "Add fans",
+		"codeLabel": "cheat.button.add_custom_fans",
+		"tooltip": "Add the specified number of fans.",
+		"codeTooltip": "cheat.tooltip.add_custom_fans",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "AddFans",
+		"inputs": [
+			{
+				"id": "amount",
+				"type": "integer",
+				"label": "Fans to add",
+				"codeLabel": "cheat.input.add_custom_fans_amount",
+				"default": 10000,
+				"min": 1,
+				"max": 1000000000
+			}
+		]
 	}
 ]
