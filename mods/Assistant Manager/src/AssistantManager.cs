@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using TMPro;
@@ -35,6 +36,8 @@ namespace AssitantManagerMod
         internal const int AssistantManagerType2ExpertInfluenceLevel = 6;
 
         internal const string AssistantManagerOfficeBuildButtonObjectName = "AssistantManagerOffice_BuildRoomButton";
+        internal const string AssistantManagerOfficeBuildRowObjectName = "AssistantManagerOffice_BuildMenuRow";
+        internal const string AssistantManagerOfficeBuildHeaderObjectName = "AssistantManagerOffice_BuildMenuHeader";
         internal const string AssistantManagerHireButtonObjectName = "AssistantManager_StaffHireButton";
         internal const string MalePlayerPortraitFolderName = "Player_Male";
         internal const string FemalePlayerPortraitFolderName = "Player_Female";
@@ -84,7 +87,7 @@ namespace AssitantManagerMod
             {
                 return ModLocalization.Get(
                     AssistantManagerConstants.KeyAssistantManagerOfficeTitle,
-                    "Assistant Manager Office");
+                    "Assistant Manager's Office");
             }
         }
 
@@ -121,7 +124,13 @@ namespace AssitantManagerMod
 
     internal static class AssistantManagerDateTracking
     {
+        private const double DateCooldownDays = 7.0;
         private static Dictionary<int, Dictionary<int, DateTime>> roomGirlCooldowns = new Dictionary<int, Dictionary<int, DateTime>>();
+
+        internal static void Reset()
+        {
+            roomGirlCooldowns.Clear();
+        }
 
         internal static int GetCooldownDays(int roomId, int girlId)
         {
@@ -129,6 +138,16 @@ namespace AssitantManagerMod
             {
                 if (girlCooldowns.TryGetValue(girlId, out DateTime cooldownDate))
                 {
+                    if (cooldownDate <= staticVars.dateTime)
+                    {
+                        girlCooldowns.Remove(girlId);
+                        if (girlCooldowns.Count == 0)
+                        {
+                            roomGirlCooldowns.Remove(roomId);
+                        }
+                        return 0;
+                    }
+
                     int daysLeft = Mathf.CeilToInt((float)(cooldownDate - staticVars.dateTime).TotalDays);
                     return Mathf.Max(0, daysLeft);
                 }
@@ -142,8 +161,12 @@ namespace AssitantManagerMod
             {
                 roomGirlCooldowns[roomId] = new Dictionary<int, DateTime>();
             }
-            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(7.0);
+            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(DateCooldownDays);
         }
+    }
+
+    internal sealed class AssistantManagerBuildMenuRowMarker : MonoBehaviour
+    {
     }
 
     internal static class AssistantManagerRules
@@ -158,6 +181,48 @@ namespace AssitantManagerMod
 
         private static readonly MethodInfo OnTaskCompleteMethod =
             AccessTools.Method(typeof(agency._room), "OnTaskComplete");
+
+        private static Sprite customMaleSprite = null;
+        private static Sprite customFemaleSprite = null;
+        private static bool attemptedLoadMale = false;
+        private static bool attemptedLoadFemale = false;
+        private static bool isEnsuringBuildMenuButton = false;
+
+        internal static Sprite GetCustomPortrait()
+        {
+            bool isMale = IsPlayerMale();
+            
+            if (isMale)
+            {
+                if (attemptedLoadMale) return customMaleSprite;
+                attemptedLoadMale = true;
+            }
+            else
+            {
+                if (attemptedLoadFemale) return customFemaleSprite;
+                attemptedLoadFemale = true;
+            }
+
+            string fileName = isMale ? "AssistantManager_Male.png" : "AssistantManager_Female.png";
+            string assemblyDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string imagePath = System.IO.Path.Combine(assemblyDir, "Textures", fileName);
+
+            if (System.IO.File.Exists(imagePath))
+            {
+                byte[] fileData = System.IO.File.ReadAllBytes(imagePath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (ImageConversion.LoadImage(tex, fileData))
+                {
+                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+                    
+                    if (isMale) customMaleSprite = sprite;
+                    else customFemaleSprite = sprite;
+                    
+                    return sprite;
+                }
+            }
+            return null;
+        }
 
         internal static bool IsAssistantManagerStaffType(staff._type staffType)
         {
@@ -408,58 +473,460 @@ namespace AssitantManagerMod
             agencyInstance.roomPrefabs = newPrefabs;
         }
 
-        internal static void EnsureBuildMenuButton(agency agencyInstance)
+        internal static Transform GetRoomUIBlock(BuildRoomButton button)
         {
-            if (agencyInstance == null || agencyInstance.newRoomPopup == null)
+            if (button == null)
+            {
+                return null;
+            }
+
+            Transform current = button.transform;
+            while (current.parent != null)
+            {
+                Transform parent = current.parent;
+                if (parent.GetComponent<BuildRoom_Popup>() != null)
+                {
+                    return current;
+                }
+
+                BuildRoomButton[] buttonsInParent = parent.GetComponentsInChildren<BuildRoomButton>(true);
+                if (buttonsInParent.Length != 1)
+                {
+                    return current;
+                }
+
+                current = parent;
+            }
+
+            return current;
+        }
+
+        private static Transform FindBuildMenuHeader(Transform entry)
+        {
+            if (entry == null || entry.parent == null)
+            {
+                return null;
+            }
+
+            int entrySiblingIndex = entry.GetSiblingIndex();
+            for (int i = entrySiblingIndex - 1; i >= 0; i--)
+            {
+                Transform candidate = entry.parent.GetChild(i);
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (candidate.GetComponentsInChildren<BuildRoomButton>(true).Length > 0)
+                {
+                    break;
+                }
+
+                if (candidate.GetComponentsInChildren<RoomTitle>(true).Length > 0 ||
+                    candidate.GetComponentsInChildren<TextMeshProUGUI>(true).Length > 0 ||
+                    candidate.GetComponentsInChildren<Text>(true).Length > 0)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static Transform EnsureAssistantManagerBuildMenuHeader(Transform assistantRow, Transform headerTemplate)
+        {
+            if (assistantRow == null || assistantRow.parent == null)
+            {
+                return null;
+            }
+
+            Transform parent = assistantRow.parent;
+            Transform existingHeader = parent.Find(AssistantManagerConstants.AssistantManagerOfficeBuildHeaderObjectName);
+            if (existingHeader != null)
+            {
+                existingHeader.SetSiblingIndex(assistantRow.GetSiblingIndex());
+                ApplyAssistantManagerBuildMenuHeaderPresentation(existingHeader.gameObject);
+                return existingHeader;
+            }
+
+            if (headerTemplate == null)
+            {
+                return null;
+            }
+
+            GameObject header = UnityEngine.Object.Instantiate<GameObject>(headerTemplate.gameObject, parent, false);
+            header.name = AssistantManagerConstants.AssistantManagerOfficeBuildHeaderObjectName;
+            header.transform.SetSiblingIndex(assistantRow.GetSiblingIndex());
+
+            RectTransform headerRect = header.GetComponent<RectTransform>();
+            float headerHeight = GetBuildMenuHeaderHeight(headerRect);
+            LayoutElement headerLayout = header.GetComponent<LayoutElement>();
+            if (headerLayout == null)
+            {
+                headerLayout = header.AddComponent<LayoutElement>();
+            }
+            if (headerLayout.minHeight <= 0f)
+            {
+                headerLayout.minHeight = headerHeight;
+            }
+            if (headerLayout.preferredHeight <= 0f)
+            {
+                headerLayout.preferredHeight = headerHeight;
+            }
+
+            if (!UsesAutomaticBuildMenuLayout(parent))
+            {
+                PositionBuildMenuRowBelowPreviousSibling(headerRect, parent, header.transform.GetSiblingIndex(), headerHeight);
+                ShiftFollowingBuildMenuEntries(parent, header.transform, headerHeight);
+            }
+
+            ExpandBuildMenuOverlay(parent, headerHeight);
+            ApplyAssistantManagerBuildMenuHeaderPresentation(header);
+            return header.transform;
+        }
+
+        private static void ApplyAssistantManagerBuildMenuHeaderPresentation(GameObject header)
+        {
+            if (header == null)
             {
                 return;
             }
 
-            BuildRoomButton[] buttons = agencyInstance.newRoomPopup.GetComponentsInChildren<BuildRoomButton>(true);
-            BuildRoomButton managerOfficeBuildButton = null;
-            BuildRoomButton theaterBuildButton = null;
-
-            for (int i = 0; i < buttons.Length; i++)
+            Lang_Button[] languageBindings = header.GetComponentsInChildren<Lang_Button>(true);
+            for (int i = 0; i < languageBindings.Length; i++)
             {
-                if (buttons[i] == null) continue;
-
-                if (buttons[i].type == AssistantManagerConstants.AssistantManagerOfficeRoomType)
+                if (languageBindings[i] == null)
                 {
-                    ApplyAssistantManagerOfficeBuildButtonPresentation(buttons[i], agencyInstance);
+                    continue;
+                }
+
+                languageBindings[i].Constant = string.Empty;
+                languageBindings[i].Tooltip = string.Empty;
+            }
+
+            RoomTitle[] roomTitles = header.GetComponentsInChildren<RoomTitle>(true);
+            for (int i = 0; i < roomTitles.Length; i++)
+            {
+                if (roomTitles[i] != null)
+                {
+                    roomTitles[i].SetText(AssistantManagerText.AssistantManagerOfficeTitle);
+                }
+            }
+
+            TextMeshProUGUI[] tmpTexts = header.GetComponentsInChildren<TextMeshProUGUI>(true);
+            for (int i = 0; i < tmpTexts.Length; i++)
+            {
+                if (tmpTexts[i] != null)
+                {
+                    tmpTexts[i].text = AssistantManagerText.AssistantManagerOfficeTitle;
+                }
+            }
+
+            Text[] legacyTexts = header.GetComponentsInChildren<Text>(true);
+            for (int i = 0; i < legacyTexts.Length; i++)
+            {
+                if (legacyTexts[i] != null)
+                {
+                    legacyTexts[i].text = AssistantManagerText.AssistantManagerOfficeTitle;
+                }
+            }
+        }
+
+        private static Transform EnsureAssistantManagerBuildMenuRow(Transform entry)
+        {
+            if (entry == null)
+            {
+                return null;
+            }
+
+            AssistantManagerBuildMenuRowMarker existingMarker = entry.GetComponentInParent<AssistantManagerBuildMenuRowMarker>();
+            if (existingMarker != null)
+            {
+                return existingMarker.transform;
+            }
+
+            Transform parent = entry.parent;
+            if (parent == null)
+            {
+                return entry;
+            }
+
+            RectTransform entryRect = entry as RectTransform;
+            Vector2 anchorMin = entryRect != null ? entryRect.anchorMin : Vector2.zero;
+            Vector2 anchorMax = entryRect != null ? entryRect.anchorMax : Vector2.one;
+            Vector2 anchoredPosition = entryRect != null ? entryRect.anchoredPosition : Vector2.zero;
+            Vector2 sizeDelta = entryRect != null ? entryRect.sizeDelta : Vector2.zero;
+            Vector2 pivot = entryRect != null ? entryRect.pivot : new Vector2(0.5f, 0.5f);
+            float entryHeight = GetBuildMenuEntryHeight(entryRect);
+            int siblingIndex = entry.GetSiblingIndex();
+
+            GameObject rowObject = new GameObject(
+                AssistantManagerConstants.AssistantManagerOfficeBuildRowObjectName,
+                typeof(RectTransform),
+                typeof(LayoutElement),
+                typeof(AssistantManagerBuildMenuRowMarker));
+            rowObject.transform.SetParent(parent, false);
+            rowObject.transform.SetSiblingIndex(siblingIndex);
+
+            RectTransform rowRect = rowObject.GetComponent<RectTransform>();
+            rowRect.anchorMin = anchorMin;
+            rowRect.anchorMax = anchorMax;
+            rowRect.anchoredPosition = anchoredPosition;
+            rowRect.sizeDelta = sizeDelta;
+            rowRect.pivot = pivot;
+
+            LayoutElement layoutElement = rowObject.GetComponent<LayoutElement>();
+            layoutElement.minHeight = entryHeight;
+            layoutElement.preferredHeight = entryHeight;
+
+            if (!UsesAutomaticBuildMenuLayout(parent))
+            {
+                PositionBuildMenuRowBelowPreviousSibling(rowRect, parent, siblingIndex, entryHeight);
+                ShiftFollowingBuildMenuEntries(parent, rowObject.transform, entryHeight);
+            }
+
+            entry.SetParent(rowObject.transform, false);
+            if (entryRect != null)
+            {
+                entryRect.anchorMin = Vector2.zero;
+                entryRect.anchorMax = Vector2.one;
+                entryRect.offsetMin = Vector2.zero;
+                entryRect.offsetMax = Vector2.zero;
+                entryRect.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            ExpandBuildMenuOverlay(parent, entryHeight);
+            return rowObject.transform;
+        }
+
+        private static bool UsesAutomaticBuildMenuLayout(Transform contentRoot)
+        {
+            return contentRoot != null &&
+                   (contentRoot.GetComponent<VerticalLayoutGroup>() != null ||
+                    contentRoot.GetComponent<GridLayoutGroup>() != null);
+        }
+
+        private static void PositionBuildMenuRowBelowPreviousSibling(
+            RectTransform rowRect,
+            Transform parent,
+            int siblingIndex,
+            float rowHeight)
+        {
+            if (rowRect == null || parent == null || siblingIndex <= 0)
+            {
+                return;
+            }
+
+            RectTransform previousRect = parent.GetChild(siblingIndex - 1) as RectTransform;
+            if (previousRect == null)
+            {
+                return;
+            }
+
+            float previousHeight = GetBuildMenuEntryHeight(previousRect);
+            float previousBottom = previousRect.anchoredPosition.y - previousHeight * (1f - previousRect.pivot.y);
+            float rowY = previousBottom - rowHeight * rowRect.pivot.y - 4f;
+            AlignBuildMenuRowLeftEdge(rowRect, parent, previousRect);
+            rowRect.anchoredPosition = new Vector2(rowRect.anchoredPosition.x, rowY);
+        }
+
+        private static void AlignBuildMenuRowLeftEdge(RectTransform rowRect, Transform parent, RectTransform referenceRect)
+        {
+            if (rowRect == null || parent == null || referenceRect == null)
+            {
+                return;
+            }
+
+            Vector3[] referenceCorners = new Vector3[4];
+            referenceRect.GetWorldCorners(referenceCorners);
+            float referenceLeft = parent.InverseTransformPoint(referenceCorners[0]).x;
+
+            float rowWidth = Mathf.Abs(rowRect.rect.width);
+            if (rowWidth <= 0f)
+            {
+                rowWidth = Mathf.Abs(rowRect.sizeDelta.x);
+            }
+
+            rowRect.anchorMin = new Vector2(0f, rowRect.anchorMin.y);
+            rowRect.anchorMax = new Vector2(0f, rowRect.anchorMax.y);
+            rowRect.pivot = new Vector2(0f, rowRect.pivot.y);
+            rowRect.anchoredPosition = new Vector2(referenceLeft, rowRect.anchoredPosition.y);
+            rowRect.sizeDelta = new Vector2(rowWidth, rowRect.sizeDelta.y);
+        }
+
+        private static void ShiftFollowingBuildMenuEntries(Transform parent, Transform row, float rowHeight)
+        {
+            if (parent == null || row == null)
+            {
+                return;
+            }
+
+            int rowSiblingIndex = row.GetSiblingIndex();
+            for (int i = rowSiblingIndex + 1; i < parent.childCount; i++)
+            {
+                Transform sibling = parent.GetChild(i);
+                if (sibling == null)
+                {
+                    continue;
+                }
+
+                RectTransform siblingRect = sibling as RectTransform;
+                if (siblingRect != null)
+                {
+                    siblingRect.anchoredPosition -= new Vector2(0f, rowHeight + 4f);
+                }
+            }
+        }
+
+        private static float GetBuildMenuEntryHeight(RectTransform entryRect)
+        {
+            if (entryRect != null)
+            {
+                float height = Mathf.Abs(entryRect.rect.height);
+                if (height > 0f)
+                {
+                    return height;
+                }
+
+                height = Mathf.Abs(entryRect.sizeDelta.y);
+                if (height > 0f)
+                {
+                    return height;
+                }
+            }
+
+            return 90f;
+        }
+
+        private static float GetBuildMenuHeaderHeight(RectTransform headerRect)
+        {
+            if (headerRect != null)
+            {
+                float height = Mathf.Abs(headerRect.rect.height);
+                if (height > 0f)
+                {
+                    return height;
+                }
+
+                height = Mathf.Abs(headerRect.sizeDelta.y);
+                if (height > 0f)
+                {
+                    return height;
+                }
+            }
+
+            return 40f;
+        }
+
+        private static void ExpandBuildMenuOverlay(Transform contentRoot, float entryHeight)
+        {
+            if (contentRoot == null)
+            {
+                return;
+            }
+
+            RectTransform contentRect = contentRoot as RectTransform;
+            bool contentUsesSizeFitter = contentRoot.GetComponent<ContentSizeFitter>() != null;
+            if (!contentUsesSizeFitter && contentRect != null)
+            {
+                contentRect.sizeDelta = new Vector2(
+                    contentRect.sizeDelta.x,
+                    contentRect.sizeDelta.y + entryHeight);
+            }
+
+            if (contentRect != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+            }
+
+            ScrollRect scrollRect = contentRoot.GetComponentInParent<ScrollRect>();
+            if (scrollRect != null && scrollRect.content != null && scrollRect.content != contentRect)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.content);
+            }
+        }
+
+        internal static void EnsureBuildMenuButton(agency agencyInstance)
+        {
+            if (isEnsuringBuildMenuButton || agencyInstance == null || agencyInstance.newRoomPopup == null)
+            {
+                return;
+            }
+
+            isEnsuringBuildMenuButton = true;
+            try
+            {
+                BuildRoomButton[] buttons = agencyInstance.newRoomPopup.GetComponentsInChildren<BuildRoomButton>(true);
+                BuildRoomButton assistantOfficeButton = null;
+                BuildRoomButton managerOfficeButton = null;
+                BuildRoomButton theaterButton = null;
+
+                for (int i = 0; i < buttons.Length; i++)
+                {
+                    BuildRoomButton button = buttons[i];
+                    if (button == null)
+                    {
+                        continue;
+                    }
+
+                    if (button.type == AssistantManagerConstants.AssistantManagerOfficeRoomType)
+                    {
+                        assistantOfficeButton = button;
+                    }
+                    else if (button.type == agency._type.yourOffice)
+                    {
+                        managerOfficeButton = button;
+                    }
+                    else if (button.type == agency._type.theatre)
+                    {
+                        theaterButton = button;
+                    }
+                }
+
+                if (assistantOfficeButton != null)
+                {
+                    Transform existingEntry = GetRoomUIBlock(assistantOfficeButton);
+                    Transform assistantRow = EnsureAssistantManagerBuildMenuRow(existingEntry);
+                    Transform managerOfficeEntry = GetRoomUIBlock(managerOfficeButton);
+                    Transform headerTemplate = FindBuildMenuHeader(managerOfficeEntry) ?? FindBuildMenuHeader(GetRoomUIBlock(theaterButton));
+                    EnsureAssistantManagerBuildMenuHeader(assistantRow, headerTemplate);
+                    ApplyAssistantManagerOfficeBuildButtonPresentation(assistantOfficeButton, agencyInstance);
                     return;
                 }
 
-                if (buttons[i].type == agency._type.yourOffice) managerOfficeBuildButton = buttons[i];
-                if (buttons[i].type == agency._type.theatre) theaterBuildButton = buttons[i];
-            }
+                if (managerOfficeButton == null || theaterButton == null)
+                {
+                    return;
+                }
 
-            if (managerOfficeBuildButton == null)
-            {
-                return;
-            }
+                Transform theaterEntry = GetRoomUIBlock(theaterButton);
+                Transform managerOfficeEntryForClone = GetRoomUIBlock(managerOfficeButton);
+                if (theaterEntry == null || theaterEntry.parent == null || managerOfficeEntryForClone == null)
+                {
+                    return;
+                }
 
-            GameObject clone = UnityEngine.Object.Instantiate<GameObject>(
-                managerOfficeBuildButton.gameObject,
-                managerOfficeBuildButton.transform.parent,
-                false);
-            clone.name = AssistantManagerConstants.AssistantManagerOfficeBuildButtonObjectName;
-            BuildRoomButton buildRoomButton = clone.GetComponent<BuildRoomButton>();
-            if (buildRoomButton == null)
-            {
-                return;
-            }
+                GameObject clone = UnityEngine.Object.Instantiate<GameObject>(managerOfficeEntryForClone.gameObject, theaterEntry.parent, false);
+                clone.name = AssistantManagerConstants.AssistantManagerOfficeBuildButtonObjectName + "_Entry";
+                clone.transform.SetSiblingIndex(theaterEntry.GetSiblingIndex() + 1);
 
-            if (theaterBuildButton != null)
-            {
-                clone.transform.SetParent(theaterBuildButton.transform.parent, false);
-                clone.transform.SetSiblingIndex(theaterBuildButton.transform.GetSiblingIndex() + 1);
-            }
-            else
-            {
-                clone.transform.SetAsLastSibling();
-            }
+                BuildRoomButton clonedButton = clone.GetComponentsInChildren<BuildRoomButton>(true).FirstOrDefault();
+                if (clonedButton == null)
+                {
+                    UnityEngine.Object.Destroy(clone);
+                    return;
+                }
 
-            ApplyAssistantManagerOfficeBuildButtonPresentation(buildRoomButton, agencyInstance);
+                clonedButton.type = AssistantManagerConstants.AssistantManagerOfficeRoomType;
+                Transform assistantEntry = EnsureAssistantManagerBuildMenuRow(clone.transform);
+                Transform headerTemplateForClone = FindBuildMenuHeader(managerOfficeEntryForClone) ?? FindBuildMenuHeader(theaterEntry);
+                EnsureAssistantManagerBuildMenuHeader(assistantEntry, headerTemplateForClone);
+                ApplyAssistantManagerOfficeBuildButtonPresentation(clonedButton, agencyInstance);
+            }
+            finally
+            {
+                isEnsuringBuildMenuButton = false;
+            }
         }
 
         internal static void EnsureStaffHireButton(Staff_Hire_Popup popup)
@@ -470,7 +937,6 @@ namespace AssitantManagerMod
             Staff_Hire_Button cloneSource = null;
             int lastVanillaRowIndex = -1;
 
-            // Update existing or locate our target index and clone source
             for (int i = 0; i < allButtons.Length; i++)
             {
                 if (allButtons[i] == null) continue;
@@ -485,7 +951,6 @@ namespace AssitantManagerMod
                 }
                 else
                 {
-                    // Map the UI hierarchy to find the very last vanilla staff row in the list
                     Transform row = allButtons[i].transform;
                     while (row.parent != null && row.parent != popup.Container.transform)
                     {
@@ -514,7 +979,6 @@ namespace AssitantManagerMod
             Transform headerToClone = null;
             int cloneSourceSiblingIndex = directChildOfContainer.GetSiblingIndex();
             
-            // Extract the header above the clone source
             if (cloneSourceSiblingIndex > 0)
             {
                 Transform prevSibling = popup.Container.transform.GetChild(cloneSourceSiblingIndex - 1);
@@ -524,11 +988,8 @@ namespace AssitantManagerMod
                 }
             }
 
-            // Target the index immediately after the last vanilla staff row. 
-            // This safely bypasses any invisible padding objects at the end of the scroll view.
             int targetSiblingIndex = lastVanillaRowIndex != -1 ? lastVanillaRowIndex + 1 : popup.Container.transform.childCount;
 
-            // Process Header
             Transform existingHeader = popup.Container.transform.Find("AssistantManagerHeader");
             GameObject newHeader = existingHeader != null ? existingHeader.gameObject : null;
             
@@ -545,7 +1006,6 @@ namespace AssitantManagerMod
                 ApplyAssistantManagerHeaderPresentation(newHeader);
             }
 
-            // Process Buttons Row
             Transform existingRow = popup.Container.transform.Find("AssistantManagerRow");
             GameObject newRow = existingRow != null ? existingRow.gameObject : null;
             bool isNewRow = false;
@@ -590,7 +1050,6 @@ namespace AssitantManagerMod
         {
             if (obj == null) return;
 
-            // Remove Vanilla Translation Scripts so they don't overwrite our custom localized string with empty text
             MonoBehaviour[] scripts = obj.GetComponentsInChildren<MonoBehaviour>(true);
             for (int i = 0; i < scripts.Length; i++)
             {
@@ -631,7 +1090,24 @@ namespace AssitantManagerMod
 
             buildRoomButton.type = AssistantManagerConstants.AssistantManagerOfficeRoomType;
             buildRoomButton.available = true;
-            SetFirstTextComponent(buildRoomButton.gameObject, AssistantManagerText.AssistantManagerOfficeTitle);
+            
+            Transform block = GetRoomUIBlock(buildRoomButton);
+            if (block == null)
+            {
+                return;
+            }
+            
+            RoomTitle roomTitle = block.GetComponentsInChildren<RoomTitle>(true).FirstOrDefault();
+            if (roomTitle != null)
+            {
+                roomTitle.gameObject.name = AssistantManagerConstants.AssistantManagerOfficeBuildHeaderObjectName;
+                roomTitle.SetText(AssistantManagerText.AssistantManagerOfficeTitle);
+            }
+            else
+            {
+                SetFirstTextComponent(block.gameObject, AssistantManagerText.AssistantManagerOfficeTitle);
+            }
+
             SetBuildRoomButtonAvailability(buildRoomButton, agencyInstance);
         }
 
@@ -846,14 +1322,14 @@ namespace AssitantManagerMod
                 return;
             }
 
-            TextMeshProUGUI tmpText = root.GetComponentInChildren<TextMeshProUGUI>(true);
+            TextMeshProUGUI tmpText = root.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
             if (tmpText != null)
             {
                 tmpText.text = text;
                 return;
             }
 
-            Text unityText = root.GetComponentInChildren<Text>(true);
+            Text unityText = root.GetComponentsInChildren<Text>(true).FirstOrDefault();
             if (unityText != null)
             {
                 unityText.text = text;
@@ -1066,86 +1542,49 @@ namespace AssitantManagerMod
             VO.Play(VO.GetRandom(VO._random.joy), girl);
         }
 
-        // --- Context Menu UI Extractor & Injector Helper Methods ---
-        
-        internal static GameObject GetContextMenuGameObject(ContextMenuController._ContextMenu contextMenu)
+        internal static bool EnsureAssistantManagerOfficeContextMenu(ContextMenuController controller)
         {
-            if (contextMenu == null) return null;
-            
-            string[] fieldNames = { "obj", "gameObject", "menu", "Container", "panel" };
-            foreach (string fieldName in fieldNames)
+            if (controller == null || controller.ContextMenu == null)
             {
-                FieldInfo field = typeof(ContextMenuController._ContextMenu).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (field != null)
-                {
-                    object val = field.GetValue(contextMenu);
-                    if (val is GameObject go) return go;
-                    if (val is Component comp) return comp.gameObject;
-                }
-            }
-            return null;
-        }
-
-        internal static void InjectFireButtons(ContextMenuController._ContextMenu yourOfficeMenu, ContextMenuController._ContextMenu officeMenu)
-        {
-            GameObject yourOfficeGo = GetContextMenuGameObject(yourOfficeMenu);
-            GameObject officeGo = GetContextMenuGameObject(officeMenu);
-
-            if (yourOfficeGo == null || officeGo == null) return;
-
-            ButtonDefault[] yourOfficeButtons = yourOfficeGo.GetComponentsInChildren<ButtonDefault>(true);
-            Transform targetParent = yourOfficeGo.transform;
-            if (yourOfficeButtons.Length > 0)
-            {
-                targetParent = yourOfficeButtons[yourOfficeButtons.Length - 1].transform.parent;
+                return false;
             }
 
-            Transform existingFire = targetParent.Find("AssistantManager_FireButton");
-            if (existingFire != null) return;
-
-            ButtonDefault[] officeButtons = officeGo.GetComponentsInChildren<ButtonDefault>(true);
-            if (officeButtons.Length >= 2)
-            {
-                // We grab the last two standard buttons in the Office menu: Fire and Fire(Severance)
-                ButtonDefault fireBtnSrc = officeButtons[officeButtons.Length - 2];
-                ButtonDefault fireSevBtnSrc = officeButtons[officeButtons.Length - 1];
-
-                GameObject cloneFire = UnityEngine.Object.Instantiate(fireBtnSrc.gameObject, targetParent, false);
-                cloneFire.name = "AssistantManager_FireButton";
-                cloneFire.transform.SetAsLastSibling();
-
-                GameObject cloneSev = UnityEngine.Object.Instantiate(fireSevBtnSrc.gameObject, targetParent, false);
-                cloneSev.name = "AssistantManager_FireSeveranceButton";
-                cloneSev.transform.SetAsLastSibling();
-            }
-        }
-
-        internal static void ToggleInjectedFireButtons(ContextMenuController controller, bool show)
-        {
-            if (controller == null || controller.ContextMenu == null) return;
-
-            ContextMenuController._ContextMenu yourOfficeMenu = null;
+            ContextMenuController._ContextMenu playerOfficeMenu = null;
             for (int i = 0; i < controller.ContextMenu.Count; i++)
             {
-                if (controller.ContextMenu[i] != null && controller.ContextMenu[i].type == agency._type.yourOffice)
+                ContextMenuController._ContextMenu contextMenu = controller.ContextMenu[i];
+                if (contextMenu == null)
                 {
-                    yourOfficeMenu = controller.ContextMenu[i];
-                    break;
+                    continue;
+                }
+
+                if (contextMenu.type == AssistantManagerConstants.AssistantManagerOfficeRoomType)
+                {
+                    return true;
+                }
+
+                if (contextMenu.type == agency._type.yourOffice)
+                {
+                    playerOfficeMenu = contextMenu;
                 }
             }
 
-            GameObject yourOfficeGo = GetContextMenuGameObject(yourOfficeMenu);
-            if (yourOfficeGo != null)
+            if (playerOfficeMenu == null || playerOfficeMenu.prefab == null)
             {
-                Transform fireBtn = FindDeepChild(yourOfficeGo.transform, "AssistantManager_FireButton");
-                Transform fireSevBtn = FindDeepChild(yourOfficeGo.transform, "AssistantManager_FireSeveranceButton");
-
-                if (fireBtn != null) fireBtn.gameObject.SetActive(show);
-                if (fireSevBtn != null) fireSevBtn.gameObject.SetActive(show);
+                return false;
             }
+
+            // ContextMenuController instantiates this prefab for every open menu.  A separate
+            // mapping therefore gives Assistant Manager offices their own UI instance and state.
+            controller.ContextMenu.Add(new ContextMenuController._ContextMenu
+            {
+                type = AssistantManagerConstants.AssistantManagerOfficeRoomType,
+                prefab = playerOfficeMenu.prefab
+            });
+            return true;
         }
 
-        private static Transform FindDeepChild(Transform parent, string name)
+        internal static Transform FindDeepChild(Transform parent, string name)
         {
             if (parent.name == name) return parent;
             foreach (Transform child in parent)
@@ -1162,8 +1601,18 @@ namespace AssitantManagerMod
     {
         private static void Postfix(agency __instance)
         {
+            AssistantManagerDateTracking.Reset();
             AssistantManagerRules.RegisterAssistantManagerOfficePrefab(__instance);
             AssistantManagerRules.EnsureBuildMenuButton(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(ContextMenuController), "Start", new Type[0])]
+    internal static class ContextMenuControllerStartPatch
+    {
+        private static void Postfix(ContextMenuController __instance)
+        {
+            AssistantManagerRules.EnsureAssistantManagerOfficeContextMenu(__instance);
         }
     }
 
@@ -1261,12 +1710,21 @@ namespace AssitantManagerMod
     {
         private static void Postfix(BuildRoomButton __instance)
         {
-            if (__instance == null || __instance.type != AssistantManagerConstants.AssistantManagerOfficeRoomType)
+            if (__instance == null)
             {
                 return;
             }
 
-            AssistantManagerRules.ApplyAssistantManagerOfficeBuildButtonPresentation(__instance, null);
+            if (__instance.type == AssistantManagerConstants.AssistantManagerOfficeRoomType)
+            {
+                AssistantManagerRules.ApplyAssistantManagerOfficeBuildButtonPresentation(__instance, null);
+                return;
+            }
+
+            if (__instance.type == agency._type.yourOffice)
+            {
+                AssistantManagerRules.EnsureBuildMenuButton(AssistantManagerRules.GetAgency());
+            }
         }
     }
 
@@ -1416,6 +1874,52 @@ namespace AssitantManagerMod
         }
     }
 
+    [HarmonyPatch(typeof(staff), nameof(staff.LoadPortrait_Big), new Type[] { typeof(staff._type), typeof(Image), typeof(bool), typeof(Action), typeof(staff._staff._unique_type) })]
+    internal static class StaffLoadPortraitBigPatch
+    {
+        private static bool Prefix(staff._type Type, Image target, Action callback)
+        {
+            if (!AssistantManagerRules.IsAssistantManagerStaffType(Type))
+            {
+                return true; 
+            }
+
+            Sprite customPortrait = AssistantManagerRules.GetCustomPortrait();
+            if (customPortrait != null)
+            {
+                target.sprite = customPortrait;
+                if (callback != null)
+                {
+                    callback();
+                }
+                return false; 
+            }
+
+            return true; 
+        }
+    }
+
+    [HarmonyPatch(typeof(staff), nameof(staff.LoadPortrait_Small), new Type[] { typeof(staff._type), typeof(Image), typeof(bool), typeof(staff._staff._unique_type) })]
+    internal static class StaffLoadPortraitSmallPatch
+    {
+        private static bool Prefix(staff._type Type, Image target)
+        {
+            if (!AssistantManagerRules.IsAssistantManagerStaffType(Type))
+            {
+                return true;
+            }
+
+            Sprite customPortrait = AssistantManagerRules.GetCustomPortrait();
+            if (customPortrait != null)
+            {
+                target.sprite = customPortrait;
+                return false; 
+            }
+
+            return true; 
+        }
+    }
+
     [HarmonyPatch(typeof(staff._staff), nameof(staff._staff.Is_Male), new Type[0])]
     internal static class StaffMemberIsMalePatch
     {
@@ -1546,44 +2050,101 @@ namespace AssitantManagerMod
                 return true;
             }
 
-            ContextMenuController._ContextMenu yourOfficeMenu = null;
-            ContextMenuController._ContextMenu officeMenu = null;
+            if (AssistantManagerRules.EnsureAssistantManagerOfficeContextMenu(__instance))
+            {
+                // Let the original lookup return the dedicated Assistant Manager entry.
+                return true;
+            }
 
+            // Older save/load orders can request a room menu before ContextMenuController.Start.
+            // Retain a safe fallback rather than failing to open the room menu.
             for (int i = 0; i < __instance.ContextMenu.Count; i++)
             {
                 ContextMenuController._ContextMenu contextMenu = __instance.ContextMenu[i];
-                if (contextMenu == null) continue;
-
-                if (contextMenu.type == agency._type.yourOffice) yourOfficeMenu = contextMenu;
-                if (contextMenu.type == agency._type.office) officeMenu = contextMenu;
-            }
-
-            // Return the yourOffice menu, but inject the fire buttons if they aren't there yet.
-            if (yourOfficeMenu != null)
-            {
-                AssistantManagerRules.InjectFireButtons(yourOfficeMenu, officeMenu);
-                __result = yourOfficeMenu;
-                return false;
+                if (contextMenu != null && contextMenu.type == agency._type.yourOffice)
+                {
+                    __result = contextMenu;
+                    return false;
+                }
             }
 
             return true;
         }
     }
 
-    [HarmonyPatch(typeof(ContextMenuController), "Show", new Type[] { typeof(agency._room) })]
-    internal static class ContextMenuControllerShowPatch
+    [HarmonyPatch(typeof(CM_Player), "Start", new Type[0])]
+    internal static class CMPlayerStartPatch
     {
-        private static void Postfix(ContextMenuController __instance, agency._room __0)
+        private static void Postfix(CM_Player __instance)
         {
-            if (__instance == null || __0 == null) return;
-            
-            bool isAssistant = AssistantManagerRules.IsAssistantManagerOfficeRoomType(__0.type);
-            bool isManager = __0.type == agency._type.yourOffice;
+            if (__instance == null) return;
 
-            if (isAssistant || isManager)
+            FieldInfo cmcField = typeof(CM_Player).GetField("cmc", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (cmcField == null) return;
+
+            ContextMenuController cmc = cmcField.GetValue(__instance) as ContextMenuController;
+            if (cmc == null || cmc.room == null) return;
+
+            bool isAssistant = AssistantManagerRules.IsAssistantManagerOfficeRoomType(cmc.room.type);
+            
+            if (isAssistant)
             {
-                // This targets the yourOffice menu that we injected the fire buttons into and safely toggles them.
-                AssistantManagerRules.ToggleInjectedFireButtons(__instance, isAssistant);
+                Transform existingFire = AssistantManagerRules.FindDeepChild(__instance.transform, "AssistantManager_FireButtonContainer");
+                if (existingFire == null && cmc.prefab_staffCM != null)
+                {
+                    CM_Staff cmStaff = cmc.prefab_staffCM.GetComponent<CM_Staff>();
+                    if (cmStaff != null && cmStaff.Fire != null)
+                    {
+                        ButtonDefault templateBtn = __instance.GetComponentsInChildren<ButtonDefault>(true).FirstOrDefault();
+                        Transform targetParent = templateBtn != null ? templateBtn.transform.parent : __instance.transform;
+
+                        GameObject cloneFire = UnityEngine.Object.Instantiate(cmStaff.Fire, targetParent, false);
+                        cloneFire.name = "AssistantManager_FireButtonContainer";
+                        cloneFire.transform.SetAsLastSibling();
+                        
+                        existingFire = cloneFire.transform;
+                    }
+                }
+
+                if (existingFire != null)
+                {
+                    bool isStaffed = cmc.room.staffer != null;
+                    existingFire.gameObject.SetActive(isStaffed);
+                }
+            }
+            else 
+            {
+                Transform existingFire = AssistantManagerRules.FindDeepChild(__instance.transform, "AssistantManager_FireButtonContainer");
+                if (existingFire != null)
+                {
+                    existingFire.gameObject.SetActive(false);
+                }
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(CM_Player), "Render", new Type[0])]
+    internal static class CMPlayerRenderPatch
+    {
+        private static void Postfix(CM_Player __instance)
+        {
+            if (__instance == null) return;
+
+            FieldInfo cmcField = typeof(CM_Player).GetField("cmc", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (cmcField != null)
+            {
+                ContextMenuController cmc = cmcField.GetValue(__instance) as ContextMenuController;
+                if (cmc != null && cmc.room != null)
+                {
+                    bool isAssistant = AssistantManagerRules.IsAssistantManagerOfficeRoomType(cmc.room.type);
+                    bool isStaffed = cmc.room.staffer != null;
+
+                    Transform fireBtnContainer = AssistantManagerRules.FindDeepChild(__instance.transform, "AssistantManager_FireButtonContainer");
+                    if (fireBtnContainer != null)
+                    {
+                        fireBtnContainer.gameObject.SetActive(isAssistant && isStaffed);
+                    }
+                }
             }
         }
     }
@@ -1665,7 +2226,6 @@ namespace AssitantManagerMod
                     }
                 }
                 
-                // Track date cooldown locally instead of the global .AddDate() trigger
                 AssistantManagerDateTracking.AddDate(__instance.id, __instance.girl.id);
 
                 __instance.girl = null;

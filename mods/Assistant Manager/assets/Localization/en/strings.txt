@@ -6,7 +6,7 @@
 staff.assistant_manager.title=Assistant Manager
 staff.assistant_manager.tooltip=Can staff Assistant Manager Offices.
 staff.assistant_manager.limit_reached=Assistant Manager limit reached.
-room.assistant_manager_office.title=Assistant Manager Office
+room.assistant_manager_office.title=Assistant Manager's Office
 room.assistant_manager_office.requires=Requires: Assistant Manager staff
 room.assistant_manager_office.limit=Maximum per agency: 2
 room.assistant_manager_office.no_available_loan_room=Requires an available Manager Office or Assistant Manager Office.
