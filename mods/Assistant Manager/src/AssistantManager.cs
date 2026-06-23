@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using HarmonyLib;
+using SimpleJSON;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -132,6 +133,13 @@ namespace AssitantManagerMod
         private const double DateCooldownDays = 7.0;
         private static Dictionary<int, Dictionary<int, DateTime>> roomGirlCooldowns = new Dictionary<int, Dictionary<int, DateTime>>();
 
+        internal struct CooldownEntry
+        {
+            internal int RoomId;
+            internal int GirlId;
+            internal DateTime Until;
+        }
+
         internal static void Reset()
         {
             roomGirlCooldowns.Clear();
@@ -184,6 +192,54 @@ namespace AssitantManagerMod
                 roomGirlCooldowns[roomId] = new Dictionary<int, DateTime>();
             }
             roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(cooldownDays);
+            AssistantManagerStatePersistence.MarkDirty();
+        }
+
+        internal static List<CooldownEntry> ExportEntries()
+        {
+            List<CooldownEntry> entries = new List<CooldownEntry>();
+            foreach (KeyValuePair<int, Dictionary<int, DateTime>> roomEntry in roomGirlCooldowns)
+            {
+                foreach (KeyValuePair<int, DateTime> girlEntry in roomEntry.Value)
+                {
+                    if (girlEntry.Value > staticVars.dateTime)
+                    {
+                        entries.Add(new CooldownEntry
+                        {
+                            RoomId = roomEntry.Key,
+                            GirlId = girlEntry.Key,
+                            Until = girlEntry.Value
+                        });
+                    }
+                }
+            }
+            return entries;
+        }
+
+        internal static void ImportEntries(List<CooldownEntry> entries)
+        {
+            roomGirlCooldowns.Clear();
+            if (entries == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                CooldownEntry entry = entries[i];
+                if (entry.Until <= staticVars.dateTime)
+                {
+                    continue;
+                }
+
+                Dictionary<int, DateTime> girlCooldowns;
+                if (!roomGirlCooldowns.TryGetValue(entry.RoomId, out girlCooldowns))
+                {
+                    girlCooldowns = new Dictionary<int, DateTime>();
+                    roomGirlCooldowns[entry.RoomId] = girlCooldowns;
+                }
+                girlCooldowns[entry.GirlId] = entry.Until;
+            }
         }
 
         private static int DateCooldownDaysInt
@@ -206,9 +262,27 @@ namespace AssitantManagerMod
         private static readonly Dictionary<Auditions.data, int> ownerRoomByAudition =
             new Dictionary<Auditions.data, int>();
 
+        internal struct CooldownEntry
+        {
+            internal int RoomId;
+            internal Auditions.type Type;
+            internal DateTime LastAudition;
+        }
+
+        internal struct OwnerEntry
+        {
+            internal int RoomId;
+            internal Auditions.type Type;
+            internal float Progress;
+        }
+
         internal struct GenerateState
         {
             internal bool IsTracked;
+            internal bool ShouldRecordCooldown;
+            internal int RoomId;
+            internal Auditions.type Type;
+            internal Auditions.data Audition;
             internal DateTime RegionalDate;
             internal DateTime NationwideDate;
         }
@@ -239,7 +313,11 @@ namespace AssitantManagerMod
                 return 0;
             }
 
-            int cooldownDays = type == Auditions.type.regional ? 30 : 90;
+            int cooldownDays = GetCooldownLengthDays(type);
+            if (cooldownDays <= 0)
+            {
+                return 0;
+            }
             return Mathf.Max(0, cooldownDays - (staticVars.dateTime - lastAudition).Days);
         }
 
@@ -295,6 +373,7 @@ namespace AssitantManagerMod
             }
 
             cooldownsByRoom.Remove(room.id);
+            AssistantManagerStatePersistence.MarkDirty();
         }
 
         internal static Auditions.data CreateRoomAudition(agency._room room, Auditions.data template)
@@ -312,6 +391,7 @@ namespace AssitantManagerMod
                 Girls = new List<Auditions.data._girl>()
             };
             ownerRoomByAudition[audition] = room.id;
+            AssistantManagerStatePersistence.MarkDirty();
             return audition;
         }
 
@@ -325,6 +405,10 @@ namespace AssitantManagerMod
             state = new GenerateState
             {
                 IsTracked = false,
+                ShouldRecordCooldown = false,
+                RoomId = -1,
+                Type = Auditions.type.local,
+                Audition = audition,
                 RegionalDate = Auditions.Regional_Date,
                 NationwideDate = Auditions.Nationwide_Date
             };
@@ -341,16 +425,9 @@ namespace AssitantManagerMod
             }
 
             state.IsTracked = true;
-            if (audition.Type == Auditions.type.regional || audition.Type == Auditions.type.nationwide)
-            {
-                Dictionary<Auditions.type, DateTime> cooldowns;
-                if (!cooldownsByRoom.TryGetValue(roomId, out cooldowns))
-                {
-                    cooldowns = new Dictionary<Auditions.type, DateTime>();
-                    cooldownsByRoom[roomId] = cooldowns;
-                }
-                cooldowns[audition.Type] = staticVars.dateTime;
-            }
+            state.RoomId = roomId;
+            state.Type = audition.Type;
+            state.ShouldRecordCooldown = CanGenerateAudition();
         }
 
         internal static void EndGenerate(GenerateState state)
@@ -360,9 +437,163 @@ namespace AssitantManagerMod
                 return;
             }
 
+            if (state.ShouldRecordCooldown &&
+                (state.Type == Auditions.type.regional || state.Type == Auditions.type.nationwide))
+            {
+                Dictionary<Auditions.type, DateTime> cooldowns;
+                if (!cooldownsByRoom.TryGetValue(state.RoomId, out cooldowns))
+                {
+                    cooldowns = new Dictionary<Auditions.type, DateTime>();
+                    cooldownsByRoom[state.RoomId] = cooldowns;
+                }
+                cooldowns[state.Type] = staticVars.dateTime;
+            }
+
             // Prevent the base global fields from leaking one manager's cooldown to another.
             Auditions.Regional_Date = state.RegionalDate;
             Auditions.Nationwide_Date = state.NationwideDate;
+            ForgetOwner(state.Audition);
+        }
+
+        internal static List<CooldownEntry> ExportCooldownEntries()
+        {
+            List<CooldownEntry> entries = new List<CooldownEntry>();
+            foreach (KeyValuePair<int, Dictionary<Auditions.type, DateTime>> roomEntry in cooldownsByRoom)
+            {
+                foreach (KeyValuePair<Auditions.type, DateTime> cooldownEntry in roomEntry.Value)
+                {
+                    if (cooldownEntry.Value <= staticVars.dateTime)
+                    {
+                        continue;
+                    }
+                    entries.Add(new CooldownEntry
+                    {
+                        RoomId = roomEntry.Key,
+                        Type = cooldownEntry.Key,
+                        LastAudition = cooldownEntry.Value
+                    });
+                }
+            }
+            return entries;
+        }
+
+        internal static void ForgetOwner(Auditions.data audition)
+        {
+            if (audition != null && ownerRoomByAudition.Remove(audition))
+            {
+                AssistantManagerStatePersistence.MarkDirty();
+            }
+        }
+
+        internal static List<OwnerEntry> ExportOwnerEntries()
+        {
+            List<OwnerEntry> entries = new List<OwnerEntry>();
+            foreach (KeyValuePair<Auditions.data, int> entry in ownerRoomByAudition)
+            {
+                if (entry.Key == null)
+                {
+                    continue;
+                }
+                entries.Add(new OwnerEntry
+                {
+                    RoomId = entry.Value,
+                    Type = entry.Key.Type,
+                    Progress = entry.Key.Progress
+                });
+            }
+            return entries;
+        }
+
+        internal static void ImportCooldownEntries(List<CooldownEntry> entries)
+        {
+            cooldownsByRoom.Clear();
+            if (entries == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                CooldownEntry entry = entries[i];
+                if (GetCooldownLengthDays(entry.Type) <= 0 ||
+                    entry.LastAudition.AddDays(GetCooldownLengthDays(entry.Type)) <= staticVars.dateTime)
+                {
+                    continue;
+                }
+
+                Dictionary<Auditions.type, DateTime> roomCooldowns;
+                if (!cooldownsByRoom.TryGetValue(entry.RoomId, out roomCooldowns))
+                {
+                    roomCooldowns = new Dictionary<Auditions.type, DateTime>();
+                    cooldownsByRoom[entry.RoomId] = roomCooldowns;
+                }
+                roomCooldowns[entry.Type] = entry.LastAudition;
+            }
+        }
+
+        internal static void RestoreOwners(agency agencyInstance, List<OwnerEntry> entries)
+        {
+            ownerRoomByAudition.Clear();
+            if (agencyInstance == null)
+            {
+                return;
+            }
+
+            List<agency._room> rooms = agencyInstance.allRooms(true, true);
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                agency._room room = rooms[i];
+                if (!AssistantManagerRules.IsManagerOffice(room) || room.auditionData == null)
+                {
+                    continue;
+                }
+
+                bool hasPersistedOwner = false;
+                if (entries != null)
+                {
+                    for (int j = 0; j < entries.Count; j++)
+                    {
+                        if (entries[j].RoomId == room.id && entries[j].Type == room.auditionData.Type)
+                        {
+                            hasPersistedOwner = true;
+                            room.auditionData.Progress = entries[j].Progress;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasPersistedOwner ||
+                    room.status == agency._room._status.audition ||
+                    room.status == agency._room._status.waiting)
+                {
+                    ownerRoomByAudition[room.auditionData] = room.id;
+                }
+            }
+        }
+
+        private static int GetCooldownLengthDays(Auditions.type type)
+        {
+            if (type == Auditions.type.regional)
+            {
+                return 30;
+            }
+            if (type == Auditions.type.nationwide)
+            {
+                return 90;
+            }
+            return 0;
+        }
+
+        private static bool CanGenerateAudition()
+        {
+            try
+            {
+                return tasks.Story_Data == null || !tasks.Story_Data.Scandal_Auditions_No_More;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static agency._room GetCurrentManagerOffice()
@@ -391,6 +622,440 @@ namespace AssitantManagerMod
             catch
             {
                 return true;
+            }
+        }
+    }
+
+    internal sealed class AssistantManagerDataCoreSession
+    {
+        internal AssistantManagerDataCoreSession(object rawSession)
+        {
+            RawSession = rawSession;
+        }
+
+        internal object RawSession { get; private set; }
+    }
+
+    /// <summary>
+    /// Optional late-bound bridge.  Assistant Manager must remain loadable when IM Data Core is
+    /// not installed, so it cannot take a CLR assembly reference to the core mod.
+    /// </summary>
+    internal static class AssistantManagerDataCoreApi
+    {
+        private const string AssemblyName = "com.cosmo.imdatacore";
+        private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
+        private const string SessionTypeName = "IMDataCore.IMDataCoreSession";
+
+        private static readonly object Sync = new object();
+        private static Type apiType;
+        private static Type sessionType;
+        private static MethodInfo isReadyMethod;
+        private static MethodInfo registerNamespaceMethod;
+        private static MethodInfo getCustomJsonMethod;
+        private static MethodInfo setCustomJsonMethod;
+        private static AssistantManagerDataCoreSession session;
+        private static DateTime nextResolveAttemptUtc = DateTime.MinValue;
+
+        internal static bool TryGetSession(out AssistantManagerDataCoreSession result)
+        {
+            result = null;
+            lock (Sync)
+            {
+                if (session != null && session.RawSession != null)
+                {
+                    result = session;
+                    return true;
+                }
+
+                if (!TryEnsureReady())
+                {
+                    return false;
+                }
+
+                object[] args = new object[] { "com.cosmo.assistantmanager", null, string.Empty };
+                object invocationResult;
+                if (!TryInvoke(registerNamespaceMethod, args, out invocationResult) ||
+                    !(invocationResult is bool) || !(bool)invocationResult || args[1] == null)
+                {
+                    return false;
+                }
+
+                session = new AssistantManagerDataCoreSession(args[1]);
+                result = session;
+                return true;
+            }
+        }
+
+        internal static bool TryGetCustomJson(AssistantManagerDataCoreSession activeSession, string key, out string json)
+        {
+            json = string.Empty;
+            if (activeSession == null || activeSession.RawSession == null || !TryEnsureReady())
+            {
+                return false;
+            }
+
+            object[] args = new object[] { activeSession.RawSession, key, null, string.Empty };
+            object invocationResult;
+            if (!TryInvoke(getCustomJsonMethod, args, out invocationResult) ||
+                !(invocationResult is bool) || !(bool)invocationResult)
+            {
+                return false;
+            }
+
+            json = args[2] as string ?? string.Empty;
+            return true;
+        }
+
+        internal static bool TrySetCustomJson(AssistantManagerDataCoreSession activeSession, string key, string json)
+        {
+            if (activeSession == null || activeSession.RawSession == null || !TryEnsureReady())
+            {
+                return false;
+            }
+
+            object[] args = new object[] { activeSession.RawSession, key, json ?? "{}", string.Empty };
+            object invocationResult;
+            return TryInvoke(setCustomJsonMethod, args, out invocationResult) &&
+                   invocationResult is bool &&
+                   (bool)invocationResult;
+        }
+
+        private static bool TryEnsureReady()
+        {
+            lock (Sync)
+            {
+                if (apiType == null || isReadyMethod == null || registerNamespaceMethod == null ||
+                    getCustomJsonMethod == null || setCustomJsonMethod == null)
+                {
+                    if (DateTime.UtcNow < nextResolveAttemptUtc || !TryResolve())
+                    {
+                        return false;
+                    }
+                }
+
+                object result;
+                return TryInvoke(isReadyMethod, null, out result) && result is bool && (bool)result;
+            }
+        }
+
+        private static bool TryResolve()
+        {
+            Assembly coreAssembly = null;
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < loadedAssemblies.Length; i++)
+            {
+                Assembly assembly = loadedAssemblies[i];
+                if (assembly != null && assembly.GetName() != null &&
+                    string.Equals(assembly.GetName().Name, AssemblyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    coreAssembly = assembly;
+                    break;
+                }
+            }
+
+            if (coreAssembly == null)
+            {
+                try
+                {
+                    coreAssembly = Assembly.Load(AssemblyName);
+                }
+                catch
+                {
+                    nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                    return false;
+                }
+            }
+
+            Type resolvedApiType = coreAssembly.GetType(ApiTypeName, false);
+            Type resolvedSessionType = coreAssembly.GetType(SessionTypeName, false);
+            if (resolvedApiType == null || resolvedSessionType == null)
+            {
+                nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                return false;
+            }
+
+            MethodInfo resolvedIsReady = FindStaticMethod(resolvedApiType, "IsReady", 0);
+            MethodInfo resolvedRegister = FindStaticMethod(resolvedApiType, "TryRegisterNamespace", 3);
+            MethodInfo resolvedGet = FindStaticMethod(resolvedApiType, "TryGetCustomJson", 4);
+            MethodInfo resolvedSet = FindStaticMethod(resolvedApiType, "TrySetCustomJson", 4);
+            if (resolvedIsReady == null || resolvedRegister == null || resolvedGet == null || resolvedSet == null)
+            {
+                nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                return false;
+            }
+
+            apiType = resolvedApiType;
+            sessionType = resolvedSessionType;
+            isReadyMethod = resolvedIsReady;
+            registerNamespaceMethod = resolvedRegister;
+            getCustomJsonMethod = resolvedGet;
+            setCustomJsonMethod = resolvedSet;
+            nextResolveAttemptUtc = DateTime.MinValue;
+            return true;
+        }
+
+        private static MethodInfo FindStaticMethod(Type type, string name, int parameterCount)
+        {
+            MethodInfo[] methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static);
+            for (int i = 0; i < methods.Length; i++)
+            {
+                if (methods[i].Name == name && methods[i].GetParameters().Length == parameterCount)
+                {
+                    return methods[i];
+                }
+            }
+            return null;
+        }
+
+        private static bool TryInvoke(MethodInfo method, object[] arguments, out object result)
+        {
+            result = null;
+            try
+            {
+                result = method.Invoke(null, arguments);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal static class AssistantManagerStatePersistence
+    {
+        private const string StateKey = "assistant_manager_office_state_v1";
+        private const string DateCooldownsKey = "date_cooldowns";
+        private const string AuditionCooldownsKey = "audition_cooldowns";
+        private const string AuditionOwnersKey = "audition_owners";
+
+        private static bool restoreRequested;
+        private static bool dirty;
+        private static bool applyingRestore;
+
+        internal static void RequestRestore()
+        {
+            restoreRequested = true;
+            dirty = false;
+        }
+
+        internal static void MarkDirty()
+        {
+            if (applyingRestore)
+            {
+                return;
+            }
+
+            dirty = true;
+        }
+
+        internal static void Synchronize(agency agencyInstance)
+        {
+            if (restoreRequested)
+            {
+                TryRestore(agencyInstance);
+            }
+
+            if (dirty)
+            {
+                TryPersist();
+            }
+        }
+
+        private static void TryRestore(agency agencyInstance)
+        {
+            AssistantManagerDataCoreSession session;
+            if (!AssistantManagerDataCoreApi.TryGetSession(out session))
+            {
+                return;
+            }
+
+            string json;
+            bool foundState = AssistantManagerDataCoreApi.TryGetCustomJson(session, StateKey, out json);
+            applyingRestore = true;
+            try
+            {
+                if (foundState && !string.IsNullOrEmpty(json))
+                {
+                    JSONNode root = JSON.Parse(json);
+                    AssistantManagerDateTracking.ImportEntries(ReadDateCooldowns(root));
+                    AssistantManagerAuditionTracking.ImportCooldownEntries(ReadAuditionCooldowns(root));
+                    AssistantManagerAuditionTracking.RestoreOwners(agencyInstance, ReadAuditionOwners(root));
+                }
+                else
+                {
+                    AssistantManagerDateTracking.ImportEntries(null);
+                    AssistantManagerAuditionTracking.ImportCooldownEntries(null);
+                    AssistantManagerAuditionTracking.RestoreOwners(agencyInstance, null);
+                }
+            }
+            catch
+            {
+                // Keep the in-memory state empty when a future schema or corrupt record cannot be read.
+            }
+            finally
+            {
+                applyingRestore = false;
+            }
+
+            restoreRequested = false;
+            dirty = false;
+        }
+
+        private static void TryPersist()
+        {
+            AssistantManagerDataCoreSession session;
+            if (!AssistantManagerDataCoreApi.TryGetSession(out session))
+            {
+                return;
+            }
+
+            JSONClass root = new JSONClass();
+            root["version"].AsInt = 1;
+            root[DateCooldownsKey] = WriteDateCooldowns();
+            root[AuditionCooldownsKey] = WriteAuditionCooldowns();
+            root[AuditionOwnersKey] = WriteAuditionOwners();
+            if (AssistantManagerDataCoreApi.TrySetCustomJson(session, StateKey, root.ToString()))
+            {
+                dirty = false;
+            }
+        }
+
+        private static JSONArray WriteDateCooldowns()
+        {
+            JSONArray array = new JSONArray();
+            List<AssistantManagerDateTracking.CooldownEntry> entries = AssistantManagerDateTracking.ExportEntries();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                JSONClass entry = new JSONClass();
+                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["girl_id"].AsInt = entries[i].GirlId;
+                entry["until"] = ExtensionMethods.ToDataString(entries[i].Until);
+                array.Add(entry);
+            }
+            return array;
+        }
+
+        private static JSONArray WriteAuditionCooldowns()
+        {
+            JSONArray array = new JSONArray();
+            List<AssistantManagerAuditionTracking.CooldownEntry> entries = AssistantManagerAuditionTracking.ExportCooldownEntries();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                JSONClass entry = new JSONClass();
+                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["type"].AsInt = (int)entries[i].Type;
+                entry["last_audition"] = ExtensionMethods.ToDataString(entries[i].LastAudition);
+                array.Add(entry);
+            }
+            return array;
+        }
+
+        private static JSONArray WriteAuditionOwners()
+        {
+            JSONArray array = new JSONArray();
+            List<AssistantManagerAuditionTracking.OwnerEntry> entries = AssistantManagerAuditionTracking.ExportOwnerEntries();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                JSONClass entry = new JSONClass();
+                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["type"].AsInt = (int)entries[i].Type;
+                entry["progress"].AsFloat = entries[i].Progress;
+                array.Add(entry);
+            }
+            return array;
+        }
+
+        private static List<AssistantManagerDateTracking.CooldownEntry> ReadDateCooldowns(JSONNode root)
+        {
+            List<AssistantManagerDateTracking.CooldownEntry> entries = new List<AssistantManagerDateTracking.CooldownEntry>();
+            if (root == null || root[DateCooldownsKey] == null)
+            {
+                return entries;
+            }
+
+            foreach (JSONNode node in root[DateCooldownsKey].AsArray)
+            {
+                DateTime until;
+                if (node == null || !TryParseDate(node["until"], out until))
+                {
+                    continue;
+                }
+                entries.Add(new AssistantManagerDateTracking.CooldownEntry
+                {
+                    RoomId = node["room_id"].AsInt,
+                    GirlId = node["girl_id"].AsInt,
+                    Until = until
+                });
+            }
+            return entries;
+        }
+
+        private static List<AssistantManagerAuditionTracking.CooldownEntry> ReadAuditionCooldowns(JSONNode root)
+        {
+            List<AssistantManagerAuditionTracking.CooldownEntry> entries = new List<AssistantManagerAuditionTracking.CooldownEntry>();
+            if (root == null || root[AuditionCooldownsKey] == null)
+            {
+                return entries;
+            }
+
+            foreach (JSONNode node in root[AuditionCooldownsKey].AsArray)
+            {
+                DateTime lastAudition;
+                if (node == null || !TryParseDate(node["last_audition"], out lastAudition))
+                {
+                    continue;
+                }
+                entries.Add(new AssistantManagerAuditionTracking.CooldownEntry
+                {
+                    RoomId = node["room_id"].AsInt,
+                    Type = (Auditions.type)node["type"].AsInt,
+                    LastAudition = lastAudition
+                });
+            }
+            return entries;
+        }
+
+        private static List<AssistantManagerAuditionTracking.OwnerEntry> ReadAuditionOwners(JSONNode root)
+        {
+            List<AssistantManagerAuditionTracking.OwnerEntry> entries = new List<AssistantManagerAuditionTracking.OwnerEntry>();
+            if (root == null || root[AuditionOwnersKey] == null)
+            {
+                return entries;
+            }
+
+            foreach (JSONNode node in root[AuditionOwnersKey].AsArray)
+            {
+                if (node == null)
+                {
+                    continue;
+                }
+                entries.Add(new AssistantManagerAuditionTracking.OwnerEntry
+                {
+                    RoomId = node["room_id"].AsInt,
+                    Type = (Auditions.type)node["type"].AsInt,
+                    Progress = node["progress"].AsFloat
+                });
+            }
+            return entries;
+        }
+
+        private static bool TryParseDate(JSONNode node, out DateTime value)
+        {
+            value = DateTime.MinValue;
+            try
+            {
+                string serialized = node == null ? string.Empty : node.Value;
+                if (string.IsNullOrEmpty(serialized))
+                {
+                    return false;
+                }
+                value = ExtensionMethods.ToDateTime(serialized);
+                return value != DateTime.MinValue;
+            }
+            catch
+            {
+                return false;
             }
         }
     }
@@ -1328,7 +1993,7 @@ namespace AssitantManagerMod
             {
                 newHeader.transform.SetSiblingIndex(targetSiblingIndex);
                 targetSiblingIndex = newHeader.transform.GetSiblingIndex() + 1;
-                ApplyAssistantManagerHeaderPresentation(newHeader);
+                ApplyAssistantManagerStaffHeaderPresentation(newHeader);
             }
 
             Transform existingRow = popup.Container.transform.Find("AssistantManagerRow");
@@ -1373,6 +2038,16 @@ namespace AssitantManagerMod
 
         internal static void ApplyAssistantManagerHeaderPresentation(GameObject obj)
         {
+            ApplyAssistantManagerHeaderPresentation(obj, AssistantManagerText.AssistantManagerOfficeTitle);
+        }
+
+        internal static void ApplyAssistantManagerStaffHeaderPresentation(GameObject obj)
+        {
+            ApplyAssistantManagerHeaderPresentation(obj, AssistantManagerText.AssistantManagerTitle);
+        }
+
+        private static void ApplyAssistantManagerHeaderPresentation(GameObject obj, string title)
+        {
             if (obj == null) return;
 
             MonoBehaviour[] scripts = obj.GetComponentsInChildren<MonoBehaviour>(true);
@@ -1392,7 +2067,7 @@ namespace AssitantManagerMod
             {
                 if (tmpTexts[i] != null && tmpTexts[i].GetComponentInParent<Staff_Hire_Button>() == null)
                 {
-                    tmpTexts[i].text = AssistantManagerText.AssistantManagerOfficeTitle;
+                    tmpTexts[i].text = title;
                 }
             }
 
@@ -1401,7 +2076,7 @@ namespace AssitantManagerMod
             {
                 if (unityTexts[i] != null && unityTexts[i].GetComponentInParent<Staff_Hire_Button>() == null)
                 {
-                    unityTexts[i].text = AssistantManagerText.AssistantManagerOfficeTitle;
+                    unityTexts[i].text = title;
                 }
             }
         }
@@ -1474,9 +2149,10 @@ namespace AssitantManagerMod
             if (hireButton.Footer != null)
             {
                 CanvasGroup footerCanvasGroup = hireButton.Footer.GetComponent<CanvasGroup>();
-                if (footerCanvasGroup != null && !canHire)
+                if (footerCanvasGroup != null)
                 {
-                    footerCanvasGroup.alpha = 0f;
+                    bool canShowFooter = canHire && (hireButton.Staffer == null || hireButton.Staffer.CanHire());
+                    footerCanvasGroup.alpha = canShowFooter ? 1f : 0f;
                 }
             }
         }
@@ -1933,6 +2609,42 @@ namespace AssitantManagerMod
         }
     }
 
+    [HarmonyPatch(typeof(agency), nameof(agency.LoadFunction), new Type[0])]
+    internal static class AgencyLoadFunctionStateRestorePatch
+    {
+        private static void Postfix()
+        {
+            AssistantManagerStatePersistence.RequestRestore();
+        }
+    }
+
+    [HarmonyPatch(typeof(agency), nameof(agency.renderFloors), new Type[0])]
+    internal static class AgencyRenderFloorsStateRestorePatch
+    {
+        private static void Postfix(agency __instance)
+        {
+            AssistantManagerStatePersistence.Synchronize(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(agency), "Update", new Type[0])]
+    internal static class AgencyUpdateStatePersistencePatch
+    {
+        private static void Postfix(agency __instance)
+        {
+            AssistantManagerStatePersistence.Synchronize(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.CallSaveEvent), new Type[0])]
+    internal static class SaveManagerCallSaveEventStatePersistencePatch
+    {
+        private static void Prefix()
+        {
+            AssistantManagerStatePersistence.Synchronize(AssistantManagerRules.GetAgency());
+        }
+    }
+
     [HarmonyPatch(typeof(ContextMenuController), "Start", new Type[0])]
     internal static class ContextMenuControllerStartPatch
     {
@@ -2106,13 +2818,13 @@ namespace AssitantManagerMod
             Transform amHeader = __instance.Container.transform.Find("AssistantManagerHeader");
             if (amHeader != null)
             {
-                AssistantManagerRules.ApplyAssistantManagerHeaderPresentation(amHeader.gameObject);
+                AssistantManagerRules.ApplyAssistantManagerStaffHeaderPresentation(amHeader.gameObject);
             }
             
             Transform amRow = __instance.Container.transform.Find("AssistantManagerRow");
             if (amRow != null)
             {
-                AssistantManagerRules.ApplyAssistantManagerHeaderPresentation(amRow.gameObject);
+                AssistantManagerRules.ApplyAssistantManagerStaffHeaderPresentation(amRow.gameObject);
             }
         }
     }
@@ -2547,8 +3259,12 @@ namespace AssitantManagerMod
                 data_girls.girls girl = __instance.girl;
                 PopupManager component = Camera.main.GetComponent<mainScript>().Data.GetComponent<PopupManager>();
                 Date_Popup component2 = component.GetByType(PopupManager._type.girl_date).obj.GetComponent<Date_Popup>();
+                DateTime producerLastDate = girl.LastDate;
                 component.Open(PopupManager._type.girl_date, true);
                 component2.Set(girl);
+                // Date_Popup.Set writes LastDate, which is the Producer's vanilla cooldown key.
+                // Assistant Manager dates use the room-scoped tracker instead, so restore it.
+                girl.LastDate = producerLastDate;
 
                 if (__instance.staffer.LevelledUp)
                 {
@@ -2561,6 +3277,7 @@ namespace AssitantManagerMod
                 }
                 
                 AssistantManagerDateTracking.AddDate(__instance, girl);
+                girl.AddDate();
 
                 __instance.girl = null;
                 __instance.status = agency._room._status.normal;
@@ -2614,6 +3331,20 @@ namespace AssitantManagerMod
             {
                 __state.room = null;
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.CancelJob), new Type[0])]
+    internal static class RoomCancelJobAuditionOwnerPatch
+    {
+        private static void Prefix(agency._room __instance, out Auditions.data __state)
+        {
+            __state = AssistantManagerRules.IsManagerOffice(__instance) ? __instance.auditionData : null;
+        }
+
+        private static void Postfix(Auditions.data __state)
+        {
+            AssistantManagerAuditionTracking.ForgetOwner(__state);
         }
     }
 
@@ -3406,9 +4137,9 @@ namespace AssitantManagerMod
                 return false;
             }
 
-            loans.Loans.Add(__0);
             if (__0.GetDaysToDevelop() == 0)
             {
+                loans.Loans.Add(__0);
                 __0.Initialize();
                 return false;
             }
@@ -3416,13 +4147,13 @@ namespace AssitantManagerMod
             agency._room targetRoom = AssistantManagerRules.FindFirstManagerOffice(true, true);
             if (targetRoom == null)
             {
-                targetRoom = AssistantManagerRules.FindFirstManagerOffice(true, false);
+                // Developing a loan must not cancel an unrelated office task.  The loan popup
+                // already requires an idle office, and direct callers now fail safely as well.
+                return false;
             }
 
-            if (targetRoom != null)
-            {
-                targetRoom.assign(__0);
-            }
+            loans.Loans.Add(__0);
+            targetRoom.assign(__0);
 
             NotificationManager.AddNotification(
                 ExtensionMethods.color(Language.Data["LOANS"].ToUpper(), mainScript.green) + "\n" + Language.Data["LOANS__IN_DEV"],
