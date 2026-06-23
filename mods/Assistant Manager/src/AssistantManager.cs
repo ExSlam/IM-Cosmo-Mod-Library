@@ -131,23 +131,32 @@ namespace AssitantManagerMod
     internal static class AssistantManagerDateTracking
     {
         private const double DateCooldownDays = 7.0;
-        private static Dictionary<int, Dictionary<int, DateTime>> roomGirlCooldowns = new Dictionary<int, Dictionary<int, DateTime>>();
+        // Room IDs are generated at runtime and are not included in the game's RoomData save
+        // model.  A manager's staff ID is saved, so it is the only stable identity for a
+        // per-manager cooldown.
+        private static Dictionary<int, Dictionary<int, DateTime>> managerGirlCooldowns = new Dictionary<int, Dictionary<int, DateTime>>();
 
         internal struct CooldownEntry
         {
-            internal int RoomId;
+            internal int ManagerId;
             internal int GirlId;
             internal DateTime Until;
         }
 
         internal static void Reset()
         {
-            roomGirlCooldowns.Clear();
+            managerGirlCooldowns.Clear();
         }
 
-        internal static int GetCooldownDays(int roomId, int girlId)
+        internal static int GetCooldownDays(agency._room room, int girlId)
         {
-            if (roomGirlCooldowns.TryGetValue(roomId, out var girlCooldowns))
+            int managerId;
+            if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+            {
+                return 0;
+            }
+
+            if (managerGirlCooldowns.TryGetValue(managerId, out var girlCooldowns))
             {
                 if (girlCooldowns.TryGetValue(girlId, out DateTime cooldownDate))
                 {
@@ -156,7 +165,7 @@ namespace AssitantManagerMod
                         girlCooldowns.Remove(girlId);
                         if (girlCooldowns.Count == 0)
                         {
-                            roomGirlCooldowns.Remove(roomId);
+                            managerGirlCooldowns.Remove(managerId);
                         }
                         return 0;
                     }
@@ -185,28 +194,33 @@ namespace AssitantManagerMod
                 }
             }
 
-            int roomId = room.id;
-            int girlId = girl.id;
-            if (!roomGirlCooldowns.ContainsKey(roomId))
+            int managerId;
+            if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
             {
-                roomGirlCooldowns[roomId] = new Dictionary<int, DateTime>();
+                return;
             }
-            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(cooldownDays);
+
+            int girlId = girl.id;
+            if (!managerGirlCooldowns.ContainsKey(managerId))
+            {
+                managerGirlCooldowns[managerId] = new Dictionary<int, DateTime>();
+            }
+            managerGirlCooldowns[managerId][girlId] = staticVars.dateTime.AddDays(cooldownDays);
             AssistantManagerStatePersistence.MarkDirty();
         }
 
         internal static List<CooldownEntry> ExportEntries()
         {
             List<CooldownEntry> entries = new List<CooldownEntry>();
-            foreach (KeyValuePair<int, Dictionary<int, DateTime>> roomEntry in roomGirlCooldowns)
+            foreach (KeyValuePair<int, Dictionary<int, DateTime>> managerEntry in managerGirlCooldowns)
             {
-                foreach (KeyValuePair<int, DateTime> girlEntry in roomEntry.Value)
+                foreach (KeyValuePair<int, DateTime> girlEntry in managerEntry.Value)
                 {
                     if (girlEntry.Value > staticVars.dateTime)
                     {
                         entries.Add(new CooldownEntry
                         {
-                            RoomId = roomEntry.Key,
+                            ManagerId = managerEntry.Key,
                             GirlId = girlEntry.Key,
                             Until = girlEntry.Value
                         });
@@ -218,7 +232,7 @@ namespace AssitantManagerMod
 
         internal static void ImportEntries(List<CooldownEntry> entries)
         {
-            roomGirlCooldowns.Clear();
+            managerGirlCooldowns.Clear();
             if (entries == null)
             {
                 return;
@@ -233,10 +247,10 @@ namespace AssitantManagerMod
                 }
 
                 Dictionary<int, DateTime> girlCooldowns;
-                if (!roomGirlCooldowns.TryGetValue(entry.RoomId, out girlCooldowns))
+                if (!managerGirlCooldowns.TryGetValue(entry.ManagerId, out girlCooldowns))
                 {
                     girlCooldowns = new Dictionary<int, DateTime>();
-                    roomGirlCooldowns[entry.RoomId] = girlCooldowns;
+                    managerGirlCooldowns[entry.ManagerId] = girlCooldowns;
                 }
                 girlCooldowns[entry.GirlId] = entry.Until;
             }
@@ -252,26 +266,26 @@ namespace AssitantManagerMod
     /// The base game stores regional and nationwide audition cooldowns in two global fields and
     /// hands every office the same mutable Auditions.data instance.  That is safe for one
     /// producer office, but not for multiple Assistant Manager offices.  Keep the cooldown and
-    /// active audition data scoped to the room that owns the work.
+    /// active audition data scoped to the manager who owns the work.
     /// </summary>
     internal static class AssistantManagerAuditionTracking
     {
-        private static readonly Dictionary<int, Dictionary<Auditions.type, DateTime>> cooldownsByRoom =
+        private static readonly Dictionary<int, Dictionary<Auditions.type, DateTime>> cooldownsByManager =
             new Dictionary<int, Dictionary<Auditions.type, DateTime>>();
 
-        private static readonly Dictionary<Auditions.data, int> ownerRoomByAudition =
+        private static readonly Dictionary<Auditions.data, int> ownerManagerByAudition =
             new Dictionary<Auditions.data, int>();
 
         internal struct CooldownEntry
         {
-            internal int RoomId;
+            internal int ManagerId;
             internal Auditions.type Type;
             internal DateTime LastAudition;
         }
 
         internal struct OwnerEntry
         {
-            internal int RoomId;
+            internal int ManagerId;
             internal Auditions.type Type;
             internal float Progress;
         }
@@ -280,7 +294,7 @@ namespace AssitantManagerMod
         {
             internal bool IsTracked;
             internal bool ShouldRecordCooldown;
-            internal int RoomId;
+            internal int ManagerId;
             internal Auditions.type Type;
             internal Auditions.data Audition;
             internal DateTime RegionalDate;
@@ -289,13 +303,18 @@ namespace AssitantManagerMod
 
         internal static void Reset()
         {
-            cooldownsByRoom.Clear();
-            ownerRoomByAudition.Clear();
+            cooldownsByManager.Clear();
+            ownerManagerByAudition.Clear();
         }
 
         internal static bool CanProduce(agency._room room, Auditions.type type)
         {
             return type == Auditions.type.local || GetDaysTillCanProduce(room, type) <= 0;
+        }
+
+        internal static bool CanStartAudition(agency._room room, Auditions.type type)
+        {
+            return !HasBlockingAudition(room) && CanProduce(room, type);
         }
 
         internal static int GetDaysTillCanProduce(agency._room room, Auditions.type type)
@@ -305,9 +324,15 @@ namespace AssitantManagerMod
                 return 0;
             }
 
+            int managerId;
+            if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+            {
+                return 0;
+            }
+
             Dictionary<Auditions.type, DateTime> cooldowns;
             DateTime lastAudition;
-            if (!cooldownsByRoom.TryGetValue(room.id, out cooldowns) ||
+            if (!cooldownsByManager.TryGetValue(managerId, out cooldowns) ||
                 !cooldowns.TryGetValue(type, out lastAudition))
             {
                 return 0;
@@ -372,7 +397,11 @@ namespace AssitantManagerMod
                 Research.GetCategory(Research.type.player).AddPoints(-(float)(cost * 10));
             }
 
-            cooldownsByRoom.Remove(room.id);
+            int managerId;
+            if (AssistantManagerRules.TryGetManagerId(room, out managerId))
+            {
+                cooldownsByManager.Remove(managerId);
+            }
             AssistantManagerStatePersistence.MarkDirty();
         }
 
@@ -390,14 +419,49 @@ namespace AssitantManagerMod
                 Progress = 0f,
                 Girls = new List<Auditions.data._girl>()
             };
-            ownerRoomByAudition[audition] = room.id;
+            int managerId;
+            if (AssistantManagerRules.TryGetManagerId(room, out managerId))
+            {
+                ownerManagerByAudition[audition] = managerId;
+            }
             AssistantManagerStatePersistence.MarkDirty();
             return audition;
         }
 
         internal static bool IsRoomAudition(Auditions.data audition)
         {
-            return audition != null && ownerRoomByAudition.ContainsKey(audition);
+            return audition != null && ownerManagerByAudition.ContainsKey(audition);
+        }
+
+        internal static bool HasBlockingAudition(agency._room requestingRoom)
+        {
+            agency agencyInstance = AssistantManagerRules.GetAgency();
+            if (agencyInstance == null)
+            {
+                return false;
+            }
+
+            List<agency._room> rooms = agencyInstance.allRooms(true, true);
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                agency._room room = rooms[i];
+                if (room == null || room == requestingRoom ||
+                    !AssistantManagerRules.IsManagerOffice(room) ||
+                    room.auditionData == null)
+                {
+                    continue;
+                }
+
+                // "waiting" means the work is complete but its audition result has not yet
+                // been generated.  Keep the lock until that UI flow is resolved as well.
+                if (room.status == agency._room._status.audition ||
+                    room.status == agency._room._status.waiting)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal static void BeginGenerate(Auditions.data audition, out GenerateState state)
@@ -406,7 +470,7 @@ namespace AssitantManagerMod
             {
                 IsTracked = false,
                 ShouldRecordCooldown = false,
-                RoomId = -1,
+                ManagerId = -1,
                 Type = Auditions.type.local,
                 Audition = audition,
                 RegionalDate = Auditions.Regional_Date,
@@ -418,14 +482,14 @@ namespace AssitantManagerMod
                 return;
             }
 
-            int roomId;
-            if (!ownerRoomByAudition.TryGetValue(audition, out roomId))
+            int managerId;
+            if (!ownerManagerByAudition.TryGetValue(audition, out managerId))
             {
                 return;
             }
 
             state.IsTracked = true;
-            state.RoomId = roomId;
+            state.ManagerId = managerId;
             state.Type = audition.Type;
             state.ShouldRecordCooldown = CanGenerateAudition();
         }
@@ -441,10 +505,10 @@ namespace AssitantManagerMod
                 (state.Type == Auditions.type.regional || state.Type == Auditions.type.nationwide))
             {
                 Dictionary<Auditions.type, DateTime> cooldowns;
-                if (!cooldownsByRoom.TryGetValue(state.RoomId, out cooldowns))
+                if (!cooldownsByManager.TryGetValue(state.ManagerId, out cooldowns))
                 {
                     cooldowns = new Dictionary<Auditions.type, DateTime>();
-                    cooldownsByRoom[state.RoomId] = cooldowns;
+                    cooldownsByManager[state.ManagerId] = cooldowns;
                 }
                 cooldowns[state.Type] = staticVars.dateTime;
             }
@@ -458,9 +522,9 @@ namespace AssitantManagerMod
         internal static List<CooldownEntry> ExportCooldownEntries()
         {
             List<CooldownEntry> entries = new List<CooldownEntry>();
-            foreach (KeyValuePair<int, Dictionary<Auditions.type, DateTime>> roomEntry in cooldownsByRoom)
+            foreach (KeyValuePair<int, Dictionary<Auditions.type, DateTime>> managerEntry in cooldownsByManager)
             {
-                foreach (KeyValuePair<Auditions.type, DateTime> cooldownEntry in roomEntry.Value)
+                foreach (KeyValuePair<Auditions.type, DateTime> cooldownEntry in managerEntry.Value)
                 {
                     if (cooldownEntry.Value <= staticVars.dateTime)
                     {
@@ -468,7 +532,7 @@ namespace AssitantManagerMod
                     }
                     entries.Add(new CooldownEntry
                     {
-                        RoomId = roomEntry.Key,
+                        ManagerId = managerEntry.Key,
                         Type = cooldownEntry.Key,
                         LastAudition = cooldownEntry.Value
                     });
@@ -479,7 +543,7 @@ namespace AssitantManagerMod
 
         internal static void ForgetOwner(Auditions.data audition)
         {
-            if (audition != null && ownerRoomByAudition.Remove(audition))
+            if (audition != null && ownerManagerByAudition.Remove(audition))
             {
                 AssistantManagerStatePersistence.MarkDirty();
             }
@@ -488,7 +552,7 @@ namespace AssitantManagerMod
         internal static List<OwnerEntry> ExportOwnerEntries()
         {
             List<OwnerEntry> entries = new List<OwnerEntry>();
-            foreach (KeyValuePair<Auditions.data, int> entry in ownerRoomByAudition)
+            foreach (KeyValuePair<Auditions.data, int> entry in ownerManagerByAudition)
             {
                 if (entry.Key == null)
                 {
@@ -496,7 +560,7 @@ namespace AssitantManagerMod
                 }
                 entries.Add(new OwnerEntry
                 {
-                    RoomId = entry.Value,
+                    ManagerId = entry.Value,
                     Type = entry.Key.Type,
                     Progress = entry.Key.Progress
                 });
@@ -506,7 +570,7 @@ namespace AssitantManagerMod
 
         internal static void ImportCooldownEntries(List<CooldownEntry> entries)
         {
-            cooldownsByRoom.Clear();
+            cooldownsByManager.Clear();
             if (entries == null)
             {
                 return;
@@ -522,10 +586,10 @@ namespace AssitantManagerMod
                 }
 
                 Dictionary<Auditions.type, DateTime> roomCooldowns;
-                if (!cooldownsByRoom.TryGetValue(entry.RoomId, out roomCooldowns))
+                if (!cooldownsByManager.TryGetValue(entry.ManagerId, out roomCooldowns))
                 {
                     roomCooldowns = new Dictionary<Auditions.type, DateTime>();
-                    cooldownsByRoom[entry.RoomId] = roomCooldowns;
+                    cooldownsByManager[entry.ManagerId] = roomCooldowns;
                 }
                 roomCooldowns[entry.Type] = entry.LastAudition;
             }
@@ -533,7 +597,7 @@ namespace AssitantManagerMod
 
         internal static void RestoreOwners(agency agencyInstance, List<OwnerEntry> entries)
         {
-            ownerRoomByAudition.Clear();
+            ownerManagerByAudition.Clear();
             if (agencyInstance == null)
             {
                 return;
@@ -548,12 +612,18 @@ namespace AssitantManagerMod
                     continue;
                 }
 
+                int managerId;
+                if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+                {
+                    continue;
+                }
+
                 bool hasPersistedOwner = false;
                 if (entries != null)
                 {
                     for (int j = 0; j < entries.Count; j++)
                     {
-                        if (entries[j].RoomId == room.id && entries[j].Type == room.auditionData.Type)
+                        if (entries[j].ManagerId == managerId && entries[j].Type == room.auditionData.Type)
                         {
                             hasPersistedOwner = true;
                             room.auditionData.Progress = entries[j].Progress;
@@ -566,7 +636,7 @@ namespace AssitantManagerMod
                     room.status == agency._room._status.audition ||
                     room.status == agency._room._status.waiting)
                 {
-                    ownerRoomByAudition[room.auditionData] = room.id;
+                    ownerManagerByAudition[room.auditionData] = managerId;
                 }
             }
         }
@@ -824,7 +894,9 @@ namespace AssitantManagerMod
 
     internal static class AssistantManagerStatePersistence
     {
-        private const string StateKey = "assistant_manager_office_state_v1";
+        // v1 used room IDs, which the game does not persist.  Use a new key so invalid v1
+        // cooldowns cannot be restored as a shared cooldown after upgrading.
+        private const string StateKey = "assistant_manager_office_state_v2";
         private const string DateCooldownsKey = "date_cooldowns";
         private const string AuditionCooldownsKey = "audition_cooldowns";
         private const string AuditionOwnersKey = "audition_owners";
@@ -911,7 +983,7 @@ namespace AssitantManagerMod
             }
 
             JSONClass root = new JSONClass();
-            root["version"].AsInt = 1;
+            root["version"].AsInt = 2;
             root[DateCooldownsKey] = WriteDateCooldowns();
             root[AuditionCooldownsKey] = WriteAuditionCooldowns();
             root[AuditionOwnersKey] = WriteAuditionOwners();
@@ -928,7 +1000,7 @@ namespace AssitantManagerMod
             for (int i = 0; i < entries.Count; i++)
             {
                 JSONClass entry = new JSONClass();
-                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["manager_id"].AsInt = entries[i].ManagerId;
                 entry["girl_id"].AsInt = entries[i].GirlId;
                 entry["until"] = ExtensionMethods.ToDataString(entries[i].Until);
                 array.Add(entry);
@@ -943,7 +1015,7 @@ namespace AssitantManagerMod
             for (int i = 0; i < entries.Count; i++)
             {
                 JSONClass entry = new JSONClass();
-                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["manager_id"].AsInt = entries[i].ManagerId;
                 entry["type"].AsInt = (int)entries[i].Type;
                 entry["last_audition"] = ExtensionMethods.ToDataString(entries[i].LastAudition);
                 array.Add(entry);
@@ -958,7 +1030,7 @@ namespace AssitantManagerMod
             for (int i = 0; i < entries.Count; i++)
             {
                 JSONClass entry = new JSONClass();
-                entry["room_id"].AsInt = entries[i].RoomId;
+                entry["manager_id"].AsInt = entries[i].ManagerId;
                 entry["type"].AsInt = (int)entries[i].Type;
                 entry["progress"].AsFloat = entries[i].Progress;
                 array.Add(entry);
@@ -983,7 +1055,7 @@ namespace AssitantManagerMod
                 }
                 entries.Add(new AssistantManagerDateTracking.CooldownEntry
                 {
-                    RoomId = node["room_id"].AsInt,
+                    ManagerId = node["manager_id"].AsInt,
                     GirlId = node["girl_id"].AsInt,
                     Until = until
                 });
@@ -1008,7 +1080,7 @@ namespace AssitantManagerMod
                 }
                 entries.Add(new AssistantManagerAuditionTracking.CooldownEntry
                 {
-                    RoomId = node["room_id"].AsInt,
+                    ManagerId = node["manager_id"].AsInt,
                     Type = (Auditions.type)node["type"].AsInt,
                     LastAudition = lastAudition
                 });
@@ -1032,7 +1104,7 @@ namespace AssitantManagerMod
                 }
                 entries.Add(new AssistantManagerAuditionTracking.OwnerEntry
                 {
-                    RoomId = node["room_id"].AsInt,
+                    ManagerId = node["manager_id"].AsInt,
                     Type = (Auditions.type)node["type"].AsInt,
                     Progress = node["progress"].AsFloat
                 });
@@ -1223,6 +1295,18 @@ namespace AssitantManagerMod
         internal static bool IsAssistantManager(staff._staff staffMember)
         {
             return staffMember != null && IsAssistantManagerStaffType(staffMember.type);
+        }
+
+        internal static bool TryGetManagerId(agency._room room, out int managerId)
+        {
+            managerId = -1;
+            if (room == null || room.staffer == null)
+            {
+                return false;
+            }
+
+            managerId = room.staffer.id;
+            return true;
         }
 
         internal static bool IsAssistantManagerOfficeRoomType(agency._type roomType)
@@ -3176,7 +3260,7 @@ namespace AssitantManagerMod
                        _girl.status == data_girls._status.normal &&
                        (Dating.DEBUG ||
                         (AssistantManagerRules.IsAssistantManagerOffice(__instance)
-                            ? AssistantManagerDateTracking.GetCooldownDays(__instance.id, _girl.id) <= 0
+                            ? AssistantManagerDateTracking.GetCooldownDays(__instance, _girl.id) <= 0
                             : Dating.GetDaysCooldown(_girl) <= 0));
             return false;
         }
@@ -3263,7 +3347,7 @@ namespace AssitantManagerMod
                 component.Open(PopupManager._type.girl_date, true);
                 component2.Set(girl);
                 // Date_Popup.Set writes LastDate, which is the Producer's vanilla cooldown key.
-                // Assistant Manager dates use the room-scoped tracker instead, so restore it.
+                // Assistant Manager dates use the manager-scoped tracker instead, so restore it.
                 girl.LastDate = producerLastDate;
 
                 if (__instance.staffer.LevelledUp)
@@ -3358,7 +3442,7 @@ namespace AssitantManagerMod
                 return true;
             }
 
-            int daysCooldown = AssistantManagerDateTracking.GetCooldownDays(__instance.room.id, Girl.id);
+            int daysCooldown = AssistantManagerDateTracking.GetCooldownDays(__instance.room, Girl.id);
             string str;
             if (daysCooldown > 1)
             {
@@ -3396,7 +3480,7 @@ namespace AssitantManagerMod
                 agency._room room = rooms[i];
                 if (!AssistantManagerRules.IsAssistantManagerOffice(room) ||
                     room.status != agency._room._status.normal ||
-                    AssistantManagerDateTracking.GetCooldownDays(room.id, girl.id) <= 0 ||
+                    AssistantManagerDateTracking.GetCooldownDays(room, girl.id) <= 0 ||
                     room.roomObj == null)
                 {
                     continue;
@@ -3424,7 +3508,7 @@ namespace AssitantManagerMod
             if (__instance.staffer == null ||
                 __instance.status != agency._room._status.normal ||
                 _data == null ||
-                !AssistantManagerAuditionTracking.CanProduce(__instance, _data.Type))
+                !AssistantManagerAuditionTracking.CanStartAudition(__instance, _data.Type))
             {
                 return false;
             }
@@ -3482,7 +3566,7 @@ namespace AssitantManagerMod
                 return true;
             }
 
-            __result = AssistantManagerAuditionTracking.CanProduce(room, _type);
+            __result = AssistantManagerAuditionTracking.CanStartAudition(room, _type);
             return false;
         }
     }
