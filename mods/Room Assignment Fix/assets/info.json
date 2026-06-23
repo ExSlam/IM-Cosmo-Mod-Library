@@ -1,0 +1,8 @@
+{
+  "Title": "Room Assignment Fix",
+  "Description": "Prevents manual and automatic room assignment from assigning an idol to multiple tasks at once.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["gameplay", "fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.roomassignmentfix"
+}
