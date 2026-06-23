@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Show Cast Assignment Fix</ModName>
+    <RootNamespace>ShowCastAssignmentFix</RootNamespace>
+    <AssemblyName>com.cosmo.showcastassignmentfix</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\ShowCastAssignmentFix.cs" />
+  </ItemGroup>
+</Project>

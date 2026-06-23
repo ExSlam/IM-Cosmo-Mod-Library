@@ -1,0 +1,8 @@
+{
+  "Title": "Show Cast Assignment Fix",
+  "Description": "Prevents an idol from occupying multiple permanent-cast slots in radio, internet, and TV shows.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["gameplay", "fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.showcastassignmentfix"
+}
