@@ -41,6 +41,11 @@ namespace AssitantManagerMod
         internal const string AssistantManagerHireButtonObjectName = "AssistantManager_StaffHireButton";
         internal const string MalePlayerPortraitFolderName = "Player_Male";
         internal const string FemalePlayerPortraitFolderName = "Player_Female";
+        internal const string PortraitTexturesDirectoryName = "Textures";
+        internal const string MalePortraitFileName = "AssistantManager_Male.png";
+        internal const string FemalePortraitFileName = "AssistantManager_Female.png";
+        internal const string MaleProPortraitFileName = "AssistantManager_Male_Pro.png";
+        internal const string FemaleProPortraitFileName = "AssistantManager_Female_Pro.png";
 
         internal const string KeyAssistantManagerTitle = "staff.assistant_manager.title";
         internal const string KeyAssistantManagerTooltip = "staff.assistant_manager.tooltip";
@@ -155,13 +160,238 @@ namespace AssitantManagerMod
             return 0;
         }
 
-        internal static void AddDate(int roomId, int girlId)
+        internal static void AddDate(agency._room room, data_girls.girls girl)
         {
+            if (room == null || girl == null)
+            {
+                return;
+            }
+
+            int cooldownDays = DateCooldownDaysInt;
+            if (room.staffer != null)
+            {
+                staff._staff._skill influence = room.staffer.GetSkill(staff._skill_type.influence);
+                if (influence != null)
+                {
+                    cooldownDays = Mathf.Max(0, cooldownDays - influence.GetLevel() / 2);
+                }
+            }
+
+            int roomId = room.id;
+            int girlId = girl.id;
             if (!roomGirlCooldowns.ContainsKey(roomId))
             {
                 roomGirlCooldowns[roomId] = new Dictionary<int, DateTime>();
             }
-            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(DateCooldownDays);
+            roomGirlCooldowns[roomId][girlId] = staticVars.dateTime.AddDays(cooldownDays);
+        }
+
+        private static int DateCooldownDaysInt
+        {
+            get { return Mathf.RoundToInt((float)DateCooldownDays); }
+        }
+    }
+
+    /// <summary>
+    /// The base game stores regional and nationwide audition cooldowns in two global fields and
+    /// hands every office the same mutable Auditions.data instance.  That is safe for one
+    /// producer office, but not for multiple Assistant Manager offices.  Keep the cooldown and
+    /// active audition data scoped to the room that owns the work.
+    /// </summary>
+    internal static class AssistantManagerAuditionTracking
+    {
+        private static readonly Dictionary<int, Dictionary<Auditions.type, DateTime>> cooldownsByRoom =
+            new Dictionary<int, Dictionary<Auditions.type, DateTime>>();
+
+        private static readonly Dictionary<Auditions.data, int> ownerRoomByAudition =
+            new Dictionary<Auditions.data, int>();
+
+        internal struct GenerateState
+        {
+            internal bool IsTracked;
+            internal DateTime RegionalDate;
+            internal DateTime NationwideDate;
+        }
+
+        internal static void Reset()
+        {
+            cooldownsByRoom.Clear();
+            ownerRoomByAudition.Clear();
+        }
+
+        internal static bool CanProduce(agency._room room, Auditions.type type)
+        {
+            return type == Auditions.type.local || GetDaysTillCanProduce(room, type) <= 0;
+        }
+
+        internal static int GetDaysTillCanProduce(agency._room room, Auditions.type type)
+        {
+            if (room == null || type == Auditions.type.local)
+            {
+                return 0;
+            }
+
+            Dictionary<Auditions.type, DateTime> cooldowns;
+            DateTime lastAudition;
+            if (!cooldownsByRoom.TryGetValue(room.id, out cooldowns) ||
+                !cooldowns.TryGetValue(type, out lastAudition))
+            {
+                return 0;
+            }
+
+            int cooldownDays = type == Auditions.type.regional ? 30 : 90;
+            return Mathf.Max(0, cooldownDays - (staticVars.dateTime - lastAudition).Days);
+        }
+
+        internal static bool IsOnCooldown(agency._room room)
+        {
+            return !CanProduce(room, Auditions.type.regional) ||
+                   !CanProduce(room, Auditions.type.nationwide);
+        }
+
+        internal static int GetCooldownCost(agency._room room, CM_Player_Audition_Cooldown._type type)
+        {
+            int regionalDays = GetDaysTillCanProduce(room, Auditions.type.regional);
+            int nationwideDays = GetDaysTillCanProduce(room, Auditions.type.nationwide);
+            if (type == CM_Player_Audition_Cooldown._type.money)
+            {
+                return 15000 * regionalDays + 50000 * nationwideDays;
+            }
+
+            return 20 * regionalDays + 30 * nationwideDays;
+        }
+
+        internal static bool EnoughResourcesForCooldown(agency._room room, CM_Player_Audition_Cooldown._type type)
+        {
+            int cost = GetCooldownCost(room, type);
+            if (type == CM_Player_Audition_Cooldown._type.money)
+            {
+                return resources.Money() >= (long)cost;
+            }
+
+            return Research.GetCategory(Research.type.player).GetPoints() >= (long)cost;
+        }
+
+        internal static bool CanResetCooldown(agency._room room, CM_Player_Audition_Cooldown._type type)
+        {
+            return IsOnCooldown(room) && EnoughResourcesForCooldown(room, type);
+        }
+
+        internal static void ResetCooldown(agency._room room, CM_Player_Audition_Cooldown._type type)
+        {
+            if (!CanResetCooldown(room, type))
+            {
+                return;
+            }
+
+            int cost = GetCooldownCost(room, type);
+            if (type == CM_Player_Audition_Cooldown._type.money)
+            {
+                resources.Add(resources.type.money, -(long)cost);
+            }
+            else
+            {
+                Research.GetCategory(Research.type.player).AddPoints(-(float)(cost * 10));
+            }
+
+            cooldownsByRoom.Remove(room.id);
+        }
+
+        internal static Auditions.data CreateRoomAudition(agency._room room, Auditions.data template)
+        {
+            if (room == null || template == null)
+            {
+                return null;
+            }
+
+            Auditions.data audition = new Auditions.data
+            {
+                Type = template.Type,
+                Title = template.Title,
+                Progress = 0f,
+                Girls = new List<Auditions.data._girl>()
+            };
+            ownerRoomByAudition[audition] = room.id;
+            return audition;
+        }
+
+        internal static bool IsRoomAudition(Auditions.data audition)
+        {
+            return audition != null && ownerRoomByAudition.ContainsKey(audition);
+        }
+
+        internal static void BeginGenerate(Auditions.data audition, out GenerateState state)
+        {
+            state = new GenerateState
+            {
+                IsTracked = false,
+                RegionalDate = Auditions.Regional_Date,
+                NationwideDate = Auditions.Nationwide_Date
+            };
+
+            if (audition == null)
+            {
+                return;
+            }
+
+            int roomId;
+            if (!ownerRoomByAudition.TryGetValue(audition, out roomId))
+            {
+                return;
+            }
+
+            state.IsTracked = true;
+            if (audition.Type == Auditions.type.regional || audition.Type == Auditions.type.nationwide)
+            {
+                Dictionary<Auditions.type, DateTime> cooldowns;
+                if (!cooldownsByRoom.TryGetValue(roomId, out cooldowns))
+                {
+                    cooldowns = new Dictionary<Auditions.type, DateTime>();
+                    cooldownsByRoom[roomId] = cooldowns;
+                }
+                cooldowns[audition.Type] = staticVars.dateTime;
+            }
+        }
+
+        internal static void EndGenerate(GenerateState state)
+        {
+            if (!state.IsTracked)
+            {
+                return;
+            }
+
+            // Prevent the base global fields from leaking one manager's cooldown to another.
+            Auditions.Regional_Date = state.RegionalDate;
+            Auditions.Nationwide_Date = state.NationwideDate;
+        }
+
+        internal static agency._room GetCurrentManagerOffice()
+        {
+            try
+            {
+                ContextMenuController menu = Camera.main.GetComponent<mainScript>().Data.GetComponent<ContextMenuController>();
+                return menu != null && menu.open_mainMenu != null && AssistantManagerRules.IsManagerOffice(menu.room)
+                    ? menu.room
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static bool IsAuditionPopupBusy()
+        {
+            try
+            {
+                PopupManager popupManager = Camera.main.GetComponent<mainScript>().Data.GetComponent<PopupManager>();
+                PopupManager._popup auditionPopup = popupManager.GetByType(PopupManager._type.audition);
+                return (auditionPopup != null && auditionPopup.open) || popupManager.queue.Contains(PopupManager._type.audition);
+            }
+            catch
+            {
+                return true;
+            }
         }
     }
 
@@ -184,44 +414,139 @@ namespace AssitantManagerMod
 
         private static Sprite customMaleSprite = null;
         private static Sprite customFemaleSprite = null;
+        private static Sprite customMaleProSprite = null;
+        private static Sprite customFemaleProSprite = null;
         private static bool attemptedLoadMale = false;
         private static bool attemptedLoadFemale = false;
+        private static bool attemptedLoadMalePro = false;
+        private static bool attemptedLoadFemalePro = false;
         private static bool isEnsuringBuildMenuButton = false;
 
-        internal static Sprite GetCustomPortrait()
+        internal static bool TryApplyAssistantManagerPortrait(staff._type staffType, Image target, bool pro, Action callback)
         {
-            bool isMale = IsPlayerMale();
-            
+            if (!IsAssistantManagerStaffType(staffType) || target == null)
+            {
+                return false;
+            }
+
+            Sprite portrait = GetCustomPortrait(IsPlayerMale(), pro);
+            if (portrait == null)
+            {
+                return false;
+            }
+
+            target.overrideSprite = null;
+            target.sprite = portrait;
+            target.preserveAspect = true;
+            if (callback != null)
+            {
+                callback();
+            }
+
+            return true;
+        }
+
+        private static Sprite GetCustomPortrait(bool isMale, bool pro)
+        {
+            if (pro)
+            {
+                if (isMale)
+                {
+                    if (!attemptedLoadMalePro)
+                    {
+                        attemptedLoadMalePro = true;
+                        customMaleProSprite = LoadCustomPortrait(true, true);
+                    }
+
+                    return customMaleProSprite ?? GetCustomPortrait(true, false);
+                }
+
+                if (!attemptedLoadFemalePro)
+                {
+                    attemptedLoadFemalePro = true;
+                    customFemaleProSprite = LoadCustomPortrait(false, true);
+                }
+
+                return customFemaleProSprite ?? GetCustomPortrait(false, false);
+            }
+
             if (isMale)
             {
-                if (attemptedLoadMale) return customMaleSprite;
+                if (attemptedLoadMale)
+                {
+                    return customMaleSprite;
+                }
                 attemptedLoadMale = true;
-            }
-            else
-            {
-                if (attemptedLoadFemale) return customFemaleSprite;
-                attemptedLoadFemale = true;
+                customMaleSprite = LoadCustomPortrait(true, false);
+                return customMaleSprite;
             }
 
-            string fileName = isMale ? "AssistantManager_Male.png" : "AssistantManager_Female.png";
-            string assemblyDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            string imagePath = System.IO.Path.Combine(assemblyDir, "Textures", fileName);
-
-            if (System.IO.File.Exists(imagePath))
+            if (attemptedLoadFemale)
             {
+                return customFemaleSprite;
+            }
+
+            attemptedLoadFemale = true;
+            customFemaleSprite = LoadCustomPortrait(false, false);
+            return customFemaleSprite;
+        }
+
+        private static Sprite LoadCustomPortrait(bool isMale, bool pro)
+        {
+            try
+            {
+                string fileName;
+                if (pro)
+                {
+                    fileName = isMale
+                        ? AssistantManagerConstants.MaleProPortraitFileName
+                        : AssistantManagerConstants.FemaleProPortraitFileName;
+                }
+                else
+                {
+                    fileName = isMale
+                        ? AssistantManagerConstants.MalePortraitFileName
+                        : AssistantManagerConstants.FemalePortraitFileName;
+                }
+                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                string assemblyDir = string.IsNullOrEmpty(assemblyPath)
+                    ? string.Empty
+                    : System.IO.Path.GetDirectoryName(assemblyPath);
+                string imagePath = string.IsNullOrEmpty(assemblyDir)
+                    ? string.Empty
+                    : System.IO.Path.Combine(
+                        assemblyDir,
+                        AssistantManagerConstants.PortraitTexturesDirectoryName,
+                        fileName);
+                if (string.IsNullOrEmpty(imagePath) || !System.IO.File.Exists(imagePath))
+                {
+                    return null;
+                }
+
                 byte[] fileData = System.IO.File.ReadAllBytes(imagePath);
                 Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                if (ImageConversion.LoadImage(tex, fileData))
+                if (!ImageConversion.LoadImage(tex, fileData))
                 {
-                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                    
-                    if (isMale) customMaleSprite = sprite;
-                    else customFemaleSprite = sprite;
-                    
-                    return sprite;
+                    UnityEngine.Object.Destroy(tex);
+                    return null;
                 }
+
+                tex.name = "AssistantManagerPortrait_" + (isMale ? "Male" : "Female") + (pro ? "_Pro" : string.Empty);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                Sprite sprite = Sprite.Create(
+                    tex,
+                    new Rect(0f, 0f, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f,
+                    0,
+                    SpriteMeshType.FullRect);
+
+                return sprite;
             }
-            return null;
+            catch
+            {
+                return null;
+            }
         }
 
         internal static bool IsAssistantManagerStaffType(staff._type staffType)
@@ -1602,6 +1927,7 @@ namespace AssitantManagerMod
         private static void Postfix(agency __instance)
         {
             AssistantManagerDateTracking.Reset();
+            AssistantManagerAuditionTracking.Reset();
             AssistantManagerRules.RegisterAssistantManagerOfficePrefab(__instance);
             AssistantManagerRules.EnsureBuildMenuButton(__instance);
         }
@@ -1877,46 +2203,18 @@ namespace AssitantManagerMod
     [HarmonyPatch(typeof(staff), nameof(staff.LoadPortrait_Big), new Type[] { typeof(staff._type), typeof(Image), typeof(bool), typeof(Action), typeof(staff._staff._unique_type) })]
     internal static class StaffLoadPortraitBigPatch
     {
-        private static bool Prefix(staff._type Type, Image target, Action callback)
+        private static bool Prefix(staff._type Type, Image target, bool Pro, Action callback)
         {
-            if (!AssistantManagerRules.IsAssistantManagerStaffType(Type))
-            {
-                return true; 
-            }
-
-            Sprite customPortrait = AssistantManagerRules.GetCustomPortrait();
-            if (customPortrait != null)
-            {
-                target.sprite = customPortrait;
-                if (callback != null)
-                {
-                    callback();
-                }
-                return false; 
-            }
-
-            return true; 
+            return !AssistantManagerRules.TryApplyAssistantManagerPortrait(Type, target, Pro, callback);
         }
     }
 
     [HarmonyPatch(typeof(staff), nameof(staff.LoadPortrait_Small), new Type[] { typeof(staff._type), typeof(Image), typeof(bool), typeof(staff._staff._unique_type) })]
     internal static class StaffLoadPortraitSmallPatch
     {
-        private static bool Prefix(staff._type Type, Image target)
+        private static bool Prefix(staff._type Type, Image target, bool Pro)
         {
-            if (!AssistantManagerRules.IsAssistantManagerStaffType(Type))
-            {
-                return true;
-            }
-
-            Sprite customPortrait = AssistantManagerRules.GetCustomPortrait();
-            if (customPortrait != null)
-            {
-                target.sprite = customPortrait;
-                return false; 
-            }
-
-            return true; 
+            return !AssistantManagerRules.TryApplyAssistantManagerPortrait(Type, target, Pro, null);
         }
     }
 
@@ -2154,7 +2452,7 @@ namespace AssitantManagerMod
     {
         private static bool Prefix(agency._room __instance, data_girls.girls _girl, ref bool __result)
         {
-            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance))
+            if (!AssistantManagerRules.IsManagerOffice(__instance))
             {
                 return true;
             }
@@ -2163,7 +2461,11 @@ namespace AssitantManagerMod
                        _girl != null &&
                        __instance.girl == null &&
                        __instance.status == agency._room._status.normal &&
-                       (Dating.DEBUG || AssistantManagerDateTracking.GetCooldownDays(__instance.id, _girl.id) <= 0);
+                       _girl.status == data_girls._status.normal &&
+                       (Dating.DEBUG ||
+                        (AssistantManagerRules.IsAssistantManagerOffice(__instance)
+                            ? AssistantManagerDateTracking.GetCooldownDays(__instance.id, _girl.id) <= 0
+                            : Dating.GetDaysCooldown(_girl) <= 0));
             return false;
         }
     }
@@ -2188,14 +2490,21 @@ namespace AssitantManagerMod
     {
         private static bool Prefix(agency._room __instance, data_girls.girls _girl)
         {
-            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance))
+            if (!AssistantManagerRules.IsManagerOffice(__instance))
             {
                 return true;
             }
 
-            if (_girl == null || __instance.staffer == null)
+            // assign() can be reached directly by a room click, bypassing drag-and-drop's
+            // canAssign check.  Recheck here so two office assignments cannot win a frame race.
+            if (!__instance.canAssign(_girl, null))
             {
                 return false;
+            }
+
+            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance))
+            {
+                return true;
             }
 
             __instance.assign_date(_girl);
@@ -2204,36 +2513,107 @@ namespace AssitantManagerMod
         }
     }
 
+    [HarmonyPatch(typeof(agency._room), "assign_date", new Type[] { typeof(data_girls.girls) })]
+    internal static class RoomAssignDatePatch
+    {
+        private static void Postfix(agency._room __instance, data_girls.girls _girl)
+        {
+            if (!AssistantManagerRules.IsManagerOffice(__instance) || _girl == null || __instance.girl != _girl)
+            {
+                return;
+            }
+
+            // The game does not provide a dedicated "on date" idol status.  Practice is the
+            // standard unavailable state and therefore prevents training, scenes, or a second
+            // office from using this idol until the date is resolved.
+            _girl.SetStatus(data_girls._status.practice);
+            _girl.room = __instance;
+        }
+    }
+
     [HarmonyPatch(typeof(agency._room), nameof(agency._room.GoOnDate), new Type[0])]
     internal static class RoomGoOnDatePatch
     {
-        private static bool Prefix(agency._room __instance)
+        private static bool Prefix(agency._room __instance, out data_girls.girls __state)
         {
+            __state = AssistantManagerRules.IsManagerOffice(__instance) ? __instance.girl : null;
             if (AssistantManagerRules.IsAssistantManagerOffice(__instance))
             {
+                if (__instance.girl == null || __instance.staffer == null)
+                {
+                    return false;
+                }
+
+                data_girls.girls girl = __instance.girl;
                 PopupManager component = Camera.main.GetComponent<mainScript>().Data.GetComponent<PopupManager>();
                 Date_Popup component2 = component.GetByType(PopupManager._type.girl_date).obj.GetComponent<Date_Popup>();
                 component.Open(PopupManager._type.girl_date, true);
-                component2.Set(__instance.girl);
+                component2.Set(girl);
 
                 if (__instance.staffer.LevelledUp)
                 {
-                    __instance.girl.addParam(data_girls._paramType.physicalStamina, 5f, false);
-                    int relationshipLevel = __instance.girl.GetRelationshipLevel(Relationships_Player._type.Friendship);
+                    girl.addParam(data_girls._paramType.physicalStamina, 5f, false);
+                    int relationshipLevel = girl.GetRelationshipLevel(Relationships_Player._type.Friendship);
                     if (relationshipLevel > 0)
                     {
-                        __instance.girl.addParam(data_girls._paramType.mentalStamina, (float)relationshipLevel, false);
+                        girl.addParam(data_girls._paramType.mentalStamina, (float)relationshipLevel, false);
                     }
                 }
                 
-                AssistantManagerDateTracking.AddDate(__instance.id, __instance.girl.id);
+                AssistantManagerDateTracking.AddDate(__instance, girl);
 
                 __instance.girl = null;
                 __instance.status = agency._room._status.normal;
                 __instance.staffer.StopWorking(StatusButton._state.normal);
+                girl.SetStatus(data_girls._status.normal);
+                girl.room = null;
                 return false;
             }
             return true;
+        }
+
+        private static void Postfix(agency._room __instance, data_girls.girls __state)
+        {
+            if (AssistantManagerRules.IsAssistantManagerOffice(__instance) || __state == null)
+            {
+                return;
+            }
+
+            if (AssistantManagerRules.IsManagerOffice(__instance))
+            {
+                __state.SetStatus(data_girls._status.normal);
+                if (__state.room == __instance)
+                {
+                    __state.room = null;
+                }
+            }
+        }
+
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.CancelJob), new Type[0])]
+    internal static class RoomCancelJobDatePatch
+    {
+        private static void Prefix(agency._room __instance, out data_girls.girls __state)
+        {
+            __state = AssistantManagerRules.IsManagerOffice(__instance) &&
+                      __instance.status == agency._room._status.date
+                ? __instance.girl
+                : null;
+        }
+
+        private static void Postfix(agency._room __instance, data_girls.girls __state)
+        {
+            if (__state == null)
+            {
+                return;
+            }
+
+            __state.SetStatus(data_girls._status.normal);
+            if (__state.room == __instance)
+            {
+                __state.room = null;
+            }
         }
     }
 
@@ -2259,6 +2639,236 @@ namespace AssitantManagerMod
             }
             
             __instance.ShowTitle(ExtensionMethods.color(str, mainScript.red), null);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(DragAndDropManager), nameof(DragAndDropManager.OnMouseDown), new Type[] { typeof(data_girls.girls), typeof(staticVars.DragAndDrop) })]
+    internal static class DragAndDropManagerDateCooldownTitlePatch
+    {
+        private static void Postfix(data_girls.girls girl, staticVars.DragAndDrop type)
+        {
+            if (girl == null || type != staticVars.DragAndDrop.room)
+            {
+                return;
+            }
+
+            agency agencyInstance = AssistantManagerRules.GetAgency();
+            if (agencyInstance == null)
+            {
+                return;
+            }
+
+            List<agency._room> rooms = agencyInstance.allRooms(true, true);
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                agency._room room = rooms[i];
+                if (!AssistantManagerRules.IsAssistantManagerOffice(room) ||
+                    room.status != agency._room._status.normal ||
+                    AssistantManagerDateTracking.GetCooldownDays(room.id, girl.id) <= 0 ||
+                    room.roomObj == null)
+                {
+                    continue;
+                }
+
+                Room roomView = room.roomObj.GetComponent<Room>();
+                if (roomView != null)
+                {
+                    roomView.SetTitle_Date(girl);
+                }
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.Auditions), new Type[] { typeof(Auditions.data) })]
+    internal static class RoomAuditionsPatch
+    {
+        private static bool Prefix(agency._room __instance, ref Auditions.data _data)
+        {
+            if (!AssistantManagerRules.IsManagerOffice(__instance))
+            {
+                return true;
+            }
+
+            if (__instance.staffer == null ||
+                __instance.status != agency._room._status.normal ||
+                _data == null ||
+                !AssistantManagerAuditionTracking.CanProduce(__instance, _data.Type))
+            {
+                return false;
+            }
+
+            // The menu's Auditions.data is a shared template.  Each office must own a separate
+            // instance so progress and generated candidates cannot overwrite another office.
+            _data = AssistantManagerAuditionTracking.CreateRoomAudition(__instance, _data);
+            return _data != null;
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.ShowAuditions), new Type[0])]
+    internal static class RoomShowAuditionsPatch
+    {
+        private static bool Prefix(agency._room __instance)
+        {
+            if (!AssistantManagerRules.IsManagerOffice(__instance))
+            {
+                return true;
+            }
+
+            if (__instance.auditionData == null || !__instance.auditionData.CanLaunch())
+            {
+                return false;
+            }
+
+            // PopupManager has one audition popup and one blur/input-lock state.  Leave later
+            // completed auditions ready on their own office rather than enqueueing a second UI.
+            return !AssistantManagerAuditionTracking.IsAuditionPopupBusy();
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.GenerateAudition), new Type[] { typeof(Auditions.data), typeof(bool) })]
+    internal static class AuditionsGenerateAuditionPatch
+    {
+        private static void Prefix(Auditions.data _data, out AssistantManagerAuditionTracking.GenerateState __state)
+        {
+            AssistantManagerAuditionTracking.BeginGenerate(_data, out __state);
+        }
+
+        private static void Postfix(AssistantManagerAuditionTracking.GenerateState __state)
+        {
+            AssistantManagerAuditionTracking.EndGenerate(__state);
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.CanProduce), new Type[] { typeof(Auditions.type) })]
+    internal static class AuditionsCanProducePatch
+    {
+        private static bool Prefix(Auditions.type _type, ref bool __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.CanProduce(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.GetDaysTillCanProduce), new Type[] { typeof(Auditions.type) })]
+    internal static class AuditionsGetDaysTillCanProducePatch
+    {
+        private static bool Prefix(Auditions.type _type, ref int __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.GetDaysTillCanProduce(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.GetCooldownCost), new Type[] { typeof(CM_Player_Audition_Cooldown._type) })]
+    internal static class AuditionsGetCooldownCostPatch
+    {
+        private static bool Prefix(CM_Player_Audition_Cooldown._type _type, ref int __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.GetCooldownCost(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.EnoughResourcesForCooldown), new Type[] { typeof(CM_Player_Audition_Cooldown._type) })]
+    internal static class AuditionsEnoughResourcesForCooldownPatch
+    {
+        private static bool Prefix(CM_Player_Audition_Cooldown._type _type, ref bool __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.EnoughResourcesForCooldown(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.IsOnCooldown), new Type[0])]
+    internal static class AuditionsIsOnCooldownPatch
+    {
+        private static bool Prefix(ref bool __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.IsOnCooldown(room);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.CanResetCooldown), new Type[] { typeof(CM_Player_Audition_Cooldown._type) })]
+    internal static class AuditionsCanResetCooldownPatch
+    {
+        private static bool Prefix(CM_Player_Audition_Cooldown._type _type, ref bool __result)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            __result = AssistantManagerAuditionTracking.CanResetCooldown(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Auditions), nameof(Auditions.ResetCooldown), new Type[] { typeof(CM_Player_Audition_Cooldown._type) })]
+    internal static class AuditionsResetCooldownPatch
+    {
+        private static bool Prefix(CM_Player_Audition_Cooldown._type _type)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            AssistantManagerAuditionTracking.ResetCooldown(room, _type);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(CM_Player_Audition_Button), "UpdateData", new Type[0])]
+    internal static class CMAuditionButtonUpdateDataPatch
+    {
+        private static bool Prefix(CM_Player_Audition_Button __instance)
+        {
+            agency._room room = AssistantManagerAuditionTracking.GetCurrentManagerOffice();
+            if (room == null)
+            {
+                return true;
+            }
+
+            float progress = 0f;
+            if (room.auditionData != null && room.auditionData.Type == __instance.level)
+            {
+                progress = room.auditionData.Progress;
+            }
+            __instance.GetComponent<ContextMenuButton>().SetFill(progress);
             return false;
         }
     }
