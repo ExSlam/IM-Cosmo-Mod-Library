@@ -1,0 +1,63 @@
+[h1]Assistant Manager[/h1]
+
+Build dedicated Assistant Manager Offices, hire Assistant Managers, and delegate office work without replacing the Producer.
+
+[h1]Requirements[/h1]
+
+This mod requires [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863]IM Harmony[/url].
+
+After subscribing, follow the setup instructions from [url=https://github.com/ui3TD/IM-HarmonyIntegration]ui3TD/IM-HarmonyIntegration[/url].
+
+For the best experience, also subscribe to:
+
+[list]
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3750618476]Room Assignment Fix[/url]
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3680171587]Staff Firing Freeze Fix[/url]
+[/list]
+
+[h1]Features[/h1]
+
+[list]
+[*]Build up to two Assistant Manager Offices.
+[*]Hire up to two Assistant Managers at Novice, Professional, and Expert levels.
+[*]Assistant Managers can handle eligible office work independently of the Producer.
+[*]Auditions are protected from overlap: an Assistant Manager cannot start an audition while the Producer or another Assistant Manager is already conducting one.
+[*]Supports [b]Idol Career Diary[/b] integration, including credited Assistant Manager entries and portraits.
+[*]Language support: English, Chinese, Japanese, Russian, and Brazilian Portuguese.
+[/list]
+
+[h1]Custom Assistant Manager Portraits[/h1]
+
+You can replace the Assistant Manager portrait with custom PNG files.
+
+Find the installed mod folder here:
+
+[code]C:\Program Files (x86)\Steam\steamapps\workshop\content\821880\3750751199[/code]
+
+Place your portrait files in the mod's [code]Textures[/code] folder. Use the same dimensions and transparency requirements as portraits for Unique Idol mods.
+
+Supported filenames:
+
+[list]
+[*][code]AssistantManager_Male.png[/code]
+[*][code]AssistantManager_Female.png[/code]
+[/list]
+optional Professional portraits:
+[list]
+[*][code]AssistantManager_Male_Pro.png[/code]
+[*][code]AssistantManager_Female_Pro.png[/code] 
+[/list]
+
+If a Pro portrait is not present, the normal Male/Female portrait is used instead.
+
+[h1]Important Notes[/h1]
+
+[list]
+[*]Maximum: two Assistant Manager Office buildings.
+[*]Maximum: two Assistant Manager staff members.
+[*]To fire an Assistant Manager, first remove them from their assigned office. Then open the staff-list context menu and fire them normally.
+[/list]
+
+[h1]Feedback[/h1]
+I made this mod by request.
+Let me know if you have balance suggestions for this mod, or ideas/requests for other Idol Manager mods you would like to see from me. 
