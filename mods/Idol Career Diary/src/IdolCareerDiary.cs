@@ -268,6 +268,7 @@ namespace IdolCareerDiary
         internal const int DetailPopupSiblingOffset = 2;
 
         internal const float TimelineRowHeight = 30f;
+        internal const float TimelineStaffPortraitSize = 24f;
         internal const float TimelineSpacing = 4f;
         internal const int TimelineParticipantCardsPerRow = 4;
         internal const float TimelineParticipantSectionSpacing = 4f;
@@ -548,6 +549,7 @@ namespace IdolCareerDiary
         internal const string EventAgencyRoomBuilt = "agency_room_built";
         internal const string EventAgencyRoomDestroyed = "agency_room_destroyed";
         internal const string EventAgencyRoomCostPaid = "agency_room_cost_paid";
+        internal const string EventRoomWorkCompleted = "room_work_completed";
         internal const string EventStaffHired = "staff_hired";
         internal const string EventStaffFired = "staff_fired";
         internal const string EventStaffFiredSeverance = "staff_fired_severance";
@@ -627,6 +629,23 @@ namespace IdolCareerDiary
         internal const string JsonDatingUsedGoods = "dating_used_goods";
         internal const string JsonDatingDatedIdol = "dating_dated_idol";
         internal const string JsonIdolId = "idol_id";
+        internal const string JsonStaffId = "staff_id";
+        internal const string JsonStaffName = "staff_name";
+        internal const string JsonStaffRole = "staff_role";
+        internal const string JsonStaffTypeRaw = "staff_type_raw";
+        internal const string JsonStaffUniqueTypeRaw = "staff_unique_type_raw";
+        internal const string JsonStaffIsPro = "staff_is_pro";
+        internal const string JsonStaffIsProducer = "staff_is_producer";
+        internal const string JsonRoomWorkKind = "room_work_kind";
+        internal const string JsonRoomWorkStage = "room_work_stage";
+        internal const string JsonRoomWorkEntityId = "room_work_entity_id";
+        internal const string JsonRoomWorkTitle = "room_work_title";
+        internal const string JsonAssignedStaffId = "assigned_staff_id";
+        internal const string JsonAssignedStaffName = "assigned_staff_name";
+        internal const string JsonAssignedStaffRole = "assigned_staff_role";
+        internal const string JsonCompletedStaffId = "completed_staff_id";
+        internal const string JsonCompletedStaffName = "completed_staff_name";
+        internal const string JsonCompletedStaffRole = "completed_staff_role";
         internal const string JsonContractType = "contract_type";
         internal const string JsonContractSkill = "contract_skill";
         internal const string JsonContractStartDate = "contract_start_date";
@@ -986,6 +1005,19 @@ namespace IdolCareerDiary
         internal static readonly string TextStaffLeveledUp = ModLocalization.Get("TextStaffLeveledUp", "Staff Leveled Up");
         internal const string KeyStaffName = "staff_name";
         internal static readonly string LabelStaff = ModLocalization.Get("LabelStaff", "Staff");
+        internal static readonly string LabelCreditedStaff = ModLocalization.Get("LabelCreditedStaff", "Credited Staff");
+        internal static readonly string LabelAssignedBy = ModLocalization.Get("LabelAssignedBy", "Assigned By");
+        internal static readonly string LabelCompletedBy = ModLocalization.Get("LabelCompletedBy", "Completed By");
+        internal static readonly string TextHiredBy = ModLocalization.Get("TextHiredBy", "Hired by: ");
+        internal static readonly string TextCreditedTo = ModLocalization.Get("TextCreditedTo", "Credited to: ");
+        internal static readonly string TextAssignedAndCompletedBy = ModLocalization.Get("TextAssignedAndCompletedBy", "Assigned and completed by: ");
+        internal static readonly string TextTrainingPracticeCompleted = ModLocalization.Get("TextTrainingPracticeCompleted", "Training Practice Completed");
+        internal static readonly string TextStaminaRecoveryCompleted = ModLocalization.Get("TextStaminaRecoveryCompleted", "Stamina Recovery Completed");
+        internal static readonly string TextSinglePreparationCompleted = ModLocalization.Get("TextSinglePreparationCompleted", "Single Preparation Completed");
+        internal static readonly string TextShowPreparationCompleted = ModLocalization.Get("TextShowPreparationCompleted", "Show Preparation Completed");
+        internal static readonly string TextConcertPreparationCompleted = ModLocalization.Get("TextConcertPreparationCompleted", "Concert Preparation Completed");
+        internal static readonly string TextEventPreparationCompleted = ModLocalization.Get("TextEventPreparationCompleted", "Event Preparation Completed");
+        internal static readonly string TextWorkStage = ModLocalization.Get("TextWorkStage", "Stage: ");
         internal static readonly string LabelRole = ModLocalization.Get("LabelRole", "Role");
         internal const string KeyStaffAction = "staff_action";
         internal static readonly string LabelSalary = ModLocalization.Get("LabelSalary", "Salary");
@@ -3714,6 +3746,40 @@ namespace IdolCareerDiary
         internal string ModSource = string.Empty;
         internal string PayloadPreview = string.Empty;
         internal List<int> RelatedIdols = new List<int>();
+        internal StaffCreditInfo StaffCredit;
+    }
+
+    /// <summary>
+    /// Portable staff identity from IM Data Core's event payload.  It supports rendering a
+    /// portrait after the staff member has been fired, including Assistant Manager textures.
+    /// </summary>
+    internal sealed class StaffCreditInfo
+    {
+        internal int StaffId = C.InvalidId;
+        internal string Name = string.Empty;
+        internal string Role = string.Empty;
+        internal int TypeRaw = C.InvalidId;
+        internal int UniqueTypeRaw = C.InvalidId;
+        internal bool IsPro;
+        internal bool IsProducer;
+
+        internal bool HasIdentity
+        {
+            get { return !string.IsNullOrEmpty(Name); }
+        }
+
+        internal string DisplayName
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(Name))
+                {
+                    return Name;
+                }
+
+                return IsProducer ? "Producer" : C.LabelUnknown;
+            }
+        }
     }
 
     /// <summary>
@@ -7751,6 +7817,11 @@ namespace IdolCareerDiary
                     le.preferredHeight = C.TimelineRowHeight;
                 }
 
+                if (p.StaffCredit != null && p.StaffCredit.HasIdentity)
+                {
+                    AddTimelineStaffPortrait(row.transform, p.StaffCredit, i);
+                }
+
                 bool selected = ev != null && ev.EventId == selectedEventId;
                 SetButtonSelected(row, selected);
             }
@@ -8263,6 +8334,8 @@ namespace IdolCareerDiary
                 }
             }
 
+            RenderStaffCreditContext(p.StaffCredit);
+
             RenderSingleSourceDetails(ev);
             RenderDatingPartnerContext(ev, payload);
             RenderShowCastContext(ev, payload);
@@ -8321,6 +8394,42 @@ namespace IdolCareerDiary
             });
 
             RebuildLayout(diaryDetailContentRoot);
+        }
+
+        /// <summary>
+        /// Renders the portable staff credit with a native small portrait when available.
+        /// </summary>
+        private void RenderStaffCreditContext(StaffCreditInfo credit)
+        {
+            if (diaryDetailContentRoot == null || credit == null || !credit.HasIdentity)
+            {
+                return;
+            }
+
+            AddDivider(diaryDetailContentRoot);
+            AddTitle(diaryDetailContentRoot, C.LabelCreditedStaff);
+
+            GameObject row = CreateUiObject("CareerDiary_StaffCredit", diaryDetailContentRoot);
+            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.spacing = C.ActionSpacing;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+
+            GameObject portraitObject = CreateUiObject("CareerDiary_StaffCreditPortrait", row.transform);
+            Image portraitImage = portraitObject.AddComponent<Image>();
+            portraitImage.color = mainScript.white32;
+            portraitImage.preserveAspect = true;
+            LayoutElement portraitLayout = portraitObject.AddComponent<LayoutElement>();
+            portraitLayout.preferredWidth = C.TimelineParticipantPortraitSize;
+            portraitLayout.preferredHeight = C.TimelineParticipantPortraitSize;
+            portraitLayout.minWidth = C.TimelineParticipantPortraitSize;
+            portraitLayout.minHeight = C.TimelineParticipantPortraitSize;
+            ApplyStaffPortrait(portraitImage, credit);
+
+            AddText(row.transform, FormatStaffCredit(credit));
         }
 
         /// <summary>
@@ -8890,6 +8999,84 @@ namespace IdolCareerDiary
 
             portraitImage.color = mainScript.white32;
             portraitImage.sprite = headshot;
+        }
+
+        /// <summary>
+        /// Adds a small responsible-staff portrait to a timeline row.  The stored raw staff type
+        /// allows Assistant Manager's portrait Harmony patches to supply their mod texture even
+        /// after that staffer is no longer in the active staff list.
+        /// </summary>
+        private static void AddTimelineStaffPortrait(Transform parent, StaffCreditInfo credit, int rowIndex)
+        {
+            if (parent == null || credit == null || !credit.HasIdentity)
+            {
+                return;
+            }
+
+            GameObject portraitObject = CreateUiObject(
+                C.UiNameCareerDiaryTimelineItemPrefix + rowIndex.ToString(CultureInfo.InvariantCulture) + "_StaffPortrait",
+                parent);
+            Image portraitImage = portraitObject.AddComponent<Image>();
+            portraitImage.color = mainScript.white32;
+            portraitImage.preserveAspect = true;
+
+            RectTransform portraitRect = portraitObject.GetComponent<RectTransform>();
+            if (portraitRect != null)
+            {
+                portraitRect.anchorMin = new Vector2(C.FloatOne, 0.5f);
+                portraitRect.anchorMax = new Vector2(C.FloatOne, 0.5f);
+                portraitRect.pivot = new Vector2(C.FloatOne, 0.5f);
+                portraitRect.anchoredPosition = new Vector2(-4f, 0f);
+                portraitRect.sizeDelta = new Vector2(C.TimelineStaffPortraitSize, C.TimelineStaffPortraitSize);
+            }
+
+            ApplyStaffPortrait(portraitImage, credit);
+        }
+
+        /// <summary>
+        /// Uses the game staff portrait loader so vanilla, unique-staff, and Assistant Manager
+        /// portraits all follow their native image-selection rules.
+        /// </summary>
+        private static void ApplyStaffPortrait(Image portraitImage, StaffCreditInfo credit)
+        {
+            if (portraitImage == null || credit == null)
+            {
+                return;
+            }
+
+            try
+            {
+                mainScript main = Camera.main != null ? Camera.main.GetComponent<mainScript>() : null;
+                staff staffData = main != null && main.Data != null ? main.Data.GetComponent<staff>() : null;
+                if (staffData == null)
+                {
+                    portraitImage.enabled = false;
+                    return;
+                }
+
+                staff._staff liveStaff = credit.StaffId >= C.MinId ? staff.GetStaffByID(credit.StaffId) : null;
+                if (liveStaff != null)
+                {
+                    staffData.LoadPortrait_Small(liveStaff, portraitImage);
+                    return;
+                }
+
+                if (credit.TypeRaw < C.ZeroIndex)
+                {
+                    portraitImage.enabled = false;
+                    return;
+                }
+
+                staffData.LoadPortrait_Small(
+                    (staff._type)credit.TypeRaw,
+                    portraitImage,
+                    credit.IsPro,
+                    (staff._staff._unique_type)credit.UniqueTypeRaw);
+            }
+            catch
+            {
+                portraitImage.enabled = false;
+            }
         }
 
         /// <summary>
@@ -12186,6 +12373,24 @@ namespace IdolCareerDiary
                 outcomeLines.Add(C.TextTimelineEntryRecorded);
             }
 
+            StaffCreditInfo primaryStaff = ReadStaffCredit(payload, string.Empty);
+            if (primaryStaff != null && primaryStaff.HasIdentity)
+            {
+                p.StaffCredit = primaryStaff;
+                if (type == C.EventRoomWorkCompleted)
+                {
+                    AddRoomWorkStaffCreditLines(payload, primaryStaff, outcomeLines);
+                }
+                else if (type == C.EventIdolHired)
+                {
+                    outcomeLines.Add(C.TextHiredBy + C.SeparatorSpace + FormatStaffCredit(primaryStaff));
+                }
+                else
+                {
+                    outcomeLines.Add(C.TextCreditedTo + C.SeparatorSpace + FormatStaffCredit(primaryStaff));
+                }
+            }
+
             AddRelatedLifecycleStartDateLineIfKnown(ev, payload, outcomeLines);
             AddRelatedIdols(p.RelatedIdols, ev, payload);
             if (type == C.EventDatingPartnerStatusChanged || type == C.EventIdolDatingStatusChanged)
@@ -12257,6 +12462,74 @@ namespace IdolCareerDiary
             }
 
             return p;
+        }
+
+        /// <summary>
+        /// Reads portable staff attribution.  Passing an empty prefix reads the primary staff;
+        /// "assigned_" and "completed_" read the room-work role-specific fields.
+        /// </summary>
+        private static StaffCreditInfo ReadStaffCredit(JSONNode payload, string prefix)
+        {
+            if (payload == null)
+            {
+                return null;
+            }
+
+            string normalizedPrefix = prefix ?? string.Empty;
+            string name = ReadStr(payload, normalizedPrefix + "staff_name");
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            StaffCreditInfo credit = new StaffCreditInfo
+            {
+                StaffId = ReadInt(payload, normalizedPrefix + "staff_id"),
+                Name = name,
+                Role = ReadStr(payload, normalizedPrefix + "staff_role"),
+                TypeRaw = ReadInt(payload, normalizedPrefix + "staff_type_raw"),
+                UniqueTypeRaw = ReadInt(payload, normalizedPrefix + "staff_unique_type_raw"),
+                IsPro = ReadBool(payload, normalizedPrefix + "staff_is_pro"),
+                IsProducer = ReadBool(payload, normalizedPrefix + "staff_is_producer")
+            };
+
+            return credit;
+        }
+
+        private static string FormatStaffCredit(StaffCreditInfo credit)
+        {
+            if (credit == null)
+            {
+                return C.LabelUnknown;
+            }
+
+            string name = credit.DisplayName;
+            return string.IsNullOrEmpty(credit.Role) ? name : name + C.MetadataPipeSeparator + credit.Role;
+        }
+
+        private static void AddRoomWorkStaffCreditLines(JSONNode payload, StaffCreditInfo primaryStaff, List<string> outcomeLines)
+        {
+            StaffCreditInfo assigned = ReadStaffCredit(payload, "assigned_");
+            StaffCreditInfo completed = ReadStaffCredit(payload, "completed_");
+            if (assigned != null && assigned.HasIdentity && completed != null && completed.HasIdentity &&
+                string.Equals(assigned.Name, completed.Name, StringComparison.Ordinal))
+            {
+                outcomeLines.Add(C.TextAssignedAndCompletedBy + C.SeparatorSpace + FormatStaffCredit(completed));
+                return;
+            }
+
+            if (assigned != null && assigned.HasIdentity)
+            {
+                outcomeLines.Add(C.LabelAssignedBy + C.SeparatorColonSpace + FormatStaffCredit(assigned));
+            }
+
+            if (completed != null && completed.HasIdentity)
+            {
+                outcomeLines.Add(C.LabelCompletedBy + C.SeparatorColonSpace + FormatStaffCredit(completed));
+                return;
+            }
+
+            outcomeLines.Add(C.TextCreditedTo + C.SeparatorSpace + FormatStaffCredit(primaryStaff));
         }
 
         /// <summary>
@@ -13615,6 +13888,10 @@ namespace IdolCareerDiary
                     BuildAgencyRoomPresentation(type, payload, p, outcomeLines);
                     return true;
 
+                case C.EventRoomWorkCompleted:
+                    BuildRoomWorkPresentation(payload, p, outcomeLines);
+                    return true;
+
                 case C.EventTourCreated:
                 case C.EventTourStarted:
                 case C.EventTourFinished:
@@ -13657,6 +13934,52 @@ namespace IdolCareerDiary
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Builds the diary entry for a completed room preparation or training task.
+        /// </summary>
+        private static void BuildRoomWorkPresentation(JSONNode payload, Presentation p, List<string> outcomeLines)
+        {
+            string kind = ReadStr(payload, C.JsonRoomWorkKind);
+            string title = NormalizeRawText(ReadStr(payload, C.JsonRoomWorkTitle));
+            string stage = HumanizeUnknown(ReadStr(payload, C.JsonRoomWorkStage));
+
+            if (string.Equals(kind, "medical_recovery", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Title = C.TextStaminaRecoveryCompleted;
+                p.WithWhom = title != C.LabelUnknown ? HumanizeUnknown(title) : C.LabelUnknown;
+            }
+            else if (string.Equals(kind, "training", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Title = C.TextTrainingPracticeCompleted;
+                p.WithWhom = title != C.LabelUnknown ? HumanizeUnknown(title) : C.LabelUnknown;
+            }
+            else if (string.Equals(kind, "single", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Title = C.TextSinglePreparationCompleted;
+                p.WithWhom = title != C.LabelUnknown ? title : C.LabelUnknown;
+            }
+            else if (string.Equals(kind, "show", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Title = C.TextShowPreparationCompleted;
+                p.WithWhom = title != C.LabelUnknown ? title : C.LabelUnknown;
+            }
+            else if (string.Equals(kind, "concert", StringComparison.OrdinalIgnoreCase))
+            {
+                p.Title = C.TextConcertPreparationCompleted;
+                p.WithWhom = title != C.LabelUnknown ? title : C.LabelUnknown;
+            }
+            else
+            {
+                p.Title = C.TextEventPreparationCompleted;
+                p.WithWhom = title != C.LabelUnknown ? title : C.LabelUnknown;
+            }
+
+            if (stage != C.LabelUnknown)
+            {
+                outcomeLines.Add(C.TextWorkStage + C.SeparatorSpace + stage);
+            }
         }
 
         /// <summary>

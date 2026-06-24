@@ -210,6 +210,10 @@ namespace IMDataCore
         internal const string EventTypeAgencyRoomBuilt = "agency_room_built";
         internal const string EventTypeAgencyRoomDestroyed = "agency_room_destroyed";
         internal const string EventTypeAgencyRoomCostPaid = "agency_room_cost_paid";
+        // Room work is emitted once per participating idol when a staffed room completes a
+        // preparation or practice task.  The JSON payload deliberately carries optional
+        // staff attribution, so databases written by older Core versions remain valid.
+        internal const string EventTypeRoomWorkCompleted = "room_work_completed";
         internal const string EventTypeAuditionStarted = "audition_started";
         internal const string EventTypeAuditionCostPaid = "audition_cost_paid";
         internal const string EventTypeAuditionCooldownReset = "audition_cooldown_reset";
@@ -263,6 +267,7 @@ namespace IMDataCore
         internal const string EventEntityKindIdolOutfit = "idol_outfit";
         internal const string EventEntityKindWish = "wish";
         internal const string EventEntityKindAgencyRoom = "agency_room";
+        internal const string EventEntityKindRoomWork = "room_work";
         internal const string EventEntityKindAudition = "audition";
         internal const string EventEntityKindRandomEvent = "random_event";
         internal const string EventEntityKindSubstory = "substory";
@@ -396,6 +401,8 @@ namespace IMDataCore
         internal const string EventSourceResearchCategoryAddPointsPatch = "patch.Research.category.AddPoints.Postfix";
         internal const string EventSourceAgencyAddRoomPatch = "patch.agency.addRoom.Postfix";
         internal const string EventSourceAgencyDestroyRoomPatch = "patch.agency.DestroyRoom.Postfix";
+        internal const string EventSourceRoomWorkCompletedPatch = "patch.agency._room.work_completed.Postfix";
+        internal const string EventSourceRoomTrainingCompletedPatch = "patch.agency._room.FinishPractice.Postfix";
         internal const string EventSourceAuditionsGeneratePatch = "patch.Auditions.GenerateAudition.Postfix";
         internal const string EventSourceAuditionsResetCooldownPatch = "patch.Auditions.ResetCooldown.Postfix";
         internal const string EventSourceTasksAddTaskPatch = "patch.tasks.AddTask.Postfix";
@@ -1126,6 +1133,27 @@ namespace IMDataCore
         internal const string JsonFieldIdolTrivia = "idol_trivia";
         internal const string JsonFieldIdolCustomTrivia = "idol_custom_trivia";
         internal const string JsonFieldIdolGraduationWithDialogue = "idol_graduation_with_dialogue";
+        // Generic staff-credit fields.  Older events simply do not contain these keys.
+        internal const string JsonFieldStaffId = "staff_id";
+        internal const string JsonFieldStaffName = "staff_name";
+        internal const string JsonFieldStaffRole = "staff_role";
+        internal const string JsonFieldStaffType = "staff_type";
+        internal const string JsonFieldStaffTypeRaw = "staff_type_raw";
+        internal const string JsonFieldStaffUniqueTypeRaw = "staff_unique_type_raw";
+        internal const string JsonFieldStaffIsPro = "staff_is_pro";
+        internal const string JsonFieldStaffIsProducer = "staff_is_producer";
+        internal const string JsonFieldRoomWorkKind = "room_work_kind";
+        internal const string JsonFieldRoomWorkStage = "room_work_stage";
+        internal const string JsonFieldRoomWorkEntityId = "room_work_entity_id";
+        internal const string JsonFieldRoomWorkTitle = "room_work_title";
+        internal const string JsonFieldRoomId = "room_id";
+        internal const string JsonFieldRoomType = "room_type";
+        internal const string JsonFieldAssignedStaffId = "assigned_staff_id";
+        internal const string JsonFieldAssignedStaffName = "assigned_staff_name";
+        internal const string JsonFieldAssignedStaffRole = "assigned_staff_role";
+        internal const string JsonFieldCompletedStaffId = "completed_staff_id";
+        internal const string JsonFieldCompletedStaffName = "completed_staff_name";
+        internal const string JsonFieldCompletedStaffRole = "completed_staff_role";
         internal const string JsonFieldSalaryAction = "salary_action";
         internal const string JsonFieldSalaryBefore = "salary_before";
         internal const string JsonFieldSalaryAfter = "salary_after";
@@ -4685,7 +4713,8 @@ namespace IMDataCore
             data_girls.girls idol,
             string lifecycleActionCode,
             string customTrivia,
-            bool graduatedWithDialogue)
+            bool graduatedWithDialogue,
+            StaffAttributionSnapshot staffAttribution = null)
         {
             if (idol == null)
             {
@@ -4699,7 +4728,7 @@ namespace IMDataCore
                 ? string.Empty
                 : CoreDateTimeUtility.ToRoundTripString(idol.Graduation_Date);
 
-            return new IdolLifecyclePayload
+            IdolLifecyclePayload payload = new IdolLifecyclePayload
             {
                 IdolId = idol.id,
                 IdolLifecycleAction = lifecycleActionCode ?? string.Empty,
@@ -4712,6 +4741,30 @@ namespace IMDataCore
                 IdolCustomTrivia = customTrivia ?? string.Empty,
                 IdolGraduationWithDialogue = graduatedWithDialogue
             };
+
+            ApplyStaffAttribution(payload, staffAttribution);
+            return payload;
+        }
+
+        /// <summary>
+        /// Copies a portable staff identity into a lifecycle payload.  Primitive fields keep
+        /// event history usable after a staff member has been fired or a save was reloaded.
+        /// </summary>
+        private static void ApplyStaffAttribution(IdolLifecyclePayload payload, StaffAttributionSnapshot attribution)
+        {
+            if (payload == null || attribution == null)
+            {
+                return;
+            }
+
+            payload.StaffId = attribution.StaffId;
+            payload.StaffName = attribution.StaffName ?? string.Empty;
+            payload.StaffRole = attribution.StaffRole ?? string.Empty;
+            payload.StaffType = attribution.StaffType ?? string.Empty;
+            payload.StaffTypeRaw = attribution.StaffTypeRaw;
+            payload.StaffUniqueTypeRaw = attribution.StaffUniqueTypeRaw;
+            payload.StaffIsPro = attribution.StaffIsPro;
+            payload.StaffIsProducer = attribution.StaffIsProducer;
         }
 
         /// <summary>
@@ -6552,6 +6605,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolTrivia, payload.IdolTrivia ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolCustomTrivia, payload.IdolCustomTrivia ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldIdolGraduationWithDialogue, payload.IdolGraduationWithDialogue, ref isFirstProperty);
+            AppendStaffAttributionProperties(builder, payload.StaffId, payload.StaffName, payload.StaffRole, payload.StaffType, payload.StaffTypeRaw, payload.StaffUniqueTypeRaw, payload.StaffIsPro, payload.StaffIsProducer, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -7352,9 +7406,35 @@ namespace IMDataCore
             AppendBooleanProperty(builder, CoreConstants.JsonFieldDateCaughtAfter, payload.DateCaughtAfter, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldDateRelationshipLevelBefore, payload.DateRelationshipLevelBefore, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldDateRelationshipLevelAfter, payload.DateRelationshipLevelAfter, ref isFirstProperty);
+            AppendStaffAttributionProperties(builder, payload.StaffId, payload.StaffName, payload.StaffRole, payload.StaffType, payload.StaffTypeRaw, payload.StaffUniqueTypeRaw, payload.StaffIsPro, payload.StaffIsProducer, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// Writes the optional common staff-credit fields shared by career-history events.
+        /// </summary>
+        private static void AppendStaffAttributionProperties(
+            StringBuilder builder,
+            int staffId,
+            string staffName,
+            string staffRole,
+            string staffType,
+            int staffTypeRaw,
+            int staffUniqueTypeRaw,
+            bool staffIsPro,
+            bool staffIsProducer,
+            ref bool isFirstProperty)
+        {
+            AppendIntProperty(builder, CoreConstants.JsonFieldStaffId, staffId, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldStaffName, staffName ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldStaffRole, staffRole ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldStaffType, staffType ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldStaffTypeRaw, staffTypeRaw, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldStaffUniqueTypeRaw, staffUniqueTypeRaw, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldStaffIsPro, staffIsPro, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldStaffIsProducer, staffIsProducer, ref isFirstProperty);
         }
 
         /// <summary>
@@ -7689,6 +7769,7 @@ namespace IMDataCore
             AppendBooleanProperty(builder, CoreConstants.JsonFieldMedicalFinishWasForced, payload.MedicalFinishWasForced, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldMedicalInjuryCounter, payload.MedicalInjuryCounter, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldMedicalDepressionCounter, payload.MedicalDepressionCounter, ref isFirstProperty);
+            AppendStaffAttributionProperties(builder, payload.StaffId, payload.StaffName, payload.StaffRole, payload.StaffType, payload.StaffTypeRaw, payload.StaffUniqueTypeRaw, payload.StaffIsPro, payload.StaffIsProducer, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -8397,6 +8478,14 @@ namespace IMDataCore
         public string IdolTrivia = string.Empty;
         public string IdolCustomTrivia = string.Empty;
         public bool IdolGraduationWithDialogue;
+        public int StaffId = CoreConstants.InvalidIdValue;
+        public string StaffName = string.Empty;
+        public string StaffRole = string.Empty;
+        public string StaffType = string.Empty;
+        public int StaffTypeRaw = CoreConstants.InvalidIdValue;
+        public int StaffUniqueTypeRaw = CoreConstants.InvalidIdValue;
+        public bool StaffIsPro;
+        public bool StaffIsProducer;
     }
 
     /// <summary>
@@ -8922,6 +9011,44 @@ namespace IMDataCore
         public bool DateCaughtAfter;
         public int DateRelationshipLevelBefore;
         public int DateRelationshipLevelAfter;
+        public int StaffId = CoreConstants.InvalidIdValue;
+        public string StaffName = string.Empty;
+        public string StaffRole = string.Empty;
+        public string StaffType = string.Empty;
+        public int StaffTypeRaw = CoreConstants.InvalidIdValue;
+        public int StaffUniqueTypeRaw = CoreConstants.InvalidIdValue;
+        public bool StaffIsPro;
+        public bool StaffIsProducer;
+    }
+
+    /// <summary>
+    /// JSON payload emitted for a room task after its preparation or training work completes.
+    /// All fields are optional to readers so adding it does not require a database migration.
+    /// </summary>
+    [Serializable]
+    internal sealed class RoomWorkCompletedEventPayload
+    {
+        public int idol_id = CoreConstants.InvalidIdValue;
+        public int room_id = CoreConstants.InvalidIdValue;
+        public string room_type = string.Empty;
+        public string room_work_kind = string.Empty;
+        public string room_work_stage = string.Empty;
+        public string room_work_entity_id = string.Empty;
+        public string room_work_title = string.Empty;
+        public int staff_id = CoreConstants.InvalidIdValue;
+        public string staff_name = string.Empty;
+        public string staff_role = string.Empty;
+        public string staff_type = string.Empty;
+        public int staff_type_raw = CoreConstants.InvalidIdValue;
+        public int staff_unique_type_raw = CoreConstants.InvalidIdValue;
+        public bool staff_is_pro;
+        public bool staff_is_producer;
+        public int assigned_staff_id = CoreConstants.InvalidIdValue;
+        public string assigned_staff_name = string.Empty;
+        public string assigned_staff_role = string.Empty;
+        public int completed_staff_id = CoreConstants.InvalidIdValue;
+        public string completed_staff_name = string.Empty;
+        public string completed_staff_role = string.Empty;
     }
 
     /// <summary>
@@ -9127,6 +9254,14 @@ namespace IMDataCore
         public bool MedicalFinishWasForced;
         public int MedicalInjuryCounter;
         public int MedicalDepressionCounter;
+        public int StaffId = CoreConstants.InvalidIdValue;
+        public string StaffName = string.Empty;
+        public string StaffRole = string.Empty;
+        public string StaffType = string.Empty;
+        public int StaffTypeRaw = CoreConstants.InvalidIdValue;
+        public int StaffUniqueTypeRaw = CoreConstants.InvalidIdValue;
+        public bool StaffIsPro;
+        public bool StaffIsProducer;
     }
 
     /// <summary>

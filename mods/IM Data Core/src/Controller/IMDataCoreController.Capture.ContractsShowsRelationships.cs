@@ -2755,6 +2755,9 @@ namespace IMDataCore
 
             PlayerDateInteractionSnapshot safeSnapshot = interactionSnapshot ?? new PlayerDateInteractionSnapshot();
             Dating._partner partnerAfter = idol.GetDatingData();
+            // Date events represent the player-facing date route, including dates initiated
+            // from an Assistant Manager office.  Keep that history credited to the Producer.
+            StaffAttributionSnapshot producer = CreateStaffAttribution(staff.GetPlayer());
             PlayerDateInteractionPayload payload = new PlayerDateInteractionPayload
             {
                 IdolId = idol.id,
@@ -2776,7 +2779,15 @@ namespace IMDataCore
                 DateCaughtBefore = safeSnapshot.DateCaughtBefore,
                 DateCaughtAfter = Dating.Data != null && Dating.Data.Caught,
                 DateRelationshipLevelBefore = safeSnapshot.RelationshipLevelBefore,
-                DateRelationshipLevelAfter = idol.GetRelationshipLevel(Relationships_Player._type.Romance)
+                DateRelationshipLevelAfter = idol.GetRelationshipLevel(Relationships_Player._type.Romance),
+                StaffId = producer != null ? producer.StaffId : CoreConstants.InvalidIdValue,
+                StaffName = producer != null ? producer.StaffName : string.Empty,
+                StaffRole = producer != null ? producer.StaffRole : string.Empty,
+                StaffType = producer != null ? producer.StaffType : string.Empty,
+                StaffTypeRaw = producer != null ? producer.StaffTypeRaw : CoreConstants.InvalidIdValue,
+                StaffUniqueTypeRaw = producer != null ? producer.StaffUniqueTypeRaw : CoreConstants.InvalidIdValue,
+                StaffIsPro = producer != null && producer.StaffIsPro,
+                StaffIsProducer = true
             };
 
             lock (runtimeLock)

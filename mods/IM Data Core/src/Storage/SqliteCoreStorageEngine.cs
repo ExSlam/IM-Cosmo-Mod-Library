@@ -179,6 +179,7 @@ namespace IMDataCore
             RegisterBuiltInObjectEventSchemaSource<AgencyRoomLifecycleEventPayload>(map, CoreConstants.EventTypeAgencyRoomBuilt);
             RegisterBuiltInObjectEventSchemaSource<AgencyRoomCostPaidEventPayload>(map, CoreConstants.EventTypeAgencyRoomCostPaid);
             RegisterBuiltInObjectEventSchemaSource<AgencyRoomLifecycleEventPayload>(map, CoreConstants.EventTypeAgencyRoomDestroyed);
+            RegisterBuiltInObjectEventSchemaSource<RoomWorkCompletedEventPayload>(map, CoreConstants.EventTypeRoomWorkCompleted);
             RegisterBuiltInObjectEventSchemaSource<AuditionCooldownResetEventPayload>(map, CoreConstants.EventTypeAuditionCooldownReset);
             RegisterBuiltInObjectEventSchemaSource<AuditionCostPaidEventPayload>(map, CoreConstants.EventTypeAuditionCostPaid);
             RegisterBuiltInObjectEventSchemaSource<AuditionFailureEventPayload>(map, CoreConstants.EventTypeAuditionFailureTriggered);

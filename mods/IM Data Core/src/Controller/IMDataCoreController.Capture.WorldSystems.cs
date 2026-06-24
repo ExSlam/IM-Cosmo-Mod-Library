@@ -4241,13 +4241,15 @@ namespace IMDataCore
             string medicalEventTypeCode,
             bool medicalFinishWasForced,
             data_girls._status previousStatus,
-            string sourcePatchCode)
+            string sourcePatchCode,
+            StaffAttributionSnapshot staffAttribution = null)
         {
             if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
             {
                 return;
             }
 
+            StaffAttributionSnapshot responsibleStaff = staffAttribution ?? MedicalStaffAttributionContext.Current;
             MedicalEventPayload payload = new MedicalEventPayload
             {
                 IdolId = idol.id,
@@ -4259,7 +4261,15 @@ namespace IMDataCore
                     : CoreDateTimeUtility.ToRoundTripString(idol.HiatusEnd),
                 MedicalFinishWasForced = medicalFinishWasForced,
                 MedicalInjuryCounter = idol.Injury_Counter,
-                MedicalDepressionCounter = idol.Depression_Counter
+                MedicalDepressionCounter = idol.Depression_Counter,
+                StaffId = responsibleStaff != null ? responsibleStaff.StaffId : CoreConstants.InvalidIdValue,
+                StaffName = responsibleStaff != null ? responsibleStaff.StaffName : string.Empty,
+                StaffRole = responsibleStaff != null ? responsibleStaff.StaffRole : string.Empty,
+                StaffType = responsibleStaff != null ? responsibleStaff.StaffType : string.Empty,
+                StaffTypeRaw = responsibleStaff != null ? responsibleStaff.StaffTypeRaw : CoreConstants.InvalidIdValue,
+                StaffUniqueTypeRaw = responsibleStaff != null ? responsibleStaff.StaffUniqueTypeRaw : CoreConstants.InvalidIdValue,
+                StaffIsPro = responsibleStaff != null && responsibleStaff.StaffIsPro,
+                StaffIsProducer = responsibleStaff != null && responsibleStaff.StaffIsProducer
             };
 
             string medicalEventType = medicalEventTypeCode ?? string.Empty;

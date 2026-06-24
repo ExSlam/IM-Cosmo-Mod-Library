@@ -1059,13 +1059,16 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureIdolHired(data_girls.girls idol)
         {
+            StaffAttributionSnapshot hiringStaff;
+            TryTakeHireStaffAttribution(idol != null ? idol.id : CoreConstants.InvalidIdValue, out hiringStaff);
             CaptureIdolLifecycleEvent(
                 idol,
                 CoreConstants.EventTypeIdolHired,
                 CoreConstants.EventSourceDataGirlsHirePatch,
                 CoreConstants.IdolLifecycleActionHired,
                 string.Empty,
-                false);
+                false,
+                hiringStaff);
         }
 
         /// <summary>
@@ -1165,14 +1168,15 @@ namespace IMDataCore
             string sourcePatchCode,
             string lifecycleActionCode,
             string customTrivia,
-            bool graduatedWithDialogue)
+            bool graduatedWithDialogue,
+            StaffAttributionSnapshot staffAttribution = null)
         {
             if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
             {
                 return;
             }
 
-            IdolLifecyclePayload payload = BuildIdolLifecyclePayload(idol, lifecycleActionCode, customTrivia, graduatedWithDialogue);
+            IdolLifecyclePayload payload = BuildIdolLifecyclePayload(idol, lifecycleActionCode, customTrivia, graduatedWithDialogue, staffAttribution);
 
             lock (runtimeLock)
             {
