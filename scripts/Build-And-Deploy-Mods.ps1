@@ -150,7 +150,9 @@ function Resolve-DeployTargetDir {
         return Join-Path $InstalledModsRoot $Project.DeployFolderName
     }
 
-    return $null
+    # A first-time deploy should be as complete as an update deploy.  Use the project ModName
+    # when no existing HarmonyID-matched install supplies a custom folder name.
+    return Join-Path $InstalledModsRoot $Project.ModName
 }
 
 function Build-Project {
@@ -171,7 +173,8 @@ function Build-Project {
     $latestInput = $sourceInputs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
     Write-Host ("Building {0}" -f $Project.ModName)
-    & dotnet build $Project.ProjectPath -c $Configuration -t:Rebuild
+    $artifactRoot = Join-Path $RepoRoot ("artifacts\\mods\\{0}" -f $Configuration)
+    & dotnet build $Project.ProjectPath -c $Configuration -t:Rebuild ("-p:ModOutputDir={0}" -f $artifactRoot)
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for $($Project.ProjectPath)"
     }
@@ -207,11 +210,6 @@ function Deploy-Project {
     }
 
     $targetDir = Resolve-DeployTargetDir -Project $Project -HarmonyId $harmonyId -InstalledModMap $InstalledModMap -InstalledModsRoot $DeployRoot
-    if ([string]::IsNullOrWhiteSpace($targetDir)) {
-        Write-Warning ("Skipping deploy for '{0}' because no installed mod folder with HarmonyID '{1}' was found under '{2}', and the project does not define DeployFolderName." -f $Project.ModName, $harmonyId, $DeployRoot)
-        return
-    }
-
     $sourceDll = Join-Path $Project.ArtifactDir ($Project.AssemblyName + ".dll")
     $targetDll = Join-Path $targetDir ($Project.AssemblyName + ".dll")
 
