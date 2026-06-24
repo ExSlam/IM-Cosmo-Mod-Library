@@ -240,18 +240,19 @@ namespace CheatsMod
 
         private static string GetConfiguredLanguageCode()
         {
+            string gameLanguage = EmptyText;
             try
             {
                 if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
                 {
-                    return staticVars.Settings.Language.Trim().ToLowerInvariant();
+                    gameLanguage = staticVars.Settings.Language.Trim().ToLowerInvariant();
                 }
             }
             catch
             {
             }
 
-            return EmptyText;
+            return CosmoModLibrary.CosmoLocalizationOverride.GetLanguageOrFallback(gameLanguage);
         }
 
         private static string GetAlias(string code)

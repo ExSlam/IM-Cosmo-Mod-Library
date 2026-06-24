@@ -1,5 +1,6 @@
 # Mod Buttons UI strings
 actionhub.button.label=Central de Ações
+actionhub.button.close=Fechar
 actionhub.search.placeholder=Pesquisar Central de Ações
 actionhub.error.inputs_unavailable=Não foi possível criar os campos da ação.
 actionhub.error.input_unavailable=Um campo da ação não está disponível.
@@ -14,3 +15,10 @@ actionhub.error.target_class=A classe de destino não foi encontrada.
 actionhub.error.target_method=Nenhum método public static correspondente foi encontrado.
 actionhub.error.invocation_failed=A ação falhou: {0}
 actionhub.error.log_prefix=[ModButtons] A ação falhou: {0}
+mod.title=Mod Buttons
+cosmo.localization.button.label=Idioma dos mods Cosmo
+cosmo.localization.button.tooltip=Escolha coreano ou francês para os mods Cosmo. Reinicie Idol Manager depois de salvar.
+cosmo.localization.input.label=Idioma dos mods
+cosmo.localization.option.game=Idioma selecionado no jogo
+cosmo.localization.option.korean=Coreano (한국어)
+cosmo.localization.option.french=Francês (Français)

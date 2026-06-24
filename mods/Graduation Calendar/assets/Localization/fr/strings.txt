@@ -1,0 +1,13 @@
+profile.extras.graduation_label=Graduation : 
+common.unknown=Inconnu
+common.close=Fermer
+menu.button_tooltip=Calendrier des graduations
+menu.button_label=Calendrier
+ui.title=Calendrier des graduations
+view.calendar=Vue calendrier
+view.graduations_only=Graduations uniquement
+view.yearly=Vue annuelle
+view.monthly=Vue mensuelle
+empty.no_idols=Aucune idole disponible
+empty.no_graduations=Aucune graduation
+empty.no_graduations_scheduled=Aucune graduation prévue

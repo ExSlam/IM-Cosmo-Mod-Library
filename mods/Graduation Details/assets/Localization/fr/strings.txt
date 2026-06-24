@@ -1,0 +1,12 @@
+context_menu.profile.tooltip_ready=Afficher le profil de l'idole
+context_menu.profile.tooltip_pending=Afficher le profil de l'idole (données en attente)
+context_menu.profile.label=Profil
+jobs.total_earnings_prefix=Revenus totaux : 
+jobs.married_to_prefix=Marié(e) à {0}
+jobs.married_to_none=Marié(e) à : personne
+jobs.custody_unknown=Enfants vivant avec : inconnu
+jobs.custody_child_singular= enfant
+jobs.custody_child_plural= enfants
+jobs.custody_player_prefix=Enfants vivant avec : joueur ({0})
+jobs.custody_idol_prefix=Enfants vivant avec : idole ({0})
+jobs.custody_none=Enfants : aucun

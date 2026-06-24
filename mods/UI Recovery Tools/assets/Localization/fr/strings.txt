@@ -1,0 +1,6 @@
+overlay.header_format=Erreurs ({0} superposition, {1} effacer le flou)
+overlay.no_messages=Aucun message à afficher.
+overlay.clear_blur_format=Effacer le flou ({0})
+overlay.clear_log=Effacer le journal
+overlay.close_format=Fermer ({0})
+common.disabled=Désactivé

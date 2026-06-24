@@ -1,0 +1,12 @@
+context_menu.profile.tooltip_ready=아이돌 프로필 보기
+context_menu.profile.tooltip_pending=아이돌 프로필 보기 (데이터 대기 중)
+context_menu.profile.label=프로필
+jobs.total_earnings_prefix=총 수입: 
+jobs.married_to_prefix={0}와(과) 결혼
+jobs.married_to_none=결혼: 없음
+jobs.custody_unknown=함께 사는 자녀: 알 수 없음
+jobs.custody_child_singular=명
+jobs.custody_child_plural=명
+jobs.custody_player_prefix=함께 사는 자녀: 플레이어 ({0})
+jobs.custody_idol_prefix=함께 사는 자녀: 아이돌 ({0})
+jobs.custody_none=자녀: 없음

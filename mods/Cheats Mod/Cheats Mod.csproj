@@ -9,5 +9,6 @@
   <ItemGroup>
     <Compile Include="src\CheatsMod.cs" />
     <Compile Include="src\ModLocalization.cs" />
+    <Compile Include="..\Shared\CosmoLocalizationOverride.cs" Link="src\CosmoLocalizationOverride.cs" />
   </ItemGroup>
 </Project>

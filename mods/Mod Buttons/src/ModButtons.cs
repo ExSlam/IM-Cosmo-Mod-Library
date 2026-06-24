@@ -88,6 +88,24 @@ namespace ModButtons
         }
     }
 
+    // Used by the Action Hub entry in assets/ModButtons/buttons.json.
+    // The selection affects Cosmo mod localization only; it intentionally does
+    // not alter Idol Manager's base-game language setting.
+    public static class CosmoModLanguageSettings
+    {
+        public static void SetLanguage(string language)
+        {
+            if (CosmoModLibrary.CosmoLocalizationOverride.SetSelectedLanguage(language))
+            {
+                Debug.Log("[Cosmo Mod Library] Mod language selection saved. Restart Idol Manager to apply it.");
+            }
+            else
+            {
+                Debug.LogWarning("[Cosmo Mod Library] Could not save the mod language selection.");
+            }
+        }
+    }
+
     // --- 3. MULTI-MOD LOCALIZATION MANAGER ---
     internal static class ModButtonsLocalization
     {
@@ -190,15 +208,16 @@ namespace ModButtons
 
         private static string GetConfiguredLanguageCode()
         {
+            string gameLanguage = string.Empty;
             try
             {
                 if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
                 {
-                    return staticVars.Settings.Language.Trim().ToLowerInvariant();
+                    gameLanguage = staticVars.Settings.Language.Trim().ToLowerInvariant();
                 }
             }
             catch { }
-            return string.Empty;
+            return CosmoModLibrary.CosmoLocalizationOverride.GetLanguageOrFallback(gameLanguage);
         }
 
         private static string GetAlias(string code)
@@ -250,7 +269,8 @@ namespace ModButtons
         private const string UILineName = "Line";
         private const string UIIconName = "Icon";
         private const string UITextName = "Text";
-        private const string UIFallbackCancelLabel = "Cancel";
+        private const string UICloseButtonLocalizationKey = "actionhub.button.close";
+        private const string UICloseButtonFallback = "Close";
         
         private const string TargetDirectory = "ModButtons";
         private const string JsonFileName = "buttons.json";
@@ -943,7 +963,8 @@ namespace ModButtons
             cancelButton.SetActive(true);
             SetLayerRecursively(cancelButton, panel.gameObject.layer);
             SetCanvasGroupsVisible(cancelButton);
-            ResetActionButtonLanguageBindings(cancelButton, UIFallbackCancelLabel);
+            string closeLabel = GetActionHubText(UICloseButtonLocalizationKey, UICloseButtonFallback);
+            ResetActionButtonLanguageBindings(cancelButton, closeLabel);
 
             TextMeshProUGUI text = cancelButton.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
             if (text == null)
@@ -953,7 +974,7 @@ namespace ModButtons
             if (text != null)
             {
                 text.gameObject.SetActive(true);
-                text.text = UIFallbackCancelLabel;
+                text.text = closeLabel;
             }
 
             ButtonDefault buttonDefault = cancelButton.GetComponent<ButtonDefault>();
@@ -1279,11 +1300,16 @@ namespace ModButtons
                     if (optionNode == null) continue;
 
                     string optionLabel = optionNode[JsonKeyLabel];
+                    string optionCodeLabel = optionNode[JsonKeyCodeLabel];
                     string optionValue = optionNode[JsonKeyInputValue];
                     if (string.IsNullOrEmpty(optionLabel)) optionLabel = optionNode.Value;
                     if (string.IsNullOrEmpty(optionValue)) optionValue = optionNode.Value;
                     if (string.IsNullOrEmpty(optionValue)) optionValue = optionLabel;
                     if (string.IsNullOrEmpty(optionLabel)) optionLabel = optionValue;
+                    if (!string.IsNullOrEmpty(optionCodeLabel))
+                    {
+                        optionLabel = ModButtonsLocalization.Get(modPath, optionCodeLabel, optionLabel);
+                    }
                     definition.Options.Add(new ActionInputOption { Label = optionLabel, Value = optionValue });
                 }
             }
@@ -2714,9 +2740,16 @@ namespace ModButtons
         private static int GetDefaultDropdownIndex(ActionInputDefinition definition)
         {
             if (definition == null || definition.Options == null || definition.Options.Count == 0) return 0;
+            string defaultValue = definition.DefaultValue;
+            if (string.Equals(definition.Id, "cosmo_mod_language", StringComparison.Ordinal))
+            {
+                string selected = CosmoModLibrary.CosmoLocalizationOverride.GetSelectedLanguage();
+                defaultValue = string.IsNullOrEmpty(selected) ? "game" : selected;
+            }
+
             for (int i = 0; i < definition.Options.Count; i++)
             {
-                if (string.Equals(definition.Options[i].Value, definition.DefaultValue, StringComparison.Ordinal)) return i;
+                if (string.Equals(definition.Options[i].Value, defaultValue, StringComparison.Ordinal)) return i;
             }
 
             return 0;

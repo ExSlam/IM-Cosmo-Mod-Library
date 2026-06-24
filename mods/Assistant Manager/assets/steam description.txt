@@ -30,9 +30,9 @@ For the best experience, also subscribe to:
 
 You can replace the Assistant Manager portrait with custom PNG files.
 
-Find the installed mod folder here:
+Find the installed mod folder, likely at this location:
 
-[code]C:\Program Files (x86)\Steam\steamapps\workshop\content\821880\3750751199[/code]
+[code]C:\Program Files (x86)\Steam\steamapps\workshop\content\821880\3750761215[/code]
 
 Place your portrait files in the mod's [code]Textures[/code] folder. Use the same dimensions and transparency requirements as portraits for Unique Idol mods.
 

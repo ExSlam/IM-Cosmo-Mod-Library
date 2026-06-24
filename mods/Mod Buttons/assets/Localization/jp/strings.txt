@@ -1,5 +1,6 @@
 # Mod Buttons UI strings
 actionhub.button.label=アクションハブ
+actionhub.button.close=閉じる
 actionhub.search.placeholder=アクションハブを検索
 actionhub.error.inputs_unavailable=アクション入力を作成できませんでした。
 actionhub.error.input_unavailable=アクション入力を利用できません。
@@ -14,3 +15,10 @@ actionhub.error.target_class=対象のクラスが見つかりませんでした
 actionhub.error.target_method=一致する public static メソッドが見つかりませんでした。
 actionhub.error.invocation_failed=アクションに失敗しました: {0}
 actionhub.error.log_prefix=[ModButtons] アクションに失敗しました: {0}
+mod.title=Mod Buttons
+cosmo.localization.button.label=Cosmo MODの言語
+cosmo.localization.button.tooltip=Cosmo MOD 用に韓国語またはフランス語を選択します。保存後に Idol Manager を再起動してください。
+cosmo.localization.input.label=MODの言語
+cosmo.localization.option.game=ゲームで選択中の言語
+cosmo.localization.option.korean=韓国語 (한국어)
+cosmo.localization.option.french=フランス語 (Français)

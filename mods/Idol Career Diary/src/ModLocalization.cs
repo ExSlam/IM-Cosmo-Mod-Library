@@ -280,18 +280,19 @@ namespace IdolCareerDiary
 
         private static string GetConfiguredLanguageCode()
         {
+            string gameLanguage = string.Empty;
             try
             {
                 if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
                 {
-                    return staticVars.Settings.Language.Trim();
+                    gameLanguage = staticVars.Settings.Language.Trim();
                 }
             }
             catch
             {
             }
 
-            return string.Empty;
+            return CosmoModLibrary.CosmoLocalizationOverride.GetLanguageOrFallback(gameLanguage);
         }
 
         private static string ResolveConfiguredLanguageTag(string code)

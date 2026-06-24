@@ -1,0 +1,10 @@
+notification.unit_month=개월
+notification.unit_day=일
+notification.note_prefix= 졸업이 다음 기간만큼 연기됨: 
+notification.reason_monthly=월간 성과
+notification.reason_center=센터 기념일
+notification.reason_weekly=주간 요인
+notification.reason_weekly_announced=주간 요인 (발표됨)
+notification.option_label=졸업일 연기
+notification.reason_suffix_format= ({0})
+notification.message_format={0}{1}{2}{3}. 새 날짜: {4}

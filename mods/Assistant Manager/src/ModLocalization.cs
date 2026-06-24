@@ -196,18 +196,19 @@ namespace AssitantManagerMod
 
         private static string GetConfiguredLanguageCode()
         {
+            string gameLanguage = string.Empty;
             try
             {
                 if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
                 {
-                    return staticVars.Settings.Language.Trim().ToLowerInvariant();
+                    gameLanguage = staticVars.Settings.Language.Trim().ToLowerInvariant();
                 }
             }
             catch
             {
             }
 
-            return string.Empty;
+            return CosmoModLibrary.CosmoLocalizationOverride.GetLanguageOrFallback(gameLanguage);
         }
 
         private static string GetAlias(string code)

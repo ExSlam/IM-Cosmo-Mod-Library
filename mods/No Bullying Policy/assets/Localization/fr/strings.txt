@@ -1,0 +1,6 @@
+POLICY_BULLYING_MAIN_TITLE=Harcèlement
+POLICY_BULLYING_MAIN_TOOLTIP=Choisissez comment l'agence doit gérer les conflits interpersonnels.
+POLICY_BULLYING_DEFAULT_TITLE=Par défaut
+POLICY_BULLYING_DEFAULT_TOOLTIP=Les idoles agissent naturellement. Des clans peuvent se former et cibler certaines idoles.
+POLICY_BULLYING_DISABLED_TITLE=Pas de harcèlement
+POLICY_BULLYING_DISABLED_TOOLTIP=Politique stricte de tolérance zéro. Met automatiquement fin au harcèlement existant et empêche tout nouveau harcèlement.

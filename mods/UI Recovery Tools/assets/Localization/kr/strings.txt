@@ -1,0 +1,6 @@
+overlay.header_format=오류 ({0} 오버레이, {1} 흐림 제거)
+overlay.no_messages=표시할 메시지가 없습니다.
+overlay.clear_blur_format=흐림 제거 ({0})
+overlay.clear_log=로그 지우기
+overlay.close_format=닫기 ({0})
+common.disabled=비활성화됨

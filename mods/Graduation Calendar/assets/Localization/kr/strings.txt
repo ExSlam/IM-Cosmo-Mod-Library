@@ -1,0 +1,13 @@
+profile.extras.graduation_label=졸업: 
+common.unknown=알 수 없음
+common.close=닫기
+menu.button_tooltip=졸업 달력
+menu.button_label=달력
+ui.title=졸업 달력
+view.calendar=달력 보기
+view.graduations_only=졸업만 보기
+view.yearly=연간 보기
+view.monthly=월간 보기
+empty.no_idols=사용 가능한 아이돌이 없습니다
+empty.no_graduations=졸업이 없습니다
+empty.no_graduations_scheduled=예정된 졸업이 없습니다

@@ -1,0 +1,10 @@
+notification.unit_month=mois
+notification.unit_day=jour
+notification.note_prefix= graduation repoussée de 
+notification.reason_monthly=performance mensuelle
+notification.reason_center=étape de centre
+notification.reason_weekly=facteurs hebdomadaires
+notification.reason_weekly_announced=facteurs hebdomadaires (annoncés)
+notification.option_label=Report du jour de graduation
+notification.reason_suffix_format= ({0})
+notification.message_format={0}{1}{2}{3}. Nouvelle date : {4}

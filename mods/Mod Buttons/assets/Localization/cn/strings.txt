@@ -1,5 +1,6 @@
 # Mod Buttons UI strings
 actionhub.button.label=操作中心
+actionhub.button.close=关闭
 actionhub.search.placeholder=搜索操作中心
 actionhub.error.inputs_unavailable=无法创建操作输入项。
 actionhub.error.input_unavailable=一个操作输入项不可用。
@@ -14,3 +15,10 @@ actionhub.error.target_class=未找到目标类。
 actionhub.error.target_method=未找到匹配的公共静态方法。
 actionhub.error.invocation_failed=操作失败：{0}
 actionhub.error.log_prefix=[ModButtons] 操作失败：{0}
+mod.title=Mod Buttons
+cosmo.localization.button.label=Cosmo 模组语言
+cosmo.localization.button.tooltip=为 Cosmo 模组选择韩语或法语。保存后重启 Idol Manager。
+cosmo.localization.input.label=模组语言
+cosmo.localization.option.game=游戏当前选择的语言
+cosmo.localization.option.korean=韩语 (한국어)
+cosmo.localization.option.french=法语 (Français)

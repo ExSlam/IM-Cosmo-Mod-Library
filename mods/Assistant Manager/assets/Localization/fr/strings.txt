@@ -1,0 +1,7 @@
+staff.assistant_manager.title=Assistant manager
+staff.assistant_manager.tooltip=Peut travailler dans les bureaux d'assistant manager.
+staff.assistant_manager.limit_reached=Limite d'assistants managers atteinte.
+room.assistant_manager_office.title=Bureau d'assistant manager
+room.assistant_manager_office.requires=Requiert : personnel assistant manager
+room.assistant_manager_office.limit=Maximum par agence : 2
+room.assistant_manager_office.no_available_loan_room=Requiert un bureau de manager ou d'assistant manager disponible.

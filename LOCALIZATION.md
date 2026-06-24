@@ -1,8 +1,30 @@
 # Localization Guide
 
-This guide explains how to create a new translation for both the base game `Idol Manager` and the `Idol Career Diary` mod, including languages that are not shipped with the game by default.
+This guide explains how to create a new translation for both the base game `Idol Manager` and Cosmo Mod Library mods, including languages that are not shipped with the game by default.
 
-`Idol Career Diary` uses the language currently selected in the base game. If the base game does not have that language installed and selected, the mod will not switch to it.
+Most Cosmo mods use the language currently selected in the base game. Korean and French are additionally supported as **mod-only languages** through the Cosmo Mod Language selector described below. That selector changes Cosmo mod text only; it does not try to translate the base game.
+
+## Mod-only Korean and French
+
+Korean and French do not need an `Idol Manager` language folder. Install the current **Mod Buttons** mod, then:
+
+1. Open the game's **Settings** tab.
+2. Select **Action Hub**.
+3. In the **Mod Buttons** section, select **Cosmo mod language**.
+4. Choose **Korean (한국어)** or **French (Français)** and apply it.
+5. Restart `Idol Manager`.
+
+The choice is saved to:
+
+```text
+%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods\Cosmo Mod Library\localization.ini
+```
+
+Choose **Game's Selected Language** to remove the mod-only override and return to the game's selected language. The selector uses `kr` for Korean and `fr` for French. `kr` is an intentional compatibility folder name for the bundled Cosmo packs, even though the BCP 47 tag for Korean is `ko`.
+
+For Korean, the loader also tries to register the Windows fonts `Malgun Gothic`, `NanumGothic`, or `Nanum Gothic` as a TextMeshPro fallback. If none is installed, some Korean text may render as missing glyphs; install one of those fonts and restart the game.
+
+All localized Cosmo mods load English first and then overlay the selected pack. A missing future key therefore falls back safely to English rather than leaving blank text.
 
 ## 1. Find the `Idol Manager` install folder
 

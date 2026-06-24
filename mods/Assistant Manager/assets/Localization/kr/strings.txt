@@ -1,0 +1,7 @@
+staff.assistant_manager.title=보조 매니저
+staff.assistant_manager.tooltip=보조 매니저 사무실에 직원을 배치할 수 있습니다.
+staff.assistant_manager.limit_reached=보조 매니저 한도에 도달했습니다.
+room.assistant_manager_office.title=보조 매니저 사무실
+room.assistant_manager_office.requires=필요: 보조 매니저 직원
+room.assistant_manager_office.limit=기획사당 최대: 2
+room.assistant_manager_office.no_available_loan_room=사용 가능한 매니저 사무실 또는 보조 매니저 사무실이 필요합니다.
