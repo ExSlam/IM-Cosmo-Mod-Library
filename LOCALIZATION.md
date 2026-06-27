@@ -6,7 +6,7 @@ Most Cosmo mods use the language currently selected in the base game. Korean and
 
 ## Mod-only Korean and French
 
-Korean and French do not need an `Idol Manager` language folder. Install the current **Mod Buttons** mod, then:
+Korean and French do not need an `Idol Manager` language folder. Install **Mod Localization System** and the current **Mod Buttons** mod, then:
 
 1. Open the game's **Settings** tab.
 2. Select **Action Hub**.
@@ -17,7 +17,7 @@ Korean and French do not need an `Idol Manager` language folder. Install the cur
 The choice is saved to:
 
 ```text
-%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods\Cosmo Mod Library\localization.ini
+%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods\Mod Localization System\localization.ini
 ```
 
 Choose **Game's Selected Language** to remove the mod-only override and return to the game's selected language. The selector uses `kr` for Korean and `fr` for French. `kr` is an intentional compatibility folder name for the bundled Cosmo packs, even though the BCP 47 tag for Korean is `ko`.

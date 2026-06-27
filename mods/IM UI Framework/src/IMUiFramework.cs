@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using HarmonyLib;
+using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using HarmonyLib;
+using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;

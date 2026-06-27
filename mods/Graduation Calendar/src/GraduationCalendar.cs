@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using HarmonyLib;
+using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -346,7 +347,6 @@ namespace GraduationCalendar
         private const string AwardsLocalizationDictionaryKey = "AWARDS";
         private const string AwardsFallbackLabel = "Awards";
         private const string AwardsNameKeyword = "award";
-        private const string UnknownLocalizationDictionaryKey = "UNKNOWN";
         private const string UnknownLocalizationKey = "common.unknown";
         private const string UnknownFallbackLabel = "Unknown";
         private const string CloseLocalizationDictionaryKey = "CLOSE";
@@ -3620,10 +3620,6 @@ namespace GraduationCalendar
 
         private static string GetUnknownLabel()
         {
-            if (Language.Data != null && Language.Data.ContainsKey(UnknownLocalizationDictionaryKey))
-            {
-                return Language.Data[UnknownLocalizationDictionaryKey];
-            }
             return ModLocalization.Get(UnknownLocalizationKey, UnknownFallbackLabel);
         }
 

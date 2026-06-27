@@ -1,6 +1,6 @@
 {
   "Title": "IM UI Framework",
-  "Description": "Intermediary UI toolkit for modders: clone game-style controls, inject buttons, and build custom popups that fit Idol Manager.",
+  "Description": "Intermediary UI toolkit for modders: clone game-style controls, inject buttons, and build custom popups that fit Idol Manager. Requires Mod Localization System (com.cosmo.modlocalizationsystem).",
   "Author": "Cosmo",
   "Version": "1.2.0",
   "Tags": ["ui", "framework", "modding"],

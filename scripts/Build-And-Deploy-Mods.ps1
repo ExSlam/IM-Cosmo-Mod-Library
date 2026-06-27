@@ -1,7 +1,7 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Debug",
+    [string]$Configuration = "Release",
 
     [string]$RepoRoot = "",
 

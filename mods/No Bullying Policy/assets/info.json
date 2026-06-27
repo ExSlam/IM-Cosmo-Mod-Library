@@ -1,6 +1,6 @@
 {
   "Title": "No Bullying Policy",
-  "Description": "Allows you to turn off bullying with a policy change. Use Default or turn off the mod for bullying-related events and achievements.",
+  "Description": "Allows you to turn off bullying with a policy change. Use Default or turn off the mod for bullying-related events and achievements. Requires Mod Localization System (com.cosmo.modlocalizationsystem).",
   "Author": "Cosmo",
   "Version": "1.0.0",
   "Tags": ["gameplay", "policy"],

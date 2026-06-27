@@ -1,6 +1,6 @@
 {
   "Title": "Assistant Manager",
-  "Description": "Build up to two Assistant Manager Offices and hire Assistant Managers to share eligible office work with the Producer. Assistant Managers maintain their own office-date and audition cooldowns, support custom portraits. Requires IM Harmony; Room Assignment Fix and Staff Firing Freeze Fix are recommended and Idol Career Diary Integration is supported.",
+  "Description": "Build up to two Assistant Manager Offices and hire Assistant Managers to share eligible office work with the Producer. Assistant Managers maintain their own office-date and audition cooldowns, support custom portraits. Requires IM Harmony and Mod Localization System (com.cosmo.modlocalizationsystem); Room Assignment Fix and Staff Firing Freeze Fix are recommended and Idol Career Diary Integration is supported.",
   "Author": "Cosmo",
   "Version": "1.1.0",
   "Tags": ["gameplay"],

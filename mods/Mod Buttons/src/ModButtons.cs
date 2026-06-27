@@ -4,13 +4,13 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Michsky.UI.ModernUIPack;
 using SimpleJSON;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
 using UnityEngine.Events;
+using ModLocalizationSystem;
 
 namespace ModButtons
 {
@@ -95,7 +95,7 @@ namespace ModButtons
     {
         public static void SetLanguage(string language)
         {
-            if (CosmoModLibrary.CosmoLocalizationOverride.SetSelectedLanguage(language))
+            if (ModLocalization.SetSelectedLanguage(language))
             {
                 Debug.Log("[Cosmo Mod Library] Mod language selection saved. Restart Idol Manager to apply it.");
             }
@@ -109,136 +109,26 @@ namespace ModButtons
     // --- 3. MULTI-MOD LOCALIZATION MANAGER ---
     internal static class ModButtonsLocalization
     {
-        private const string LocalizationDirectoryName = "Localization";
-        private const string EnglishFolderName = "en";
-        private const string StringsFileName = "strings.txt";
-        private const int MaxLocalizationEntries = 4096;
-        private const int MaxLineLength = 8192;
-        private const int MaxValueLength = 4096;
-        
-        private static readonly Dictionary<string, Dictionary<string, string>> ModDictionaries = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-
         internal static string Get(string modPath, string key, string fallback)
         {
-            if (string.IsNullOrEmpty(modPath) || string.IsNullOrEmpty(key)) return fallback;
-            EnsureLoaded(modPath);
-
-            if (ModDictionaries.TryGetValue(modPath, out var modDict))
-            {
-                if (modDict.TryGetValue(key, out string value) && !string.IsNullOrEmpty(value))
-                {
-                    return value;
-                }
-            }
-            return fallback;
+            return string.IsNullOrEmpty(modPath) || string.IsNullOrEmpty(key)
+                ? fallback
+                : ModLocalization.ForDirectory(modPath).Get(key, fallback);
         }
 
         internal static string GetOwn(string key, string fallback)
         {
-            string assemblyPath;
-            try
-            {
-                assemblyPath = Assembly.GetExecutingAssembly().Location;
-            }
-            catch
-            {
-                assemblyPath = string.Empty;
-            }
-
-            string modPath = string.IsNullOrEmpty(assemblyPath)
-                ? string.Empty
-                : Path.GetDirectoryName(assemblyPath);
-            return Get(modPath, key, fallback);
+            return ModLocalization.Get(key, fallback);
         }
 
         internal static void EnsureLoaded(string modPath)
         {
-            if (string.IsNullOrEmpty(modPath) || ModDictionaries.ContainsKey(modPath)) return;
-
-            Dictionary<string, string> dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ModDictionaries[modPath] = dict;
-
-            try
+            if (!string.IsNullOrEmpty(modPath))
             {
-                string localizationDir = Path.Combine(modPath, LocalizationDirectoryName);
-                if (!Directory.Exists(localizationDir)) return;
-
-                LoadFile(Path.Combine(localizationDir, EnglishFolderName, StringsFileName), dict);
-                LoadFile(Path.Combine(localizationDir, StringsFileName), dict); 
-
-                string configuredLang = GetConfiguredLanguageCode();
-                if (!string.IsNullOrEmpty(configuredLang) && configuredLang != EnglishFolderName)
-                {
-                    string alias = GetAlias(configuredLang);
-                    LoadFile(Path.Combine(localizationDir, configuredLang, StringsFileName), dict);
-                    if (alias != configuredLang) LoadFile(Path.Combine(localizationDir, alias, StringsFileName), dict);
-                }
-            }
-            catch { }
-        }
-
-        private static void LoadFile(string path, Dictionary<string, string> dict)
-        {
-            if (!File.Exists(path)) return;
-
-            try
-            {
-                string[] lines = File.ReadAllLines(path);
-                foreach (string raw in lines)
-                {
-                    if (dict.Count >= MaxLocalizationEntries) return;
-                    if (string.IsNullOrEmpty(raw) || raw.Length > MaxLineLength) continue;
-
-                    string trimmed = raw.Trim();
-                    if (trimmed.Length == 0 || trimmed.StartsWith("#") || trimmed.StartsWith(";") || trimmed.StartsWith("//")) continue;
-
-                    int sepIndex = raw.IndexOf('=');
-                    if (sepIndex <= 0) continue;
-
-                    string key = raw.Substring(0, sepIndex).Trim();
-                    string value = raw.Substring(sepIndex + 1);
-                    if (!string.IsNullOrEmpty(key))
-                    {
-                        dict[key] = SanitizeValue(value.Replace("\\n", "\n").Replace("\\r", "\r").Replace("\\t", "\t"));
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private static string GetConfiguredLanguageCode()
-        {
-            string gameLanguage = string.Empty;
-            try
-            {
-                if (staticVars.Settings != null && !string.IsNullOrEmpty(staticVars.Settings.Language))
-                {
-                    gameLanguage = staticVars.Settings.Language.Trim().ToLowerInvariant();
-                }
-            }
-            catch { }
-            return CosmoModLibrary.CosmoLocalizationOverride.GetLanguageOrFallback(gameLanguage);
-        }
-
-        private static string GetAlias(string code)
-        {
-            switch (code)
-            {
-                case "english": case "enus": case "enusutf8": return "en";
-                case "japanese": case "ja": return "jp";
-                case "schinese": case "tchinese": case "zh": case "zhcn": return "cn";
-                case "russian": case "ukrainian": case "ua": return "ru";
-                case "portuguese": case "brazilian": case "pt": case "pt-br": case "pt_br": return "ptbr";
-                default: return code;
+                ModLocalization.ForDirectory(modPath);
             }
         }
 
-        private static string SanitizeValue(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return string.Empty;
-            if (value.Length > MaxValueLength) value = value.Substring(0, MaxValueLength);
-            return value.Replace('\0', ' ').Replace('<', '＜').Replace('>', '＞');
-        }
     }
 
     // --- 4. CORE LOGIC ---
@@ -324,16 +214,18 @@ namespace ModButtons
         private const float SectionTitleHeight = 44f;
         private const float FallbackBtnMinWidth = 200f;
         private const float FallbackBtnMinHeight = 40f;
+        // Form actions should use the same two-column footprint as regular text
+        // buttons, rather than inheriting the compact dimensions of a dropdown
+        // prefab.
         private const float FormPreferredWidth = 440f;
         private const float FormActionButtonHeight = 38f;
-        private const float FormActionButtonWidth = 150f;
         private const float FormInlineSpacing = 16f;
         private const float FormFieldLabelHeight = 18f;
         private const float FormControlHeight = 32f;
         private const float FormFieldHeight = 54f;
-        private const float FormFieldWidth = 200f;
         private const float FormSpacing = 8f;
         private const float FormValidationHeight = 18f;
+        private const float DropdownOptionSpacing = 4f;
         private const int FormInputsPerRow = 2;
         private const int IconButtonsPerRow = 2;
         private const int FallbackTextButtonsPerRow = 2;
@@ -369,6 +261,7 @@ namespace ModButtons
 
         // This is the purple color assigned to the action buttons
         private static readonly Color GeneratedButtonColor = new Color(0.4078f, 0.4118f, 0.6706f, 1f);
+        private static ActionHubPopupLayout activePopupLayout;
 
         private sealed class ButtonSectionLayout
         {
@@ -446,7 +339,6 @@ namespace ModButtons
             internal ActionInputDefinition Definition;
             internal TMP_InputField TextInput;
             internal Slider Slider;
-            internal CustomDropdown Dropdown;
             internal int DropdownIndex;
         }
 
@@ -594,6 +486,173 @@ namespace ModButtons
             internal float DividerWidth;
             internal float RightPadding;
             internal bool RequiresScrollbar;
+            internal bool ReserveScrollbar;
+            internal float MaximumPanelHeight;
+        }
+
+        private sealed class ActionHubDropdownState
+        {
+            internal GameObject Form;
+            internal GameObject Menu;
+            internal float BaseFormHeight;
+            internal float ExpandedHeight;
+            internal bool MenuPopulated;
+            internal Action PopulateMenu;
+        }
+
+        private sealed class ActionHubPopupLayout
+        {
+            private Transform panel;
+            private GameObject cancelButton;
+            private ScrollRect scrollRect;
+            private RectTransform content;
+            private PopupLayoutMetrics metrics;
+            private ActionHubDropdownState openDropdown;
+
+            internal void Initialize(
+                Transform popupPanel,
+                GameObject popupCancelButton,
+                ScrollRect popupScrollRect,
+                RectTransform popupContent,
+                PopupLayoutMetrics popupMetrics)
+            {
+                panel = popupPanel;
+                cancelButton = popupCancelButton;
+                scrollRect = popupScrollRect;
+                content = popupContent;
+                metrics = popupMetrics;
+            }
+
+            internal void ToggleDropdown(ActionHubDropdownState dropdown)
+            {
+                if (dropdown == null || dropdown.Menu == null) return;
+
+                if (openDropdown == dropdown)
+                {
+                    SetDropdownOpen(dropdown, false);
+                    openDropdown = null;
+                }
+                else
+                {
+                    if (openDropdown != null)
+                    {
+                        SetDropdownOpen(openDropdown, false);
+                    }
+
+                    openDropdown = dropdown;
+                    // First give the form and popup their final dimensions.
+                    // The option controls are created only after this refresh, so
+                    // Unity never renders a list inside the old viewport.
+                    SetDropdownOpen(dropdown, true);
+                    Refresh();
+                    PopulateMenu(dropdown);
+                    if (dropdown.Menu != null) dropdown.Menu.SetActive(true);
+                }
+
+                Refresh();
+            }
+
+            internal void CloseDropdown(ActionHubDropdownState dropdown)
+            {
+                if (dropdown == null) return;
+
+                SetDropdownOpen(dropdown, false);
+                if (openDropdown == dropdown) openDropdown = null;
+                Refresh();
+            }
+
+            private static void SetDropdownOpen(ActionHubDropdownState dropdown, bool open)
+            {
+                if (dropdown == null) return;
+
+                if (!open && dropdown.Menu != null) dropdown.Menu.SetActive(false);
+
+                if (dropdown.Form == null) return;
+                LayoutElement formLayout = dropdown.Form.GetComponent<LayoutElement>();
+                RectTransform formRect = dropdown.Form.GetComponent<RectTransform>();
+                float height = dropdown.BaseFormHeight + (open ? dropdown.ExpandedHeight : 0f);
+                if (formLayout != null)
+                {
+                    formLayout.minHeight = height;
+                    formLayout.preferredHeight = height;
+                }
+                if (formRect != null)
+                {
+                    formRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+                }
+            }
+
+            private static void PopulateMenu(ActionHubDropdownState dropdown)
+            {
+                if (dropdown == null || dropdown.MenuPopulated) return;
+
+                dropdown.PopulateMenu?.Invoke();
+                dropdown.MenuPopulated = true;
+            }
+
+            private void Refresh()
+            {
+                if (metrics == null || panel == null || content == null) return;
+
+                float expandedHeight = openDropdown != null ? openDropdown.ExpandedHeight : 0f;
+                float contentHeight = metrics.ContentHeight + expandedHeight;
+                float panelHeight = Mathf.Clamp(
+                    contentHeight + PopupTopPadding + PopupBottomPadding,
+                    PopupMinimumHeight,
+                    metrics.MaximumPanelHeight);
+                float viewportHeight = Mathf.Max(0f, panelHeight - PopupTopPadding - PopupBottomPadding);
+                bool requiresScrollbar = metrics.RequiresScrollbar || contentHeight > viewportHeight;
+
+                RectTransform panelRect = panel as RectTransform;
+                if (panelRect != null)
+                {
+                    panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, panelHeight);
+                }
+
+                PopupLayoutMetrics currentMetrics = new PopupLayoutMetrics
+                {
+                    PanelWidth = metrics.PanelWidth,
+                    PanelHeight = panelHeight,
+                    ContentHeight = contentHeight,
+                    ViewportHeight = viewportHeight
+                };
+                PositionCancelButton(cancelButton, currentMetrics);
+
+                Canvas.ForceUpdateCanvases();
+                RectTransform scrollRectTransform = scrollRect != null
+                    ? scrollRect.GetComponent<RectTransform>()
+                    : null;
+                if (scrollRectTransform != null)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRectTransform);
+                }
+                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+                content.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+                Canvas.ForceUpdateCanvases();
+
+                if (scrollRect != null)
+                {
+                    scrollRect.vertical = requiresScrollbar;
+                    Scrollbar scrollbar = scrollRect.verticalScrollbar;
+                    if (scrollbar != null)
+                    {
+                        scrollbar.gameObject.SetActive(requiresScrollbar);
+                        if (requiresScrollbar && contentHeight > 0f)
+                        {
+                            scrollbar.size = Mathf.Clamp(
+                                viewportHeight / contentHeight,
+                                ScrollbarMinimumHandleSize,
+                                1f);
+                            scrollbar.value = 1f;
+                        }
+                    }
+
+                    scrollRect.StopMovement();
+                    scrollRect.verticalNormalizedPosition = 1f;
+                }
+
+                Canvas.ForceUpdateCanvases();
+            }
         }
 
         public static bool TryInstallActionHubButton()
@@ -845,6 +904,7 @@ namespace ModButtons
             if (pm == null) return null;
 
             RemoveExistingActionHubPopup(pm);
+            activePopupLayout = null;
 
             GameObject originalPopup = pm.GetByType(PopupManager._type.settings_difficulty)?.obj;
             if (originalPopup == null) return null;
@@ -873,6 +933,9 @@ namespace ModButtons
             ScrollRect scrollRect;
             RectTransform contentRect;
             CreateScrollArea(panel, metrics, scrollbarTemplate, out scrollRect, out contentRect);
+            ActionHubPopupLayout popupLayout = new ActionHubPopupLayout();
+            popupLayout.Initialize(panel, cancelButton, scrollRect, contentRect, metrics);
+            activePopupLayout = popupLayout;
 
             ActionHubSearchIndex searchIndex = PopulateCustomButtons(
                 contentRect,
@@ -1124,9 +1187,11 @@ namespace ModButtons
                 float gridWidth = columnCount > 0
                     ? columnCount * cellWidth + Math.Max(0, columnCount - 1) * GridCellSpacing
                     : 0f;
-                if (formActionCount > 0 && gridWidth <= 0f)
+                if (formActionCount > 0)
                 {
-                    gridWidth = FallbackTextButtonsPerRow * cellWidth + GridCellSpacing;
+                    // Input/action forms need two genuinely usable columns.  Do
+                    // not size them from the dropdown prefab or a 200px button.
+                    gridWidth = Mathf.Max(gridWidth, FormPreferredWidth);
                 }
                 float gridHeight = rowCount > 0
                     ? rowCount * cellHeight + Math.Max(0, rowCount - 1) * GridCellSpacing
@@ -1373,6 +1438,47 @@ namespace ModButtons
                 FormSpacing + FormValidationHeight;
         }
 
+        private static float GetDropdownMenuHeight(ActionInputDefinition input)
+        {
+            int optionCount = input?.Options != null ? input.Options.Count : 0;
+            if (optionCount <= 0) return 0f;
+
+            return optionCount * FormActionButtonHeight +
+                Mathf.Max(0, optionCount - 1) * DropdownOptionSpacing;
+        }
+
+        private static float GetMaximumDropdownExpansion(List<ButtonSectionLayout> sections)
+        {
+            float maximumExpansion = 0f;
+            if (sections == null) return maximumExpansion;
+
+            for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
+            {
+                List<ActionDefinition> actions = sections[sectionIndex]?.Actions;
+                if (actions == null) continue;
+
+                for (int actionIndex = 0; actionIndex < actions.Count; actionIndex++)
+                {
+                    List<ActionInputDefinition> inputs = actions[actionIndex]?.Inputs;
+                    if (inputs == null) continue;
+
+                    for (int inputIndex = 0; inputIndex < inputs.Count; inputIndex++)
+                    {
+                        ActionInputDefinition input = inputs[inputIndex];
+                        if (input == null || input.InputKind != ActionInputKind.Dropdown) continue;
+
+                        // The menu is an additional child of the form and
+                        // therefore also receives the form's vertical spacing.
+                        maximumExpansion = Mathf.Max(
+                            maximumExpansion,
+                            FormSpacing + GetDropdownMenuHeight(input));
+                    }
+                }
+            }
+
+            return maximumExpansion;
+        }
+
         private static PopupLayoutMetrics CalculatePopupLayoutMetrics(List<ButtonSectionLayout> sections)
         {
             float contentWidth = DividerWidth;
@@ -1420,8 +1526,16 @@ namespace ModButtons
             float panelHeight = Mathf.Clamp(unconstrainedPanelHeight, PopupMinimumHeight, maxPanelHeight);
             float viewportHeight = Mathf.Max(0f, panelHeight - PopupTopPadding - PopupBottomPadding);
             bool requiresScrollbar = contentHeight > viewportHeight || buttonCount > ScrollbarButtonCountThreshold;
-            float rightPadding = requiresScrollbar ? PopupScrollbarRightPadding : PopupHorizontalPadding;
-            float scrollbarReserve = requiresScrollbar ? ScrollbarWidth + ScrollbarSpacing : 0f;
+            float maximumDropdownExpansion = GetMaximumDropdownExpansion(sections);
+            float expandedContentHeight = contentHeight + maximumDropdownExpansion;
+            float expandedPanelHeight = Mathf.Clamp(
+                expandedContentHeight + PopupTopPadding + PopupBottomPadding,
+                PopupMinimumHeight,
+                maxPanelHeight);
+            float expandedViewportHeight = Mathf.Max(0f, expandedPanelHeight - PopupTopPadding - PopupBottomPadding);
+            bool reserveScrollbar = requiresScrollbar || expandedContentHeight > expandedViewportHeight;
+            float rightPadding = reserveScrollbar ? PopupScrollbarRightPadding : PopupHorizontalPadding;
+            float scrollbarReserve = reserveScrollbar ? ScrollbarWidth + ScrollbarSpacing : 0f;
 
             float unconstrainedPanelWidth = contentWidth + PopupHorizontalPadding + rightPadding + scrollbarReserve;
             float panelWidth = Mathf.Clamp(unconstrainedPanelWidth, PopupMinimumWidth, maxPanelWidth);
@@ -1437,7 +1551,9 @@ namespace ModButtons
                 ViewportHeight = viewportHeight,
                 DividerWidth = Mathf.Min(DividerWidth, Mathf.Max(contentWidth, viewportWidth)),
                 RightPadding = rightPadding,
-                RequiresScrollbar = requiresScrollbar
+                RequiresScrollbar = requiresScrollbar,
+                ReserveScrollbar = reserveScrollbar,
+                MaximumPanelHeight = maxPanelHeight
             };
         }
 
@@ -1526,7 +1642,7 @@ namespace ModButtons
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
             viewportRect.offsetMin = Vector2.zero;
-            viewportRect.offsetMax = metrics != null && metrics.RequiresScrollbar
+            viewportRect.offsetMax = metrics != null && metrics.ReserveScrollbar
                 ? new Vector2(-(ScrollbarWidth + ScrollbarSpacing), 0f)
                 : Vector2.zero;
 
@@ -1562,9 +1678,13 @@ namespace ModButtons
             scrollRect.viewport = viewportRect;
             scrollRect.content = contentRect;
 
-            if (metrics != null && metrics.RequiresScrollbar)
+            if (metrics != null && metrics.ReserveScrollbar)
             {
-                CreateScrollbar(scrollObj.transform, scrollRect, metrics, scrollbarTemplate);
+                Scrollbar scrollbar = CreateScrollbar(scrollObj.transform, scrollRect, metrics, scrollbarTemplate);
+                if (scrollbar != null)
+                {
+                    scrollbar.gameObject.SetActive(metrics.RequiresScrollbar);
+                }
             }
         }
 
@@ -1850,8 +1970,7 @@ namespace ModButtons
                         verticalContainer,
                         templateButton,
                         action,
-                        section.GridWidth,
-                        section.CellWidth);
+                        section.GridWidth);
                     if (form != null)
                     {
                         createdForms.Add(new KeyValuePair<GameObject, ActionDefinition>(form, action));
@@ -2113,12 +2232,10 @@ namespace ModButtons
             Transform parent,
             GameObject templateButton,
             ActionDefinition action,
-            float formWidth,
-            float cellWidth)
+            float formWidth)
         {
             if (parent == null || action == null || !action.HasInputs) return null;
             if (formWidth <= 0f) formWidth = FormPreferredWidth;
-            if (cellWidth <= 0f) cellWidth = (formWidth - GridCellSpacing) * 0.5f;
 
             bool isSingleInput = action.Inputs.Count == 1;
             int horizontalPadding = isSingleInput ? 0 : 8;
@@ -2155,14 +2272,14 @@ namespace ModButtons
             if (isSingleInput)
             {
                 GameObject row = CreateFormRow(form.transform, "ActionRow", FormFieldHeight, contentWidth);
-                float inputWidth = Mathf.Max(0f, Mathf.Min(
-                    cellWidth,
-                    (contentWidth - GridCellSpacing) * 0.5f));
+                float inputWidth = Mathf.Max(0f, (contentWidth - FormInlineSpacing) * 0.5f);
                 ActionInputBinding binding = CreateInlineActionInputControl(
                     row.transform,
                     templateButton,
                     action.Inputs[0],
-                    inputWidth);
+                    inputWidth,
+                    form,
+                    formHeight);
                 if (binding != null) bindings.Add(binding);
                 actionButton = CreateFormActionButton(
                     row.transform,
@@ -2200,7 +2317,9 @@ namespace ModButtons
                         grid.transform,
                         templateButton,
                         action.Inputs[i],
-                        gridLayout.cellSize.x);
+                        gridLayout.cellSize.x,
+                        form,
+                        formHeight);
                     if (binding != null) bindings.Add(binding);
                 }
             }
@@ -2274,6 +2393,7 @@ namespace ModButtons
             RectTransform rect = buttonObject.GetComponent<RectTransform>();
             if (rect != null)
             {
+                rect.localScale = Vector3.one;
                 rect.sizeDelta = new Vector2(width, height);
             }
 
@@ -2291,6 +2411,7 @@ namespace ModButtons
                 rect.anchoredPosition = Vector2.zero;
                 rect.sizeDelta = new Vector2(width, height);
             }
+            StretchButtonToFillRoot(buttonObject, button);
             DisableChildRaycastTargets(buttonObject);
             return button;
         }
@@ -2299,7 +2420,9 @@ namespace ModButtons
             Transform parent,
             GameObject templateButton,
             ActionInputDefinition definition,
-            float width)
+            float width,
+            GameObject form,
+            float baseFormHeight)
         {
             if (parent == null || definition == null) return null;
 
@@ -2324,14 +2447,14 @@ namespace ModButtons
                     binding.Slider = CreateSliderControl(group.transform, definition, width);
                     break;
                 case ActionInputKind.Dropdown:
-                    binding.Dropdown = CreateDropdownControl(group.transform, definition, width, binding, templateButton);
+                    CreateDropdownControl(group.transform, definition, width, binding, templateButton, form, baseFormHeight);
                     break;
                 default:
                     binding.TextInput = CreateTextInputControl(group.transform, definition, width);
                     break;
             }
 
-            if (binding.TextInput == null && binding.Slider == null && binding.Dropdown == null &&
+            if (binding.TextInput == null && binding.Slider == null &&
                 definition.InputKind != ActionInputKind.Dropdown)
             {
                 UnityEngine.Object.Destroy(group);
@@ -2363,7 +2486,9 @@ namespace ModButtons
             Transform parent,
             GameObject templateButton,
             ActionInputDefinition definition,
-            float width)
+            float width,
+            GameObject form,
+            float baseFormHeight)
         {
             if (parent == null || definition == null) return null;
 
@@ -2398,14 +2523,14 @@ namespace ModButtons
                     binding.Slider = CreateSliderControl(group.transform, definition, width);
                     break;
                 case ActionInputKind.Dropdown:
-                    binding.Dropdown = CreateDropdownControl(group.transform, definition, width, binding, templateButton);
+                    CreateDropdownControl(group.transform, definition, width, binding, templateButton, form, baseFormHeight);
                     break;
                 default:
                     binding.TextInput = CreateTextInputControl(group.transform, definition, width);
                     break;
             }
 
-            if (binding.TextInput == null && binding.Slider == null && binding.Dropdown == null &&
+            if (binding.TextInput == null && binding.Slider == null &&
                 definition.InputKind != ActionInputKind.Dropdown)
             {
                 UnityEngine.Object.Destroy(group);
@@ -2657,56 +2782,21 @@ namespace ModButtons
             return root;
         }
 
-        private static CustomDropdown CreateDropdownControl(
+        private static void CreateDropdownControl(
             Transform parent,
             ActionInputDefinition definition,
             float width,
             ActionInputBinding binding,
-            GameObject templateButton)
+            GameObject templateButton,
+            GameObject form,
+            float baseFormHeight)
         {
-            CustomDropdown template = FindTemplate<CustomDropdown>();
-            if (template == null)
+            if (parent == null || definition == null || binding == null || definition.Options == null ||
+                definition.Options.Count == 0)
             {
-                CreateDropdownFallback(parent, definition, width, binding, templateButton);
-                return null;
+                return;
             }
 
-            GameObject dropdownObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-            CustomDropdown dropdown = dropdownObject.GetComponent<CustomDropdown>() ?? dropdownObject.GetComponentInChildren<CustomDropdown>(true);
-            if (dropdown == null)
-            {
-                UnityEngine.Object.Destroy(dropdownObject);
-                return null;
-            }
-
-            dropdownObject.name = "Dropdown";
-            dropdownObject.SetActive(true);
-            SetLayerRecursively(dropdownObject, parent.gameObject.layer);
-            dropdown.saveSelected = false;
-            dropdown.invokeAtStart = false;
-            dropdown.dropdownItems.Clear();
-            for (int i = 0; i < definition.Options.Count; i++)
-            {
-                dropdown.CreateNewItemFast(definition.Options[i].Label, null);
-            }
-
-            binding.DropdownIndex = GetDefaultDropdownIndex(definition);
-            dropdown.dropdownEvent = new CustomDropdown.DropdownEvent();
-            dropdown.dropdownEvent.AddListener(index => binding.DropdownIndex = Mathf.Clamp(index, 0, definition.Options.Count - 1));
-            dropdown.SetupDropdown();
-            dropdown.ChangeDropdownInfo(binding.DropdownIndex);
-            dropdown.selectedItemIndex = binding.DropdownIndex;
-            ConfigureControlLayout(dropdownObject, width, FormControlHeight);
-            return dropdown;
-        }
-
-        private static void CreateDropdownFallback(
-            Transform parent,
-            ActionInputDefinition definition,
-            float width,
-            ActionInputBinding binding,
-            GameObject templateButton)
-        {
             GameObject selectorObject = templateButton != null
                 ? UnityEngine.Object.Instantiate(templateButton, parent, false)
                 : new GameObject("Dropdown", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -2714,13 +2804,44 @@ namespace ModButtons
             selectorObject.name = "Dropdown";
             selectorObject.SetActive(true);
             SetLayerRecursively(selectorObject, parent.gameObject.layer);
+            SetCanvasGroupsVisible(selectorObject);
             binding.DropdownIndex = GetDefaultDropdownIndex(definition);
 
             Button selector = selectorObject.GetComponent<Button>() ?? selectorObject.GetComponentInChildren<Button>(true);
-            if (selector == null) return;
+            if (selector == null)
+            {
+                UnityEngine.Object.Destroy(selectorObject);
+                return;
+            }
+
             selector.onClick = new Button.ButtonClickedEvent();
+            ResetActionButtonLanguageBindings(selectorObject, string.Empty);
             TextMeshProUGUI text = selectorObject.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
             if (text == null) text = CreateActionButtonText(selectorObject);
+            if (text != null)
+            {
+                text.gameObject.SetActive(true);
+                text.enableWordWrapping = false;
+                text.overflowMode = TextOverflowModes.Ellipsis;
+            }
+
+            RectTransform selectorRect = selectorObject.GetComponent<RectTransform>();
+            if (selectorRect != null) selectorRect.localScale = Vector3.one;
+            ConfigureControlLayout(selectorObject, width, FormControlHeight);
+            StretchButtonToFillRoot(selectorObject, selector);
+            DisableChildRaycastTargets(selectorObject);
+
+            Transform menuParent = form != null ? form.transform : parent;
+            GameObject menu = CreateDropdownMenu(menuParent, definition, width);
+            ActionHubPopupLayout popupLayout = activePopupLayout;
+            ActionHubDropdownState dropdownState = new ActionHubDropdownState
+            {
+                Form = form,
+                Menu = menu,
+                BaseFormHeight = baseFormHeight,
+                ExpandedHeight = FormSpacing + GetDropdownMenuHeight(definition)
+            };
+
             Action refresh = () =>
             {
                 if (text != null && definition.Options.Count > 0)
@@ -2728,13 +2849,139 @@ namespace ModButtons
                     text.text = definition.Options[binding.DropdownIndex].Label;
                 }
             };
+
+            dropdownState.PopulateMenu = () =>
+            {
+                for (int i = 0; i < definition.Options.Count; i++)
+                {
+                    int optionIndex = i;
+                    Button optionButton = CreateDropdownOptionButton(
+                        menu != null ? menu.transform : null,
+                        templateButton,
+                        definition.Options[optionIndex].Label,
+                        width,
+                        optionIndex);
+                    if (optionButton == null) continue;
+
+                    optionButton.onClick.AddListener(() =>
+                    {
+                        binding.DropdownIndex = optionIndex;
+                        refresh();
+                        if (popupLayout != null)
+                        {
+                            popupLayout.CloseDropdown(dropdownState);
+                        }
+                        else if (menu != null)
+                        {
+                            menu.SetActive(false);
+                        }
+                    });
+                }
+            };
+
             selector.onClick.AddListener(() =>
             {
-                binding.DropdownIndex = (binding.DropdownIndex + 1) % definition.Options.Count;
-                refresh();
+                if (popupLayout != null)
+                {
+                    popupLayout.ToggleDropdown(dropdownState);
+                }
+                else if (menu != null)
+                {
+                    menu.SetActive(!menu.activeSelf);
+                }
             });
             refresh();
-            ConfigureControlLayout(selectorObject, width, FormControlHeight);
+        }
+
+        private static GameObject CreateDropdownMenu(
+            Transform parent,
+            ActionInputDefinition definition,
+            float width)
+        {
+            if (parent == null || definition == null) return null;
+
+            float height = GetDropdownMenuHeight(definition);
+            GameObject menu = new GameObject(
+                "DropdownOptions",
+                typeof(RectTransform),
+                typeof(LayoutElement));
+            menu.transform.SetParent(parent, false);
+            SetLayerRecursively(menu, parent.gameObject.layer);
+
+            RectTransform menuRect = menu.GetComponent<RectTransform>();
+            menuRect.sizeDelta = new Vector2(width, height);
+
+            LayoutElement menuLayout = menu.GetComponent<LayoutElement>();
+            menuLayout.minWidth = width;
+            menuLayout.preferredWidth = width;
+            menuLayout.minHeight = height;
+            menuLayout.preferredHeight = height;
+
+            menu.SetActive(false);
+            return menu;
+        }
+
+        private static Button CreateDropdownOptionButton(
+            Transform parent,
+            GameObject templateButton,
+            string label,
+            float width,
+            int optionIndex)
+        {
+            if (parent == null) return null;
+
+            GameObject optionObject = templateButton != null
+                ? UnityEngine.Object.Instantiate(templateButton, parent, false)
+                : new GameObject("Option", typeof(RectTransform), typeof(Image), typeof(Button));
+            if (templateButton == null) optionObject.transform.SetParent(parent, false);
+            optionObject.name = "Option_" + (label ?? string.Empty);
+            optionObject.SetActive(true);
+            SetLayerRecursively(optionObject, parent.gameObject.layer);
+            SetCanvasGroupsVisible(optionObject);
+
+            Button optionButton = optionObject.GetComponent<Button>() ?? optionObject.GetComponentInChildren<Button>(true);
+            if (optionButton == null)
+            {
+                UnityEngine.Object.Destroy(optionObject);
+                return null;
+            }
+
+            optionButton.onClick = new Button.ButtonClickedEvent();
+            ResetActionButtonLanguageBindings(optionObject, label);
+            TextMeshProUGUI text = optionObject.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault();
+            if (text == null) text = CreateActionButtonText(optionObject);
+            if (text != null)
+            {
+                text.gameObject.SetActive(true);
+                text.text = label ?? string.Empty;
+                text.enableWordWrapping = false;
+                text.overflowMode = TextOverflowModes.Ellipsis;
+            }
+
+            RectTransform optionRect = optionObject.GetComponent<RectTransform>();
+            if (optionRect != null)
+            {
+                optionRect.anchorMin = new Vector2(0.5f, 1f);
+                optionRect.anchorMax = new Vector2(0.5f, 1f);
+                optionRect.pivot = new Vector2(0.5f, 1f);
+                optionRect.anchoredPosition = new Vector2(
+                    0f,
+                    -optionIndex * (FormActionButtonHeight + DropdownOptionSpacing));
+                optionRect.localScale = Vector3.one;
+                optionRect.sizeDelta = new Vector2(width, FormActionButtonHeight);
+            }
+
+            LayoutElement optionLayout = optionObject.GetComponent<LayoutElement>() ?? optionObject.AddComponent<LayoutElement>();
+            // The menu lays out its rows explicitly.  Prefab layout components
+            // otherwise collapse all cloned option buttons into the first row.
+            optionLayout.ignoreLayout = true;
+            optionLayout.minWidth = width;
+            optionLayout.preferredWidth = width;
+            optionLayout.minHeight = FormActionButtonHeight;
+            optionLayout.preferredHeight = FormActionButtonHeight;
+            StretchButtonToFillRoot(optionObject, optionButton);
+            DisableChildRaycastTargets(optionObject);
+            return optionButton;
         }
 
         private static int GetDefaultDropdownIndex(ActionInputDefinition definition)
@@ -2743,7 +2990,7 @@ namespace ModButtons
             string defaultValue = definition.DefaultValue;
             if (string.Equals(definition.Id, "cosmo_mod_language", StringComparison.Ordinal))
             {
-                string selected = CosmoModLibrary.CosmoLocalizationOverride.GetSelectedLanguage();
+                string selected = ModLocalization.GetSelectedLanguage();
                 defaultValue = string.IsNullOrEmpty(selected) ? "game" : selected;
             }
 
@@ -2759,7 +3006,11 @@ namespace ModButtons
         {
             if (control == null) return;
             RectTransform rect = control.GetComponent<RectTransform>();
-            if (rect != null) rect.sizeDelta = new Vector2(width, height);
+            if (rect != null)
+            {
+                rect.localScale = Vector3.one;
+                rect.sizeDelta = new Vector2(width, height);
+            }
             LayoutElement layout = control.GetComponent<LayoutElement>() ?? control.AddComponent<LayoutElement>();
             layout.ignoreLayout = false;
             layout.minWidth = width;
@@ -2912,7 +3163,7 @@ namespace ModButtons
             }
 
             string raw;
-            if (binding.Dropdown != null || binding.Definition.InputKind == ActionInputKind.Dropdown)
+            if (binding.Definition.InputKind == ActionInputKind.Dropdown)
             {
                 List<ActionInputOption> options = binding.Definition.Options;
                 if (options == null || options.Count == 0)
@@ -3056,6 +3307,27 @@ namespace ModButtons
                 Graphic graphic = graphics[i];
                 if (graphic == null || graphic.gameObject == button) continue;
                 graphic.raycastTarget = false;
+            }
+        }
+
+        private static void StretchButtonToFillRoot(GameObject root, Button button)
+        {
+            if (root == null || button == null) return;
+
+            Transform current = button.transform;
+            while (current != null && current != root.transform)
+            {
+                RectTransform rect = current as RectTransform;
+                if (rect != null)
+                {
+                    rect.anchorMin = Vector2.zero;
+                    rect.anchorMax = Vector2.one;
+                    rect.pivot = new Vector2(0.5f, 0.5f);
+                    rect.anchoredPosition = Vector2.zero;
+                    rect.sizeDelta = Vector2.zero;
+                    rect.localScale = Vector3.one;
+                }
+                current = current.parent;
             }
         }
 

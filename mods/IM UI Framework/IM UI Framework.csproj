@@ -10,8 +10,10 @@
     <Compile Include="src\IMUiFramework.cs" />
     <Compile Include="src\IMUiBridges.cs" />
     <Compile Include="src\IMUiTween.cs" />
-    <Compile Include="src\ModLocalization.cs" />
-    <Compile Include="..\Shared\CosmoLocalizationOverride.cs" Link="src\CosmoLocalizationOverride.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mod Localization System\Mod Localization System.csproj" Private="false" />
   </ItemGroup>
 
   <ItemGroup>

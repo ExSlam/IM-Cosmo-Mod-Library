@@ -1,6 +1,6 @@
 {
   "Title": "UI Recovery Tools",
-  "Description": "Adds configurable single-key recovery hotkeys + error overlay. Edit UIRecoveryTools.config.ini to set keys. Defaults: F9 clear blur/input, F10 toggle overlay.",
+  "Description": "Adds configurable single-key recovery hotkeys + error overlay. Edit UIRecoveryTools.config.ini to set keys. Defaults: F9 clear blur/input, F10 toggle overlay. Requires Mod Localization System (com.cosmo.modlocalizationsystem).",
   "Author": "Cosmo",
   "Version": "0.2.0",
   "Tags": ["ui", "debug", "qol"],

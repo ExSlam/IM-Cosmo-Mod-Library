@@ -1,6 +1,6 @@
 {
   "Title": "Graduation Rebalances",
-  "Description": "Pushes graduation dates back for high-performing idols.",
+  "Description": "Pushes graduation dates back for high-performing idols. Requires Mod Localization System (com.cosmo.modlocalizationsystem).",
   "Author": "Cosmo",
   "Version": "0.2.6",
   "Tags": ["gameplay", "balance"],

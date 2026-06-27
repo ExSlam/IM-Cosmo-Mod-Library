@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
+using ModLocalizationSystem;
 using SimpleJSON;
 using TMPro;
 using UnityEngine;
@@ -69,6 +70,7 @@ namespace IdolCareerDiary
         internal const string InfoJsonFileName = "info.json";
         internal const string InfoTitleField = "Title";
         internal const string InfoHarmonyIdField = "HarmonyID";
+        internal const string InternalEventLedgerNamespace = "data";
         internal static readonly string LabelModSourcePrefix = ModLocalization.Get("LabelModSourcePrefix", "From mod:");
         internal static readonly string ConfigCommentHeader = ModLocalization.Get("ConfigCommentHeader", "# IdolCareerDiary configuration");
         internal static readonly string ConfigCommentShowUnknownSocialParticipants = ModLocalization.Get("ConfigCommentShowUnknownSocialParticipants", "# Show social-event participants even when producer does not know them.");
@@ -133,7 +135,7 @@ namespace IdolCareerDiary
         internal static readonly string LabelBullying = ModLocalization.Get("LabelBullying", "Bullying");
         internal static readonly string LabelStory = ModLocalization.Get("LabelStory", "Story");
         internal static readonly string LabelSingleStatus = ModLocalization.Get("LabelSingleStatus", "Single");
-        internal static readonly string LabelNotKnownToProducer = ModLocalization.Get("LabelNotKnownToProducer", "[Not known to producer]");
+        internal static readonly string LabelNotKnownToProducer = ModLocalization.Get("LabelNotKnownToProducer", "[Not known to Producer]");
         internal static readonly string LabelCastThisEpisodePrefix = ModLocalization.Get("LabelCastThisEpisodePrefix", "Cast this episode: ");
         internal static readonly string LabelEpisodesReleasedPrefix = ModLocalization.Get("LabelEpisodesReleasedPrefix", "Episodes Released This Week: ");
         internal static readonly string LabelEpisodeReleasedPrefix = ModLocalization.Get("LabelEpisodeReleasedPrefix", "Episode Released This Week: ");
@@ -237,6 +239,11 @@ namespace IdolCareerDiary
         internal static readonly string OpenIdolSuffix = ModLocalization.Get("OpenIdolSuffix", " profile");
 
         internal static readonly string DateFormatUi = ModLocalization.Get("DateFormatUi", "ddd, dd MMM yyyy");
+        internal static readonly string[] EnglishAbbreviatedMonthTokens =
+        {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec"
+        };
         internal static readonly string TextDurationUnitDaySingular = ModLocalization.Get("TextDurationUnitDaySingular", "day");
         internal static readonly string TextDurationUnitDayPlural = ModLocalization.Get("TextDurationUnitDayPlural", "days");
         internal static readonly string TextDurationUnitWeekSingular = ModLocalization.Get("TextDurationUnitWeekSingular", "week");
@@ -345,6 +352,7 @@ namespace IdolCareerDiary
         internal const int SenbatsuMaximumSlots = 15;
         internal const int SingleSenbatsuGridColumnCount = 5;
         internal const int UnknownChartPosition = 0;
+        internal const int UnknownGraduationYear = 1900;
         internal const int InvalidMonthId = -1;
         internal const int ReleaseDateChartMonthOffset = 1;
         internal const int SenbatsuDisplayIndexOffset = 1;
@@ -379,8 +387,16 @@ namespace IdolCareerDiary
         internal const string LanguageKeyActivitySpaTreatment = "ACTIVITIES__SPATREATMENT";
         internal const string LanguageKeySingleGenre = "SINGLE__GENRE";
         internal const string LanguageKeySingleLyrics = "SINGLE__LYRICS";
+        internal const string LanguageKeySingleSong = "SINGLE__SONG";
         internal const string LanguageKeySingleChoreography = "SINGLE__CHOREO";
         internal const string LanguageKeySingleMarketing = "SINGLE__MARKETING";
+        internal const string LanguageKeyMediaPreproduction = "MEDIA__PREPROD";
+        internal const string LanguageKeyMediaConcept = "MEDIA__CONCEPT";
+        internal const string LanguageKeySingleReleased = "SINGLES__RELEASED";
+        internal const string LanguageKeyProfileBestFriends = "PROFILE__BEST_FRIENDS";
+        internal const string LanguageKeyProfileFriends = "PROFILE__FRIENDS";
+        internal const string LanguageKeyProfileDislikes = "PROFILE__DISLIKES";
+        internal const string LanguageKeyProfileHates = "PROFILE__HATES";
         internal const string LanguageKeyShowRadio = "SHOW__RADIO";
         internal const string LanguageKeyShowInternet = "SHOW__INTERNET";
         internal const string LanguageKeyShowTv = "SHOW__TV";
@@ -1675,6 +1691,8 @@ namespace IdolCareerDiary
         internal const string KeySingleIsDigital = "single_is_digital";
         internal const string CodeDigital = "digital";
         internal const string CodePhysical = "physical";
+        internal const string CodeReleased = "released";
+        internal const string CodeConcept = "concept";
         internal const string KeySingleLinkedElectionId = "single_linked_election_id";
         internal static readonly string TextLinkedElection = ModLocalization.Get("TextLinkedElection", "Linked Election: #");
         internal static readonly string TextTvShowCreated = ModLocalization.Get("TextTvShowCreated", "TV Show Created");
@@ -3977,6 +3995,13 @@ namespace IdolCareerDiary
             string namespaceId = NormalizeInfoToken(ev.NamespaceId);
             string sourcePatch = NormalizeInfoToken(ev.SourcePatch);
 
+            // "data" is an internal event-ledger namespace, not a player
+            // installed mod.  Do not expose it as a misleading source label.
+            if (string.Equals(namespaceId, C.InternalEventLedgerNamespace, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
             lock (Sync)
             {
                 string title = ResolveByExactTokenUnsafe(namespaceId);
@@ -4378,6 +4403,139 @@ namespace IdolCareerDiary
             catch
             {
                 return string.Empty;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reuses exact English player-facing values from installed mods, then asks
+    /// Mod Localization System for that owning mod's selected translation. This
+    /// keeps stored IM Data Core text such as Assistant Manager staff roles from
+    /// remaining English in Career Diary.
+    /// </summary>
+    internal static class ExternalModLocalizationCatalog
+    {
+        private sealed class Entry
+        {
+            internal ModLocalizer Localizer;
+            internal string Key = string.Empty;
+            internal string EnglishValue = string.Empty;
+        }
+
+        private static readonly object Sync = new object();
+        private static readonly List<Entry> Entries = new List<Entry>();
+        private static bool loaded;
+
+        internal static string ResolveEnglishText(string rawText)
+        {
+            string candidate = (rawText ?? string.Empty).Trim();
+            if (candidate.Length == C.ZeroIndex)
+            {
+                return rawText ?? string.Empty;
+            }
+
+            EnsureLoaded();
+            lock (Sync)
+            {
+                for (int index = C.ZeroIndex; index < Entries.Count; index++)
+                {
+                    Entry entry = Entries[index];
+                    if (!string.Equals(entry.EnglishValue, candidate, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    string localized = entry.Localizer.Get(entry.Key, candidate);
+                    if (!string.IsNullOrEmpty(localized) &&
+                        !string.Equals(localized, candidate, StringComparison.Ordinal))
+                    {
+                        return localized;
+                    }
+                }
+            }
+
+            return rawText ?? string.Empty;
+        }
+
+        private static void EnsureLoaded()
+        {
+            lock (Sync)
+            {
+                if (loaded)
+                {
+                    return;
+                }
+
+                loaded = true;
+                List<string> roots = ModInfoCatalog.GetCandidateModRoots();
+                for (int rootIndex = C.ZeroIndex; rootIndex < roots.Count; rootIndex++)
+                {
+                    LoadRoot(roots[rootIndex]);
+                }
+            }
+        }
+
+        private static void LoadRoot(string root)
+        {
+            if (string.IsNullOrEmpty(root))
+            {
+                return;
+            }
+
+            string modDirectory = root;
+            string englishPath = Path.Combine(root, "Localization", "en", "strings.txt");
+            if (!File.Exists(englishPath))
+            {
+                modDirectory = Path.Combine(root, "assets");
+                englishPath = Path.Combine(modDirectory, "Localization", "en", "strings.txt");
+            }
+
+            if (!File.Exists(englishPath))
+            {
+                return;
+            }
+
+            string[] lines;
+            try
+            {
+                lines = File.ReadAllLines(englishPath);
+            }
+            catch
+            {
+                return;
+            }
+
+            ModLocalizer localizer = ModLocalization.ForDirectory(modDirectory);
+            for (int lineIndex = C.ZeroIndex; lineIndex < lines.Length; lineIndex++)
+            {
+                string rawLine = lines[lineIndex] ?? string.Empty;
+                string trimmedLine = rawLine.Trim();
+                if (trimmedLine.Length == C.ZeroIndex || trimmedLine.StartsWith("#") ||
+                    trimmedLine.StartsWith(";") || trimmedLine.StartsWith("//"))
+                {
+                    continue;
+                }
+
+                int separator = rawLine.IndexOf('=');
+                if (separator <= C.ZeroIndex)
+                {
+                    continue;
+                }
+
+                string key = rawLine.Substring(C.ZeroIndex, separator).Trim();
+                string englishValue = rawLine.Substring(separator + C.LastFromCount).Trim();
+                if (key.Length == C.ZeroIndex || englishValue.Length < 4 ||
+                    englishValue.IndexOf('{') >= C.ZeroIndex || englishValue.IndexOf('@') >= C.ZeroIndex)
+                {
+                    continue;
+                }
+
+                Entries.Add(new Entry
+                {
+                    Localizer = localizer,
+                    Key = key,
+                    EnglishValue = englishValue
+                });
             }
         }
     }
@@ -6657,7 +6815,14 @@ namespace IdolCareerDiary
                 AddCodeLineIfKnown(lines, C.LabelType, ReadStr(payload, C.KeyIdolType));
                 AddIntLineIfPositive(lines, C.LabelAge, ReadInt(payload, C.KeyIdolAge));
                 AddDateLineIfKnown(lines, C.TextHiringDate, ReadStr(payload, C.KeyIdolHiringDate));
-                AddDateLineIfKnown(lines, C.TextGraduationDate, ReadStr(payload, C.KeyIdolGraduationDate));
+                if (type == C.EventIdolHired)
+                {
+                    AddGraduationDateLine(lines, ReadStr(payload, C.KeyIdolGraduationDate));
+                }
+                else
+                {
+                    AddDateLineIfKnown(lines, C.TextGraduationDate, ReadStr(payload, C.KeyIdolGraduationDate));
+                }
                 AddRawLineIfKnown(lines, C.LabelTrivia, ReadStr(payload, C.KeyIdolCustomTrivia));
                 AddRawLineIfKnown(lines, C.LabelTrivia, ReadStr(payload, C.KeyIdolTrivia));
 
@@ -12486,7 +12651,8 @@ namespace IdolCareerDiary
             {
                 StaffId = ReadInt(payload, normalizedPrefix + "staff_id"),
                 Name = name,
-                Role = ReadStr(payload, normalizedPrefix + "staff_role"),
+                Role = ExternalModLocalizationCatalog.ResolveEnglishText(
+                    ReadStr(payload, normalizedPrefix + "staff_role")),
                 TypeRaw = ReadInt(payload, normalizedPrefix + "staff_type_raw"),
                 UniqueTypeRaw = ReadInt(payload, normalizedPrefix + "staff_unique_type_raw"),
                 IsPro = ReadBool(payload, normalizedPrefix + "staff_is_pro"),
@@ -13357,6 +13523,12 @@ namespace IdolCareerDiary
         /// </summary>
         private static CultureInfo GetUiDateCulture()
         {
+            CultureInfo overrideCulture = GetSelectedModLanguageDateCulture();
+            if (overrideCulture != null)
+            {
+                return overrideCulture;
+            }
+
             CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
             DateTimeFormatInfo invariantFormat = CultureInfo.InvariantCulture.DateTimeFormat;
 
@@ -13392,6 +13564,40 @@ namespace IdolCareerDiary
             };
             culture.DateTimeFormat.ShortestDayNames = (string[])culture.DateTimeFormat.AbbreviatedDayNames.Clone();
             return culture;
+        }
+
+        /// <summary>
+        /// Uses a language-native date culture when Mod Localization System has
+        /// an explicit override.  This localizes both month and weekday names,
+        /// rather than borrowing the base game's currently selected language.
+        /// </summary>
+        private static CultureInfo GetSelectedModLanguageDateCulture()
+        {
+            string selectedLanguage = (ModLocalization.GetSelectedLanguage() ?? string.Empty).Trim().ToLowerInvariant();
+            string cultureName;
+            switch (selectedLanguage)
+            {
+                case "kr":
+                case "ko":
+                case "ko-kr":
+                    cultureName = "ko-KR";
+                    break;
+                case "fr":
+                case "fr-fr":
+                    cultureName = "fr-FR";
+                    break;
+                default:
+                    return null;
+            }
+
+            try
+            {
+                return (CultureInfo)CultureInfo.GetCultureInfo(cultureName).Clone();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -14787,6 +14993,31 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Adds a graduation date for an idol joining the agency.  A missing
+        /// date and the game's 1900-01-01 sentinel both mean the schedule is
+        /// unknown, but the field should remain visible to the player.
+        /// </summary>
+        private static void AddGraduationDateLine(List<string> lines, string roundTripDate)
+        {
+            DateTime parsed;
+            if (TryParseEventDate(roundTripDate, out parsed) && parsed.Year != C.UnknownGraduationYear)
+            {
+                lines.Add(C.TextGraduationDate + C.SeparatorColonSpace + FormatUiDate(parsed));
+                return;
+            }
+
+            int dateKey;
+            if (TryParseInt(roundTripDate, out dateKey) && TryParseDateKeyForUi(dateKey, out parsed) &&
+                parsed.Year != C.UnknownGraduationYear)
+            {
+                lines.Add(C.TextGraduationDate + C.SeparatorColonSpace + FormatUiDate(parsed));
+                return;
+            }
+
+            lines.Add(C.TextGraduationDate + C.SeparatorColonSpace + C.LabelUnknown);
+        }
+
+        /// <summary>
         /// Adds one date transition line from round-trip date values.
         /// </summary>
         private static void AddDateTransitionLineIfKnown(List<string> lines, string label, string beforeRoundTripDate, string afterRoundTripDate)
@@ -15129,6 +15360,12 @@ namespace IdolCareerDiary
                 return C.LabelUnknown;
             }
 
+            string localizedDate;
+            if (TryLocalizeImDataCoreAbbreviatedMonthDate(trimmed, out localizedDate))
+            {
+                return localizedDate;
+            }
+
             if (string.Equals(trimmed, C.LabelUnknown, StringComparison.OrdinalIgnoreCase))
             {
                 return C.LabelUnknown;
@@ -15157,7 +15394,97 @@ namespace IdolCareerDiary
             }
             // --- NEW LOCALIZATION PATCH END ---
 
+            string externalModText = ExternalModLocalizationCatalog.ResolveEnglishText(trimmed);
+            if (!string.Equals(externalModText, trimmed, StringComparison.Ordinal))
+            {
+                return externalModText;
+            }
+
             return trimmed;
+        }
+
+        /// <summary>
+        /// Converts legacy IM Data Core date strings containing English month
+        /// abbreviations before they are shown as otherwise-raw payload text.
+        /// Dedicated date fields already pass through FormatRoundTripDateForUi;
+        /// this covers dates stored in generic text fields by older Core data.
+        /// </summary>
+        private static bool TryLocalizeImDataCoreAbbreviatedMonthDate(string rawText, out string localizedDate)
+        {
+            localizedDate = string.Empty;
+            if (!ContainsEnglishAbbreviatedMonthToken(rawText) || CountNumericRuns(rawText) < 2)
+            {
+                return false;
+            }
+
+            DateTime parsed;
+            if (!TryParseEventDate(rawText, out parsed))
+            {
+                return false;
+            }
+
+            localizedDate = FormatUiDate(parsed);
+            return true;
+        }
+
+        /// <summary>
+        /// Detects a standalone English abbreviated month without matching a
+        /// title that merely starts with the same letters.
+        /// </summary>
+        private static bool ContainsEnglishAbbreviatedMonthToken(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int tokenIndex = C.ZeroIndex; tokenIndex < C.EnglishAbbreviatedMonthTokens.Length; tokenIndex++)
+            {
+                string token = C.EnglishAbbreviatedMonthTokens[tokenIndex];
+                int searchIndex = C.ZeroIndex;
+                while (searchIndex < value.Length)
+                {
+                    int matchIndex = value.IndexOf(token, searchIndex, StringComparison.OrdinalIgnoreCase);
+                    if (matchIndex < C.ZeroIndex)
+                    {
+                        break;
+                    }
+
+                    int endIndex = matchIndex + token.Length;
+                    bool hasLeftBoundary = matchIndex == C.ZeroIndex || !char.IsLetter(value[matchIndex - C.LastFromCount]);
+                    bool hasRightBoundary = endIndex >= value.Length || !char.IsLetter(value[endIndex]);
+                    if (hasLeftBoundary && hasRightBoundary)
+                    {
+                        return true;
+                    }
+
+                    searchIndex = endIndex;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Counts numeric components so names such as "May" are not mistaken
+        /// for dates. Core display dates contain at least day and year numbers.
+        /// </summary>
+        private static int CountNumericRuns(string value)
+        {
+            int count = C.ZeroIndex;
+            bool inNumericRun = false;
+            for (int index = C.ZeroIndex; index < (value ?? string.Empty).Length; index++)
+            {
+                bool isDigit = char.IsDigit(value[index]);
+                if (isDigit && !inNumericRun)
+                {
+                    count++;
+                }
+
+                inNumericRun = isDigit;
+            }
+
+            return count;
         }
 
         /// <summary>
@@ -16837,6 +17164,12 @@ namespace IdolCareerDiary
                 return true;
             }
 
+            if (normalizedCode == "song")
+            {
+                label = GetGameLocalization(C.LanguageKeySingleSong);
+                return true;
+            }
+
             if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.choreography)))
             {
                 label = GetGameLocalization(C.LanguageKeySingleChoreography);
@@ -16846,6 +17179,18 @@ namespace IdolCareerDiary
             if (normalizedCode == NormalizeCodeToken(nameof(singles._param._type.marketing)))
             {
                 label = GetGameLocalization(C.LanguageKeySingleMarketing);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeReleased)
+            {
+                label = GetGameLocalization(C.LanguageKeySingleReleased);
+                return true;
+            }
+
+            if (normalizedCode == C.CodeConcept)
+            {
+                label = GetGameLocalization(C.LanguageKeyMediaConcept);
                 return true;
             }
 
@@ -16876,6 +17221,12 @@ namespace IdolCareerDiary
             if (normalizedCode == spaTreatmentCode || normalizedCode == C.CodeActivityPrefix + spaTreatmentCode)
             {
                 label = GetGameLocalization(C.LanguageKeyActivitySpaTreatment);
+                return true;
+            }
+
+            if (normalizedCode == "preproduction")
+            {
+                label = GetGameLocalization(C.LanguageKeyMediaPreproduction);
                 return true;
             }
 
@@ -17164,6 +17515,30 @@ namespace IdolCareerDiary
         /// </summary>
         private static bool TryResolveGameRelationshipCodeLabel(string normalizedCode, out string label)
         {
+            if (normalizedCode == "best_friends")
+            {
+                label = GetGameLocalization(C.LanguageKeyProfileBestFriends);
+                return true;
+            }
+
+            if (normalizedCode == "friends")
+            {
+                label = GetGameLocalization(C.LanguageKeyProfileFriends);
+                return true;
+            }
+
+            if (normalizedCode == "dislikes")
+            {
+                label = GetGameLocalization(C.LanguageKeyProfileDislikes);
+                return true;
+            }
+
+            if (normalizedCode == "hates")
+            {
+                label = GetGameLocalization(C.LanguageKeyProfileHates);
+                return true;
+            }
+
             if (normalizedCode == NormalizeCodeToken(nameof(Relationships_Player._type.Friendship)))
             {
                 label = Relationships_Player.GetEventName(Relationships_Player._type.Friendship);
@@ -17224,7 +17599,7 @@ namespace IdolCareerDiary
         /// </summary>
         private static bool TryResolveGameBusinessCodeLabel(string normalizedCode, out string label)
         {
-            if (normalizedCode == C.CodePlayer)
+            if (normalizedCode == C.CodePlayer || normalizedCode == "producer")
             {
                 label = GetGameLocalization(C.LanguageKeyResearchProducer);
                 return true;
@@ -17268,14 +17643,21 @@ namespace IdolCareerDiary
                 return string.Empty;
             }
 
+            // When the mod follows Idol Manager, reuse the game's active
+            // language table for concepts it already owns.  An explicit Mod
+            // Localization System override (such as Korean or French) must
+            // instead use this mod's language pack; Language.Data still
+            // represents Idol Manager's separately selected language.
             string gameLabel;
-            if (TryResolveGameCodeLabel(rawCode, out gameLabel))
+            if (string.IsNullOrEmpty(ModLocalization.GetSelectedLanguage()) &&
+                TryResolveGameCodeLabel(rawCode, out gameLabel))
             {
                 return gameLabel;
             }
 
             string normalized = rawCode.Trim().ToLowerInvariant()
-                .Replace(C.SeparatorDash, C.SeparatorUnderscore);
+                .Replace(C.SeparatorDash, C.SeparatorUnderscore)
+                .Replace(".", C.SeparatorUnderscore);
             if (normalized.Length == C.ZeroIndex)
             {
                 return string.Empty;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Michsky.UI.ModernUIPack;
+using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;

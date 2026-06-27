@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Mod Localization System</ModName>
+    <DeployFolderName>Mod Localization System</DeployFolderName>
+    <RootNamespace>ModLocalizationSystem</RootNamespace>
+    <AssemblyName>com.cosmo.modlocalizationsystem</AssemblyName>
+    <Version>1.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\ModLocalization.cs" />
+    <Compile Include="src\LocalizedJsonAssets.cs" />
+  </ItemGroup>
+</Project>

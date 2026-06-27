@@ -1,0 +1,8 @@
+{
+  "Title": "Mod Localization System",
+  "Description": "Shared localization runtime for Idol Manager mods, including localized UI strings, language-aware JSON assets, language fallback, and mod-only language selection.",
+  "Author": "Cosmo",
+  "Version": "1.1.0",
+  "Tags": ["framework", "library", "localization"],
+  "HarmonyID": "com.cosmo.modlocalizationsystem"
+}

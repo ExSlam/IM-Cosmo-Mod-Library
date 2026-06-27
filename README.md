@@ -13,6 +13,7 @@ Source repository for Cosmo's Idol Manager mods.
 - [Graduation Rebalances](mods/Graduation%20Rebalances/README.md) - Pushes graduation dates back for high-performing idols.
 - [Idol Career Diary](mods/Idol%20Career%20Diary/README.md) - Profile-integrated career timeline UI powered by IM Data Core and IM UI Framework.
 - [IM Data Core](mods/IM%20Data%20Core/README.md) - Reusable persistent data and event ledger backend for Idol Manager mods.
+- [Mod Localization System](mods/Mod%20Localization%20System/README.md) - Shared UI-string and language-aware JSON runtime for Harmony and data-only mods.
 - [IM UI Framework](mods/IM%20UI%20Framework/README.md) - Reusable UI toolkit for modders building game-style controls and popups.
 - [Staff Firing Freeze Fix](mods/Staff%20Firing%20Freeze%20Fix/README.md) - Prevents room and business proposal state from getting stuck when staff are fired mid-task.
 - [UI Recovery Tools](mods/UI%20Recovery%20Tools/README.md) - Adds configurable recovery hotkeys and an error overlay for stuck UI states.

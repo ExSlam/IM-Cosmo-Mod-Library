@@ -101,7 +101,7 @@ Each input has an `id`, `type`, and optional label/default/range properties. Inp
 | `integer` / `int` | `int` | A whole-number field. `min` and `max` are validated before invocation. |
 | `float` / `number` | `float` | A decimal-number field. `min` and `max` are validated before invocation. |
 | `slider` | `float` | Uses a game slider template. Defaults to `0`–`100` when no range is supplied. Set `"valueType": "integer"` for an `int` parameter. |
-| `dropdown` / `select` | `string` | Uses a Modern UI Pack dropdown template when available. Supply `options`; set `valueType` to `integer` or `float` when its values should be converted. |
+| `dropdown` / `select` | `string` | Uses an Action Hub-styled expandable list. Supply `options`; set `valueType` to `integer` or `float` when its values should be converted. |
 
 Example with a slider and dropdown:
 
@@ -142,7 +142,9 @@ public static void ApplyPromotion(int budget, string audience)
 }
 ```
 
-For a dropdown, an option may also be a simple string such as `"general"`. Object options allow the player-facing `label` and method argument `value` to differ. If no Modern UI Pack dropdown template is available, Mod Buttons provides a game-styled selector fallback that cycles through the configured options.
+For a dropdown, an option may also be a simple string such as `"general"`. Object options allow the player-facing `label` and method argument `value` to differ. Opening a dropdown expands the Action Hub popup to fit its options (up to the popup's normal scroll limit).
+
+Object options can include `codeLabel`, which localizes the option label from the owning mod's `Localization/<language>/strings.txt` file while preserving the stable `value` passed to the method.
 
 Input actions stay open when validation or method resolution fails and show the failure under the action. They close after the reflected method completes successfully.
 
