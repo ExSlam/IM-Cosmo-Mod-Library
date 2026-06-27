@@ -18,6 +18,19 @@
     </PackageReference>
   </ItemGroup>
 
+  <!--
+    Every localized Cosmo mod embeds the shared string-localization runtime.
+    This keeps its UI translations working even when Steam has not installed
+    the standalone Mod Localization System dependency. The standalone mod owns
+    only the global JSON interception patches needed by data-only content mods.
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\assets\Localization') Or Exists('$(MSBuildProjectDirectory)\assets\Localizations')">
+    <Compile
+      Include="$(MSBuildThisFileDirectory)mods\Mod Localization System\src\ModLocalization.cs"
+      Link="src\ModLocalization.cs"
+      Condition="'$(MSBuildProjectName)' != 'Mod Localization System'" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="Assembly-CSharp" Private="false">
       <HintPath>$(dllDir)\Assembly-CSharp.dll</HintPath>

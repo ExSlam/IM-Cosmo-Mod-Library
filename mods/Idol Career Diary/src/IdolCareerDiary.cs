@@ -13578,7 +13578,7 @@ namespace IdolCareerDiary
             {
                 case "en":
                 case "english":
-                    cultureName = "en-US";
+                    cultureName = "en";
                     break;
                 case "kr":
                 case "ko":

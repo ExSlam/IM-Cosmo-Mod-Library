@@ -13,10 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mod Localization System\Mod Localization System.csproj" Private="false" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="DOTween" Private="false">
       <HintPath>$(dllDir)\DOTween.dll</HintPath>
     </Reference>

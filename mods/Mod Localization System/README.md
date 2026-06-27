@@ -11,6 +11,18 @@ JSON mods to use the same language selection and fallback rules as UI strings.
 An explicit empty value such as `OpenIdolPrefix=` is preserved as a translation;
 it does not fall back to English. This supports languages with different word order.
 
+## Embedded UI fallback in Cosmo mods
+
+Every Cosmo project containing `assets/Localization` compiles the shared
+`ModLocalization.cs` source into its own DLL. Those mods therefore keep their UI
+translations when Steam installs or updates them without also subscribing the
+player to this standalone framework mod.
+
+The source is linked centrally by `Directory.Build.props`; it is not maintained as
+separate copy-pasted implementations. Installing the standalone Mod Localization
+System remains necessary for automatic localized-JSON interception, especially for
+data-only mods. It is not required for the embedded UI-string fallback.
+
 ## Mod author usage
 
 Reference `com.cosmo.modlocalizationsystem.dll` with `Private` set to `false` so the

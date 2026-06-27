@@ -9,8 +9,4 @@
   <ItemGroup>
     <Compile Include="src\GraduationDetails.cs" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Mod Localization System\Mod Localization System.csproj" Private="false" />
-  </ItemGroup>
 </Project>
