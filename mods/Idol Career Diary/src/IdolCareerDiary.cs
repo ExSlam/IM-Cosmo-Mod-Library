@@ -13523,10 +13523,10 @@ namespace IdolCareerDiary
         /// </summary>
         private static CultureInfo GetUiDateCulture()
         {
-            CultureInfo overrideCulture = GetSelectedModLanguageDateCulture();
-            if (overrideCulture != null)
+            CultureInfo gameLanguageCulture = GetGameLanguageDateCulture();
+            if (gameLanguageCulture != null)
             {
-                return overrideCulture;
+                return gameLanguageCulture;
             }
 
             CultureInfo culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
@@ -13567,24 +13567,52 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Uses a language-native date culture when Mod Localization System has
-        /// an explicit override.  This localizes both month and weekday names,
-        /// rather than borrowing the base game's currently selected language.
+        /// Uses a language-native date culture matching Idol Manager's selected
+        /// language so both month and weekday names are localized consistently.
         /// </summary>
-        private static CultureInfo GetSelectedModLanguageDateCulture()
+        private static CultureInfo GetGameLanguageDateCulture()
         {
-            string selectedLanguage = (ModLocalization.GetSelectedLanguage() ?? string.Empty).Trim().ToLowerInvariant();
+            string selectedLanguage = (ModLocalization.GetEffectiveLanguageCode() ?? string.Empty).Trim().ToLowerInvariant();
             string cultureName;
             switch (selectedLanguage)
             {
+                case "en":
+                case "english":
+                    cultureName = "en-US";
+                    break;
                 case "kr":
                 case "ko":
                 case "ko-kr":
+                case "korean":
                     cultureName = "ko-KR";
                     break;
                 case "fr":
                 case "fr-fr":
+                case "french":
                     cultureName = "fr-FR";
+                    break;
+                case "cn":
+                case "zh":
+                case "zh-cn":
+                case "zh-hans":
+                case "schinese":
+                    cultureName = "zh-CN";
+                    break;
+                case "jp":
+                case "ja":
+                case "ja-jp":
+                case "japanese":
+                    cultureName = "ja-JP";
+                    break;
+                case "ru":
+                case "ru-ru":
+                case "russian":
+                    cultureName = "ru-RU";
+                    break;
+                case "ptbr":
+                case "pt-br":
+                case "brazilian":
+                    cultureName = "pt-BR";
                     break;
                 default:
                     return null;
@@ -17643,14 +17671,10 @@ namespace IdolCareerDiary
                 return string.Empty;
             }
 
-            // When the mod follows Idol Manager, reuse the game's active
-            // language table for concepts it already owns.  An explicit Mod
-            // Localization System override (such as Korean or French) must
-            // instead use this mod's language pack; Language.Data still
-            // represents Idol Manager's separately selected language.
+            // Mod Localization System follows Idol Manager's selected language,
+            // so reuse the game's terminology for concepts it already owns.
             string gameLabel;
-            if (string.IsNullOrEmpty(ModLocalization.GetSelectedLanguage()) &&
-                TryResolveGameCodeLabel(rawCode, out gameLabel))
+            if (TryResolveGameCodeLabel(rawCode, out gameLabel))
             {
                 return gameLabel;
             }

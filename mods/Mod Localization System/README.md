@@ -2,7 +2,7 @@
 
 `Mod Localization System` is a standalone runtime dependency for Idol Manager mods.
 It loads `Localization/<language>/strings.txt` relative to the calling mod's DLL,
-with English loaded first as a safe fallback.
+with `Localization/en/strings.txt` required as the safe fallback.
 
 It also selects complete language-specific JSON assets for both Harmony and
 data-only mods. This allows event, dialogue, trivia, policy, and other text-heavy
@@ -32,15 +32,13 @@ string title = ModLocalization.Get("menu.title", "My Mod");
 string rawText = ModLocalization.GetRaw("POLICY_TITLE");
 ```
 
-The runtime resolves the active Idol Manager language, then tries sensible exact,
-parent-tag, and legacy-folder candidates. For example, `fr-CA` can use `fr`, and
-`ko` can use the bundled legacy `kr` folder.
+The runtime always follows Idol Manager's selected language. There is no separate
+mod-language override. It tries exact, parent-tag, and legacy-folder candidates;
+for example, `fr-CA` can use `fr`, and `ko` can use the legacy `kr` folder.
 
-Use `ModLocalization.LanguageChanged` to refresh runtime UI that can update without
-a restart. `SetSelectedLanguage("game")` follows Idol Manager; any valid BCP 47-like
-tag such as `fr`, `kr`, or `de` can be selected as a mod-only override.
-The selected-language override is saved as `localization.ini` beside the installed
-`Mod Localization System` DLL.
+The currently established language folders are `en`, `fr`, `kr`, `cn`, `jp`,
+`ru`, and `ptbr`. The resolver is not limited to those codes: another valid
+language tag works when a mod supplies a corresponding localization folder.
 
 Tools that render another mod's action definitions can use
 `ModLocalization.ForDirectory(mod.Path)` to localize that mod's own assets without
@@ -48,18 +46,19 @@ copying the parser.
 
 ## Localized JSON assets
 
-Keep the normal JSON file as the compatibility fallback. Put translated copies
-under `Localization/<language>/` and preserve the entire original relative path:
+Every localized JSON copy, including English, must live under its own
+`Localization/<language>/` directory while preserving the original relative path:
 
 ```text
 My Event Mod/
 ├── info.json
-├── JSON/
-│   └── Events/
-│       ├── dialogues.json
-│       ├── random_events.json
-│       └── characters.json
 └── Localization/
+    ├── en/
+    │   └── JSON/
+    │       └── Events/
+    │           ├── dialogues.json
+    │           ├── random_events.json
+    │           └── characters.json
     ├── fr/
     │   └── JSON/
     │       └── Events/
@@ -80,10 +79,15 @@ only needs the shared Mod Localization System installed and enabled. It also wor
 automatically for Harmony mods whose JSON uses the normal Idol Manager directory
 layout.
 
-Resolution order is the selected exact language, its compatible aliases and
-parent language, `Localization/en/`, then the normal file at the mod root. For
-example, `fr-CA` can use `Localization/fr/`, and `ko` can use the legacy
-`Localization/kr/` folder.
+`Localization/en/<relative path>` is required for each automatically localized
+JSON asset. Resolution uses Idol Manager's exact language, compatible aliases and
+parent language, then the English localized file. A root file such as
+`JSON/Events/dialogues.json` is never treated as an English localization.
+
+If a mod has only the vanilla root JSON structure and no matching English file
+under `Localization/en/`, the framework leaves that mod completely untouched.
+This prevents ordinary single-language content mods from being mistaken for
+localized mods.
 
 Localized JSON files are whole-file replacements, not key-level merges. Keep IDs,
 conditions, actions, and other non-text data synchronized across every copy.
@@ -95,6 +99,8 @@ If a DLL reads a JSON file itself instead of asking Idol Manager for a standard
 
 ```csharp
 string path = ModLocalization.GetLocalizedAssetPath("Data/dialogues.json");
+if (string.IsNullOrEmpty(path))
+    throw new FileNotFoundException("Missing Localization/en/Data/dialogues.json");
 string json = File.ReadAllText(path);
 ```
 
@@ -106,12 +112,11 @@ string path = ModLocalization
     .GetLocalizedAssetPath("Data/dialogues.json");
 ```
 
-The API supports any relative asset path. Automatic game interception is
+The API supports any relative asset path but still requires its English copy
+inside `Localization/en/`. Automatic game interception is
 deliberately restricted to JSON below the standard `JSON/` directory so localized
 data cannot unexpectedly replace unrelated images, audio, configuration, or mod
 metadata.
 
-Idol Manager parses most JSON data during startup. Changing the mod-language
-override while a save is already open therefore takes effect for JSON after the
-game is restarted; UI strings that subscribe to `LanguageChanged` can still
-refresh immediately.
+Idol Manager parses most JSON data during startup, so changing the game's language
+requires the same reload or restart that the game normally uses for language data.

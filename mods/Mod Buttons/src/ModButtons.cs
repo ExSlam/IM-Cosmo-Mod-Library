@@ -88,24 +88,6 @@ namespace ModButtons
         }
     }
 
-    // Used by the Action Hub entry in assets/ModButtons/buttons.json.
-    // The selection affects Cosmo mod localization only; it intentionally does
-    // not alter Idol Manager's base-game language setting.
-    public static class CosmoModLanguageSettings
-    {
-        public static void SetLanguage(string language)
-        {
-            if (ModLocalization.SetSelectedLanguage(language))
-            {
-                Debug.Log("[Cosmo Mod Library] Mod language selection saved. Restart Idol Manager to apply it.");
-            }
-            else
-            {
-                Debug.LogWarning("[Cosmo Mod Library] Could not save the mod language selection.");
-            }
-        }
-    }
-
     // --- 3. MULTI-MOD LOCALIZATION MANAGER ---
     internal static class ModButtonsLocalization
     {
@@ -2988,12 +2970,6 @@ namespace ModButtons
         {
             if (definition == null || definition.Options == null || definition.Options.Count == 0) return 0;
             string defaultValue = definition.DefaultValue;
-            if (string.Equals(definition.Id, "cosmo_mod_language", StringComparison.Ordinal))
-            {
-                string selected = ModLocalization.GetSelectedLanguage();
-                defaultValue = string.IsNullOrEmpty(selected) ? "game" : selected;
-            }
-
             for (int i = 0; i < definition.Options.Count; i++)
             {
                 if (string.Equals(definition.Options[i].Value, defaultValue, StringComparison.Ordinal)) return i;

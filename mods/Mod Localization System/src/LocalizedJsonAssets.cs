@@ -8,7 +8,8 @@ namespace ModLocalizationSystem
     /// <summary>
     /// Applies localized whole-file JSON replacements to Idol Manager's normal
     /// mod discovery APIs. This also supports data-only mods because the shared
-    /// localization runtime owns the Harmony patches.
+    /// localization runtime owns the Harmony patches. A matching English asset
+    /// under Localization/en is required, so vanilla root-only mods are skipped.
     /// </summary>
     internal static class LocalizedJsonAssets
     {

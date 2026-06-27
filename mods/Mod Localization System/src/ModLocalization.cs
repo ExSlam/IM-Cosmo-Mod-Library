@@ -47,29 +47,28 @@ namespace ModLocalizationSystem
         /// <summary>
         /// Resolves a language-specific copy of an asset relative to this mod.
         /// Localized copies live under Localization/&lt;language&gt;/ while keeping
-        /// the asset's original relative path. The normal mod file is the final
-        /// fallback when no localized copy exists.
+        /// the asset's original relative path. Localization/en is required and
+        /// is the fallback when the game-language copy does not exist.
         /// </summary>
         public string GetLocalizedAssetPath(string relativePath)
         {
-            string fallbackPath;
             string normalizedRelativePath;
-            if (!TryNormalizeAssetPath(relativePath, out fallbackPath, out normalizedRelativePath))
+            if (!TryNormalizeAssetPath(relativePath, out normalizedRelativePath))
             {
                 return string.Empty;
             }
 
-            string localizedPath = FindLocalizedAsset(normalizedRelativePath, ModLocalization.GetEffectiveLanguage());
-            if (!string.IsNullOrEmpty(localizedPath))
+            string englishPath = FindLocalizedAsset(normalizedRelativePath, EnglishFolderName);
+            if (string.IsNullOrEmpty(englishPath))
             {
-                return localizedPath;
+                // Requiring an English localized asset makes JSON localization
+                // explicitly opt-in. A normal root JSON tree is not treated as
+                // a localization pack and remains entirely game-owned.
+                return string.Empty;
             }
 
-            // An explicit English tree is optional. It is useful when the root
-            // JSON contains language-neutral data and authors want every text
-            // language, including English, under Localization.
-            localizedPath = FindLocalizedAsset(normalizedRelativePath, EnglishFolderName);
-            return string.IsNullOrEmpty(localizedPath) ? fallbackPath : localizedPath;
+            string localizedPath = FindLocalizedAsset(normalizedRelativePath, ModLocalization.GetEffectiveLanguage());
+            return string.IsNullOrEmpty(localizedPath) ? englishPath : localizedPath;
         }
 
         internal void Reset()
@@ -96,9 +95,8 @@ namespace ModLocalizationSystem
             return string.Empty;
         }
 
-        private bool TryNormalizeAssetPath(string relativePath, out string fallbackPath, out string normalizedRelativePath)
+        private bool TryNormalizeAssetPath(string relativePath, out string normalizedRelativePath)
         {
-            fallbackPath = string.Empty;
             normalizedRelativePath = string.Empty;
             if (string.IsNullOrEmpty(modDirectory) || string.IsNullOrEmpty(relativePath))
             {
@@ -121,7 +119,6 @@ namespace ModLocalizationSystem
                     return false;
                 }
 
-                fallbackPath = candidate;
                 normalizedRelativePath = candidate.Substring(root.Length);
                 return normalizedRelativePath.Length > 0;
             }
@@ -148,7 +145,6 @@ namespace ModLocalizationSystem
 
                 string localizationDirectory = Path.Combine(modDirectory, LocalizationDirectoryName);
                 LoadFile(Path.Combine(localizationDirectory, EnglishFolderName, StringsFileName));
-                LoadFile(Path.Combine(localizationDirectory, StringsFileName));
 
                 List<string> folders = BuildFolderCandidates(ModLocalization.GetEffectiveLanguage());
                 for (int i = 0; i < folders.Count; i++)
@@ -278,17 +274,26 @@ namespace ModLocalizationSystem
                     }
                     break;
                 case "ru":
-                case "ua":
                     AddFolder(folders, "russian");
-                    AddFolder(folders, "ukrainian");
                     AddFolder(folders, "ru");
                     break;
-                case "pt":
+                case "uk":
+                case "ua":
+                    AddFolder(folders, "ukrainian");
+                    AddFolder(folders, "uk");
+                    AddFolder(folders, "ua");
+                    break;
                 case "ptbr":
                     AddFolder(folders, "portuguese");
                     AddFolder(folders, "brazilian");
-                    if (primary == "pt")
+                    AddFolder(folders, "pt-BR");
+                    break;
+                case "pt":
+                    AddFolder(folders, "portuguese");
+                    if (normalized.Equals("pt-br", StringComparison.OrdinalIgnoreCase) ||
+                        normalized.Equals("pt_br", StringComparison.OrdinalIgnoreCase))
                     {
+                        AddFolder(folders, "brazilian");
                         AddFolder(folders, "ptbr");
                     }
                     break;
@@ -350,14 +355,9 @@ namespace ModLocalizationSystem
 
     public static class ModLocalization
     {
-        private const string ConfigFileName = "localization.ini";
-        private const string ConfigKey = "language";
-        private const string FollowGameLanguage = "game";
         private static readonly Dictionary<Assembly, ModLocalizer> Localizers = new Dictionary<Assembly, ModLocalizer>();
         private static readonly Dictionary<string, ModLocalizer> DirectoryLocalizers = new Dictionary<string, ModLocalizer>(StringComparer.OrdinalIgnoreCase);
         private static readonly object LocalizerLock = new object();
-
-        public static event Action LanguageChanged;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static string Get(string key, string fallback)
@@ -372,8 +372,9 @@ namespace ModLocalizationSystem
         }
 
         /// <summary>
-        /// Resolves an asset for the calling mod using the selected mod
-        /// language, language aliases, English, and finally the normal mod file.
+        /// Resolves an asset for the calling mod using Idol Manager's language,
+        /// compatible language aliases, and the required English localized file.
+        /// Returns an empty string when the asset did not opt into localization.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static string GetLocalizedAssetPath(string relativePath)
@@ -422,85 +423,12 @@ namespace ModLocalizationSystem
             }
         }
 
-        public static string GetSelectedLanguage()
-        {
-            try
-            {
-                string path = GetConfigPath();
-                if (string.IsNullOrEmpty(path) || !File.Exists(path))
-                {
-                    return string.Empty;
-                }
-
-                string[] lines = File.ReadAllLines(path);
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    string line = lines[i].Trim();
-                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";") || line.StartsWith("//"))
-                    {
-                        continue;
-                    }
-
-                    int separator = line.IndexOf('=');
-                    if (separator > 0 && string.Equals(line.Substring(0, separator).Trim(), ConfigKey, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return NormalizeOverride(line.Substring(separator + 1));
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return string.Empty;
-        }
-
         /// <summary>
-        /// Returns the language currently used for mod localization: a selected
-        /// override when present, otherwise Idol Manager's selected language.
+        /// Returns Idol Manager's language currently used for mod localization.
         /// </summary>
         public static string GetEffectiveLanguageCode()
         {
             return GetEffectiveLanguage();
-        }
-
-        public static bool SetSelectedLanguage(string language)
-        {
-            bool followGame = string.Equals((language ?? string.Empty).Trim(), FollowGameLanguage, StringComparison.OrdinalIgnoreCase);
-            string normalized = NormalizeOverride(language);
-            if (!followGame && string.IsNullOrEmpty(normalized))
-            {
-                return false;
-            }
-
-            try
-            {
-                string path = GetConfigPath();
-                if (string.IsNullOrEmpty(path))
-                {
-                    return false;
-                }
-
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllLines(path, new[]
-                {
-                    "# Mod Localization System language override.",
-                    "# Use game to follow Idol Manager, or a language tag such as fr, kr, or de.",
-                    ConfigKey + "=" + (followGame ? FollowGameLanguage : normalized)
-                });
-                ReloadAll();
-                RaiseLanguageChanged();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         public static void ReloadAll()
@@ -521,36 +449,11 @@ namespace ModLocalizationSystem
 
         internal static string GetEffectiveLanguage()
         {
-            string overrideLanguage = GetSelectedLanguage();
-            if (!string.IsNullOrEmpty(overrideLanguage))
-            {
-                EnsureKoreanTmpFallback(overrideLanguage);
-                return overrideLanguage;
-            }
-
             try
             {
                 string gameLanguage = staticVars.Settings == null ? string.Empty : staticVars.Settings.Language;
                 EnsureKoreanTmpFallback(gameLanguage);
                 return gameLanguage ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static string GetConfigPath()
-        {
-            try
-            {
-                // Keep this setting beside the shared runtime that owns it.  It
-                // avoids creating a separate Cosmo Mod Library folder merely to
-                // hold one framework-specific INI file.
-                string systemDirectory = GetAssemblyDirectory(typeof(ModLocalization).Assembly);
-                return string.IsNullOrEmpty(systemDirectory)
-                    ? string.Empty
-                    : Path.Combine(systemDirectory, ConfigFileName);
             }
             catch
             {
@@ -588,56 +491,12 @@ namespace ModLocalizationSystem
             }
         }
 
-        private static string NormalizeOverride(string language)
-        {
-            if (string.IsNullOrEmpty(language))
-            {
-                return string.Empty;
-            }
-
-            string normalized = language.Trim();
-            if (string.Equals(normalized, FollowGameLanguage, StringComparison.OrdinalIgnoreCase) || normalized.Length > 64)
-            {
-                return string.Empty;
-            }
-
-            for (int i = 0; i < normalized.Length; i++)
-            {
-                char c = normalized[i];
-                if (!char.IsLetterOrDigit(c) && c != '-' && c != '_')
-                {
-                    return string.Empty;
-                }
-            }
-
-            return normalized;
-        }
-
-        private static void RaiseLanguageChanged()
-        {
-            Action handlers = LanguageChanged;
-            if (handlers == null)
-            {
-                return;
-            }
-
-            Delegate[] subscribers = handlers.GetInvocationList();
-            for (int i = 0; i < subscribers.Length; i++)
-            {
-                try
-                {
-                    ((Action)subscribers[i])();
-                }
-                catch
-                {
-                }
-            }
-        }
-
         private static void EnsureKoreanTmpFallback(string language)
         {
             string normalized = (language ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalized != "kr" && normalized != "ko")
+            if (normalized != "kr" && normalized != "ko" &&
+                !normalized.StartsWith("ko-", StringComparison.Ordinal) &&
+                !normalized.StartsWith("ko_", StringComparison.Ordinal))
             {
                 return;
             }
