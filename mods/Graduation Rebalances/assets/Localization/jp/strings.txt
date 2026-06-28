@@ -2,3 +2,16 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+notification.unit_month=か月
+notification.unit_month_plural=か月
+notification.unit_day=日
+notification.unit_day_plural=日
+notification.note_prefix=の卒業予定日を
+notification.reason_monthly=月間活動実績
+notification.reason_center=センター抜擢
+notification.reason_weekly=週間活動実績
+notification.reason_weekly_announced=週間活動実績（発表済み）
+notification.option_label=卒業予定日の延期
+notification.reason_suffix_format=（{0}）
+notification.message_format={0}{1}{2}{3}延期しました。新しい卒業予定日：{4}
+

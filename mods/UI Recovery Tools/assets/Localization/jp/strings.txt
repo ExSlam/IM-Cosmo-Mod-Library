@@ -2,3 +2,10 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+overlay.header_format=エラー（{0}：オーバーレイ切替、{1}：ぼかし解除）
+overlay.no_messages=表示するメッセージはありません。
+overlay.clear_blur_format=ぼかしを解除（{0}）
+overlay.clear_log=ログを消去
+overlay.close_format=閉じる（{0}）
+common.disabled=無効
+

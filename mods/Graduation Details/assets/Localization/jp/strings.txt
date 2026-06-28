@@ -1,16 +1,15 @@
-# Machine-translated localization for Graduation Details.
-# Generated from the English source and may contain errors or awkward phrasing.
+# Japanese localization for Graduation Details.
 # Format: key=value
 
 context_menu.profile.tooltip_ready=アイドルのプロフィールを表示
-context_menu.profile.tooltip_pending=アイドルプロフィールを表示（データ保留中）
+context_menu.profile.tooltip_pending=アイドルのプロフィールを表示（データ読み込み中）
 context_menu.profile.label=プロフィール
-jobs.total_earnings_prefix=総収益: 
-jobs.married_to_prefix=結婚相手: {0}
-jobs.married_to_none=結婚相手：いいえ
-jobs.custody_unknown=保護者: 不明
-jobs.custody_child_singular= 子供
-jobs.custody_child_plural= 子供たち
-jobs.custody_player_prefix=保護者：プレイヤー（{0}）
-jobs.custody_idol_prefix=担当：アイドル（{0}）
-jobs.custody_none=預かり：なし
+jobs.total_earnings_prefix=総収入：
+jobs.married_to_prefix=結婚相手：{0}
+jobs.married_to_none=結婚相手：なし
+jobs.custody_unknown=子どもの同居先：不明
+jobs.custody_child_singular=人）
+jobs.custody_child_plural=人）
+jobs.custody_player_prefix=子どもの同居先：プロデューサー（{0}
+jobs.custody_idol_prefix=子どもの同居先：アイドル（{0}
+jobs.custody_none=子ども：なし

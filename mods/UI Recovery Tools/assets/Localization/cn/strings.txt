@@ -2,3 +2,10 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+overlay.header_format=错误（{0}：显示/隐藏界面，{1}：清除模糊）
+overlay.no_messages=没有可显示的消息。
+overlay.clear_blur_format=清除模糊（{0}）
+overlay.clear_log=清除日志
+overlay.close_format=关闭（{0}）
+common.disabled=已禁用
+

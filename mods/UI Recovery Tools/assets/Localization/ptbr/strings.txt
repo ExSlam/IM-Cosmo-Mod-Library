@@ -2,3 +2,10 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+overlay.header_format=Erros ({0}: sobreposição, {1}: remover desfoque)
+overlay.no_messages=Nenhuma mensagem para exibir.
+overlay.clear_blur_format=Remover desfoque ({0})
+overlay.clear_log=Limpar registro
+overlay.close_format=Fechar ({0})
+common.disabled=Desativado
+

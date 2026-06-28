@@ -4,7 +4,9 @@
 # Format: key=value
 
 notification.unit_month=month
+notification.unit_month_plural=months
 notification.unit_day=day
+notification.unit_day_plural=days
 notification.note_prefix= graduation extended by 
 notification.reason_monthly=monthly performance
 notification.reason_center=center milestone

@@ -2,3 +2,10 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+overlay.header_format=Ошибки ({0} — оверлей, {1} — убрать размытие)
+overlay.no_messages=Нет сообщений для отображения.
+overlay.clear_blur_format=Убрать размытие ({0})
+overlay.clear_log=Очистить журнал
+overlay.close_format=Закрыть ({0})
+common.disabled=Отключено
+

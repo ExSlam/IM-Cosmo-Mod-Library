@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -71,19 +71,19 @@ namespace IdolCareerDiary
         internal const string InfoTitleField = "Title";
         internal const string InfoHarmonyIdField = "HarmonyID";
         internal const string InternalEventLedgerNamespace = "data";
-        internal static readonly string LabelModSourcePrefix = ModLocalization.Get("LabelModSourcePrefix", "From mod:");
-        internal static readonly string ConfigCommentHeader = ModLocalization.Get("ConfigCommentHeader", "# IdolCareerDiary configuration");
-        internal static readonly string ConfigCommentShowUnknownSocialParticipants = ModLocalization.Get("ConfigCommentShowUnknownSocialParticipants", "# Show social-event participants even when producer does not know them.");
+        internal static string LabelModSourcePrefix { get { return ModLocalization.Get("LabelModSourcePrefix", "From mod:"); } }
+        internal static string ConfigCommentHeader { get { return ModLocalization.Get("ConfigCommentHeader", "# IdolCareerDiary configuration"); } }
+        internal static string ConfigCommentShowUnknownSocialParticipants { get { return ModLocalization.Get("ConfigCommentShowUnknownSocialParticipants", "# Show social-event participants even when producer does not know them."); } }
         internal static readonly string[] DefaultConfigTemplateLines = new[]
         {
             ConfigCommentHeader,
             ConfigCommentShowUnknownSocialParticipants,
             "show_unknown_social_participants=false"
         };
-        internal static readonly string MessageCoreDependencyDetected = ModLocalization.Get("MessageCoreDependencyDetected", "Detected required dependency: IMDataCore.");
-        internal static readonly string MessageUiFrameworkDependencyDetected = ModLocalization.Get("MessageUiFrameworkDependencyDetected", "Detected required dependency: IMUIFramework.");
-        internal static readonly string MessageCoreDependencyMissingPrefix = ModLocalization.Get("MessageCoreDependencyMissingPrefix", "Hard dependency missing: IMDataCore is required for IdolCareerDiary. Details: ");
-        internal static readonly string MessageUiFrameworkDependencyMissingPrefix = ModLocalization.Get("MessageUiFrameworkDependencyMissingPrefix", "Hard dependency missing: IMUIFramework is required for IdolCareerDiary. Details: ");
+        internal static string MessageCoreDependencyDetected { get { return ModLocalization.Get("MessageCoreDependencyDetected", "Detected required dependency: IMDataCore."); } }
+        internal static string MessageUiFrameworkDependencyDetected { get { return ModLocalization.Get("MessageUiFrameworkDependencyDetected", "Detected required dependency: IMUIFramework."); } }
+        internal static string MessageCoreDependencyMissingPrefix { get { return ModLocalization.Get("MessageCoreDependencyMissingPrefix", "Hard dependency missing: IMDataCore is required for IdolCareerDiary. Details: "); } }
+        internal static string MessageUiFrameworkDependencyMissingPrefix { get { return ModLocalization.Get("MessageUiFrameworkDependencyMissingPrefix", "Hard dependency missing: IMUIFramework is required for IdolCareerDiary. Details: "); } }
 
         internal const string MethodRenderHeader = "RenderHeader";
         internal const string MethodSetTab = "SetTab";
@@ -101,157 +101,157 @@ namespace IdolCareerDiary
         internal const string SingleSenbatsuCardNamePrefix = "CareerDiary_SingleSenbatsuCard_";
         internal const string SingleSenbatsuRowNamePrefix = "CareerDiary_SingleSenbatsuRow_";
 
-        internal static readonly string DiaryTabLabel = ModLocalization.Get("DiaryTabLabel", "Career Diary");
-        internal static readonly string TitleDiary = ModLocalization.Get("TitleDiary", "Career Diary");
-        internal static readonly string TitleOverview = ModLocalization.Get("TitleOverview", "Overview");
-        internal static readonly string TitleTimeline = ModLocalization.Get("TitleTimeline", "Timeline");
-        internal static readonly string TitleDetails = ModLocalization.Get("TitleDetails", "Event Details");
-        internal static readonly string TitleDetailsSubtitle = ModLocalization.Get("TitleDetailsSubtitle", "Event Detail");
-        internal static readonly string TitleSingleSourceDetails = ModLocalization.Get("TitleSingleSourceDetails", "Single Source Details");
-        internal static readonly string TitleSingleParticipationRecordedDetails = ModLocalization.Get("TitleSingleParticipationRecordedDetails", "Event: Single Participation Recorded");
-        internal static readonly string TitleSingleReleaseSnapshot = ModLocalization.Get("TitleSingleReleaseSnapshot", "Singles Release");
-        internal static readonly string TitleSingleReleaseEconomics = ModLocalization.Get("TitleSingleReleaseEconomics", "Release Economics");
-        internal static readonly string TitleSingleFanAppeal = ModLocalization.Get("TitleSingleFanAppeal", "Fan Approval");
-        internal static readonly string TitleSingleFanSegmentSales = ModLocalization.Get("TitleSingleFanSegmentSales", "Sales by Audience");
-        internal static readonly string TitleSingleFanSegmentNewFans = ModLocalization.Get("TitleSingleFanSegmentNewFans", "New Fans by Audience");
-        internal static readonly string TitleSingleSenbatsu = ModLocalization.Get("TitleSingleSenbatsu", "Senbatsu");
-        internal static readonly string TitleSingleSenbatsuStats = ModLocalization.Get("TitleSingleSenbatsuStats", "Senbatsu Stats");
-        internal static readonly string LabelBackToTimeline = ModLocalization.Get("LabelBackToTimeline", "Back to Timeline");
-        internal static readonly string LabelOpenSource = ModLocalization.Get("LabelOpenSource", "Open Related Record");
-        internal static readonly string LabelOpenSingleFormation = ModLocalization.Get("LabelOpenSingleFormation", "Open Formation Viewer");
-        internal static readonly string LabelOpenSingleChart = ModLocalization.Get("LabelOpenSingleChart", "Open Sales Chart");
-        internal static readonly string LabelRefresh = ModLocalization.Get("LabelRefresh", "Refresh Timeline");
-        internal static readonly string LabelShowMore = ModLocalization.Get("LabelShowMore", "Show More (+100)");
-        internal static readonly string LabelClearFilters = ModLocalization.Get("LabelClearFilters", "Clear Filters");
-        internal static readonly string LabelNoEventsAfterFilters = ModLocalization.Get("LabelNoEventsAfterFilters", "No timeline entries match current filter toggles.");
-        internal static readonly string LabelEventsShownPrefix = ModLocalization.Get("LabelEventsShownPrefix", "Events shown: ");
-        internal static readonly string LabelNoEvents = ModLocalization.Get("LabelNoEvents", "No IM Data Core events recorded for this idol yet.");
-        internal static readonly string LabelSelectEvent = ModLocalization.Get("LabelSelectEvent", "Select a timeline entry to open detail popup.");
-        internal static readonly string LabelOpenProfile = ModLocalization.Get("LabelOpenProfile", "Open Profile");
-        internal static readonly string LabelDatingContextTitle = ModLocalization.Get("LabelDatingContextTitle", "Other Idol Involved");
-        internal static readonly string LabelRelatedIdolsContextTitle = ModLocalization.Get("LabelRelatedIdolsContextTitle", "Idols Involved");
-        internal static readonly string LabelClique = ModLocalization.Get("LabelClique", "Clique");
-        internal static readonly string LabelRelationship = ModLocalization.Get("LabelRelationship", "Relationship");
-        internal static readonly string LabelBullying = ModLocalization.Get("LabelBullying", "Bullying");
-        internal static readonly string LabelStory = ModLocalization.Get("LabelStory", "Story");
-        internal static readonly string LabelSingleStatus = ModLocalization.Get("LabelSingleStatus", "Single");
-        internal static readonly string LabelNotKnownToProducer = ModLocalization.Get("LabelNotKnownToProducer", "[Not known to Producer]");
-        internal static readonly string LabelCastThisEpisodePrefix = ModLocalization.Get("LabelCastThisEpisodePrefix", "Cast this episode: ");
-        internal static readonly string LabelEpisodesReleasedPrefix = ModLocalization.Get("LabelEpisodesReleasedPrefix", "Episodes Released This Week: ");
-        internal static readonly string LabelEpisodeReleasedPrefix = ModLocalization.Get("LabelEpisodeReleasedPrefix", "Episode Released This Week: ");
-        internal static readonly string LabelTotalEpisodesReleasedPrefix = ModLocalization.Get("LabelTotalEpisodesReleasedPrefix", "Total Episodes Released: ");
-        internal static readonly string LabelCastTypePrefix = ModLocalization.Get("LabelCastTypePrefix", "Cast: ");
-        internal static readonly string LabelStatusPrefix = ModLocalization.Get("LabelStatusPrefix", "Status: ");
-        internal static readonly string LabelAverageAudiencePrefix = ModLocalization.Get("LabelAverageAudiencePrefix", "Average audience: ");
-        internal static readonly string LabelAverageRevenuePrefix = ModLocalization.Get("LabelAverageRevenuePrefix", "Average revenue: ");
-        internal static readonly string LabelAverageNewFansPrefix = ModLocalization.Get("LabelAverageNewFansPrefix", "Average new fans: ");
-        internal static readonly string LabelAverageBuzzPrefix = ModLocalization.Get("LabelAverageBuzzPrefix", "Average buzz: ");
-        internal static readonly string LabelDatePrefix = ModLocalization.Get("LabelDatePrefix", "Date: ");
-        internal static readonly string LabelUnknown = ModLocalization.Get("LabelUnknown", "Unknown");
-        internal static readonly string LabelNoSource = ModLocalization.Get("LabelNoSource", "No related popup is available for this event.");
-        internal static readonly string LabelMainSystemsUnavailable = ModLocalization.Get("LabelMainSystemsUnavailable", "Main systems unavailable.");
-        internal static readonly string OutcomeLinePrefix = ModLocalization.Get("OutcomeLinePrefix", " - ");
-        internal static readonly string ListJoinSeparator = ModLocalization.Get("ListJoinSeparator", ", ");
-        internal static readonly string MetadataPipeSeparator = ModLocalization.Get("MetadataPipeSeparator", " | ");
-        internal static readonly string LabelSingleTitlePrefix = ModLocalization.Get("LabelSingleTitlePrefix", "Title: ");
-        internal static readonly string LabelSingleGroupPrefix = ModLocalization.Get("LabelSingleGroupPrefix", "Group: ");
-        internal static readonly string LabelSingleReleaseDatePrefix = ModLocalization.Get("LabelSingleReleaseDatePrefix", "Release date: ");
-        internal static readonly string LabelSingleSalesPrefix = ModLocalization.Get("LabelSingleSalesPrefix", "Sales: ");
-        internal static readonly string LabelSingleChartPrefix = ModLocalization.Get("LabelSingleChartPrefix", "Chart position: ");
-        internal static readonly string LabelSingleDidNotChart = ModLocalization.Get("LabelSingleDidNotChart", "Did not chart");
-        internal static readonly string LabelSingleQualityPrefix = ModLocalization.Get("LabelSingleQualityPrefix", "Quality: ");
-        internal static readonly string LabelSingleFanSatisfactionPrefix = ModLocalization.Get("LabelSingleFanSatisfactionPrefix", "Fan satisfaction: ");
-        internal static readonly string LabelSingleFanBuzzPrefix = ModLocalization.Get("LabelSingleFanBuzzPrefix", "Fan buzz: ");
-        internal static readonly string LabelSingleNewFansPrefix = ModLocalization.Get("LabelSingleNewFansPrefix", "New fans: ");
-        internal static readonly string LabelSingleNewHardcoreFansPrefix = ModLocalization.Get("LabelSingleNewHardcoreFansPrefix", "New hardcore fans: ");
-        internal static readonly string LabelSingleNewCasualFansPrefix = ModLocalization.Get("LabelSingleNewCasualFansPrefix", "New casual fans: ");
-        internal static readonly string LabelSingleQuantityPrefix = ModLocalization.Get("LabelSingleQuantityPrefix", "Copies produced: ");
-        internal static readonly string LabelSingleProductionCostPrefix = ModLocalization.Get("LabelSingleProductionCostPrefix", "Production cost: ");
-        internal static readonly string LabelSingleGrossRevenuePrefix = ModLocalization.Get("LabelSingleGrossRevenuePrefix", "Gross revenue: ");
-        internal static readonly string LabelSingleOtherExpensesPrefix = ModLocalization.Get("LabelSingleOtherExpensesPrefix", "Other expenses: ");
-        internal static readonly string LabelSingleProfitPrefix = ModLocalization.Get("LabelSingleProfitPrefix", "Profit: ");
-        internal static readonly string LabelSingleOneCdCostPrefix = ModLocalization.Get("LabelSingleOneCdCostPrefix", "Cost per CD: ");
-        internal static readonly string LabelSingleOneCdRevenuePrefix = ModLocalization.Get("LabelSingleOneCdRevenuePrefix", "Revenue per CD: ");
-        internal static readonly string LabelSingleSalesPerFanPrefix = ModLocalization.Get("LabelSingleSalesPerFanPrefix", "Sales per fan: ");
-        internal static readonly string LabelSingleFamePointsAwardedPrefix = ModLocalization.Get("LabelSingleFamePointsAwardedPrefix", "Fame points awarded: ");
-        internal static readonly string LabelSingleGroupHandshakePrefix = ModLocalization.Get("LabelSingleGroupHandshakePrefix", "Group handshake: ");
-        internal static readonly string LabelSingleIndividualHandshakePrefix = ModLocalization.Get("LabelSingleIndividualHandshakePrefix", "Individual handshake: ");
-        internal static readonly string LabelSingleMarketingResultPrefix = ModLocalization.Get("LabelSingleMarketingResultPrefix", "Marketing result: ");
-        internal static readonly string LabelSingleMarketingResultStatusPrefix = ModLocalization.Get("LabelSingleMarketingResultStatusPrefix", "Marketing status: ");
-        internal static readonly string LabelSingleMostPopularGenrePrefix = ModLocalization.Get("LabelSingleMostPopularGenrePrefix", "Most popular genre: ");
-        internal static readonly string LabelSingleMostPopularLyricsPrefix = ModLocalization.Get("LabelSingleMostPopularLyricsPrefix", "Most popular lyrics: ");
-        internal static readonly string LabelSingleMostPopularChoreographyPrefix = ModLocalization.Get("LabelSingleMostPopularChoreographyPrefix", "Most popular choreography: ");
-        internal static readonly string LabelSingleFanAppealMalePrefix = ModLocalization.Get("LabelSingleFanAppealMalePrefix", "Male: ");
-        internal static readonly string LabelSingleFanAppealFemalePrefix = ModLocalization.Get("LabelSingleFanAppealFemalePrefix", "Female: ");
-        internal static readonly string LabelSingleFanAppealCasualPrefix = ModLocalization.Get("LabelSingleFanAppealCasualPrefix", "Casual: ");
-        internal static readonly string LabelSingleFanAppealHardcorePrefix = ModLocalization.Get("LabelSingleFanAppealHardcorePrefix", "Hardcore: ");
-        internal static readonly string LabelSingleFanAppealTeenPrefix = ModLocalization.Get("LabelSingleFanAppealTeenPrefix", "Teen: ");
-        internal static readonly string LabelSingleFanAppealYoungAdultPrefix = ModLocalization.Get("LabelSingleFanAppealYoungAdultPrefix", "Young adult: ");
-        internal static readonly string LabelSingleFanAppealAdultPrefix = ModLocalization.Get("LabelSingleFanAppealAdultPrefix", "Adult: ");
-        internal static readonly string LabelSingleCohortHardcoreFansPrefix = ModLocalization.Get("LabelSingleCohortHardcoreFansPrefix", "Cohort hardcore fans: ");
-        internal static readonly string LabelSingleCohortCasualFansPrefix = ModLocalization.Get("LabelSingleCohortCasualFansPrefix", "Cohort casual fans: ");
-        internal static readonly string LabelSingleCohortOtherFansPrefix = ModLocalization.Get("LabelSingleCohortOtherFansPrefix", "Cohort other fans: ");
-        internal static readonly string LabelSingleNewFansDeltaPrefix = ModLocalization.Get("LabelSingleNewFansDeltaPrefix", "Release/cohort difference: ");
-        internal static readonly string LabelSingleCohortBreakdownUnavailable = ModLocalization.Get("LabelSingleCohortBreakdownUnavailable", "Cohort breakdown unavailable in this event payload.");
-        internal static readonly string TextSingleCohortEstimatedFromFanAppeal = ModLocalization.Get("TextSingleCohortEstimatedFromFanAppeal", "Cohort split estimated from fan-appeal weights because detailed segment data was empty.");
-        internal static readonly string TextReleaseDataTag = ModLocalization.Get("TextReleaseDataTag", " (release data)");
-        internal static readonly string TextCohortSumTag = ModLocalization.Get("TextCohortSumTag", " (cohort sum)");
-        internal static readonly string TextSingleFanAppealAxesNote = ModLocalization.Get("TextSingleFanAppealAxesNote", "Fan appeal uses separate axes (gender/intensity/age), so percentages do not add into one total.");
-        internal static readonly string LabelSingleSegmentSummaryEmpty = ModLocalization.Get("LabelSingleSegmentSummaryEmpty", "No segment data captured.");
-        internal static readonly string LabelSingleGenrePrefix = ModLocalization.Get("LabelSingleGenrePrefix", "Genre: ");
-        internal static readonly string LabelSingleLyricsPrefix = ModLocalization.Get("LabelSingleLyricsPrefix", "Lyrics: ");
-        internal static readonly string LabelSingleChoreographyPrefix = ModLocalization.Get("LabelSingleChoreographyPrefix", "Choreography: ");
-        internal static readonly string LabelSingleMarketingPrefix = ModLocalization.Get("LabelSingleMarketingPrefix", "Marketing: ");
-        internal static readonly string LabelSingleTotalSalesPrefix = ModLocalization.Get("LabelSingleTotalSalesPrefix", "Total Sales: ");
-        internal static readonly string LabelSingleTotalNewFansPrefix = ModLocalization.Get("LabelSingleTotalNewFansPrefix", "Total New Fans: ");
-        internal static readonly string LabelSingleRosterEmpty = ModLocalization.Get("LabelSingleRosterEmpty", "No senbatsu members available in this record.");
-        internal static readonly string LabelSingleFormationOpened = ModLocalization.Get("LabelSingleFormationOpened", "Opened formation viewer for this single.");
-        internal static readonly string LabelSingleFormationPopupUnavailable = ModLocalization.Get("LabelSingleFormationPopupUnavailable", "Single formation popup unavailable.");
-        internal static readonly string LabelSingleFormationComponentUnavailable = ModLocalization.Get("LabelSingleFormationComponentUnavailable", "Single formation component unavailable.");
-        internal static readonly string LabelSingleChartOpened = ModLocalization.Get("LabelSingleChartOpened", "Opened chart popup for this single.");
-        internal static readonly string LabelSingleChartMonthUnknown = ModLocalization.Get("LabelSingleChartMonthUnknown", "Unable to locate chart month for this release.");
-        internal static readonly string LabelSingleChartPopupUnavailable = ModLocalization.Get("LabelSingleChartPopupUnavailable", "Single chart popup unavailable.");
-        internal static readonly string LabelSingleChartComponentUnavailable = ModLocalization.Get("LabelSingleChartComponentUnavailable", "Single chart component unavailable.");
-        internal static readonly string LabelPopupOpenTransitionFailed = ModLocalization.Get("LabelPopupOpenTransitionFailed", "Popup transition did not complete.");
-        internal static readonly string LabelSingleNotFound = ModLocalization.Get("LabelSingleNotFound", "Single source record unavailable.");
-        internal static readonly string LabelSingleInvalidId = ModLocalization.Get("LabelSingleInvalidId", "Single source id is invalid.");
-        internal static readonly string LabelSingleMemberPrefix = ModLocalization.Get("LabelSingleMemberPrefix", "Member: ");
-        internal static readonly string LabelSingleSenbatsuRowPrefix = ModLocalization.Get("LabelSingleSenbatsuRowPrefix", "Row ");
-        internal static readonly string LabelSingleSenbatsuPositionPrefix = ModLocalization.Get("LabelSingleSenbatsuPositionPrefix", "Position ");
+        internal static string DiaryTabLabel { get { return ModLocalization.Get("DiaryTabLabel", "Career Diary"); } }
+        internal static string TitleDiary { get { return ModLocalization.Get("TitleDiary", "Career Diary"); } }
+        internal static string TitleOverview { get { return ModLocalization.Get("TitleOverview", "Overview"); } }
+        internal static string TitleTimeline { get { return ModLocalization.Get("TitleTimeline", "Timeline"); } }
+        internal static string TitleDetails { get { return ModLocalization.Get("TitleDetails", "Event Details"); } }
+        internal static string TitleDetailsSubtitle { get { return ModLocalization.Get("TitleDetailsSubtitle", "Event Detail"); } }
+        internal static string TitleSingleSourceDetails { get { return ModLocalization.Get("TitleSingleSourceDetails", "Single Source Details"); } }
+        internal static string TitleSingleParticipationRecordedDetails { get { return ModLocalization.Get("TitleSingleParticipationRecordedDetails", "Event: Single Participation Recorded"); } }
+        internal static string TitleSingleReleaseSnapshot { get { return ModLocalization.Get("TitleSingleReleaseSnapshot", "Singles Release"); } }
+        internal static string TitleSingleReleaseEconomics { get { return ModLocalization.Get("TitleSingleReleaseEconomics", "Release Economics"); } }
+        internal static string TitleSingleFanAppeal { get { return ModLocalization.Get("TitleSingleFanAppeal", "Fan Approval"); } }
+        internal static string TitleSingleFanSegmentSales { get { return ModLocalization.Get("TitleSingleFanSegmentSales", "Sales by Audience"); } }
+        internal static string TitleSingleFanSegmentNewFans { get { return ModLocalization.Get("TitleSingleFanSegmentNewFans", "New Fans by Audience"); } }
+        internal static string TitleSingleSenbatsu { get { return ModLocalization.Get("TitleSingleSenbatsu", "Senbatsu"); } }
+        internal static string TitleSingleSenbatsuStats { get { return ModLocalization.Get("TitleSingleSenbatsuStats", "Senbatsu Stats"); } }
+        internal static string LabelBackToTimeline { get { return ModLocalization.Get("LabelBackToTimeline", "Back to Timeline"); } }
+        internal static string LabelOpenSource { get { return ModLocalization.Get("LabelOpenSource", "Open Related Record"); } }
+        internal static string LabelOpenSingleFormation { get { return ModLocalization.Get("LabelOpenSingleFormation", "Open Formation Viewer"); } }
+        internal static string LabelOpenSingleChart { get { return ModLocalization.Get("LabelOpenSingleChart", "Open Sales Chart"); } }
+        internal static string LabelRefresh { get { return ModLocalization.Get("LabelRefresh", "Refresh Timeline"); } }
+        internal static string LabelShowMore { get { return ModLocalization.Get("LabelShowMore", "Show More (+100)"); } }
+        internal static string LabelClearFilters { get { return ModLocalization.Get("LabelClearFilters", "Clear Filters"); } }
+        internal static string LabelNoEventsAfterFilters { get { return ModLocalization.Get("LabelNoEventsAfterFilters", "No timeline entries match current filter toggles."); } }
+        internal static string LabelEventsShownPrefix { get { return ModLocalization.Get("LabelEventsShownPrefix", "Events shown: "); } }
+        internal static string LabelNoEvents { get { return ModLocalization.Get("LabelNoEvents", "No IM Data Core events recorded for this idol yet."); } }
+        internal static string LabelSelectEvent { get { return ModLocalization.Get("LabelSelectEvent", "Select a timeline entry to open detail popup."); } }
+        internal static string LabelOpenProfile { get { return ModLocalization.Get("LabelOpenProfile", "Open Profile"); } }
+        internal static string LabelDatingContextTitle { get { return ModLocalization.Get("LabelDatingContextTitle", "Other Idol Involved"); } }
+        internal static string LabelRelatedIdolsContextTitle { get { return ModLocalization.Get("LabelRelatedIdolsContextTitle", "Idols Involved"); } }
+        internal static string LabelClique { get { return ModLocalization.Get("LabelClique", "Clique"); } }
+        internal static string LabelRelationship { get { return ModLocalization.Get("LabelRelationship", "Relationship"); } }
+        internal static string LabelBullying { get { return ModLocalization.Get("LabelBullying", "Bullying"); } }
+        internal static string LabelStory { get { return ModLocalization.Get("LabelStory", "Story"); } }
+        internal static string LabelSingleStatus { get { return ModLocalization.Get("LabelSingleStatus", "Single"); } }
+        internal static string LabelNotKnownToProducer { get { return ModLocalization.Get("LabelNotKnownToProducer", "[Not known to Producer]"); } }
+        internal static string LabelCastThisEpisodePrefix { get { return ModLocalization.Get("LabelCastThisEpisodePrefix", "Cast this episode: "); } }
+        internal static string LabelEpisodesReleasedPrefix { get { return ModLocalization.Get("LabelEpisodesReleasedPrefix", "Episodes Released This Week: "); } }
+        internal static string LabelEpisodeReleasedPrefix { get { return ModLocalization.Get("LabelEpisodeReleasedPrefix", "Episode Released This Week: "); } }
+        internal static string LabelTotalEpisodesReleasedPrefix { get { return ModLocalization.Get("LabelTotalEpisodesReleasedPrefix", "Total Episodes Released: "); } }
+        internal static string LabelCastTypePrefix { get { return ModLocalization.Get("LabelCastTypePrefix", "Cast: "); } }
+        internal static string LabelStatusPrefix { get { return ModLocalization.Get("LabelStatusPrefix", "Status: "); } }
+        internal static string LabelAverageAudiencePrefix { get { return ModLocalization.Get("LabelAverageAudiencePrefix", "Average audience: "); } }
+        internal static string LabelAverageRevenuePrefix { get { return ModLocalization.Get("LabelAverageRevenuePrefix", "Average revenue: "); } }
+        internal static string LabelAverageNewFansPrefix { get { return ModLocalization.Get("LabelAverageNewFansPrefix", "Average new fans: "); } }
+        internal static string LabelAverageBuzzPrefix { get { return ModLocalization.Get("LabelAverageBuzzPrefix", "Average buzz: "); } }
+        internal static string LabelDatePrefix { get { return ModLocalization.Get("LabelDatePrefix", "Date: "); } }
+        internal static string LabelUnknown { get { return ModLocalization.Get("LabelUnknown", "Unknown"); } }
+        internal static string LabelNoSource { get { return ModLocalization.Get("LabelNoSource", "No related popup is available for this event."); } }
+        internal static string LabelMainSystemsUnavailable { get { return ModLocalization.Get("LabelMainSystemsUnavailable", "Main systems unavailable."); } }
+        internal static string OutcomeLinePrefix { get { return ModLocalization.Get("OutcomeLinePrefix", " - "); } }
+        internal static string ListJoinSeparator { get { return ModLocalization.Get("ListJoinSeparator", ", "); } }
+        internal static string MetadataPipeSeparator { get { return ModLocalization.Get("MetadataPipeSeparator", " | "); } }
+        internal static string LabelSingleTitlePrefix { get { return ModLocalization.Get("LabelSingleTitlePrefix", "Title: "); } }
+        internal static string LabelSingleGroupPrefix { get { return ModLocalization.Get("LabelSingleGroupPrefix", "Group: "); } }
+        internal static string LabelSingleReleaseDatePrefix { get { return ModLocalization.Get("LabelSingleReleaseDatePrefix", "Release date: "); } }
+        internal static string LabelSingleSalesPrefix { get { return ModLocalization.Get("LabelSingleSalesPrefix", "Sales: "); } }
+        internal static string LabelSingleChartPrefix { get { return ModLocalization.Get("LabelSingleChartPrefix", "Chart position: "); } }
+        internal static string LabelSingleDidNotChart { get { return ModLocalization.Get("LabelSingleDidNotChart", "Did not chart"); } }
+        internal static string LabelSingleQualityPrefix { get { return ModLocalization.Get("LabelSingleQualityPrefix", "Quality: "); } }
+        internal static string LabelSingleFanSatisfactionPrefix { get { return ModLocalization.Get("LabelSingleFanSatisfactionPrefix", "Fan satisfaction: "); } }
+        internal static string LabelSingleFanBuzzPrefix { get { return ModLocalization.Get("LabelSingleFanBuzzPrefix", "Fan buzz: "); } }
+        internal static string LabelSingleNewFansPrefix { get { return ModLocalization.Get("LabelSingleNewFansPrefix", "New fans: "); } }
+        internal static string LabelSingleNewHardcoreFansPrefix { get { return ModLocalization.Get("LabelSingleNewHardcoreFansPrefix", "New hardcore fans: "); } }
+        internal static string LabelSingleNewCasualFansPrefix { get { return ModLocalization.Get("LabelSingleNewCasualFansPrefix", "New casual fans: "); } }
+        internal static string LabelSingleQuantityPrefix { get { return ModLocalization.Get("LabelSingleQuantityPrefix", "Copies produced: "); } }
+        internal static string LabelSingleProductionCostPrefix { get { return ModLocalization.Get("LabelSingleProductionCostPrefix", "Production cost: "); } }
+        internal static string LabelSingleGrossRevenuePrefix { get { return ModLocalization.Get("LabelSingleGrossRevenuePrefix", "Gross revenue: "); } }
+        internal static string LabelSingleOtherExpensesPrefix { get { return ModLocalization.Get("LabelSingleOtherExpensesPrefix", "Other expenses: "); } }
+        internal static string LabelSingleProfitPrefix { get { return ModLocalization.Get("LabelSingleProfitPrefix", "Profit: "); } }
+        internal static string LabelSingleOneCdCostPrefix { get { return ModLocalization.Get("LabelSingleOneCdCostPrefix", "Cost per CD: "); } }
+        internal static string LabelSingleOneCdRevenuePrefix { get { return ModLocalization.Get("LabelSingleOneCdRevenuePrefix", "Revenue per CD: "); } }
+        internal static string LabelSingleSalesPerFanPrefix { get { return ModLocalization.Get("LabelSingleSalesPerFanPrefix", "Sales per fan: "); } }
+        internal static string LabelSingleFamePointsAwardedPrefix { get { return ModLocalization.Get("LabelSingleFamePointsAwardedPrefix", "Fame points awarded: "); } }
+        internal static string LabelSingleGroupHandshakePrefix { get { return ModLocalization.Get("LabelSingleGroupHandshakePrefix", "Group handshake: "); } }
+        internal static string LabelSingleIndividualHandshakePrefix { get { return ModLocalization.Get("LabelSingleIndividualHandshakePrefix", "Individual handshake: "); } }
+        internal static string LabelSingleMarketingResultPrefix { get { return ModLocalization.Get("LabelSingleMarketingResultPrefix", "Marketing result: "); } }
+        internal static string LabelSingleMarketingResultStatusPrefix { get { return ModLocalization.Get("LabelSingleMarketingResultStatusPrefix", "Marketing status: "); } }
+        internal static string LabelSingleMostPopularGenrePrefix { get { return ModLocalization.Get("LabelSingleMostPopularGenrePrefix", "Most popular genre: "); } }
+        internal static string LabelSingleMostPopularLyricsPrefix { get { return ModLocalization.Get("LabelSingleMostPopularLyricsPrefix", "Most popular lyrics: "); } }
+        internal static string LabelSingleMostPopularChoreographyPrefix { get { return ModLocalization.Get("LabelSingleMostPopularChoreographyPrefix", "Most popular choreography: "); } }
+        internal static string LabelSingleFanAppealMalePrefix { get { return ModLocalization.Get("LabelSingleFanAppealMalePrefix", "Male: "); } }
+        internal static string LabelSingleFanAppealFemalePrefix { get { return ModLocalization.Get("LabelSingleFanAppealFemalePrefix", "Female: "); } }
+        internal static string LabelSingleFanAppealCasualPrefix { get { return ModLocalization.Get("LabelSingleFanAppealCasualPrefix", "Casual: "); } }
+        internal static string LabelSingleFanAppealHardcorePrefix { get { return ModLocalization.Get("LabelSingleFanAppealHardcorePrefix", "Hardcore: "); } }
+        internal static string LabelSingleFanAppealTeenPrefix { get { return ModLocalization.Get("LabelSingleFanAppealTeenPrefix", "Teen: "); } }
+        internal static string LabelSingleFanAppealYoungAdultPrefix { get { return ModLocalization.Get("LabelSingleFanAppealYoungAdultPrefix", "Young adult: "); } }
+        internal static string LabelSingleFanAppealAdultPrefix { get { return ModLocalization.Get("LabelSingleFanAppealAdultPrefix", "Adult: "); } }
+        internal static string LabelSingleCohortHardcoreFansPrefix { get { return ModLocalization.Get("LabelSingleCohortHardcoreFansPrefix", "Cohort hardcore fans: "); } }
+        internal static string LabelSingleCohortCasualFansPrefix { get { return ModLocalization.Get("LabelSingleCohortCasualFansPrefix", "Cohort casual fans: "); } }
+        internal static string LabelSingleCohortOtherFansPrefix { get { return ModLocalization.Get("LabelSingleCohortOtherFansPrefix", "Cohort other fans: "); } }
+        internal static string LabelSingleNewFansDeltaPrefix { get { return ModLocalization.Get("LabelSingleNewFansDeltaPrefix", "Release/cohort difference: "); } }
+        internal static string LabelSingleCohortBreakdownUnavailable { get { return ModLocalization.Get("LabelSingleCohortBreakdownUnavailable", "Cohort breakdown unavailable in this event payload."); } }
+        internal static string TextSingleCohortEstimatedFromFanAppeal { get { return ModLocalization.Get("TextSingleCohortEstimatedFromFanAppeal", "Cohort split estimated from fan-appeal weights because detailed segment data was empty."); } }
+        internal static string TextReleaseDataTag { get { return ModLocalization.Get("TextReleaseDataTag", " (release data)"); } }
+        internal static string TextCohortSumTag { get { return ModLocalization.Get("TextCohortSumTag", " (cohort sum)"); } }
+        internal static string TextSingleFanAppealAxesNote { get { return ModLocalization.Get("TextSingleFanAppealAxesNote", "Fan appeal uses separate axes (gender/intensity/age), so percentages do not add into one total."); } }
+        internal static string LabelSingleSegmentSummaryEmpty { get { return ModLocalization.Get("LabelSingleSegmentSummaryEmpty", "No segment data captured."); } }
+        internal static string LabelSingleGenrePrefix { get { return ModLocalization.Get("LabelSingleGenrePrefix", "Genre: "); } }
+        internal static string LabelSingleLyricsPrefix { get { return ModLocalization.Get("LabelSingleLyricsPrefix", "Lyrics: "); } }
+        internal static string LabelSingleChoreographyPrefix { get { return ModLocalization.Get("LabelSingleChoreographyPrefix", "Choreography: "); } }
+        internal static string LabelSingleMarketingPrefix { get { return ModLocalization.Get("LabelSingleMarketingPrefix", "Marketing: "); } }
+        internal static string LabelSingleTotalSalesPrefix { get { return ModLocalization.Get("LabelSingleTotalSalesPrefix", "Total Sales: "); } }
+        internal static string LabelSingleTotalNewFansPrefix { get { return ModLocalization.Get("LabelSingleTotalNewFansPrefix", "Total New Fans: "); } }
+        internal static string LabelSingleRosterEmpty { get { return ModLocalization.Get("LabelSingleRosterEmpty", "No senbatsu members available in this record."); } }
+        internal static string LabelSingleFormationOpened { get { return ModLocalization.Get("LabelSingleFormationOpened", "Opened formation viewer for this single."); } }
+        internal static string LabelSingleFormationPopupUnavailable { get { return ModLocalization.Get("LabelSingleFormationPopupUnavailable", "Single formation popup unavailable."); } }
+        internal static string LabelSingleFormationComponentUnavailable { get { return ModLocalization.Get("LabelSingleFormationComponentUnavailable", "Single formation component unavailable."); } }
+        internal static string LabelSingleChartOpened { get { return ModLocalization.Get("LabelSingleChartOpened", "Opened chart popup for this single."); } }
+        internal static string LabelSingleChartMonthUnknown { get { return ModLocalization.Get("LabelSingleChartMonthUnknown", "Unable to locate chart month for this release."); } }
+        internal static string LabelSingleChartPopupUnavailable { get { return ModLocalization.Get("LabelSingleChartPopupUnavailable", "Single chart popup unavailable."); } }
+        internal static string LabelSingleChartComponentUnavailable { get { return ModLocalization.Get("LabelSingleChartComponentUnavailable", "Single chart component unavailable."); } }
+        internal static string LabelPopupOpenTransitionFailed { get { return ModLocalization.Get("LabelPopupOpenTransitionFailed", "Popup transition did not complete."); } }
+        internal static string LabelSingleNotFound { get { return ModLocalization.Get("LabelSingleNotFound", "Single source record unavailable."); } }
+        internal static string LabelSingleInvalidId { get { return ModLocalization.Get("LabelSingleInvalidId", "Single source id is invalid."); } }
+        internal static string LabelSingleMemberPrefix { get { return ModLocalization.Get("LabelSingleMemberPrefix", "Member: "); } }
+        internal static string LabelSingleSenbatsuRowPrefix { get { return ModLocalization.Get("LabelSingleSenbatsuRowPrefix", "Row "); } }
+        internal static string LabelSingleSenbatsuPositionPrefix { get { return ModLocalization.Get("LabelSingleSenbatsuPositionPrefix", "Position "); } }
 
-        internal static readonly string LabelIdolPrefix = ModLocalization.Get("LabelIdolPrefix", "Idol: ");
-        internal static readonly string LabelEventCountPrefix = ModLocalization.Get("LabelEventCountPrefix", "Events loaded: ");
-        internal static readonly string LabelDataWarningPrefix = ModLocalization.Get("LabelDataWarningPrefix", "Data warning: ");
-        internal static readonly string LabelActionPrefix = ModLocalization.Get("LabelActionPrefix", "Last action: ");
+        internal static string LabelIdolPrefix { get { return ModLocalization.Get("LabelIdolPrefix", "Idol: "); } }
+        internal static string LabelEventCountPrefix { get { return ModLocalization.Get("LabelEventCountPrefix", "Events loaded: "); } }
+        internal static string LabelDataWarningPrefix { get { return ModLocalization.Get("LabelDataWarningPrefix", "Data warning: "); } }
+        internal static string LabelActionPrefix { get { return ModLocalization.Get("LabelActionPrefix", "Last action: "); } }
 
-        internal static readonly string LabelWhenPrefix = ModLocalization.Get("LabelWhenPrefix", "When: ");
-        internal static readonly string LabelWhatPrefix = ModLocalization.Get("LabelWhatPrefix", "What: ");
-        internal static readonly string LabelWithWhomPrefix = ModLocalization.Get("LabelWithWhomPrefix", "With whom: ");
-        internal static readonly string LabelShow = ModLocalization.Get("LabelShow", "Show");
-        internal static readonly string LabelOutcomePrefix = ModLocalization.Get("LabelOutcomePrefix", "Outcome change: ");
-        internal static readonly string LabelSourcePrefix = ModLocalization.Get("LabelSourcePrefix", "Related record: ");
-        internal static readonly string LabelNamespacePrefix = ModLocalization.Get("LabelNamespacePrefix", "Event Namespace: ");
-        internal static readonly string LabelPatchPrefix = ModLocalization.Get("LabelPatchPrefix", "Capture Hook: ");
-        internal static readonly string LabelPayloadPrefix = ModLocalization.Get("LabelPayloadPrefix", "Raw Event Data: ");
+        internal static string LabelWhenPrefix { get { return ModLocalization.Get("LabelWhenPrefix", "When: "); } }
+        internal static string LabelWhatPrefix { get { return ModLocalization.Get("LabelWhatPrefix", "What: "); } }
+        internal static string LabelWithWhomPrefix { get { return ModLocalization.Get("LabelWithWhomPrefix", "With whom: "); } }
+        internal static string LabelShow { get { return ModLocalization.Get("LabelShow", "Show"); } }
+        internal static string LabelOutcomePrefix { get { return ModLocalization.Get("LabelOutcomePrefix", "Outcome change: "); } }
+        internal static string LabelSourcePrefix { get { return ModLocalization.Get("LabelSourcePrefix", "Related record: "); } }
+        internal static string LabelNamespacePrefix { get { return ModLocalization.Get("LabelNamespacePrefix", "Event Namespace: "); } }
+        internal static string LabelPatchPrefix { get { return ModLocalization.Get("LabelPatchPrefix", "Capture Hook: "); } }
+        internal static string LabelPayloadPrefix { get { return ModLocalization.Get("LabelPayloadPrefix", "Raw Event Data: "); } }
         internal static readonly bool ShowTechnicalEventMetadata = false;
 
-        internal static readonly string OpenIdolPrefix = ModLocalization.Get("OpenIdolPrefix", "Open ");
-        internal static readonly string OpenIdolSuffix = ModLocalization.Get("OpenIdolSuffix", " profile");
+        internal static string OpenIdolPrefix { get { return ModLocalization.Get("OpenIdolPrefix", "Open "); } }
+        internal static string OpenIdolSuffix { get { return ModLocalization.Get("OpenIdolSuffix", " profile"); } }
 
-        internal static readonly string DateFormatUi = ModLocalization.Get("DateFormatUi", "ddd, dd MMM yyyy");
+        internal static string DateFormatUi { get { return ModLocalization.Get("DateFormatUi", "ddd, dd MMM yyyy"); } }
         internal static readonly string[] EnglishAbbreviatedMonthTokens =
         {
             "Jan", "Feb", "Mar", "Apr", "May", "Jun",
             "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec"
         };
-        internal static readonly string TextDurationUnitDaySingular = ModLocalization.Get("TextDurationUnitDaySingular", "day");
-        internal static readonly string TextDurationUnitDayPlural = ModLocalization.Get("TextDurationUnitDayPlural", "days");
-        internal static readonly string TextDurationUnitWeekSingular = ModLocalization.Get("TextDurationUnitWeekSingular", "week");
-        internal static readonly string TextDurationUnitWeekPlural = ModLocalization.Get("TextDurationUnitWeekPlural", "weeks");
-        internal static readonly string TextDurationUnitMonthSingular = ModLocalization.Get("TextDurationUnitMonthSingular", "month");
-        internal static readonly string TextDurationUnitMonthPlural = ModLocalization.Get("TextDurationUnitMonthPlural", "months");
-        internal static readonly string TextDurationUnitYearSingular = ModLocalization.Get("TextDurationUnitYearSingular", "year");
-        internal static readonly string TextDurationUnitYearPlural = ModLocalization.Get("TextDurationUnitYearPlural", "years");
+        internal static string TextDurationUnitDaySingular { get { return ModLocalization.Get("TextDurationUnitDaySingular", "day"); } }
+        internal static string TextDurationUnitDayPlural { get { return ModLocalization.Get("TextDurationUnitDayPlural", "days"); } }
+        internal static string TextDurationUnitWeekSingular { get { return ModLocalization.Get("TextDurationUnitWeekSingular", "week"); } }
+        internal static string TextDurationUnitWeekPlural { get { return ModLocalization.Get("TextDurationUnitWeekPlural", "weeks"); } }
+        internal static string TextDurationUnitMonthSingular { get { return ModLocalization.Get("TextDurationUnitMonthSingular", "month"); } }
+        internal static string TextDurationUnitMonthPlural { get { return ModLocalization.Get("TextDurationUnitMonthPlural", "months"); } }
+        internal static string TextDurationUnitYearSingular { get { return ModLocalization.Get("TextDurationUnitYearSingular", "year"); } }
+        internal static string TextDurationUnitYearPlural { get { return ModLocalization.Get("TextDurationUnitYearPlural", "years"); } }
         internal const string DateFormatRoundTrip = "o";
         internal const string OutcomeLinesJoinSeparator = "\n";
 
@@ -419,7 +419,7 @@ namespace IdolCareerDiary
         internal const string LanguageKeyCafeBestStats = "CAFE__BEST_STATS";
         internal const string LanguageKeyPopular = "POPULAR";
         internal const string LanguageKeyUnpopular = "UNPOPULAR";
-        internal static readonly string LabelCloseFallback = ModLocalization.Get("LabelCloseFallback", "Close");
+        internal static string LabelCloseFallback { get { return ModLocalization.Get("LabelCloseFallback", "Close"); } }
         internal const string MethodChartPopupRender = "Render";
 
         internal const string EventSingleReleased = "single_released";
@@ -820,22 +820,22 @@ namespace IdolCareerDiary
         internal const string IdImDataCoreImDataCoreApi = "IMDataCore.IMDataCoreApi";
         internal const string IdImDataCoreImDataCoreSession = "IMDataCore.IMDataCoreSession";
         internal const string IdImDataCoreImDataCoreEvent = "IMDataCore.IMDataCoreEvent";
-        internal static readonly string TextNamespaceIsEmpty = ModLocalization.Get("TextNamespaceIsEmpty", "Namespace is empty.");
-        internal static readonly string TextImDataCoreReturnedAnEmptySession = ModLocalization.Get("TextImDataCoreReturnedAnEmptySession", "IM Data Core returned an empty session.");
-        internal static readonly string TextImDataCoreSessionIsUnavailable = ModLocalization.Get("TextImDataCoreSessionIsUnavailable", "IM Data Core session is unavailable.");
-        internal static readonly string TextImDataCoreBridgeIsRetrying = ModLocalization.Get("TextImDataCoreBridgeIsRetrying", "IM Data Core bridge is retrying.");
-        internal static readonly string TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved = ModLocalization.Get("TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved", "IM Data Core patches are present but API assembly could not be resolved.");
-        internal static readonly string TextImDataCoreModIsNotLoaded = ModLocalization.Get("TextImDataCoreModIsNotLoaded", "IM Data Core mod is not loaded.");
-        internal static readonly string TextImDataCoreApiTypesWereNotFoundInAssembly = ModLocalization.Get("TextImDataCoreApiTypesWereNotFoundInAssembly", "IM Data Core API types were not found in assembly.");
+        internal static string TextNamespaceIsEmpty { get { return ModLocalization.Get("TextNamespaceIsEmpty", "Namespace is empty."); } }
+        internal static string TextImDataCoreReturnedAnEmptySession { get { return ModLocalization.Get("TextImDataCoreReturnedAnEmptySession", "IM Data Core returned an empty session."); } }
+        internal static string TextImDataCoreSessionIsUnavailable { get { return ModLocalization.Get("TextImDataCoreSessionIsUnavailable", "IM Data Core session is unavailable."); } }
+        internal static string TextImDataCoreBridgeIsRetrying { get { return ModLocalization.Get("TextImDataCoreBridgeIsRetrying", "IM Data Core bridge is retrying."); } }
+        internal static string TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved { get { return ModLocalization.Get("TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved", "IM Data Core patches are present but API assembly could not be resolved."); } }
+        internal static string TextImDataCoreModIsNotLoaded { get { return ModLocalization.Get("TextImDataCoreModIsNotLoaded", "IM Data Core mod is not loaded."); } }
+        internal static string TextImDataCoreApiTypesWereNotFoundInAssembly { get { return ModLocalization.Get("TextImDataCoreApiTypesWereNotFoundInAssembly", "IM Data Core API types were not found in assembly."); } }
         internal const string MemberNameIsReady = "IsReady";
         internal const string MemberNameTryRegisterNamespace = "TryRegisterNamespace";
         internal const string MemberNameTryGetCustomJson = "TryGetCustomJson";
         internal const string MemberNameTrySetCustomJson = "TrySetCustomJson";
         internal const string MemberNameTryAppendCustomEvent = "TryAppendCustomEvent";
         internal const string MemberNameTryReadRecentEventsForIdol = "TryReadRecentEventsForIdol";
-        internal static readonly string TextImDataCoreApiMethodSignatureMismatch = ModLocalization.Get("TextImDataCoreApiMethodSignatureMismatch", "IM Data Core API method signature mismatch.");
-        internal static readonly string TextImDataCoreAppendCustomEventMethodIsUnavailable = ModLocalization.Get("TextImDataCoreAppendCustomEventMethodIsUnavailable", "IM Data Core append-custom-event method is unavailable.");
-        internal static readonly string TextBirthdayEventAppendFailedPrefix = ModLocalization.Get("TextBirthdayEventAppendFailedPrefix", "Failed to append birthday event: ");
+        internal static string TextImDataCoreApiMethodSignatureMismatch { get { return ModLocalization.Get("TextImDataCoreApiMethodSignatureMismatch", "IM Data Core API method signature mismatch."); } }
+        internal static string TextImDataCoreAppendCustomEventMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreAppendCustomEventMethodIsUnavailable", "IM Data Core append-custom-event method is unavailable."); } }
+        internal static string TextBirthdayEventAppendFailedPrefix { get { return ModLocalization.Get("TextBirthdayEventAppendFailedPrefix", "Failed to append birthday event: "); } }
         internal const string MemberNameEventId = "EventId";
         internal const string MemberNameGameDateKey = "GameDateKey";
         internal const string MemberNameGameDateTime = "GameDateTime";
@@ -846,276 +846,276 @@ namespace IdolCareerDiary
         internal const string MemberNameSourcePatch = "SourcePatch";
         internal const string MemberNamePayloadJson = "PayloadJson";
         internal const string MemberNameNamespaceId = "NamespaceId";
-        internal static readonly string TextImDataCoreEventPropertySignatureMismatch = ModLocalization.Get("TextImDataCoreEventPropertySignatureMismatch", "IM Data Core event property signature mismatch.");
-        internal static readonly string TextImDataCoreBridgeMethodIsUnavailable = ModLocalization.Get("TextImDataCoreBridgeMethodIsUnavailable", "IM Data Core bridge method is unavailable.");
+        internal static string TextImDataCoreEventPropertySignatureMismatch { get { return ModLocalization.Get("TextImDataCoreEventPropertySignatureMismatch", "IM Data Core event property signature mismatch."); } }
+        internal static string TextImDataCoreBridgeMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreBridgeMethodIsUnavailable", "IM Data Core bridge method is unavailable."); } }
         internal const string IdImUiFrameworkImUiKit = "IMUiFramework.IMUiKit";
-        internal static readonly string TextPopupManagerIsNull = ModLocalization.Get("TextPopupManagerIsNull", "PopupManager is null.");
-        internal static readonly string TextImUiFrameworkReturnedNullUiObject = ModLocalization.Get("TextImUiFrameworkReturnedNullUiObject", "IM UI Framework returned null UI object.");
-        internal static readonly string TextImUiFrameworkReturnedNullStyledButton = ModLocalization.Get("TextImUiFrameworkReturnedNullStyledButton", "IM UI Framework returned null styled button.");
-        internal static readonly string TextImUiFrameworkReturnedNullClonedButton = ModLocalization.Get("TextImUiFrameworkReturnedNullClonedButton", "IM UI Framework returned null cloned button.");
-        internal static readonly string TextImUiFrameworkBridgeIsRetrying = ModLocalization.Get("TextImUiFrameworkBridgeIsRetrying", "IM UI Framework bridge is retrying.");
-        internal static readonly string TextImUiFrameworkPatchesArePresentButApiAssemblyCouldNotBeResolved = ModLocalization.Get("TextImUiFrameworkPatchesArePresentButApiAssemblyCouldNotBeResolved", "IM UI Framework patches are present but API assembly could not be resolved.");
-        internal static readonly string TextImUiFrameworkModIsNotLoaded = ModLocalization.Get("TextImUiFrameworkModIsNotLoaded", "IM UI Framework mod is not loaded.");
-        internal static readonly string TextImUiFrameworkImUiKitTypeWasNotFoundInAssembly = ModLocalization.Get("TextImUiFrameworkImUiKitTypeWasNotFoundInAssembly", "IM UI Framework IMUiKit type was not found in assembly.");
+        internal static string TextPopupManagerIsNull { get { return ModLocalization.Get("TextPopupManagerIsNull", "PopupManager is null."); } }
+        internal static string TextImUiFrameworkReturnedNullUiObject { get { return ModLocalization.Get("TextImUiFrameworkReturnedNullUiObject", "IM UI Framework returned null UI object."); } }
+        internal static string TextImUiFrameworkReturnedNullStyledButton { get { return ModLocalization.Get("TextImUiFrameworkReturnedNullStyledButton", "IM UI Framework returned null styled button."); } }
+        internal static string TextImUiFrameworkReturnedNullClonedButton { get { return ModLocalization.Get("TextImUiFrameworkReturnedNullClonedButton", "IM UI Framework returned null cloned button."); } }
+        internal static string TextImUiFrameworkBridgeIsRetrying { get { return ModLocalization.Get("TextImUiFrameworkBridgeIsRetrying", "IM UI Framework bridge is retrying."); } }
+        internal static string TextImUiFrameworkPatchesArePresentButApiAssemblyCouldNotBeResolved { get { return ModLocalization.Get("TextImUiFrameworkPatchesArePresentButApiAssemblyCouldNotBeResolved", "IM UI Framework patches are present but API assembly could not be resolved."); } }
+        internal static string TextImUiFrameworkModIsNotLoaded { get { return ModLocalization.Get("TextImUiFrameworkModIsNotLoaded", "IM UI Framework mod is not loaded."); } }
+        internal static string TextImUiFrameworkImUiKitTypeWasNotFoundInAssembly { get { return ModLocalization.Get("TextImUiFrameworkImUiKitTypeWasNotFoundInAssembly", "IM UI Framework IMUiKit type was not found in assembly."); } }
         internal const string MemberNameInitialize = "Initialize";
         internal const string MemberNameCreateUiObject = "CreateUiObject";
         internal const string MemberNameClearChildren = "ClearChildren";
         internal const string MemberNameRebuildLayout = "RebuildLayout";
         internal const string MemberNameCreateStyledButton = "CreateStyledButton";
         internal const string MemberNameCloneStyledButton = "CloneStyledButton";
-        internal static readonly string TextImUiFrameworkApiMethodSignatureMismatch = ModLocalization.Get("TextImUiFrameworkApiMethodSignatureMismatch", "IM UI Framework API method signature mismatch.");
-        internal static readonly string TextImUiFrameworkBridgeMethodIsUnavailable = ModLocalization.Get("TextImUiFrameworkBridgeMethodIsUnavailable", "IM UI Framework bridge method is unavailable.");
-        internal static readonly string TextImDataCoreErrorPrefix = ModLocalization.Get("TextImDataCoreErrorPrefix", "IMDataCore: ");
-        internal static readonly string TextUnknownError = ModLocalization.Get("TextUnknownError", "unknown error");
-        internal static readonly string TextImUiFrameworkErrorPrefix = ModLocalization.Get("TextImUiFrameworkErrorPrefix", " | IMUIFramework: ");
-        internal static readonly string TextImDataCoreUnknownDependencyResolutionError = ModLocalization.Get("TextImDataCoreUnknownDependencyResolutionError", "IMDataCore unknown dependency resolution error.");
-        internal static readonly string TextImUiFrameworkUnknownDependencyResolutionError = ModLocalization.Get("TextImUiFrameworkUnknownDependencyResolutionError", "IMUIFramework unknown dependency resolution error.");
-        internal static readonly string TextUnknownDependencyResolutionError = ModLocalization.Get("TextUnknownDependencyResolutionError", "Unknown dependency resolution error.");
-        internal static readonly string TextEnsureModImDataCore = ModLocalization.Get("TextEnsureModImDataCore", " Ensure mod 'IMDataCore' (");
-        internal static readonly string TextIsInstalledAndEnabled = ModLocalization.Get("TextIsInstalledAndEnabled", ") is installed and enabled.");
-        internal static readonly string TextEnsureModImUiFramework = ModLocalization.Get("TextEnsureModImUiFramework", " Ensure mod 'IMUIFramework' (");
-        internal static readonly string TextUnableToPersistSelectedEventStatePrefix = ModLocalization.Get("TextUnableToPersistSelectedEventStatePrefix", "Unable to persist selected event state: ");
-        internal static readonly string TextRequiredDependenciesAreMissing = ModLocalization.Get("TextRequiredDependenciesAreMissing", "Required dependencies are missing.");
-        internal static readonly string TextRetryWindowActive = ModLocalization.Get("TextRetryWindowActive", "Retry window active.");
-        internal static readonly string TextImDataCoreNotReady = ModLocalization.Get("TextImDataCoreNotReady", "IM Data Core not ready.");
-        internal static readonly string TextCoreNamespaceRegistrationFailedPrefix = ModLocalization.Get("TextCoreNamespaceRegistrationFailedPrefix", "Core namespace registration failed: ");
-        internal static readonly string TextImDataCoreSessionInitialized = ModLocalization.Get("TextImDataCoreSessionInitialized", "IM Data Core session initialized.");
-        internal static readonly string TextCareerDiaryCloseButtonAnchorNotFoundDeferringButtonPlacement = ModLocalization.Get("TextCareerDiaryCloseButtonAnchorNotFoundDeferringButtonPlacement", "Career Diary close button anchor not found; deferring button placement.");
-        internal static readonly string TextCareerDiaryButtonParentUnavailable = ModLocalization.Get("TextCareerDiaryButtonParentUnavailable", "Career Diary button parent unavailable.");
-        internal static readonly string TextCareerDiaryPanelTemplateUnavailable = ModLocalization.Get("TextCareerDiaryPanelTemplateUnavailable", "Career Diary panel template unavailable.");
-        internal static readonly string TextCareerDiaryDetailPopupTemplateUnavailable = ModLocalization.Get("TextCareerDiaryDetailPopupTemplateUnavailable", "Career Diary detail popup template unavailable.");
-        internal static readonly string TextActiveIdolContextUnavailable = ModLocalization.Get("TextActiveIdolContextUnavailable", "Active idol context unavailable.");
-        internal static readonly string TextTimelineQueryFailed = ModLocalization.Get("TextTimelineQueryFailed", "Timeline query failed.");
-        internal static readonly string TextTourCreated = ModLocalization.Get("TextTourCreated", "Tour Created");
-        internal static readonly string TextTourStarted = ModLocalization.Get("TextTourStarted", "Tour Started");
-        internal static readonly string TextTourFinished = ModLocalization.Get("TextTourFinished", "Tour Finished");
-        internal static readonly string TextTourCancelled = ModLocalization.Get("TextTourCancelled", "Tour Cancelled");
-        internal static readonly string TextTourCountryResult = ModLocalization.Get("TextTourCountryResult", "Tour Country Result");
-        internal static readonly string TextTourParticipationRecorded = ModLocalization.Get("TextTourParticipationRecorded", "Tour Participation Recorded");
-        internal static readonly string TextTour = ModLocalization.Get("TextTour", "Tour #");
-        internal static readonly string TextTourStatus = ModLocalization.Get("TextTourStatus", "Tour Status");
+        internal static string TextImUiFrameworkApiMethodSignatureMismatch { get { return ModLocalization.Get("TextImUiFrameworkApiMethodSignatureMismatch", "IM UI Framework API method signature mismatch."); } }
+        internal static string TextImUiFrameworkBridgeMethodIsUnavailable { get { return ModLocalization.Get("TextImUiFrameworkBridgeMethodIsUnavailable", "IM UI Framework bridge method is unavailable."); } }
+        internal static string TextImDataCoreErrorPrefix { get { return ModLocalization.Get("TextImDataCoreErrorPrefix", "IMDataCore: "); } }
+        internal static string TextUnknownError { get { return ModLocalization.Get("TextUnknownError", "unknown error"); } }
+        internal static string TextImUiFrameworkErrorPrefix { get { return ModLocalization.Get("TextImUiFrameworkErrorPrefix", " | IMUIFramework: "); } }
+        internal static string TextImDataCoreUnknownDependencyResolutionError { get { return ModLocalization.Get("TextImDataCoreUnknownDependencyResolutionError", "IMDataCore unknown dependency resolution error."); } }
+        internal static string TextImUiFrameworkUnknownDependencyResolutionError { get { return ModLocalization.Get("TextImUiFrameworkUnknownDependencyResolutionError", "IMUIFramework unknown dependency resolution error."); } }
+        internal static string TextUnknownDependencyResolutionError { get { return ModLocalization.Get("TextUnknownDependencyResolutionError", "Unknown dependency resolution error."); } }
+        internal static string TextEnsureModImDataCore { get { return ModLocalization.Get("TextEnsureModImDataCore", " Ensure mod 'IMDataCore' ("); } }
+        internal static string TextIsInstalledAndEnabled { get { return ModLocalization.Get("TextIsInstalledAndEnabled", ") is installed and enabled."); } }
+        internal static string TextEnsureModImUiFramework { get { return ModLocalization.Get("TextEnsureModImUiFramework", " Ensure mod 'IMUIFramework' ("); } }
+        internal static string TextUnableToPersistSelectedEventStatePrefix { get { return ModLocalization.Get("TextUnableToPersistSelectedEventStatePrefix", "Unable to persist selected event state: "); } }
+        internal static string TextRequiredDependenciesAreMissing { get { return ModLocalization.Get("TextRequiredDependenciesAreMissing", "Required dependencies are missing."); } }
+        internal static string TextRetryWindowActive { get { return ModLocalization.Get("TextRetryWindowActive", "Retry window active."); } }
+        internal static string TextImDataCoreNotReady { get { return ModLocalization.Get("TextImDataCoreNotReady", "IM Data Core not ready."); } }
+        internal static string TextCoreNamespaceRegistrationFailedPrefix { get { return ModLocalization.Get("TextCoreNamespaceRegistrationFailedPrefix", "Core namespace registration failed: "); } }
+        internal static string TextImDataCoreSessionInitialized { get { return ModLocalization.Get("TextImDataCoreSessionInitialized", "IM Data Core session initialized."); } }
+        internal static string TextCareerDiaryCloseButtonAnchorNotFoundDeferringButtonPlacement { get { return ModLocalization.Get("TextCareerDiaryCloseButtonAnchorNotFoundDeferringButtonPlacement", "Career Diary close button anchor not found; deferring button placement."); } }
+        internal static string TextCareerDiaryButtonParentUnavailable { get { return ModLocalization.Get("TextCareerDiaryButtonParentUnavailable", "Career Diary button parent unavailable."); } }
+        internal static string TextCareerDiaryPanelTemplateUnavailable { get { return ModLocalization.Get("TextCareerDiaryPanelTemplateUnavailable", "Career Diary panel template unavailable."); } }
+        internal static string TextCareerDiaryDetailPopupTemplateUnavailable { get { return ModLocalization.Get("TextCareerDiaryDetailPopupTemplateUnavailable", "Career Diary detail popup template unavailable."); } }
+        internal static string TextActiveIdolContextUnavailable { get { return ModLocalization.Get("TextActiveIdolContextUnavailable", "Active idol context unavailable."); } }
+        internal static string TextTimelineQueryFailed { get { return ModLocalization.Get("TextTimelineQueryFailed", "Timeline query failed."); } }
+        internal static string TextTourCreated { get { return ModLocalization.Get("TextTourCreated", "Tour Created"); } }
+        internal static string TextTourStarted { get { return ModLocalization.Get("TextTourStarted", "Tour Started"); } }
+        internal static string TextTourFinished { get { return ModLocalization.Get("TextTourFinished", "Tour Finished"); } }
+        internal static string TextTourCancelled { get { return ModLocalization.Get("TextTourCancelled", "Tour Cancelled"); } }
+        internal static string TextTourCountryResult { get { return ModLocalization.Get("TextTourCountryResult", "Tour Country Result"); } }
+        internal static string TextTourParticipationRecorded { get { return ModLocalization.Get("TextTourParticipationRecorded", "Tour Participation Recorded"); } }
+        internal static string TextTour { get { return ModLocalization.Get("TextTour", "Tour #"); } }
+        internal static string TextTourStatus { get { return ModLocalization.Get("TextTourStatus", "Tour Status"); } }
         internal const string KeyTourStatus = "tour_status";
-        internal static readonly string LabelAction = ModLocalization.Get("LabelAction", "Action");
+        internal static string LabelAction { get { return ModLocalization.Get("LabelAction", "Action"); } }
         internal const string KeyTourLifecycleAction = "tour_lifecycle_action";
-        internal static readonly string TextParticipantCount = ModLocalization.Get("TextParticipantCount", "Participant Count");
+        internal static string TextParticipantCount { get { return ModLocalization.Get("TextParticipantCount", "Participant Count"); } }
         internal const string KeyTourParticipantCount = "tour_participant_count";
-        internal static readonly string TextParticipants = ModLocalization.Get("TextParticipants", "Participants: ");
-        internal static readonly string TextCountryCount = ModLocalization.Get("TextCountryCount", "Country Count");
-        internal static readonly string LabelAudience = ModLocalization.Get("LabelAudience", "Audience");
-        internal static readonly string TextNewFans = ModLocalization.Get("TextNewFans", "New Fans");
-        internal static readonly string TextProductionCost = ModLocalization.Get("TextProductionCost", "Production Cost");
-        internal static readonly string LabelProfit = ModLocalization.Get("LabelProfit", "Profit");
+        internal static string TextParticipants { get { return ModLocalization.Get("TextParticipants", "Participants: "); } }
+        internal static string TextCountryCount { get { return ModLocalization.Get("TextCountryCount", "Country Count"); } }
+        internal static string LabelAudience { get { return ModLocalization.Get("LabelAudience", "Audience"); } }
+        internal static string TextNewFans { get { return ModLocalization.Get("TextNewFans", "New Fans"); } }
+        internal static string TextProductionCost { get { return ModLocalization.Get("TextProductionCost", "Production Cost"); } }
+        internal static string LabelProfit { get { return ModLocalization.Get("LabelProfit", "Profit"); } }
         internal const string KeyTourProfit = "tour_profit";
-        internal static readonly string TextStartDate = ModLocalization.Get("TextStartDate", "Start Date");
+        internal static string TextStartDate { get { return ModLocalization.Get("TextStartDate", "Start Date"); } }
         internal const string KeyTourStartDate = "tour_start_date";
-        internal static readonly string TextFinishDate = ModLocalization.Get("TextFinishDate", "Finish Date");
-        internal static readonly string LabelCountry = ModLocalization.Get("LabelCountry", "Country");
+        internal static string TextFinishDate { get { return ModLocalization.Get("TextFinishDate", "Finish Date"); } }
+        internal static string LabelCountry { get { return ModLocalization.Get("LabelCountry", "Country"); } }
         internal const string KeyTourCountryCode = "tour_country_code";
-        internal static readonly string TextCountryLevel = ModLocalization.Get("TextCountryLevel", "Country Level");
+        internal static string TextCountryLevel { get { return ModLocalization.Get("TextCountryLevel", "Country Level"); } }
         internal const string KeyTourCountryLevel = "tour_country_level";
-        internal static readonly string TextCountryAttendance = ModLocalization.Get("TextCountryAttendance", "Country Attendance");
+        internal static string TextCountryAttendance { get { return ModLocalization.Get("TextCountryAttendance", "Country Attendance"); } }
         internal const string KeyTourCountryAttendance = "tour_country_attendance";
-        internal static readonly string TextCountryAudience = ModLocalization.Get("TextCountryAudience", "Country Audience");
+        internal static string TextCountryAudience { get { return ModLocalization.Get("TextCountryAudience", "Country Audience"); } }
         internal const string KeyTourCountryAudience = "tour_country_audience";
-        internal static readonly string TextCountryRevenue = ModLocalization.Get("TextCountryRevenue", "Country Revenue");
+        internal static string TextCountryRevenue { get { return ModLocalization.Get("TextCountryRevenue", "Country Revenue"); } }
         internal const string KeyTourCountryRevenue = "tour_country_revenue";
-        internal static readonly string TextCountryNewFans = ModLocalization.Get("TextCountryNewFans", "Country New Fans");
+        internal static string TextCountryNewFans { get { return ModLocalization.Get("TextCountryNewFans", "Country New Fans"); } }
         internal const string KeyTourCountryNewFans = "tour_country_new_fans";
-        internal static readonly string TextElectionCreated = ModLocalization.Get("TextElectionCreated", "Election Created");
-        internal static readonly string TextElectionStarted = ModLocalization.Get("TextElectionStarted", "Election Started");
-        internal static readonly string TextElectionFinished = ModLocalization.Get("TextElectionFinished", "Election Finished");
-        internal static readonly string TextElectionCancelled = ModLocalization.Get("TextElectionCancelled", "Election Cancelled");
-        internal static readonly string TextElectionResultsGenerated = ModLocalization.Get("TextElectionResultsGenerated", "Election Results Generated");
-        internal static readonly string TextElectionPlaceAdjusted = ModLocalization.Get("TextElectionPlaceAdjusted", "Election Place Adjusted");
-        internal static readonly string TextElection = ModLocalization.Get("TextElection", "Election #");
-        internal static readonly string LabelStatus = ModLocalization.Get("LabelStatus", "Status");
-        internal static readonly string LabelBroadcast = ModLocalization.Get("LabelBroadcast", "Broadcast");
-        internal static readonly string LabelPlace = ModLocalization.Get("LabelPlace", "Place");
+        internal static string TextElectionCreated { get { return ModLocalization.Get("TextElectionCreated", "Election Created"); } }
+        internal static string TextElectionStarted { get { return ModLocalization.Get("TextElectionStarted", "Election Started"); } }
+        internal static string TextElectionFinished { get { return ModLocalization.Get("TextElectionFinished", "Election Finished"); } }
+        internal static string TextElectionCancelled { get { return ModLocalization.Get("TextElectionCancelled", "Election Cancelled"); } }
+        internal static string TextElectionResultsGenerated { get { return ModLocalization.Get("TextElectionResultsGenerated", "Election Results Generated"); } }
+        internal static string TextElectionPlaceAdjusted { get { return ModLocalization.Get("TextElectionPlaceAdjusted", "Election Place Adjusted"); } }
+        internal static string TextElection { get { return ModLocalization.Get("TextElection", "Election #"); } }
+        internal static string LabelStatus { get { return ModLocalization.Get("LabelStatus", "Status"); } }
+        internal static string LabelBroadcast { get { return ModLocalization.Get("LabelBroadcast", "Broadcast"); } }
+        internal static string LabelPlace { get { return ModLocalization.Get("LabelPlace", "Place"); } }
         internal const string KeyElectionPlaceBefore = "election_place_before";
         internal const string KeyElectionPlaceAfter = "election_place_after";
-        internal static readonly string LabelVotes = ModLocalization.Get("LabelVotes", "Votes");
-        internal static readonly string TextFamePoints = ModLocalization.Get("TextFamePoints", "Fame Points");
-        internal static readonly string TextResultCount = ModLocalization.Get("TextResultCount", "Ranked Idols");
-        internal static readonly string TextConcertCreated = ModLocalization.Get("TextConcertCreated", "Concert Created");
-        internal static readonly string TextConcertStarted = ModLocalization.Get("TextConcertStarted", "Concert Started");
-        internal static readonly string TextConcertFinished = ModLocalization.Get("TextConcertFinished", "Concert Finished");
-        internal static readonly string TextConcertCancelled = ModLocalization.Get("TextConcertCancelled", "Concert Cancelled");
-        internal static readonly string TextConcertParticipationRecorded = ModLocalization.Get("TextConcertParticipationRecorded", "Concert Participation Recorded");
-        internal static readonly string TextConcertCastUpdated = ModLocalization.Get("TextConcertCastUpdated", "Concert Cast Updated");
-        internal static readonly string TextConcertStatusUpdated = ModLocalization.Get("TextConcertStatusUpdated", "Concert Status Updated");
-        internal static readonly string TextConcertConfigurationUpdated = ModLocalization.Get("TextConcertConfigurationUpdated", "Concert Configuration Updated");
-        internal static readonly string TextConcertCardUsed = ModLocalization.Get("TextConcertCardUsed", "Concert Card Used");
-        internal static readonly string TextConcertCrisisDecision = ModLocalization.Get("TextConcertCrisisDecision", "Concert Crisis Decision");
-        internal static readonly string TextConcertCrisisApplied = ModLocalization.Get("TextConcertCrisisApplied", "Concert Crisis Applied");
-        internal static readonly string TextConcertFinalOutcome = ModLocalization.Get("TextConcertFinalOutcome", "Concert Final Outcome");
+        internal static string LabelVotes { get { return ModLocalization.Get("LabelVotes", "Votes"); } }
+        internal static string TextFamePoints { get { return ModLocalization.Get("TextFamePoints", "Fame Points"); } }
+        internal static string TextResultCount { get { return ModLocalization.Get("TextResultCount", "Ranked Idols"); } }
+        internal static string TextConcertCreated { get { return ModLocalization.Get("TextConcertCreated", "Concert Created"); } }
+        internal static string TextConcertStarted { get { return ModLocalization.Get("TextConcertStarted", "Concert Started"); } }
+        internal static string TextConcertFinished { get { return ModLocalization.Get("TextConcertFinished", "Concert Finished"); } }
+        internal static string TextConcertCancelled { get { return ModLocalization.Get("TextConcertCancelled", "Concert Cancelled"); } }
+        internal static string TextConcertParticipationRecorded { get { return ModLocalization.Get("TextConcertParticipationRecorded", "Concert Participation Recorded"); } }
+        internal static string TextConcertCastUpdated { get { return ModLocalization.Get("TextConcertCastUpdated", "Concert Cast Updated"); } }
+        internal static string TextConcertStatusUpdated { get { return ModLocalization.Get("TextConcertStatusUpdated", "Concert Status Updated"); } }
+        internal static string TextConcertConfigurationUpdated { get { return ModLocalization.Get("TextConcertConfigurationUpdated", "Concert Configuration Updated"); } }
+        internal static string TextConcertCardUsed { get { return ModLocalization.Get("TextConcertCardUsed", "Concert Card Used"); } }
+        internal static string TextConcertCrisisDecision { get { return ModLocalization.Get("TextConcertCrisisDecision", "Concert Crisis Decision"); } }
+        internal static string TextConcertCrisisApplied { get { return ModLocalization.Get("TextConcertCrisisApplied", "Concert Crisis Applied"); } }
+        internal static string TextConcertFinalOutcome { get { return ModLocalization.Get("TextConcertFinalOutcome", "Concert Final Outcome"); } }
         internal const string KeyConcertTitle = "concert_title";
-        internal static readonly string TextConcert = ModLocalization.Get("TextConcert", "Concert #");
-        internal static readonly string LabelVenue = ModLocalization.Get("LabelVenue", "Venue");
+        internal static string TextConcert { get { return ModLocalization.Get("TextConcert", "Concert #"); } }
+        internal static string LabelVenue { get { return ModLocalization.Get("LabelVenue", "Venue"); } }
         internal const string KeyConcertVenue = "concert_venue";
         internal const string KeyConcertPreviousStatus = "concert_previous_status";
         internal const string KeyConcertNewStatus = "concert_new_status";
         internal const string KeyConcertStatus = "concert_status";
-        internal static readonly string LabelSongs = ModLocalization.Get("LabelSongs", "Songs");
+        internal static string LabelSongs { get { return ModLocalization.Get("LabelSongs", "Songs"); } }
         internal const string KeyConcertSongCount = "concert_song_count";
-        internal static readonly string LabelParticipants = ModLocalization.Get("LabelParticipants", "Participants");
+        internal static string LabelParticipants { get { return ModLocalization.Get("LabelParticipants", "Participants"); } }
         internal const string KeyConcertParticipantCount = "concert_participant_count";
         internal const string KeyConcertParticipantCountBefore = "concert_participant_count_before";
         internal const string KeyConcertParticipantCountAfter = "concert_participant_count_after";
-        internal static readonly string TextLineup = ModLocalization.Get("TextLineup", "Lineup: ");
+        internal static string TextLineup { get { return ModLocalization.Get("TextLineup", "Lineup: "); } }
         internal const string KeyConcertParticipantIdListAdded = "concert_participant_id_list_added";
-        internal static readonly string TextAddedParticipants = ModLocalization.Get("TextAddedParticipants", "Added Participants: ");
+        internal static string TextAddedParticipants { get { return ModLocalization.Get("TextAddedParticipants", "Added Participants: "); } }
         internal const string KeyConcertParticipantIdListRemoved = "concert_participant_id_list_removed";
-        internal static readonly string TextRemovedParticipants = ModLocalization.Get("TextRemovedParticipants", "Removed Participants: ");
+        internal static string TextRemovedParticipants { get { return ModLocalization.Get("TextRemovedParticipants", "Removed Participants: "); } }
         internal const string KeyConcertRemovedIdolId = "concert_removed_idol_id";
-        internal static readonly string TextRemovedIdol = ModLocalization.Get("TextRemovedIdol", "Removed Idol: ");
-        internal static readonly string TextProjectedAudience = ModLocalization.Get("TextProjectedAudience", "Projected Audience");
+        internal static string TextRemovedIdol { get { return ModLocalization.Get("TextRemovedIdol", "Removed Idol: "); } }
+        internal static string TextProjectedAudience { get { return ModLocalization.Get("TextProjectedAudience", "Projected Audience"); } }
         internal const string KeyConcertProjectedAudience = "concert_projected_audience";
-        internal static readonly string TextActualAudience = ModLocalization.Get("TextActualAudience", "Actual Audience");
+        internal static string TextActualAudience { get { return ModLocalization.Get("TextActualAudience", "Actual Audience"); } }
         internal const string KeyConcertActualAudience = "concert_actual_audience";
-        internal static readonly string TextProjectedRevenue = ModLocalization.Get("TextProjectedRevenue", "Projected Revenue");
+        internal static string TextProjectedRevenue { get { return ModLocalization.Get("TextProjectedRevenue", "Projected Revenue"); } }
         internal const string KeyConcertProjectedRevenue = "concert_projected_revenue";
-        internal static readonly string TextActualRevenue = ModLocalization.Get("TextActualRevenue", "Actual Revenue");
+        internal static string TextActualRevenue { get { return ModLocalization.Get("TextActualRevenue", "Actual Revenue"); } }
         internal const string KeyConcertActualRevenue = "concert_actual_revenue";
         internal const string KeyConcertProductionCost = "concert_production_cost";
         internal const string KeyConcertProfit = "concert_profit";
-        internal static readonly string TextTicketPrice = ModLocalization.Get("TextTicketPrice", "Ticket Price");
+        internal static string TextTicketPrice { get { return ModLocalization.Get("TextTicketPrice", "Ticket Price"); } }
         internal const string KeyConcertTicketPrice = "concert_ticket_price";
         internal const string KeyConcertTicketPriceBefore = "concert_ticket_price_before";
         internal const string KeyConcertTicketPriceAfter = "concert_ticket_price_after";
-        internal static readonly string TextCardType = ModLocalization.Get("TextCardType", "Card Type");
+        internal static string TextCardType { get { return ModLocalization.Get("TextCardType", "Card Type"); } }
         internal const string KeyCardType = "card_type";
-        internal static readonly string TextCardLevel = ModLocalization.Get("TextCardLevel", "Card Level");
+        internal static string TextCardLevel { get { return ModLocalization.Get("TextCardLevel", "Card Level"); } }
         internal const string KeyCardLevel = "card_level";
-        internal static readonly string TextCardEffect = ModLocalization.Get("TextCardEffect", "Card Effect");
+        internal static string TextCardEffect { get { return ModLocalization.Get("TextCardEffect", "Card Effect"); } }
         internal const string KeyCardEffectValue = "card_effect_value";
-        internal static readonly string TextCardsRemaining = ModLocalization.Get("TextCardsRemaining", "Cards Remaining");
+        internal static string TextCardsRemaining { get { return ModLocalization.Get("TextCardsRemaining", "Cards Remaining"); } }
         internal const string KeyCardsBefore = "cards_before";
         internal const string KeyCardsAfter = "cards_after";
-        internal static readonly string LabelCrisis = ModLocalization.Get("LabelCrisis", "Crisis");
+        internal static string LabelCrisis { get { return ModLocalization.Get("LabelCrisis", "Crisis"); } }
         internal const string KeyAccidentTitle = "accident_title";
-        internal static readonly string LabelChoice = ModLocalization.Get("LabelChoice", "Choice");
+        internal static string LabelChoice { get { return ModLocalization.Get("LabelChoice", "Choice"); } }
         internal const string KeyChoiceType = "choice_type";
-        internal static readonly string LabelResult = ModLocalization.Get("LabelResult", "Result");
+        internal static string LabelResult { get { return ModLocalization.Get("LabelResult", "Result"); } }
         internal const string KeyResultType = "result_type";
-        internal static readonly string TextHypeDelta = ModLocalization.Get("TextHypeDelta", "Hype Change");
+        internal static string TextHypeDelta { get { return ModLocalization.Get("TextHypeDelta", "Hype Change"); } }
         internal const string KeyHypeDeltaApplied = "hype_delta_applied";
         internal const string KeyResultHypeDelta = "result_hype_delta";
-        internal static readonly string TextExpectedHypeDelta = ModLocalization.Get("TextExpectedHypeDelta", "Expected Hype Change");
+        internal static string TextExpectedHypeDelta { get { return ModLocalization.Get("TextExpectedHypeDelta", "Expected Hype Change"); } }
         internal const string KeyExpectedHypeDelta = "expected_hype_delta";
-        internal static readonly string TextSuccessChance = ModLocalization.Get("TextSuccessChance", "Success Chance");
+        internal static string TextSuccessChance { get { return ModLocalization.Get("TextSuccessChance", "Success Chance"); } }
         internal const string KeyAccidentSuccessChance = "accident_success_chance";
-        internal static readonly string TextFinalRevenue = ModLocalization.Get("TextFinalRevenue", "Final Revenue");
+        internal static string TextFinalRevenue { get { return ModLocalization.Get("TextFinalRevenue", "Final Revenue"); } }
         internal const string KeyActualRevenue = "actual_revenue";
-        internal static readonly string TextFinalProfit = ModLocalization.Get("TextFinalProfit", "Final Profit");
+        internal static string TextFinalProfit { get { return ModLocalization.Get("TextFinalProfit", "Final Profit"); } }
         internal const string KeyActualProfit = "actual_profit";
-        internal static readonly string TextIdolPayout = ModLocalization.Get("TextIdolPayout", "Total Idol Concert Earnings");
+        internal static string TextIdolPayout { get { return ModLocalization.Get("TextIdolPayout", "Total Idol Concert Earnings"); } }
         internal const string KeyIdolPayoutTotal = "idol_payout_total";
-        internal static readonly string LabelAccidents = ModLocalization.Get("LabelAccidents", "Accidents");
+        internal static string LabelAccidents { get { return ModLocalization.Get("LabelAccidents", "Accidents"); } }
         internal const string KeyUsedAccidentTitles = "used_accident_titles";
         internal const string KeyConcertFinishDate = "concert_finish_date";
-        internal static readonly string LabelDate = ModLocalization.Get("LabelDate", "Date");
+        internal static string LabelDate { get { return ModLocalization.Get("LabelDate", "Date"); } }
         internal const string KeyEventDate = "event_date";
-        internal static readonly string TextStaffHired = ModLocalization.Get("TextStaffHired", "Staff Hired");
-        internal static readonly string TextStaffFired = ModLocalization.Get("TextStaffFired", "Staff Fired");
-        internal static readonly string TextStaffFiredWithSeverance = ModLocalization.Get("TextStaffFiredWithSeverance", "Staff Fired With Severance");
-        internal static readonly string TextStaffLeveledUp = ModLocalization.Get("TextStaffLeveledUp", "Staff Leveled Up");
+        internal static string TextStaffHired { get { return ModLocalization.Get("TextStaffHired", "Staff Hired"); } }
+        internal static string TextStaffFired { get { return ModLocalization.Get("TextStaffFired", "Staff Fired"); } }
+        internal static string TextStaffFiredWithSeverance { get { return ModLocalization.Get("TextStaffFiredWithSeverance", "Staff Fired With Severance"); } }
+        internal static string TextStaffLeveledUp { get { return ModLocalization.Get("TextStaffLeveledUp", "Staff Leveled Up"); } }
         internal const string KeyStaffName = "staff_name";
-        internal static readonly string LabelStaff = ModLocalization.Get("LabelStaff", "Staff");
-        internal static readonly string LabelCreditedStaff = ModLocalization.Get("LabelCreditedStaff", "Credited Staff");
-        internal static readonly string LabelAssignedBy = ModLocalization.Get("LabelAssignedBy", "Assigned By");
-        internal static readonly string LabelCompletedBy = ModLocalization.Get("LabelCompletedBy", "Completed By");
-        internal static readonly string TextHiredBy = ModLocalization.Get("TextHiredBy", "Hired by: ");
-        internal static readonly string TextCreditedTo = ModLocalization.Get("TextCreditedTo", "Credited to: ");
-        internal static readonly string TextAssignedAndCompletedBy = ModLocalization.Get("TextAssignedAndCompletedBy", "Assigned and completed by: ");
-        internal static readonly string TextTrainingPracticeCompleted = ModLocalization.Get("TextTrainingPracticeCompleted", "Training Practice Completed");
-        internal static readonly string TextStaminaRecoveryCompleted = ModLocalization.Get("TextStaminaRecoveryCompleted", "Stamina Recovery Completed");
-        internal static readonly string TextSinglePreparationCompleted = ModLocalization.Get("TextSinglePreparationCompleted", "Single Preparation Completed");
-        internal static readonly string TextShowPreparationCompleted = ModLocalization.Get("TextShowPreparationCompleted", "Show Preparation Completed");
-        internal static readonly string TextConcertPreparationCompleted = ModLocalization.Get("TextConcertPreparationCompleted", "Concert Preparation Completed");
-        internal static readonly string TextEventPreparationCompleted = ModLocalization.Get("TextEventPreparationCompleted", "Event Preparation Completed");
-        internal static readonly string TextWorkStage = ModLocalization.Get("TextWorkStage", "Stage: ");
-        internal static readonly string LabelRole = ModLocalization.Get("LabelRole", "Role");
+        internal static string LabelStaff { get { return ModLocalization.Get("LabelStaff", "Staff"); } }
+        internal static string LabelCreditedStaff { get { return ModLocalization.Get("LabelCreditedStaff", "Credited Staff"); } }
+        internal static string LabelAssignedBy { get { return ModLocalization.Get("LabelAssignedBy", "Assigned By"); } }
+        internal static string LabelCompletedBy { get { return ModLocalization.Get("LabelCompletedBy", "Completed By"); } }
+        internal static string TextHiredBy { get { return ModLocalization.Get("TextHiredBy", "Hired by: "); } }
+        internal static string TextCreditedTo { get { return ModLocalization.Get("TextCreditedTo", "Credited to: "); } }
+        internal static string TextAssignedAndCompletedBy { get { return ModLocalization.Get("TextAssignedAndCompletedBy", "Assigned and completed by: "); } }
+        internal static string TextTrainingPracticeCompleted { get { return ModLocalization.Get("TextTrainingPracticeCompleted", "Training Practice Completed"); } }
+        internal static string TextStaminaRecoveryCompleted { get { return ModLocalization.Get("TextStaminaRecoveryCompleted", "Stamina Recovery Completed"); } }
+        internal static string TextSinglePreparationCompleted { get { return ModLocalization.Get("TextSinglePreparationCompleted", "Single Preparation Completed"); } }
+        internal static string TextShowPreparationCompleted { get { return ModLocalization.Get("TextShowPreparationCompleted", "Show Preparation Completed"); } }
+        internal static string TextConcertPreparationCompleted { get { return ModLocalization.Get("TextConcertPreparationCompleted", "Concert Preparation Completed"); } }
+        internal static string TextEventPreparationCompleted { get { return ModLocalization.Get("TextEventPreparationCompleted", "Event Preparation Completed"); } }
+        internal static string TextWorkStage { get { return ModLocalization.Get("TextWorkStage", "Stage: "); } }
+        internal static string LabelRole { get { return ModLocalization.Get("LabelRole", "Role"); } }
         internal const string KeyStaffAction = "staff_action";
-        internal static readonly string LabelSalary = ModLocalization.Get("LabelSalary", "Salary");
+        internal static string LabelSalary { get { return ModLocalization.Get("LabelSalary", "Salary"); } }
         internal const string KeyStaffSalary = "staff_salary";
-        internal static readonly string LabelLevel = ModLocalization.Get("LabelLevel", "Level");
+        internal static string LabelLevel { get { return ModLocalization.Get("LabelLevel", "Level"); } }
         internal const string KeyStaffLevelBefore = "staff_level_before";
         internal const string KeyStaffLevelAfter = "staff_level_after";
-        internal static readonly string TextSeveranceCost = ModLocalization.Get("TextSeveranceCost", "Severance Cost");
+        internal static string TextSeveranceCost { get { return ModLocalization.Get("TextSeveranceCost", "Severance Cost"); } }
         internal const string KeySeveranceCost = "severance_cost";
-        internal static readonly string TextMoneyChange = ModLocalization.Get("TextMoneyChange", "Money Change");
-        internal static readonly string LabelRoom = ModLocalization.Get("LabelRoom", "Room");
+        internal static string TextMoneyChange { get { return ModLocalization.Get("TextMoneyChange", "Money Change"); } }
+        internal static string LabelRoom { get { return ModLocalization.Get("LabelRoom", "Room"); } }
         internal const string KeyRoomType = "room_type";
         internal const string KeyFireForced = "fire_forced";
-        internal static readonly string TextForcedFiring = ModLocalization.Get("TextForcedFiring", "Forced Firing: ");
-        internal static readonly string TextLoanAdded = ModLocalization.Get("TextLoanAdded", "Loan Added");
-        internal static readonly string TextLoanInitialized = ModLocalization.Get("TextLoanInitialized", "Loan Initialized");
-        internal static readonly string TextLoanPaidOff = ModLocalization.Get("TextLoanPaidOff", "Loan Paid Off");
-        internal static readonly string TextLoan = ModLocalization.Get("TextLoan", "Loan #");
-        internal static readonly string TextLoanId = ModLocalization.Get("TextLoanId", "Loan ID");
+        internal static string TextForcedFiring { get { return ModLocalization.Get("TextForcedFiring", "Forced Firing: "); } }
+        internal static string TextLoanAdded { get { return ModLocalization.Get("TextLoanAdded", "Loan Added"); } }
+        internal static string TextLoanInitialized { get { return ModLocalization.Get("TextLoanInitialized", "Loan Initialized"); } }
+        internal static string TextLoanPaidOff { get { return ModLocalization.Get("TextLoanPaidOff", "Loan Paid Off"); } }
+        internal static string TextLoan { get { return ModLocalization.Get("TextLoan", "Loan #"); } }
+        internal static string TextLoanId { get { return ModLocalization.Get("TextLoanId", "Loan ID"); } }
         internal const string KeyLoanId = "loan_id";
         internal const string KeyLoanLifecycleAction = "loan_lifecycle_action";
-        internal static readonly string TextLoanType = ModLocalization.Get("TextLoanType", "Lender");
+        internal static string TextLoanType { get { return ModLocalization.Get("TextLoanType", "Lender"); } }
         internal const string KeyLoanType = "loan_type";
-        internal static readonly string TextLoanDuration = ModLocalization.Get("TextLoanDuration", "Repayment Term");
+        internal static string TextLoanDuration { get { return ModLocalization.Get("TextLoanDuration", "Repayment Term"); } }
         internal const string KeyLoanDuration = "loan_duration";
-        internal static readonly string TextLoanActive = ModLocalization.Get("TextLoanActive", "Loan Active");
+        internal static string TextLoanActive { get { return ModLocalization.Get("TextLoanActive", "Loan Active"); } }
         internal const string KeyLoanActiveBefore = "loan_active_before";
         internal const string KeyLoanActiveAfter = "loan_active_after";
-        internal static readonly string TextLoanAmount = ModLocalization.Get("TextLoanAmount", "Loan Amount");
+        internal static string TextLoanAmount { get { return ModLocalization.Get("TextLoanAmount", "Loan Amount"); } }
         internal const string KeyLoanAmount = "loan_amount";
-        internal static readonly string TextLoanPaymentPerWeek = ModLocalization.Get("TextLoanPaymentPerWeek", "Loan Payment Per Week");
+        internal static string TextLoanPaymentPerWeek { get { return ModLocalization.Get("TextLoanPaymentPerWeek", "Loan Payment Per Week"); } }
         internal const string KeyLoanPaymentPerWeek = "loan_payment_per_week";
-        internal static readonly string TextLoanInterestRate = ModLocalization.Get("TextLoanInterestRate", "Loan Interest Rate");
+        internal static string TextLoanInterestRate { get { return ModLocalization.Get("TextLoanInterestRate", "Loan Interest Rate"); } }
         internal const string KeyLoanInterestRate = "loan_interest_rate";
         internal const string KeyLoanStartDate = "loan_start_date";
         internal const string KeyLoanEndDate = "loan_end_date";
-        internal static readonly string TextLoanDebt = ModLocalization.Get("TextLoanDebt", "Loan Debt");
+        internal static string TextLoanDebt { get { return ModLocalization.Get("TextLoanDebt", "Loan Debt"); } }
         internal const string KeyLoanDebtBefore = "loan_debt_before";
         internal const string KeyLoanDebtAfter = "loan_debt_after";
-        internal static readonly string TextLoanCanPayOff = ModLocalization.Get("TextLoanCanPayOff", "Loan Can Pay Off");
+        internal static string TextLoanCanPayOff { get { return ModLocalization.Get("TextLoanCanPayOff", "Loan Can Pay Off"); } }
         internal const string KeyLoanCanPayOffAfter = "loan_can_pay_off_after";
-        internal static readonly string TextLoanInDevelopment = ModLocalization.Get("TextLoanInDevelopment", "Loan In Development");
+        internal static string TextLoanInDevelopment { get { return ModLocalization.Get("TextLoanInDevelopment", "Loan In Development"); } }
         internal const string KeyLoanInDevelopmentAfter = "loan_in_development_after";
-        internal static readonly string TextLoanDaysToDevelop = ModLocalization.Get("TextLoanDaysToDevelop", "Loan Days To Develop");
+        internal static string TextLoanDaysToDevelop { get { return ModLocalization.Get("TextLoanDaysToDevelop", "Loan Days To Develop"); } }
         internal const string KeyLoanDaysToDevelop = "loan_days_to_develop";
-        internal static readonly string TextActiveLoanCount = ModLocalization.Get("TextActiveLoanCount", "Active Loan Count");
+        internal static string TextActiveLoanCount { get { return ModLocalization.Get("TextActiveLoanCount", "Active Loan Count"); } }
         internal const string KeyLoanCountActive = "loan_count_active";
-        internal static readonly string TextTotalLoanCount = ModLocalization.Get("TextTotalLoanCount", "Total Loan Count");
+        internal static string TextTotalLoanCount { get { return ModLocalization.Get("TextTotalLoanCount", "Total Loan Count"); } }
         internal const string KeyLoanCountTotal = "loan_count_total";
-        internal static readonly string TextTotalLoanPaymentPerWeek = ModLocalization.Get("TextTotalLoanPaymentPerWeek", "Total Loan Payment Per Week");
+        internal static string TextTotalLoanPaymentPerWeek { get { return ModLocalization.Get("TextTotalLoanPaymentPerWeek", "Total Loan Payment Per Week"); } }
         internal const string KeyLoanTotalPaymentPerWeek = "loan_total_payment_per_week";
-        internal static readonly string TextTotalDebt = ModLocalization.Get("TextTotalDebt", "Total Debt");
+        internal static string TextTotalDebt { get { return ModLocalization.Get("TextTotalDebt", "Total Debt"); } }
         internal const string KeyLoanTotalDebt = "loan_total_debt";
         internal const string KeyMoneyBefore = "money_before";
         internal const string KeyMoneyAfter = "money_after";
-        internal static readonly string TextMoneyOnHand = ModLocalization.Get("TextMoneyOnHand", "Money On Hand");
-        internal static readonly string TextBankruptcyDangerSet = ModLocalization.Get("TextBankruptcyDangerSet", "Bankruptcy Danger Set");
-        internal static readonly string TextBankruptcyCheck = ModLocalization.Get("TextBankruptcyCheck", "Bankruptcy Check");
-        internal static readonly string TextBankruptcy = ModLocalization.Get("TextBankruptcy", "Bankruptcy");
-        internal static readonly string TextRequestedValue = ModLocalization.Get("TextRequestedValue", "Requested Value");
+        internal static string TextMoneyOnHand { get { return ModLocalization.Get("TextMoneyOnHand", "Money On Hand"); } }
+        internal static string TextBankruptcyDangerSet { get { return ModLocalization.Get("TextBankruptcyDangerSet", "Bankruptcy Danger Set"); } }
+        internal static string TextBankruptcyCheck { get { return ModLocalization.Get("TextBankruptcyCheck", "Bankruptcy Check"); } }
+        internal static string TextBankruptcy { get { return ModLocalization.Get("TextBankruptcy", "Bankruptcy"); } }
+        internal static string TextRequestedValue { get { return ModLocalization.Get("TextRequestedValue", "Requested Value"); } }
         internal const string KeyRequestedValue = "requested_value";
-        internal static readonly string TextBankruptcyDanger = ModLocalization.Get("TextBankruptcyDanger", "Bankruptcy Danger");
+        internal static string TextBankruptcyDanger { get { return ModLocalization.Get("TextBankruptcyDanger", "Bankruptcy Danger"); } }
         internal const string KeyBankruptcyDangerBefore = "bankruptcy_danger_before";
         internal const string KeyBankruptcyDangerAfter = "bankruptcy_danger_after";
-        internal static readonly string TextBankruptcyDate = ModLocalization.Get("TextBankruptcyDate", "Bankruptcy Date");
+        internal static string TextBankruptcyDate { get { return ModLocalization.Get("TextBankruptcyDate", "Bankruptcy Date"); } }
         internal const string KeyBankruptcyDateBefore = "bankruptcy_date_before";
         internal const string KeyBankruptcyDateAfter = "bankruptcy_date_after";
-        internal static readonly string TextBankruptcyDaysRemaining = ModLocalization.Get("TextBankruptcyDaysRemaining", "Bankruptcy Days Remaining");
+        internal static string TextBankruptcyDaysRemaining { get { return ModLocalization.Get("TextBankruptcyDaysRemaining", "Bankruptcy Days Remaining"); } }
         internal const string KeyBankruptcyDaysRemainingBefore = "bankruptcy_days_remaining_before";
         internal const string KeyBankruptcyDaysRemainingAfter = "bankruptcy_days_remaining_after";
         internal const string KeyTotalDebtBefore = "total_debt_before";
         internal const string KeyTotalDebtAfter = "total_debt_after";
-        internal static readonly string TextBailoutUsed = ModLocalization.Get("TextBailoutUsed", "Bailout Used");
+        internal static string TextBailoutUsed { get { return ModLocalization.Get("TextBailoutUsed", "Bailout Used"); } }
         internal const string KeyBailoutUsedBefore = "bailout_used_before";
         internal const string KeyBailoutUsedAfter = "bailout_used_after";
-        internal static readonly string TextStoryRecruitUsed = ModLocalization.Get("TextStoryRecruitUsed", "Story Recruit Used");
+        internal static string TextStoryRecruitUsed { get { return ModLocalization.Get("TextStoryRecruitUsed", "Story Recruit Used"); } }
         internal const string KeyStoryRecruitUsedBefore = "story_recruit_used_before";
         internal const string KeyStoryRecruitUsedAfter = "story_recruit_used_after";
-        internal static readonly string TextBankruptcyGameOverUsed = ModLocalization.Get("TextBankruptcyGameOverUsed", "Bankruptcy Game Over Used");
+        internal static string TextBankruptcyGameOverUsed { get { return ModLocalization.Get("TextBankruptcyGameOverUsed", "Bankruptcy Game Over Used"); } }
         internal const string KeyGameOverBankruptcyUsedBefore = "game_over_bankruptcy_used_before";
         internal const string KeyGameOverBankruptcyUsedAfter = "game_over_bankruptcy_used_after";
-        internal static readonly string TextTriggeredDialogue = ModLocalization.Get("TextTriggeredDialogue", "Triggered Story Event");
+        internal static string TextTriggeredDialogue { get { return ModLocalization.Get("TextTriggeredDialogue", "Triggered Story Event"); } }
         internal const string KeyTriggeredDialogue = "triggered_dialogue";
         internal const string CodeStoryBankruptcyBailOut = "bankruptcy_bail_out";
         internal const string CodeStoryRecruit = "story_recruit";
@@ -1124,37 +1124,37 @@ namespace IdolCareerDiary
         internal const string CodeStoryGameOverWarningScandalPoints = "game_over_warning_scandal_points";
         internal const string CodeStoryScandalPointsParents = "scandal_points_parents";
         internal const string CodeStoryGameOverScandalPoints = "game_over_scandal_points";
-        internal static readonly string TextCafeCreated = ModLocalization.Get("TextCafeCreated", "Cafe Created");
-        internal static readonly string TextCafeDestroyed = ModLocalization.Get("TextCafeDestroyed", "Cafe Destroyed");
-        internal static readonly string TextCafeDailyResult = ModLocalization.Get("TextCafeDailyResult", "Cafe Daily Result");
-        internal static readonly string TextCafe = ModLocalization.Get("TextCafe", "Cafe #");
-        internal static readonly string TextCafeId = ModLocalization.Get("TextCafeId", "Cafe ID");
+        internal static string TextCafeCreated { get { return ModLocalization.Get("TextCafeCreated", "Cafe Created"); } }
+        internal static string TextCafeDestroyed { get { return ModLocalization.Get("TextCafeDestroyed", "Cafe Destroyed"); } }
+        internal static string TextCafeDailyResult { get { return ModLocalization.Get("TextCafeDailyResult", "Cafe Daily Result"); } }
+        internal static string TextCafe { get { return ModLocalization.Get("TextCafe", "Cafe #"); } }
+        internal static string TextCafeId { get { return ModLocalization.Get("TextCafeId", "Cafe ID"); } }
         internal const string KeyCafeId = "cafe_id";
         internal const string KeyCafeLifecycleAction = "cafe_lifecycle_action";
         internal const string KeyCafeTitle = "cafe_title";
-        internal static readonly string TextGroupId = ModLocalization.Get("TextGroupId", "Group ID");
+        internal static string TextGroupId { get { return ModLocalization.Get("TextGroupId", "Group ID"); } }
         internal const string KeyRoomTheaterId = "room_theater_id";
-        internal static readonly string TextRoomTheaterId = ModLocalization.Get("TextRoomTheaterId", "Room Theater ID");
+        internal static string TextRoomTheaterId { get { return ModLocalization.Get("TextRoomTheaterId", "Room Theater ID"); } }
         internal const string KeyWaitStaffCount = "wait_staff_count";
-        internal static readonly string TextWaitStaffCount = ModLocalization.Get("TextWaitStaffCount", "Wait Staff Count");
+        internal static string TextWaitStaffCount { get { return ModLocalization.Get("TextWaitStaffCount", "Wait Staff Count"); } }
         internal const string KeyWorkingStaffCount = "working_staff_count";
-        internal static readonly string TextWorkingStaffCount = ModLocalization.Get("TextWorkingStaffCount", "Working Staff Count");
+        internal static string TextWorkingStaffCount { get { return ModLocalization.Get("TextWorkingStaffCount", "Working Staff Count"); } }
         internal const string KeyCafePriority = "cafe_priority";
-        internal static readonly string TextCafePriority = ModLocalization.Get("TextCafePriority", "Cafe Focus");
+        internal static string TextCafePriority { get { return ModLocalization.Get("TextCafePriority", "Cafe Focus"); } }
         internal const string KeyStaffPriority = "staff_priority";
-        internal static readonly string TextStaffPriority = ModLocalization.Get("TextStaffPriority", "Staff Assignment Priority");
+        internal static string TextStaffPriority { get { return ModLocalization.Get("TextStaffPriority", "Staff Assignment Priority"); } }
         internal const string KeyMenuSummary = "menu_summary";
-        internal static readonly string TextMenuSummary = ModLocalization.Get("TextMenuSummary", "Weekly Menu");
-        internal static readonly string TextMenuDayEntry = ModLocalization.Get("TextMenuDayEntry", "{0}: {1}");
-        internal static readonly string TextUnknownDishFormat = ModLocalization.Get("TextUnknownDishFormat", "Dish #{0}");
-        internal static readonly string TextNoCafeDishesSet = ModLocalization.Get("TextNoCafeDishesSet", "No dishes set");
-        internal static readonly string TextWeekdayMonday = ModLocalization.Get("TextWeekdayMonday", "Monday");
-        internal static readonly string TextWeekdayTuesday = ModLocalization.Get("TextWeekdayTuesday", "Tuesday");
-        internal static readonly string TextWeekdayWednesday = ModLocalization.Get("TextWeekdayWednesday", "Wednesday");
-        internal static readonly string TextWeekdayThursday = ModLocalization.Get("TextWeekdayThursday", "Thursday");
-        internal static readonly string TextWeekdayFriday = ModLocalization.Get("TextWeekdayFriday", "Friday");
-        internal static readonly string TextWeekdaySaturday = ModLocalization.Get("TextWeekdaySaturday", "Saturday");
-        internal static readonly string TextWeekdaySunday = ModLocalization.Get("TextWeekdaySunday", "Sunday");
+        internal static string TextMenuSummary { get { return ModLocalization.Get("TextMenuSummary", "Weekly Menu"); } }
+        internal static string TextMenuDayEntry { get { return ModLocalization.Get("TextMenuDayEntry", "{0}: {1}"); } }
+        internal static string TextUnknownDishFormat { get { return ModLocalization.Get("TextUnknownDishFormat", "Dish #{0}"); } }
+        internal static string TextNoCafeDishesSet { get { return ModLocalization.Get("TextNoCafeDishesSet", "No dishes set"); } }
+        internal static string TextWeekdayMonday { get { return ModLocalization.Get("TextWeekdayMonday", "Monday"); } }
+        internal static string TextWeekdayTuesday { get { return ModLocalization.Get("TextWeekdayTuesday", "Tuesday"); } }
+        internal static string TextWeekdayWednesday { get { return ModLocalization.Get("TextWeekdayWednesday", "Wednesday"); } }
+        internal static string TextWeekdayThursday { get { return ModLocalization.Get("TextWeekdayThursday", "Thursday"); } }
+        internal static string TextWeekdayFriday { get { return ModLocalization.Get("TextWeekdayFriday", "Friday"); } }
+        internal static string TextWeekdaySaturday { get { return ModLocalization.Get("TextWeekdaySaturday", "Saturday"); } }
+        internal static string TextWeekdaySunday { get { return ModLocalization.Get("TextWeekdaySunday", "Sunday"); } }
         internal const int WeekdayIndexMonday = 0;
         internal const int WeekdayIndexTuesday = 1;
         internal const int WeekdayIndexWednesday = 2;
@@ -1167,140 +1167,140 @@ namespace IdolCareerDiary
         internal const int CafeMenuDishIdField = 1;
         internal const string KeyLifecycleDate = "lifecycle_date";
         internal const string KeyDishId = "dish_id";
-        internal static readonly string TextDishId = ModLocalization.Get("TextDishId", "Dish ID");
+        internal static string TextDishId { get { return ModLocalization.Get("TextDishId", "Dish ID"); } }
         internal const string KeyDishType = "dish_type";
-        internal static readonly string TextDishType = ModLocalization.Get("TextDishType", "Dish Type");
+        internal static string TextDishType { get { return ModLocalization.Get("TextDishType", "Dish Type"); } }
         internal const string KeyDishTitle = "dish_title";
-        internal static readonly string TextDishTitle = ModLocalization.Get("TextDishTitle", "Dish Title");
+        internal static string TextDishTitle { get { return ModLocalization.Get("TextDishTitle", "Dish Title"); } }
         internal const string KeyCafeProfit = "profit";
-        internal static readonly string TextCafeProfit = ModLocalization.Get("TextCafeProfit", "Cafe Profit");
+        internal static string TextCafeProfit { get { return ModLocalization.Get("TextCafeProfit", "Cafe Profit"); } }
         internal const string KeyFanType = "fan_type";
-        internal static readonly string TextFanType = ModLocalization.Get("TextFanType", "Target Fan Segment");
+        internal static string TextFanType { get { return ModLocalization.Get("TextFanType", "Target Fan Segment"); } }
         internal const string KeyStaffedIdolCount = "staffed_idol_count";
-        internal static readonly string TextStaffedIdolCount = ModLocalization.Get("TextStaffedIdolCount", "Staffed Idol Count");
-        internal static readonly string TextStaffedIdols = ModLocalization.Get("TextStaffedIdols", "Staffed Idols: ");
+        internal static string TextStaffedIdolCount { get { return ModLocalization.Get("TextStaffedIdolCount", "Staffed Idol Count"); } }
+        internal static string TextStaffedIdols { get { return ModLocalization.Get("TextStaffedIdols", "Staffed Idols: "); } }
         internal const string KeyResultDate = "result_date";
         internal const string KeyTotalMoneyBefore = "total_money_before";
         internal const string KeyTotalMoneyAfter = "total_money_after";
         internal const string KeyTotalMoneyDelta = "total_money_delta";
-        internal static readonly string TextMentorshipStarted = ModLocalization.Get("TextMentorshipStarted", "Mentorship Started");
-        internal static readonly string TextMentorshipEnded = ModLocalization.Get("TextMentorshipEnded", "Mentorship Ended");
-        internal static readonly string TextMentorshipWeeklyTick = ModLocalization.Get("TextMentorshipWeeklyTick", "Mentorship Weekly Tick");
-        internal static readonly string TextMentorship = ModLocalization.Get("TextMentorship", "Mentorship");
+        internal static string TextMentorshipStarted { get { return ModLocalization.Get("TextMentorshipStarted", "Mentorship Started"); } }
+        internal static string TextMentorshipEnded { get { return ModLocalization.Get("TextMentorshipEnded", "Mentorship Ended"); } }
+        internal static string TextMentorshipWeeklyTick { get { return ModLocalization.Get("TextMentorshipWeeklyTick", "Mentorship Weekly Tick"); } }
+        internal static string TextMentorship { get { return ModLocalization.Get("TextMentorship", "Mentorship"); } }
         internal const string KeyMentorshipAction = "mentorship_action";
         internal const string KeyMentorId = "mentor_id";
         internal const string KeyKohaiId = "kohai_id";
-        internal static readonly string TextMentor = ModLocalization.Get("TextMentor", "Mentor: ");
-        internal static readonly string TextKohai = ModLocalization.Get("TextKohai", "Kohai: ");
+        internal static string TextMentor { get { return ModLocalization.Get("TextMentor", "Mentor: "); } }
+        internal static string TextKohai { get { return ModLocalization.Get("TextKohai", "Kohai: "); } }
         internal const string KeyActiveMentorCount = "active_mentor_count";
-        internal static readonly string TextActiveMentorCount = ModLocalization.Get("TextActiveMentorCount", "Active Mentor Count");
+        internal static string TextActiveMentorCount { get { return ModLocalization.Get("TextActiveMentorCount", "Active Mentor Count"); } }
         internal const string KeySenpaiToKohaiRatioBefore = "senpai_to_kohai_ratio_before";
         internal const string KeySenpaiToKohaiRatioAfter = "senpai_to_kohai_ratio_after";
-        internal static readonly string TextSenpaiToKohaiRatio = ModLocalization.Get("TextSenpaiToKohaiRatio", "Senpai -> Kohai Ratio");
+        internal static string TextSenpaiToKohaiRatio { get { return ModLocalization.Get("TextSenpaiToKohaiRatio", "Senpai -> Kohai Ratio"); } }
         internal const string KeyKohaiToSenpaiRatioBefore = "kohai_to_senpai_ratio_before";
         internal const string KeyKohaiToSenpaiRatioAfter = "kohai_to_senpai_ratio_after";
-        internal static readonly string TextKohaiToSenpaiRatio = ModLocalization.Get("TextKohaiToSenpaiRatio", "Kohai -> Senpai Ratio");
+        internal static string TextKohaiToSenpaiRatio { get { return ModLocalization.Get("TextKohaiToSenpaiRatio", "Kohai -> Senpai Ratio"); } }
         internal const string KeyMentorPairsSummary = "mentor_pairs_summary";
-        internal static readonly string TextMentorPairsSummary = ModLocalization.Get("TextMentorPairsSummary", "Active Mentorships");
-        internal static readonly string TextMentorPairFormat = ModLocalization.Get("TextMentorPairFormat", "{0} -> {1}");
+        internal static string TextMentorPairsSummary { get { return ModLocalization.Get("TextMentorPairsSummary", "Active Mentorships"); } }
+        internal static string TextMentorPairFormat { get { return ModLocalization.Get("TextMentorPairFormat", "{0} -> {1}"); } }
         internal const int MentorPairEntryFieldCount = 2;
         internal const int MentorPairMentorIdField = 0;
         internal const int MentorPairKohaiIdField = 1;
-        internal static readonly string TextScandalCheck = ModLocalization.Get("TextScandalCheck", "Scandal Check");
+        internal static string TextScandalCheck { get { return ModLocalization.Get("TextScandalCheck", "Scandal Check"); } }
         internal const string KeyTestGameOver = "test_go";
-        internal static readonly string TextTestGameOver = ModLocalization.Get("TextTestGameOver", "Test Game Over");
+        internal static string TextTestGameOver { get { return ModLocalization.Get("TextTestGameOver", "Test Game Over"); } }
         internal const string KeyScandalPointsTotalBefore = "scandal_points_total_before";
         internal const string KeyScandalPointsTotalAfter = "scandal_points_total_after";
         internal const string KeyScandalThreshold = "scandal_threshold";
-        internal static readonly string TextScandalThreshold = ModLocalization.Get("TextScandalThreshold", "Scandal Threshold");
+        internal static string TextScandalThreshold { get { return ModLocalization.Get("TextScandalThreshold", "Scandal Threshold"); } }
         internal const string KeyFirstScandalUsedBefore = "first_scandal_used_before";
         internal const string KeyFirstScandalUsedAfter = "first_scandal_used_after";
-        internal static readonly string TextFirstScandalUsed = ModLocalization.Get("TextFirstScandalUsed", "First Scandal Used");
+        internal static string TextFirstScandalUsed { get { return ModLocalization.Get("TextFirstScandalUsed", "First Scandal Used"); } }
         internal const string KeyWarningUsedBefore = "warning_used_before";
         internal const string KeyWarningUsedAfter = "warning_used_after";
-        internal static readonly string TextWarningUsed = ModLocalization.Get("TextWarningUsed", "Warning Used");
+        internal static string TextWarningUsed { get { return ModLocalization.Get("TextWarningUsed", "Warning Used"); } }
         internal const string KeyParentsUsedBefore = "parents_used_before";
         internal const string KeyParentsUsedAfter = "parents_used_after";
-        internal static readonly string TextParentsUsed = ModLocalization.Get("TextParentsUsed", "Parents Used");
+        internal static string TextParentsUsed { get { return ModLocalization.Get("TextParentsUsed", "Parents Used"); } }
         internal const string KeyGameOverUsedBefore = "game_over_used_before";
         internal const string KeyGameOverUsedAfter = "game_over_used_after";
-        internal static readonly string TextGameOverUsed = ModLocalization.Get("TextGameOverUsed", "Game Over Used");
+        internal static string TextGameOverUsed { get { return ModLocalization.Get("TextGameOverUsed", "Game Over Used"); } }
         internal const string KeyScandalParentCooldownBefore = "scandal_parent_cooldown_before";
         internal const string KeyScandalParentCooldownAfter = "scandal_parent_cooldown_after";
-        internal static readonly string TextScandalParentCooldown = ModLocalization.Get("TextScandalParentCooldown", "Scandal Parent Cooldown");
+        internal static string TextScandalParentCooldown { get { return ModLocalization.Get("TextScandalParentCooldown", "Scandal Parent Cooldown"); } }
         internal const string KeyAuditionFailureBefore = "audition_failure_before";
         internal const string KeyAuditionFailureAfter = "audition_failure_after";
-        internal static readonly string TextAuditionFailure = ModLocalization.Get("TextAuditionFailure", "Audition Failure");
+        internal static string TextAuditionFailure { get { return ModLocalization.Get("TextAuditionFailure", "Audition Failure"); } }
         internal const string KeyActiveIdolCountBefore = "active_idol_count_before";
         internal const string KeyActiveIdolCountAfter = "active_idol_count_after";
-        internal static readonly string TextActiveIdolCount = ModLocalization.Get("TextActiveIdolCount", "Active Idol Count");
-        internal static readonly string TextStoryRouteLocked = ModLocalization.Get("TextStoryRouteLocked", "Story Route Locked");
+        internal static string TextActiveIdolCount { get { return ModLocalization.Get("TextActiveIdolCount", "Active Idol Count"); } }
+        internal static string TextStoryRouteLocked { get { return ModLocalization.Get("TextStoryRouteLocked", "Story Route Locked"); } }
         internal const string KeyRouteBefore = "route_before";
         internal const string KeyRouteAfter = "route_after";
         internal const string KeyActiveTaskCountBefore = "active_task_count_before";
         internal const string KeyActiveTaskCountAfter = "active_task_count_after";
-        internal static readonly string TextActiveTaskCount = ModLocalization.Get("TextActiveTaskCount", "Active Task Count");
+        internal static string TextActiveTaskCount { get { return ModLocalization.Get("TextActiveTaskCount", "Active Task Count"); } }
         internal const string KeyRemovedTaskCount = "removed_task_count";
-        internal static readonly string TextRemovedTaskCount = ModLocalization.Get("TextRemovedTaskCount", "Removed Task Count");
+        internal static string TextRemovedTaskCount { get { return ModLocalization.Get("TextRemovedTaskCount", "Removed Task Count"); } }
         internal const string KeyRemovedTaskCustomList = "removed_task_custom_list";
-        internal static readonly string TextRemovedTaskCustomList = ModLocalization.Get("TextRemovedTaskCustomList", "Removed Task Customs");
-        internal static readonly string TextSummerGamesFinalized = ModLocalization.Get("TextSummerGamesFinalized", "Summer Games Finalized");
-        internal static readonly string TextSummerGames = ModLocalization.Get("TextSummerGames", "Summer Games");
+        internal static string TextRemovedTaskCustomList { get { return ModLocalization.Get("TextRemovedTaskCustomList", "Removed Task Customs"); } }
+        internal static string TextSummerGamesFinalized { get { return ModLocalization.Get("TextSummerGamesFinalized", "Summer Games Finalized"); } }
+        internal static string TextSummerGames { get { return ModLocalization.Get("TextSummerGames", "Summer Games"); } }
         internal const string KeySelectedSingleId = "selected_single_id";
-        internal static readonly string TextSelectedSingleId = ModLocalization.Get("TextSelectedSingleId", "Selected Single ID");
+        internal static string TextSelectedSingleId { get { return ModLocalization.Get("TextSelectedSingleId", "Selected Single ID"); } }
         internal const string KeyGenreId = "genre_id";
-        internal static readonly string TextGenreId = ModLocalization.Get("TextGenreId", "Genre ID");
+        internal static string TextGenreId { get { return ModLocalization.Get("TextGenreId", "Genre ID"); } }
         internal const string KeyLyricsId = "lyrics_id";
-        internal static readonly string TextLyricsId = ModLocalization.Get("TextLyricsId", "Lyrics ID");
+        internal static string TextLyricsId { get { return ModLocalization.Get("TextLyricsId", "Lyrics ID"); } }
         internal const string KeyChoreographyId = "choreography_id";
-        internal static readonly string TextChoreographyId = ModLocalization.Get("TextChoreographyId", "Choreography ID");
+        internal static string TextChoreographyId { get { return ModLocalization.Get("TextChoreographyId", "Choreography ID"); } }
         internal const string KeyGenreCost = "genre_cost";
-        internal static readonly string TextGenreCost = ModLocalization.Get("TextGenreCost", "Genre Cost");
+        internal static string TextGenreCost { get { return ModLocalization.Get("TextGenreCost", "Genre Cost"); } }
         internal const string KeyLyricsCost = "lyrics_cost";
-        internal static readonly string TextLyricsCost = ModLocalization.Get("TextLyricsCost", "Lyrics Cost");
+        internal static string TextLyricsCost { get { return ModLocalization.Get("TextLyricsCost", "Lyrics Cost"); } }
         internal const string KeyChoreographyCost = "choreography_cost";
-        internal static readonly string TextChoreographyCost = ModLocalization.Get("TextChoreographyCost", "Choreography Cost");
+        internal static string TextChoreographyCost { get { return ModLocalization.Get("TextChoreographyCost", "Choreography Cost"); } }
         internal const string KeyTotalCost = "total_cost";
-        internal static readonly string TextTotalCost = ModLocalization.Get("TextTotalCost", "Total Cost");
+        internal static string TextTotalCost { get { return ModLocalization.Get("TextTotalCost", "Total Cost"); } }
         internal const string KeyWasFinalizedBefore = "was_finalized_before";
         internal const string KeyIsFinalizedAfter = "is_finalized_after";
-        internal static readonly string TextFinalized = ModLocalization.Get("TextFinalized", "Finalized");
+        internal static string TextFinalized { get { return ModLocalization.Get("TextFinalized", "Finalized"); } }
         internal const string KeyVocalPointsBefore = "vocal_points_before";
         internal const string KeyVocalPointsAfter = "vocal_points_after";
         internal const string KeyVocalPointsDelta = "vocal_points_delta";
-        internal static readonly string TextVocalPoints = ModLocalization.Get("TextVocalPoints", "Vocal Points");
+        internal static string TextVocalPoints { get { return ModLocalization.Get("TextVocalPoints", "Vocal Points"); } }
         internal const string KeyPlayerPointsDelta = "player_points_delta";
-        internal static readonly string TextPlayerPoints = ModLocalization.Get("TextPlayerPoints", "Player Points");
+        internal static string TextPlayerPoints { get { return ModLocalization.Get("TextPlayerPoints", "Player Points"); } }
         internal const string KeyDancePointsBefore = "dance_points_before";
         internal const string KeyDancePointsAfter = "dance_points_after";
         internal const string KeyDancePointsDelta = "dance_points_delta";
-        internal static readonly string TextDancePoints = ModLocalization.Get("TextDancePoints", "Dance Points");
+        internal static string TextDancePoints { get { return ModLocalization.Get("TextDancePoints", "Dance Points"); } }
         internal const string KeyHappyMemberCount = "happy_member_count";
-        internal static readonly string TextHappyMemberCount = ModLocalization.Get("TextHappyMemberCount", "Happy Member Count");
-        internal static readonly string TextRandomEventStarted = ModLocalization.Get("TextRandomEventStarted", "Random Event Started");
-        internal static readonly string TextRandomEventConcluded = ModLocalization.Get("TextRandomEventConcluded", "Random Event Concluded");
+        internal static string TextHappyMemberCount { get { return ModLocalization.Get("TextHappyMemberCount", "Happy Member Count"); } }
+        internal static string TextRandomEventStarted { get { return ModLocalization.Get("TextRandomEventStarted", "Random Event Started"); } }
+        internal static string TextRandomEventConcluded { get { return ModLocalization.Get("TextRandomEventConcluded", "Random Event Concluded"); } }
         internal const string KeyRandomEventTitle = "random_event_title";
         internal const string KeyRandomEventId = "random_event_id";
-        internal static readonly string TextEventState = ModLocalization.Get("TextEventState", "Event Progress");
+        internal static string TextEventState { get { return ModLocalization.Get("TextEventState", "Event Progress"); } }
         internal const string KeyRandomEventStateBefore = "random_event_state_before";
         internal const string KeyRandomEventStateAfter = "random_event_state_after";
         internal const string KeyRandomEventState = "random_event_state";
         internal const string KeyReplyText = "reply_text";
         internal const string KeyReplyDescription = "reply_description";
-        internal static readonly string LabelEffects = ModLocalization.Get("LabelEffects", "Effects");
+        internal static string LabelEffects { get { return ModLocalization.Get("LabelEffects", "Effects"); } }
         internal const string KeyReplyEffectSummary = "reply_effect_summary";
         internal const string KeyReplyEffectEntries = "reply_effect_entries";
         internal const string KeyReplyEffectTarget = "target";
         internal const string KeyReplyEffectParameter = "parameter";
         internal const string KeyReplyEffectFormula = "formula";
         internal const string KeyReplyEffectSpecial = "special";
-        internal static readonly string TextRandomEffectResourceChange = ModLocalization.Get("TextRandomEffectResourceChange", "{0}: {1}");
-        internal static readonly string TextRandomEffectActorParameterChange = ModLocalization.Get("TextRandomEffectActorParameterChange", "{0}: {1} {2}");
-        internal static readonly string TextRandomEffectFanOpinionChange = ModLocalization.Get("TextRandomEffectFanOpinionChange", "{0} Audience Opinion: {1}");
-        internal static readonly string TextRandomEffectTriggeredStoryEvent = ModLocalization.Get("TextRandomEffectTriggeredStoryEvent", "Triggers Story Event: {0}");
-        internal static readonly string TextRandomEffectAddedTask = ModLocalization.Get("TextRandomEffectAddedTask", "Adds Task: {0}");
-        internal static readonly string TextRandomEffectAddedFollowUpTask = ModLocalization.Get("TextRandomEffectAddedFollowUpTask", "Adds Follow-Up Task: {0}");
-        internal static readonly string TextRandomEffectSetPolicy = ModLocalization.Get("TextRandomEffectSetPolicy", "Sets Policy: {0}");
+        internal static string TextRandomEffectResourceChange { get { return ModLocalization.Get("TextRandomEffectResourceChange", "{0}: {1}"); } }
+        internal static string TextRandomEffectActorParameterChange { get { return ModLocalization.Get("TextRandomEffectActorParameterChange", "{0}: {1} {2}"); } }
+        internal static string TextRandomEffectFanOpinionChange { get { return ModLocalization.Get("TextRandomEffectFanOpinionChange", "{0} Audience Opinion: {1}"); } }
+        internal static string TextRandomEffectTriggeredStoryEvent { get { return ModLocalization.Get("TextRandomEffectTriggeredStoryEvent", "Triggers Story Event: {0}"); } }
+        internal static string TextRandomEffectAddedTask { get { return ModLocalization.Get("TextRandomEffectAddedTask", "Adds Task: {0}"); } }
+        internal static string TextRandomEffectAddedFollowUpTask { get { return ModLocalization.Get("TextRandomEffectAddedFollowUpTask", "Adds Follow-Up Task: {0}"); } }
+        internal static string TextRandomEffectSetPolicy { get { return ModLocalization.Get("TextRandomEffectSetPolicy", "Sets Policy: {0}"); } }
         internal const string CodeRandomEffectTargetResource = "resource";
         internal const string CodeRandomEffectTargetFans = "fans";
         internal const string CodeRandomEffectTargetMeta = "meta";
@@ -1324,126 +1324,126 @@ namespace IdolCareerDiary
         internal const int ActorSummaryTokenField = 2;
         internal const int ActorSummaryDisplayNameField = 3;
         internal const string KeyActorsSummary = "actors_summary";
-        internal static readonly string TextInvolvedIdols = ModLocalization.Get("TextInvolvedIdols", "Involved Idols: ");
-        internal static readonly string TextFansChange = ModLocalization.Get("TextFansChange", "Fans Change");
-        internal static readonly string TextFameChange = ModLocalization.Get("TextFameChange", "Fame Change");
+        internal static string TextInvolvedIdols { get { return ModLocalization.Get("TextInvolvedIdols", "Involved Idols: "); } }
+        internal static string TextFansChange { get { return ModLocalization.Get("TextFansChange", "Fans Change"); } }
+        internal static string TextFameChange { get { return ModLocalization.Get("TextFameChange", "Fame Change"); } }
         internal const string KeyFameDelta = "fame_delta";
-        internal static readonly string TextBuzzChange = ModLocalization.Get("TextBuzzChange", "Buzz Change");
+        internal static string TextBuzzChange { get { return ModLocalization.Get("TextBuzzChange", "Buzz Change"); } }
         internal const string KeyBuzzDelta = "buzz_delta";
-        internal static readonly string TextSubstoryStarted = ModLocalization.Get("TextSubstoryStarted", "Substory Started");
-        internal static readonly string TextSubstoryDelayed = ModLocalization.Get("TextSubstoryDelayed", "Substory Delayed");
-        internal static readonly string TextSubstoryCompleted = ModLocalization.Get("TextSubstoryCompleted", "Substory Completed");
+        internal static string TextSubstoryStarted { get { return ModLocalization.Get("TextSubstoryStarted", "Substory Started"); } }
+        internal static string TextSubstoryDelayed { get { return ModLocalization.Get("TextSubstoryDelayed", "Substory Delayed"); } }
+        internal static string TextSubstoryCompleted { get { return ModLocalization.Get("TextSubstoryCompleted", "Substory Completed"); } }
         internal const string KeySubstoryParentId = "substory_parent_id";
         internal const string KeySubstoryParentDisplayName = "substory_parent_display_name";
         internal const string KeySubstoryId = "substory_id";
         internal const string KeySubstoryDisplayName = "substory_display_name";
-        internal static readonly string TextSubstoryType = ModLocalization.Get("TextSubstoryType", "Story Event Type");
+        internal static string TextSubstoryType { get { return ModLocalization.Get("TextSubstoryType", "Story Event Type"); } }
         internal const string KeySubstoryType = "substory_type";
         internal const string KeySubstoryLifecycleAction = "substory_lifecycle_action";
-        internal static readonly string TextParentStory = ModLocalization.Get("TextParentStory", "Parent Story");
-        internal static readonly string TextScheduledTime = ModLocalization.Get("TextScheduledTime", "Scheduled Time");
+        internal static string TextParentStory { get { return ModLocalization.Get("TextParentStory", "Parent Story"); } }
+        internal static string TextScheduledTime { get { return ModLocalization.Get("TextScheduledTime", "Scheduled Time"); } }
         internal const string KeyScheduledLaunchTime = "scheduled_launch_time";
-        internal static readonly string TextQueueCount = ModLocalization.Get("TextQueueCount", "Ready Substories");
+        internal static string TextQueueCount { get { return ModLocalization.Get("TextQueueCount", "Ready Substories"); } }
         internal const string KeyQueueCountBefore = "queue_count_before";
         internal const string KeyQueueCountAfter = "queue_count_after";
-        internal static readonly string TextDelayedQueue = ModLocalization.Get("TextDelayedQueue", "Delayed Substories");
+        internal static string TextDelayedQueue { get { return ModLocalization.Get("TextDelayedQueue", "Delayed Substories"); } }
         internal const string KeyDelayedQueueCountBefore = "delayed_queue_count_before";
         internal const string KeyDelayedQueueCountAfter = "delayed_queue_count_after";
-        internal static readonly string TextTaskCompleted = ModLocalization.Get("TextTaskCompleted", "Task Completed");
-        internal static readonly string TextTaskFailed = ModLocalization.Get("TextTaskFailed", "Task Failed");
-        internal static readonly string TextTaskClosed = ModLocalization.Get("TextTaskClosed", "Task Closed");
-        internal static readonly string TextTaskAdded = ModLocalization.Get("TextTaskAdded", "Task Added");
+        internal static string TextTaskCompleted { get { return ModLocalization.Get("TextTaskCompleted", "Task Completed"); } }
+        internal static string TextTaskFailed { get { return ModLocalization.Get("TextTaskFailed", "Task Failed"); } }
+        internal static string TextTaskClosed { get { return ModLocalization.Get("TextTaskClosed", "Task Closed"); } }
+        internal static string TextTaskAdded { get { return ModLocalization.Get("TextTaskAdded", "Task Added"); } }
         internal const string KeyTaskCustom = "task_custom";
         internal const string KeyTaskTitle = "task_title";
         internal const string KeyTaskDescription = "task_description";
         internal const string KeyTaskType = "task_type";
-        internal static readonly string TextTaskType = ModLocalization.Get("TextTaskType", "Task Category");
-        internal static readonly string TextTaskDescription = ModLocalization.Get("TextTaskDescription", "Task Description");
-        internal static readonly string TextTaskSummary = ModLocalization.Get("TextTaskSummary", "Task Summary");
-        internal static readonly string TextTaskSummaryTypePart = ModLocalization.Get("TextTaskSummaryTypePart", "category {0}");
-        internal static readonly string TextTaskSummaryGoalPart = ModLocalization.Get("TextTaskSummaryGoalPart", "goal {0}");
-        internal static readonly string TextTaskSummaryRoutePart = ModLocalization.Get("TextTaskSummaryRoutePart", "{0} route");
-        internal static readonly string TextTaskSummarySkillPart = ModLocalization.Get("TextTaskSummarySkillPart", "requires {0}");
-        internal static readonly string TextTaskSummaryIdolPart = ModLocalization.Get("TextTaskSummaryIdolPart", "assigned to {0}");
-        internal static readonly string TextTaskSummaryAgentPart = ModLocalization.Get("TextTaskSummaryAgentPart", "handled by {0}");
-        internal static readonly string TextTaskSummaryStoryPart = ModLocalization.Get("TextTaskSummaryStoryPart", "story {0}");
-        internal static readonly string LabelGoal = ModLocalization.Get("LabelGoal", "Goal");
+        internal static string TextTaskType { get { return ModLocalization.Get("TextTaskType", "Task Category"); } }
+        internal static string TextTaskDescription { get { return ModLocalization.Get("TextTaskDescription", "Task Description"); } }
+        internal static string TextTaskSummary { get { return ModLocalization.Get("TextTaskSummary", "Task Summary"); } }
+        internal static string TextTaskSummaryTypePart { get { return ModLocalization.Get("TextTaskSummaryTypePart", "category {0}"); } }
+        internal static string TextTaskSummaryGoalPart { get { return ModLocalization.Get("TextTaskSummaryGoalPart", "goal {0}"); } }
+        internal static string TextTaskSummaryRoutePart { get { return ModLocalization.Get("TextTaskSummaryRoutePart", "{0} route"); } }
+        internal static string TextTaskSummarySkillPart { get { return ModLocalization.Get("TextTaskSummarySkillPart", "requires {0}"); } }
+        internal static string TextTaskSummaryIdolPart { get { return ModLocalization.Get("TextTaskSummaryIdolPart", "assigned to {0}"); } }
+        internal static string TextTaskSummaryAgentPart { get { return ModLocalization.Get("TextTaskSummaryAgentPart", "handled by {0}"); } }
+        internal static string TextTaskSummaryStoryPart { get { return ModLocalization.Get("TextTaskSummaryStoryPart", "story {0}"); } }
+        internal static string LabelGoal { get { return ModLocalization.Get("LabelGoal", "Goal"); } }
         internal const string KeyTaskGoal = "task_goal";
-        internal static readonly string LabelRoute = ModLocalization.Get("LabelRoute", "Route");
+        internal static string LabelRoute { get { return ModLocalization.Get("LabelRoute", "Route"); } }
         internal const string KeyTaskRoute = "route";
         internal const string KeyTaskRouteLegacy = "Route";
         internal const string KeyTaskSubstory = "task_substory";
-        internal static readonly string LabelSkill = ModLocalization.Get("LabelSkill", "Skill");
+        internal static string LabelSkill { get { return ModLocalization.Get("LabelSkill", "Skill"); } }
         internal const string KeyTaskSkill = "task_skill";
-        internal static readonly string LabelAgent = ModLocalization.Get("LabelAgent", "Agent");
+        internal static string LabelAgent { get { return ModLocalization.Get("LabelAgent", "Agent"); } }
         internal const string KeyTaskAgentName = "task_agent_name";
         internal const string KeyTaskGirlId = "task_girl_id";
-        internal static readonly string TextAssignedIdol = ModLocalization.Get("TextAssignedIdol", "Assigned Idol: ");
-        internal static readonly string LabelFulfilled = ModLocalization.Get("LabelFulfilled", "Fulfilled");
+        internal static string TextAssignedIdol { get { return ModLocalization.Get("TextAssignedIdol", "Assigned Idol: "); } }
+        internal static string LabelFulfilled { get { return ModLocalization.Get("LabelFulfilled", "Fulfilled"); } }
         internal const string KeyFulfilledBefore = "fulfilled_before";
         internal const string KeyFulfilledAfter = "fulfilled_after";
-        internal static readonly string LabelActive = ModLocalization.Get("LabelActive", "Active");
+        internal static string LabelActive { get { return ModLocalization.Get("LabelActive", "Active"); } }
         internal const string KeyActiveBefore = "active_before";
         internal const string KeyActiveAfter = "active_after";
-        internal static readonly string TextAvailableFrom = ModLocalization.Get("TextAvailableFrom", "Available From");
+        internal static string TextAvailableFrom { get { return ModLocalization.Get("TextAvailableFrom", "Available From"); } }
         internal const string KeyAvailableFrom = "available_from";
-        internal static readonly string TextOutfitChanged = ModLocalization.Get("TextOutfitChanged", "Outfit Changed");
-        internal static readonly string TextOutfitChangeAction = ModLocalization.Get("TextOutfitChangeAction", "Outfit Change");
+        internal static string TextOutfitChanged { get { return ModLocalization.Get("TextOutfitChanged", "Outfit Changed"); } }
+        internal static string TextOutfitChangeAction { get { return ModLocalization.Get("TextOutfitChangeAction", "Outfit Change"); } }
         internal const string KeyOutfitChangeAction = "outfit_change_action";
         internal const string KeyPreviousOutfitPartId = "previous_outfit_part_id";
         internal const string KeyNewOutfitPartId = "new_outfit_part_id";
         internal const string KeyPreviousOutfitAssetId = "previous_outfit_asset_id";
         internal const string KeyNewOutfitAssetId = "new_outfit_asset_id";
-        internal static readonly string TextPreviousOutfitId = ModLocalization.Get("TextPreviousOutfitId", "Previous Outfit ID");
-        internal static readonly string TextNewOutfitId = ModLocalization.Get("TextNewOutfitId", "New Outfit ID");
-        internal static readonly string TextResearchAssigned = ModLocalization.Get("TextResearchAssigned", "Research Assigned");
-        internal static readonly string TextResearchPointsPurchased = ModLocalization.Get("TextResearchPointsPurchased", "Research Points Purchased");
-        internal static readonly string TextResearchParameterLeveledUp = ModLocalization.Get("TextResearchParameterLeveledUp", "Research Parameter Leveled Up");
+        internal static string TextPreviousOutfitId { get { return ModLocalization.Get("TextPreviousOutfitId", "Previous Outfit ID"); } }
+        internal static string TextNewOutfitId { get { return ModLocalization.Get("TextNewOutfitId", "New Outfit ID"); } }
+        internal static string TextResearchAssigned { get { return ModLocalization.Get("TextResearchAssigned", "Research Assigned"); } }
+        internal static string TextResearchPointsPurchased { get { return ModLocalization.Get("TextResearchPointsPurchased", "Research Points Purchased"); } }
+        internal static string TextResearchParameterLeveledUp { get { return ModLocalization.Get("TextResearchParameterLeveledUp", "Research Parameter Leveled Up"); } }
         internal const string KeyParamTitle = "param_title";
         internal const string KeyResearchType = "research_type";
-        internal static readonly string TextResearchType = ModLocalization.Get("TextResearchType", "Research Area");
-        internal static readonly string TextParameterType = ModLocalization.Get("TextParameterType", "Affected Parameter");
+        internal static string TextResearchType { get { return ModLocalization.Get("TextResearchType", "Research Area"); } }
+        internal static string TextParameterType { get { return ModLocalization.Get("TextParameterType", "Affected Parameter"); } }
         internal const string KeyParamType = "param_type";
-        internal static readonly string LabelParameter = ModLocalization.Get("LabelParameter", "Parameter");
+        internal static string LabelParameter { get { return ModLocalization.Get("LabelParameter", "Parameter"); } }
         internal const string KeyLevelBefore = "level_before";
         internal const string KeyLevelAfter = "level_after";
-        internal static readonly string TextSavedPoints = ModLocalization.Get("TextSavedPoints", "Saved Points");
+        internal static string TextSavedPoints { get { return ModLocalization.Get("TextSavedPoints", "Saved Points"); } }
         internal const string KeySavedPointsBefore = "saved_points_before";
         internal const string KeySavedPointsAfter = "saved_points_after";
-        internal static readonly string LabelPoints = ModLocalization.Get("LabelPoints", "Points");
+        internal static string LabelPoints { get { return ModLocalization.Get("LabelPoints", "Points"); } }
         internal const string KeyPointsBefore = "points_before";
         internal const string KeyPointsAfter = "points_after";
-        internal static readonly string TextPointsDelta = ModLocalization.Get("TextPointsDelta", "Point Change");
+        internal static string TextPointsDelta { get { return ModLocalization.Get("TextPointsDelta", "Point Change"); } }
         internal const string KeyPointsDelta = "points_delta";
-        internal static readonly string TextRivalTrendsUpdated = ModLocalization.Get("TextRivalTrendsUpdated", "Rival Trends Updated");
-        internal static readonly string TextRivalMonthlyRecalculated = ModLocalization.Get("TextRivalMonthlyRecalculated", "Rival Monthly Recalculated");
-        internal static readonly string TextRivalOffice = ModLocalization.Get("TextRivalOffice", "Rival Office");
-        internal static readonly string TextMonthIndex = ModLocalization.Get("TextMonthIndex", "Rival Market Month Number");
+        internal static string TextRivalTrendsUpdated { get { return ModLocalization.Get("TextRivalTrendsUpdated", "Rival Trends Updated"); } }
+        internal static string TextRivalMonthlyRecalculated { get { return ModLocalization.Get("TextRivalMonthlyRecalculated", "Rival Monthly Recalculated"); } }
+        internal static string TextRivalOffice { get { return ModLocalization.Get("TextRivalOffice", "Rival Office"); } }
+        internal static string TextMonthIndex { get { return ModLocalization.Get("TextMonthIndex", "Rival Market Month Number"); } }
         internal const string KeyMonthIndexBefore = "month_index_before";
         internal const string KeyMonthIndexAfter = "month_index_after";
-        internal static readonly string TextActiveGroups = ModLocalization.Get("TextActiveGroups", "Active Groups");
+        internal static string TextActiveGroups { get { return ModLocalization.Get("TextActiveGroups", "Active Groups"); } }
         internal const string KeyActiveGroupCountBefore = "active_group_count_before";
         internal const string KeyActiveGroupCountAfter = "active_group_count_after";
-        internal static readonly string TextRisingGroups = ModLocalization.Get("TextRisingGroups", "Rising Groups");
+        internal static string TextRisingGroups { get { return ModLocalization.Get("TextRisingGroups", "Rising Groups"); } }
         internal const string KeyRisingGroupCountBefore = "rising_group_count_before";
         internal const string KeyRisingGroupCountAfter = "rising_group_count_after";
-        internal static readonly string TextDisbandedGroups = ModLocalization.Get("TextDisbandedGroups", "Disbanded Groups");
+        internal static string TextDisbandedGroups { get { return ModLocalization.Get("TextDisbandedGroups", "Disbanded Groups"); } }
         internal const string KeyDeadGroupCountBefore = "dead_group_count_before";
         internal const string KeyDeadGroupCountAfter = "dead_group_count_after";
-        internal static readonly string TextTrendUpdateCost = ModLocalization.Get("TextTrendUpdateCost", "Trend Update Cost");
+        internal static string TextTrendUpdateCost { get { return ModLocalization.Get("TextTrendUpdateCost", "Trend Update Cost"); } }
         internal const string KeyTrendUpdateCost = "trend_update_cost";
-        internal static readonly string TextGenreTrends = ModLocalization.Get("TextGenreTrends", "Genre Trends");
-        internal static readonly string TextGenreTrendsRising = ModLocalization.Get("TextGenreTrendsRising", "Rising Genres");
-        internal static readonly string TextGenreTrendsFalling = ModLocalization.Get("TextGenreTrendsFalling", "Falling Genres");
+        internal static string TextGenreTrends { get { return ModLocalization.Get("TextGenreTrends", "Genre Trends"); } }
+        internal static string TextGenreTrendsRising { get { return ModLocalization.Get("TextGenreTrendsRising", "Rising Genres"); } }
+        internal static string TextGenreTrendsFalling { get { return ModLocalization.Get("TextGenreTrendsFalling", "Falling Genres"); } }
         internal const string KeyTrendsGenreSummary = "trends_genre_summary";
-        internal static readonly string TextLyricsTrends = ModLocalization.Get("TextLyricsTrends", "Lyrics Trends");
-        internal static readonly string TextLyricsTrendsRising = ModLocalization.Get("TextLyricsTrendsRising", "Rising Lyrics");
-        internal static readonly string TextLyricsTrendsFalling = ModLocalization.Get("TextLyricsTrendsFalling", "Falling Lyrics");
+        internal static string TextLyricsTrends { get { return ModLocalization.Get("TextLyricsTrends", "Lyrics Trends"); } }
+        internal static string TextLyricsTrendsRising { get { return ModLocalization.Get("TextLyricsTrendsRising", "Rising Lyrics"); } }
+        internal static string TextLyricsTrendsFalling { get { return ModLocalization.Get("TextLyricsTrendsFalling", "Falling Lyrics"); } }
         internal const string KeyTrendsLyricsSummary = "trends_lyrics_summary";
-        internal static readonly string TextChoreoTrends = ModLocalization.Get("TextChoreoTrends", "Choreo Trends");
-        internal static readonly string TextChoreoTrendsRising = ModLocalization.Get("TextChoreoTrendsRising", "Rising Choreography");
-        internal static readonly string TextChoreoTrendsFalling = ModLocalization.Get("TextChoreoTrendsFalling", "Falling Choreography");
-        internal static readonly string TextTrendEntryWithPoints = ModLocalization.Get("TextTrendEntryWithPoints", "{0} ({1} points)");
+        internal static string TextChoreoTrends { get { return ModLocalization.Get("TextChoreoTrends", "Choreo Trends"); } }
+        internal static string TextChoreoTrendsRising { get { return ModLocalization.Get("TextChoreoTrendsRising", "Rising Choreography"); } }
+        internal static string TextChoreoTrendsFalling { get { return ModLocalization.Get("TextChoreoTrendsFalling", "Falling Choreography"); } }
+        internal static string TextTrendEntryWithPoints { get { return ModLocalization.Get("TextTrendEntryWithPoints", "{0} ({1} points)"); } }
         internal const string KeyTrendsChoreoSummary = "trends_choreo_summary";
         internal const string CodeRising = "rising";
         internal const string CodeFalling = "falling";
@@ -1451,178 +1451,178 @@ namespace IdolCareerDiary
         internal const int TrendSummaryTitleField = 0;
         internal const int TrendSummaryDirectionField = 1;
         internal const int TrendSummaryPointsField = 2;
-        internal static readonly string TextPushSlotStarted = ModLocalization.Get("TextPushSlotStarted", "Push Slot Started");
-        internal static readonly string TextPushSlotEnded = ModLocalization.Get("TextPushSlotEnded", "Push Slot Ended");
-        internal static readonly string TextPushSlotProgressed = ModLocalization.Get("TextPushSlotProgressed", "Push Slot Progressed");
+        internal static string TextPushSlotStarted { get { return ModLocalization.Get("TextPushSlotStarted", "Push Slot Started"); } }
+        internal static string TextPushSlotEnded { get { return ModLocalization.Get("TextPushSlotEnded", "Push Slot Ended"); } }
+        internal static string TextPushSlotProgressed { get { return ModLocalization.Get("TextPushSlotProgressed", "Push Slot Progressed"); } }
         internal const string KeyPushCurrentIdolId = "push_current_idol_id";
         internal const string KeyPushPreviousIdolId = "push_previous_idol_id";
-        internal static readonly string TextSlotIndex = ModLocalization.Get("TextSlotIndex", "Push Slot Number");
+        internal static string TextSlotIndex { get { return ModLocalization.Get("TextSlotIndex", "Push Slot Number"); } }
         internal const string KeyPushSlotIndex = "push_slot_index";
         internal const string SeparatorArrow = " -> ";
-        internal static readonly string TextDaysInSlot = ModLocalization.Get("TextDaysInSlot", "Days in Push Slot");
+        internal static string TextDaysInSlot { get { return ModLocalization.Get("TextDaysInSlot", "Days in Push Slot"); } }
         internal const string KeyPushDaysInSlot = "push_days_in_slot";
         internal const string KeyPushLifecycleAction = "push_lifecycle_action";
-        internal static readonly string TextWishGenerated = ModLocalization.Get("TextWishGenerated", "Wish Generated");
-        internal static readonly string TextWishFulfilled = ModLocalization.Get("TextWishFulfilled", "Wish Fulfilled");
-        internal static readonly string TextWishClosed = ModLocalization.Get("TextWishClosed", "Wish Closed");
-        internal static readonly string TextWishType = ModLocalization.Get("TextWishType", "Wish Type");
+        internal static string TextWishGenerated { get { return ModLocalization.Get("TextWishGenerated", "Wish Generated"); } }
+        internal static string TextWishFulfilled { get { return ModLocalization.Get("TextWishFulfilled", "Wish Fulfilled"); } }
+        internal static string TextWishClosed { get { return ModLocalization.Get("TextWishClosed", "Wish Closed"); } }
+        internal static string TextWishType { get { return ModLocalization.Get("TextWishType", "Wish Type"); } }
         internal const string KeyWishTypeBefore = "wish_type_before";
         internal const string KeyWishTypeAfter = "wish_type_after";
-        internal static readonly string TextWishFormula = ModLocalization.Get("TextWishFormula", "Wish Goal");
+        internal static string TextWishFormula { get { return ModLocalization.Get("TextWishFormula", "Wish Goal"); } }
         internal const string KeyWishFormulaBefore = "wish_formula_before";
         internal const string KeyWishFormulaAfter = "wish_formula_after";
         internal const string KeyWishFulfilledBefore = "wish_fulfilled_before";
         internal const string KeyWishFulfilledAfter = "wish_fulfilled_after";
-        internal static readonly string TextInfluenceDelta = ModLocalization.Get("TextInfluenceDelta", "Influence Change");
+        internal static string TextInfluenceDelta { get { return ModLocalization.Get("TextInfluenceDelta", "Influence Change"); } }
         internal const string KeyInfluencePointsDelta = "influence_points_delta";
-        internal static readonly string TextMentalStaminaDelta = ModLocalization.Get("TextMentalStaminaDelta", "Mental Stamina Change");
+        internal static string TextMentalStaminaDelta { get { return ModLocalization.Get("TextMentalStaminaDelta", "Mental Stamina Change"); } }
         internal const string KeyMentalStaminaDelta = "mental_stamina_delta";
-        internal static readonly string TextBlackmailQueued = ModLocalization.Get("TextBlackmailQueued", "Blackmail Queued");
-        internal static readonly string TextBlackmailTriggered = ModLocalization.Get("TextBlackmailTriggered", "Blackmail Triggered");
+        internal static string TextBlackmailQueued { get { return ModLocalization.Get("TextBlackmailQueued", "Blackmail Queued"); } }
+        internal static string TextBlackmailTriggered { get { return ModLocalization.Get("TextBlackmailTriggered", "Blackmail Triggered"); } }
         internal const string KeyTargetId = "target_id";
         internal const string KeySpyId = "spy_id";
-        internal static readonly string TextSpyIdol = ModLocalization.Get("TextSpyIdol", "Spy Idol: ");
-        internal static readonly string TextDaysUntilReport = ModLocalization.Get("TextDaysUntilReport", "Days Until Blackmail Report");
+        internal static string TextSpyIdol { get { return ModLocalization.Get("TextSpyIdol", "Spy Idol: "); } }
+        internal static string TextDaysUntilReport { get { return ModLocalization.Get("TextDaysUntilReport", "Days Until Blackmail Report"); } }
         internal const string KeyDaysUntilReport = "days_until_report";
-        internal static readonly string TextQueueSize = ModLocalization.Get("TextQueueSize", "Queue Size");
+        internal static string TextQueueSize { get { return ModLocalization.Get("TextQueueSize", "Queue Size"); } }
         internal const string KeyQueueSizeAfter = "queue_size_after";
-        internal static readonly string TextSuccessTier = ModLocalization.Get("TextSuccessTier", "Blackmail Result Tier");
+        internal static string TextSuccessTier { get { return ModLocalization.Get("TextSuccessTier", "Blackmail Result Tier"); } }
         internal const string KeySuccessTier = "success_tier";
-        internal static readonly string TextInfluenceAward = ModLocalization.Get("TextInfluenceAward", "Influence Award");
+        internal static string TextInfluenceAward { get { return ModLocalization.Get("TextInfluenceAward", "Influence Award"); } }
         internal const string KeyInfluenceAward = "influence_award";
-        internal static readonly string TextReportDate = ModLocalization.Get("TextReportDate", "Report Date");
+        internal static string TextReportDate { get { return ModLocalization.Get("TextReportDate", "Report Date"); } }
         internal const string KeyReportDate = "report_date";
-        internal static readonly string TextScandalMitigated = ModLocalization.Get("TextScandalMitigated", "Scandal Mitigated");
-        internal static readonly string TextScandalPoints = ModLocalization.Get("TextScandalPoints", "Scandal Points");
+        internal static string TextScandalMitigated { get { return ModLocalization.Get("TextScandalMitigated", "Scandal Mitigated"); } }
+        internal static string TextScandalPoints { get { return ModLocalization.Get("TextScandalPoints", "Scandal Points"); } }
         internal const string KeyScandalPointsBefore = "scandal_points_before";
         internal const string KeyScandalPointsAfter = "scandal_points_after";
-        internal static readonly string TextPointsRemoved = ModLocalization.Get("TextPointsRemoved", "Points Removed");
+        internal static string TextPointsRemoved { get { return ModLocalization.Get("TextPointsRemoved", "Points Removed"); } }
         internal const string KeyScandalPointsRemoved = "scandal_points_removed";
-        internal static readonly string TextGroupPointsRemoved = ModLocalization.Get("TextGroupPointsRemoved", "Group Points Removed");
+        internal static string TextGroupPointsRemoved { get { return ModLocalization.Get("TextGroupPointsRemoved", "Group Points Removed"); } }
         internal const string KeyScandalGroupPointsRemoved = "scandal_group_points_removed";
-        internal static readonly string TextGroupPointsRemaining = ModLocalization.Get("TextGroupPointsRemaining", "Group Points Remaining");
+        internal static string TextGroupPointsRemaining { get { return ModLocalization.Get("TextGroupPointsRemaining", "Group Points Remaining"); } }
         internal const string KeyScandalGroupPointsRemaining = "scandal_group_points_remaining";
-        internal static readonly string TextAuditionStarted = ModLocalization.Get("TextAuditionStarted", "Audition Started");
-        internal static readonly string TextAuditionCostPaid = ModLocalization.Get("TextAuditionCostPaid", "Audition Cost Paid");
-        internal static readonly string TextAuditionCooldownReset = ModLocalization.Get("TextAuditionCooldownReset", "Audition Cooldown Reset");
-        internal static readonly string TextAuditionFailureTriggered = ModLocalization.Get("TextAuditionFailureTriggered", "Audition Failure Triggered");
-        internal static readonly string LabelAuditions = ModLocalization.Get("LabelAuditions", "Auditions");
-        internal static readonly string TextAuditionType = ModLocalization.Get("TextAuditionType", "Audition Type");
+        internal static string TextAuditionStarted { get { return ModLocalization.Get("TextAuditionStarted", "Audition Started"); } }
+        internal static string TextAuditionCostPaid { get { return ModLocalization.Get("TextAuditionCostPaid", "Audition Cost Paid"); } }
+        internal static string TextAuditionCooldownReset { get { return ModLocalization.Get("TextAuditionCooldownReset", "Audition Cooldown Reset"); } }
+        internal static string TextAuditionFailureTriggered { get { return ModLocalization.Get("TextAuditionFailureTriggered", "Audition Failure Triggered"); } }
+        internal static string LabelAuditions { get { return ModLocalization.Get("LabelAuditions", "Auditions"); } }
+        internal static string TextAuditionType { get { return ModLocalization.Get("TextAuditionType", "Audition Type"); } }
         internal const string KeyAuditionType = "audition_type";
-        internal static readonly string TextResetType = ModLocalization.Get("TextResetType", "Cooldown Reset");
+        internal static string TextResetType { get { return ModLocalization.Get("TextResetType", "Cooldown Reset"); } }
         internal const string KeyResetType = "reset_type";
-        internal static readonly string LabelCost = ModLocalization.Get("LabelCost", "Cost");
+        internal static string LabelCost { get { return ModLocalization.Get("LabelCost", "Cost"); } }
         internal const string KeyCost = "Cost";
-        internal static readonly string TextResetCost = ModLocalization.Get("TextResetCost", "Reset Cost");
+        internal static string TextResetCost { get { return ModLocalization.Get("TextResetCost", "Reset Cost"); } }
         internal const string KeyResetCost = "reset_cost";
-        internal static readonly string TextGeneratedCandidates = ModLocalization.Get("TextGeneratedCandidates", "Generated Candidates");
+        internal static string TextGeneratedCandidates { get { return ModLocalization.Get("TextGeneratedCandidates", "Generated Candidates"); } }
         internal const string KeyGeneratedCandidateCount = "generated_candidate_count";
-        internal static readonly string TextAwardNominated = ModLocalization.Get("TextAwardNominated", "Award Nominated");
-        internal static readonly string TextAwardResult = ModLocalization.Get("TextAwardResult", "Award Result");
-        internal static readonly string LabelAgency = ModLocalization.Get("LabelAgency", "Agency");
-        internal static readonly string LabelAward = ModLocalization.Get("LabelAward", "Award");
+        internal static string TextAwardNominated { get { return ModLocalization.Get("TextAwardNominated", "Award Nominated"); } }
+        internal static string TextAwardResult { get { return ModLocalization.Get("TextAwardResult", "Award Result"); } }
+        internal static string LabelAgency { get { return ModLocalization.Get("LabelAgency", "Agency"); } }
+        internal static string LabelAward { get { return ModLocalization.Get("LabelAward", "Award"); } }
         internal const string KeyAwardType = "award_type";
-        internal static readonly string LabelYear = ModLocalization.Get("LabelYear", "Year");
+        internal static string LabelYear { get { return ModLocalization.Get("LabelYear", "Year"); } }
         internal const string KeyAwardYear = "award_year";
         internal const string KeyAwardIsNomination = "award_is_nomination";
-        internal static readonly string TextIsNomination = ModLocalization.Get("TextIsNomination", "Is Nomination: ");
+        internal static string TextIsNomination { get { return ModLocalization.Get("TextIsNomination", "Is Nomination: "); } }
         internal const string KeyAwardWon = "award_won";
-        internal static readonly string TextWon = ModLocalization.Get("TextWon", "Won: ");
-        internal static readonly string TextAgencyRoomBuilt = ModLocalization.Get("TextAgencyRoomBuilt", "Agency Room Built");
-        internal static readonly string TextAgencyRoomCostPaid = ModLocalization.Get("TextAgencyRoomCostPaid", "Agency Room Cost Paid");
-        internal static readonly string TextRoomId = ModLocalization.Get("TextRoomId", "Room ID");
+        internal static string TextWon { get { return ModLocalization.Get("TextWon", "Won: "); } }
+        internal static string TextAgencyRoomBuilt { get { return ModLocalization.Get("TextAgencyRoomBuilt", "Agency Room Built"); } }
+        internal static string TextAgencyRoomCostPaid { get { return ModLocalization.Get("TextAgencyRoomCostPaid", "Agency Room Cost Paid"); } }
+        internal static string TextRoomId { get { return ModLocalization.Get("TextRoomId", "Room ID"); } }
         internal const string KeyRoomId = "room_id";
-        internal static readonly string LabelFloor = ModLocalization.Get("LabelFloor", "Floor");
+        internal static string LabelFloor { get { return ModLocalization.Get("LabelFloor", "Floor"); } }
         internal const string KeyFloorIndex = "floor_index";
-        internal static readonly string TextRoomSpace = ModLocalization.Get("TextRoomSpace", "Room Space");
+        internal static string TextRoomSpace { get { return ModLocalization.Get("TextRoomSpace", "Room Space"); } }
         internal const string KeyRoomSpace = "room_space";
-        internal static readonly string TextRoomCost = ModLocalization.Get("TextRoomCost", "Room Cost");
+        internal static string TextRoomCost { get { return ModLocalization.Get("TextRoomCost", "Room Cost"); } }
         internal const string KeyRoomCost = "room_cost";
-        internal static readonly string TextIdolJoinedAgency = ModLocalization.Get("TextIdolJoinedAgency", "Idol Joined Agency");
-        internal static readonly string TextGraduationAnnounced = ModLocalization.Get("TextGraduationAnnounced", "Graduation Announced");
-        internal static readonly string TextIdolGraduated = ModLocalization.Get("TextIdolGraduated", "Idol Graduated");
-        internal static readonly string TextIdolBirthday = ModLocalization.Get("TextIdolBirthday", "Birthday");
-        internal static readonly string TextIdolGroupTransfer = ModLocalization.Get("TextIdolGroupTransfer", "Idol Group Transfer");
-        internal static readonly string TextFromGroup = ModLocalization.Get("TextFromGroup", "From Group");
+        internal static string TextIdolJoinedAgency { get { return ModLocalization.Get("TextIdolJoinedAgency", "Idol Joined Agency"); } }
+        internal static string TextGraduationAnnounced { get { return ModLocalization.Get("TextGraduationAnnounced", "Graduation Announced"); } }
+        internal static string TextIdolGraduated { get { return ModLocalization.Get("TextIdolGraduated", "Idol Graduated"); } }
+        internal static string TextIdolBirthday { get { return ModLocalization.Get("TextIdolBirthday", "Birthday"); } }
+        internal static string TextIdolGroupTransfer { get { return ModLocalization.Get("TextIdolGroupTransfer", "Idol Group Transfer"); } }
+        internal static string TextFromGroup { get { return ModLocalization.Get("TextFromGroup", "From Group"); } }
         internal const string KeyFromGroupTitle = "from_group_title";
-        internal static readonly string TextToGroup = ModLocalization.Get("TextToGroup", "To Group");
+        internal static string TextToGroup { get { return ModLocalization.Get("TextToGroup", "To Group"); } }
         internal const string KeyToGroupTitle = "to_group_title";
-        internal static readonly string TextFromGroupStatus = ModLocalization.Get("TextFromGroupStatus", "From Group Status");
+        internal static string TextFromGroupStatus { get { return ModLocalization.Get("TextFromGroupStatus", "From Group Status"); } }
         internal const string KeyFromGroupStatus = "from_group_status";
-        internal static readonly string TextToGroupStatus = ModLocalization.Get("TextToGroupStatus", "To Group Status");
+        internal static string TextToGroupStatus { get { return ModLocalization.Get("TextToGroupStatus", "To Group Status"); } }
         internal const string KeyToGroupStatus = "to_group_status";
-        internal static readonly string TextTransferDate = ModLocalization.Get("TextTransferDate", "Transfer Date");
+        internal static string TextTransferDate { get { return ModLocalization.Get("TextTransferDate", "Transfer Date"); } }
         internal const string KeyTransferDate = "transfer_date";
-        internal static readonly string LabelType = ModLocalization.Get("LabelType", "Type");
+        internal static string LabelType { get { return ModLocalization.Get("LabelType", "Type"); } }
         internal const string KeyIdolType = "idol_type";
-        internal static readonly string LabelAge = ModLocalization.Get("LabelAge", "Age");
+        internal static string LabelAge { get { return ModLocalization.Get("LabelAge", "Age"); } }
         internal const string KeyIdolAge = "idol_age";
         internal const string KeyIdolBirthdayDate = "idol_birthday_date";
-        internal static readonly string TextHiringDate = ModLocalization.Get("TextHiringDate", "Hiring Date");
+        internal static string TextHiringDate { get { return ModLocalization.Get("TextHiringDate", "Hiring Date"); } }
         internal const string KeyIdolHiringDate = "idol_hiring_date";
-        internal static readonly string TextGraduationDate = ModLocalization.Get("TextGraduationDate", "Graduation Date");
+        internal static string TextGraduationDate { get { return ModLocalization.Get("TextGraduationDate", "Graduation Date"); } }
         internal const string KeyIdolGraduationDate = "idol_graduation_date";
-        internal static readonly string LabelTrivia = ModLocalization.Get("LabelTrivia", "Trivia");
+        internal static string LabelTrivia { get { return ModLocalization.Get("LabelTrivia", "Trivia"); } }
         internal const string KeyIdolCustomTrivia = "idol_custom_trivia";
         internal const string KeyIdolTrivia = "idol_trivia";
         internal const string KeyIdolGraduationWithDialogue = "idol_graduation_with_dialogue";
-        internal static readonly string TextGraduationDialogue = ModLocalization.Get("TextGraduationDialogue", "Graduation Dialogue: ");
-        internal static readonly string TextStatusStarted = ModLocalization.Get("TextStatusStarted", "Status Started");
-        internal static readonly string TextStatusEnded = ModLocalization.Get("TextStatusEnded", "Status Ended");
-        internal static readonly string TextStatusUpdated = ModLocalization.Get("TextStatusUpdated", "Status Updated");
-        internal static readonly string TextDailyAgencyUpdate = ModLocalization.Get("TextDailyAgencyUpdate", "Daily Agency Update");
-        internal static readonly string TextExpectedDailyProfit = ModLocalization.Get("TextExpectedDailyProfit", "Expected Daily Profit");
+        internal static string TextGraduationDialogue { get { return ModLocalization.Get("TextGraduationDialogue", "Graduation Dialogue: "); } }
+        internal static string TextStatusStarted { get { return ModLocalization.Get("TextStatusStarted", "Status Started"); } }
+        internal static string TextStatusEnded { get { return ModLocalization.Get("TextStatusEnded", "Status Ended"); } }
+        internal static string TextStatusUpdated { get { return ModLocalization.Get("TextStatusUpdated", "Status Updated"); } }
+        internal static string TextDailyAgencyUpdate { get { return ModLocalization.Get("TextDailyAgencyUpdate", "Daily Agency Update"); } }
+        internal static string TextExpectedDailyProfit { get { return ModLocalization.Get("TextExpectedDailyProfit", "Expected Daily Profit"); } }
         internal const string KeyExpectedDailyProfit = "expected_daily_profit";
-        internal static readonly string TextExpectedDailyFame = ModLocalization.Get("TextExpectedDailyFame", "Expected Daily Fame");
+        internal static string TextExpectedDailyFame { get { return ModLocalization.Get("TextExpectedDailyFame", "Expected Daily Fame"); } }
         internal const string KeyExpectedDailyFameGain = "expected_daily_fame_gain";
-        internal static readonly string TextExpectedDailyBuzz = ModLocalization.Get("TextExpectedDailyBuzz", "Expected Daily Buzz");
+        internal static string TextExpectedDailyBuzz { get { return ModLocalization.Get("TextExpectedDailyBuzz", "Expected Daily Buzz"); } }
         internal const string KeyExpectedDailyBuzzGain = "expected_daily_buzz_gain";
-        internal static readonly string TextWeeklyExpensesApplied = ModLocalization.Get("TextWeeklyExpensesApplied", "Weekly Expenses Applied");
-        internal static readonly string TextWeeklyExpense = ModLocalization.Get("TextWeeklyExpense", "Weekly Expense");
+        internal static string TextWeeklyExpensesApplied { get { return ModLocalization.Get("TextWeeklyExpensesApplied", "Weekly Expenses Applied"); } }
+        internal static string TextWeeklyExpense { get { return ModLocalization.Get("TextWeeklyExpense", "Weekly Expense"); } }
         internal const string KeyWeeklyExpense = "weekly_expense";
-        internal static readonly string TextTotalFans = ModLocalization.Get("TextTotalFans", "Total Fans");
+        internal static string TextTotalFans { get { return ModLocalization.Get("TextTotalFans", "Total Fans"); } }
         internal const string KeyFansTotal = "fans_total";
         internal const string KeyFamePoints = "fame_points";
-        internal static readonly string TextBuzzPoints = ModLocalization.Get("TextBuzzPoints", "Buzz Points");
+        internal static string TextBuzzPoints { get { return ModLocalization.Get("TextBuzzPoints", "Buzz Points"); } }
         internal const string KeyBuzzPoints = "buzz_points";
-        internal static readonly string TextPolicyDecisionSelected = ModLocalization.Get("TextPolicyDecisionSelected", "Policy Decision Selected");
-        internal static readonly string TextAgencyPolicy = ModLocalization.Get("TextAgencyPolicy", "Agency Policy");
-        internal static readonly string LabelPolicy = ModLocalization.Get("LabelPolicy", "Policy");
+        internal static string TextPolicyDecisionSelected { get { return ModLocalization.Get("TextPolicyDecisionSelected", "Policy Decision Selected"); } }
+        internal static string TextAgencyPolicy { get { return ModLocalization.Get("TextAgencyPolicy", "Agency Policy"); } }
+        internal static string LabelPolicy { get { return ModLocalization.Get("LabelPolicy", "Policy"); } }
         internal const string KeyPolicyType = "policy_type";
-        internal static readonly string LabelSelection = ModLocalization.Get("LabelSelection", "Selection");
+        internal static string LabelSelection { get { return ModLocalization.Get("LabelSelection", "Selection"); } }
         internal const string KeyPreviousValue = "previous_value";
         internal const string KeyNewValue = "new_value";
-        internal static readonly string TextPolicyCost = ModLocalization.Get("TextPolicyCost", "Policy Cost");
+        internal static string TextPolicyCost { get { return ModLocalization.Get("TextPolicyCost", "Policy Cost"); } }
         internal const string KeyPolicyCost = "policy_cost";
         internal const string KeyFreeSelection = "free_selection";
-        internal static readonly string TextFreeSelection = ModLocalization.Get("TextFreeSelection", "Free Selection: ");
-        internal static readonly string TextDecisionDate = ModLocalization.Get("TextDecisionDate", "Decision Date");
+        internal static string TextFreeSelection { get { return ModLocalization.Get("TextFreeSelection", "Free Selection: "); } }
+        internal static string TextDecisionDate { get { return ModLocalization.Get("TextDecisionDate", "Decision Date"); } }
         internal const string KeyDecisionDate = "decision_date";
-        internal static readonly string TextProducerRelationshipUpdated = ModLocalization.Get("TextProducerRelationshipUpdated", "Producer Relationship Updated");
-        internal static readonly string TextRelationshipType = ModLocalization.Get("TextRelationshipType", "Producer Relationship");
+        internal static string TextProducerRelationshipUpdated { get { return ModLocalization.Get("TextProducerRelationshipUpdated", "Producer Relationship Updated"); } }
+        internal static string TextRelationshipType { get { return ModLocalization.Get("TextRelationshipType", "Producer Relationship"); } }
         internal const string KeyPlayerRelationshipType = "player_relationship_type";
-        internal static readonly string TextRelationshipPoints = ModLocalization.Get("TextRelationshipPoints", "Relationship Points");
+        internal static string TextRelationshipPoints { get { return ModLocalization.Get("TextRelationshipPoints", "Relationship Points"); } }
         internal const string KeyPlayerPointsBefore = "player_points_before";
         internal const string KeyPlayerPointsAfter = "player_points_after";
-        internal static readonly string TextAppliedChange = ModLocalization.Get("TextAppliedChange", "Applied Change");
+        internal static string TextAppliedChange { get { return ModLocalization.Get("TextAppliedChange", "Applied Change"); } }
         internal const string KeyPlayerPointsAppliedDelta = "player_points_applied_delta";
-        internal static readonly string TextInfluenceLevel = ModLocalization.Get("TextInfluenceLevel", "Influence Level");
+        internal static string TextInfluenceLevel { get { return ModLocalization.Get("TextInfluenceLevel", "Influence Level"); } }
         internal const string KeyPlayerLevelBefore = "player_level_before";
         internal const string KeyPlayerLevelAfter = "player_level_after";
-        internal static readonly string TextProducerDateInteraction = ModLocalization.Get("TextProducerDateInteraction", "Producer Date Interaction");
-        internal static readonly string LabelInteraction = ModLocalization.Get("LabelInteraction", "Interaction");
+        internal static string TextProducerDateInteraction { get { return ModLocalization.Get("TextProducerDateInteraction", "Producer Date Interaction"); } }
+        internal static string LabelInteraction { get { return ModLocalization.Get("LabelInteraction", "Interaction"); } }
         internal const string KeyDateInteractionType = "date_interaction_type";
         internal const string KeyDateRouteBefore = "date_route_before";
         internal const string KeyDateRouteAfter = "date_route_after";
-        internal static readonly string LabelStage = ModLocalization.Get("LabelStage", "Stage");
+        internal static string LabelStage { get { return ModLocalization.Get("LabelStage", "Stage"); } }
         internal const string KeyDateStageBefore = "date_stage_before";
         internal const string KeyDateStageAfter = "date_stage_after";
-        internal static readonly string TextDateStatus = ModLocalization.Get("TextDateStatus", "Dating Status");
+        internal static string TextDateStatus { get { return ModLocalization.Get("TextDateStatus", "Dating Status"); } }
         internal const string KeyDateStatusBefore = "date_status_before";
         internal const string KeyDateStatusAfter = "date_status_after";
         internal const string KeyDateResultToken = "date_result_token";
         internal const string KeyDateResultSummaryCode = "date_result_summary_code";
-        internal static readonly string TextDateOutcome = ModLocalization.Get("TextDateOutcome", "Date Outcome");
+        internal static string TextDateOutcome { get { return ModLocalization.Get("TextDateOutcome", "Date Outcome"); } }
         internal const string CodeDateResultTokenPublic = "pub";
         internal const string CodeDateResultTokenGeneric = "generic";
         internal const string CodeDateResultTokenDeferred = "deferred";
@@ -1632,29 +1632,29 @@ namespace IdolCareerDiary
         internal const string CodeDateResultPublicDate = "public_date";
         internal const string CodeDateResultRoutineDate = "routine_date";
         internal const string CodeDateResultMultiResult = "multi_result";
-        internal static readonly string LabelCaught = ModLocalization.Get("LabelCaught", "Caught");
+        internal static string LabelCaught { get { return ModLocalization.Get("LabelCaught", "Caught"); } }
         internal const string KeyDateCaughtBefore = "date_caught_before";
         internal const string KeyDateCaughtAfter = "date_caught_after";
-        internal static readonly string TextRelationshipLevel = ModLocalization.Get("TextRelationshipLevel", "Relationship Level");
+        internal static string TextRelationshipLevel { get { return ModLocalization.Get("TextRelationshipLevel", "Relationship Level"); } }
         internal const string KeyDateRelationshipLevelBefore = "date_relationship_level_before";
         internal const string KeyDateRelationshipLevelAfter = "date_relationship_level_after";
-        internal static readonly string TextMarriageOutcome = ModLocalization.Get("TextMarriageOutcome", "Marriage Outcome");
+        internal static string TextMarriageOutcome { get { return ModLocalization.Get("TextMarriageOutcome", "Marriage Outcome"); } }
         internal const string KeyMarriageRoute = "marriage_route";
         internal const string KeyMarriageStage = "marriage_stage";
-        internal static readonly string TextPartnerStatus = ModLocalization.Get("TextPartnerStatus", "Marriage Status");
+        internal static string TextPartnerStatus { get { return ModLocalization.Get("TextPartnerStatus", "Marriage Status"); } }
         internal const string KeyMarriagePartnerStatus = "marriage_partner_status";
         internal const string KeyMarriageGoodOutcome = "marriage_good_outcome";
-        internal static readonly string TextGoodOutcome = ModLocalization.Get("TextGoodOutcome", "Good Outcome: ");
-        internal static readonly string LabelKids = ModLocalization.Get("LabelKids", "Kids");
+        internal static string TextGoodOutcome { get { return ModLocalization.Get("TextGoodOutcome", "Good Outcome: "); } }
+        internal static string LabelKids { get { return ModLocalization.Get("LabelKids", "Kids"); } }
         internal const string KeyMarriageKidsString = "marriage_kids_string";
-        internal static readonly string TextCareerOutcomeOne = ModLocalization.Get("TextCareerOutcomeOne", "Career Outcome 1");
+        internal static string TextCareerOutcomeOne { get { return ModLocalization.Get("TextCareerOutcomeOne", "Career Outcome 1"); } }
         internal const string KeyMarriageCareerStringOne = "marriage_career_string_one";
-        internal static readonly string TextCareerOutcomeTwo = ModLocalization.Get("TextCareerOutcomeTwo", "Career Outcome 2");
+        internal static string TextCareerOutcomeTwo { get { return ModLocalization.Get("TextCareerOutcomeTwo", "Career Outcome 2"); } }
         internal const string KeyMarriageCareerStringTwo = "marriage_career_string_two";
-        internal static readonly string TextRelationshipOutcome = ModLocalization.Get("TextRelationshipOutcome", "Relationship Outcome");
+        internal static string TextRelationshipOutcome { get { return ModLocalization.Get("TextRelationshipOutcome", "Relationship Outcome"); } }
         internal const string KeyMarriageRelationshipOutcomeString = "marriage_relationship_outcome_string";
-        internal static readonly string TextJoinedClique = ModLocalization.Get("TextJoinedClique", "Joined Clique");
-        internal static readonly string TextLeftClique = ModLocalization.Get("TextLeftClique", "Left Clique");
+        internal static string TextJoinedClique { get { return ModLocalization.Get("TextJoinedClique", "Joined Clique"); } }
+        internal static string TextLeftClique { get { return ModLocalization.Get("TextLeftClique", "Left Clique"); } }
         internal const string KeyCliqueLeaderId = "clique_leader_id";
         internal const string KeyCliqueLeaderIdBefore = "clique_leader_id_before";
         internal const string KeyCliqueLeaderIdAfter = "clique_leader_id_after";
@@ -1663,169 +1663,169 @@ namespace IdolCareerDiary
         internal const string KeyCliqueMemberIdListAfter = "clique_member_id_list_after";
         internal const string KeyCliqueMemberIdListAdded = "clique_member_id_list_added";
         internal const string KeyCliqueMemberIdListRemoved = "clique_member_id_list_removed";
-        internal static readonly string TextCliqueLeader = ModLocalization.Get("TextCliqueLeader", "Clique Leader: ");
-        internal static readonly string TextCliqueMembers = ModLocalization.Get("TextCliqueMembers", "Clique Members");
+        internal static string TextCliqueLeader { get { return ModLocalization.Get("TextCliqueLeader", "Clique Leader: "); } }
+        internal static string TextCliqueMembers { get { return ModLocalization.Get("TextCliqueMembers", "Clique Members"); } }
         internal const string KeyCliqueMemberCount = "clique_member_count";
         internal const string KeyCliqueQuitWasViolent = "clique_quit_was_violent";
-        internal static readonly string TextViolentExit = ModLocalization.Get("TextViolentExit", "Kicked Out of Clique: ");
-        internal static readonly string TextSingleCreated = ModLocalization.Get("TextSingleCreated", "Single Created");
-        internal static readonly string TextSingleCancelled = ModLocalization.Get("TextSingleCancelled", "Single Cancelled");
-        internal static readonly string TextSingleStatusUpdated = ModLocalization.Get("TextSingleStatusUpdated", "Single Status Updated");
-        internal static readonly string TextSingleSenbatsuUpdated = ModLocalization.Get("TextSingleSenbatsuUpdated", "Single Senbatsu Updated");
-        internal static readonly string TextSingleGroupAssignmentUpdated = ModLocalization.Get("TextSingleGroupAssignmentUpdated", "Single Group Assignment Updated");
+        internal static string TextViolentExit { get { return ModLocalization.Get("TextViolentExit", "Kicked Out of Clique: "); } }
+        internal static string TextSingleCreated { get { return ModLocalization.Get("TextSingleCreated", "Single Created"); } }
+        internal static string TextSingleCancelled { get { return ModLocalization.Get("TextSingleCancelled", "Single Cancelled"); } }
+        internal static string TextSingleStatusUpdated { get { return ModLocalization.Get("TextSingleStatusUpdated", "Single Status Updated"); } }
+        internal static string TextSingleSenbatsuUpdated { get { return ModLocalization.Get("TextSingleSenbatsuUpdated", "Single Senbatsu Updated"); } }
+        internal static string TextSingleGroupAssignmentUpdated { get { return ModLocalization.Get("TextSingleGroupAssignmentUpdated", "Single Group Assignment Updated"); } }
         internal const string KeySinglePreviousStatus = "single_previous_status";
         internal const string KeySingleNewStatus = "single_new_status";
-        internal static readonly string TextCastMembers = ModLocalization.Get("TextCastMembers", "Cast Members");
+        internal static string TextCastMembers { get { return ModLocalization.Get("TextCastMembers", "Cast Members"); } }
         internal const string KeySingleCastCount = "single_cast_count";
-        internal static readonly string TextCastSize = ModLocalization.Get("TextCastSize", "Cast Size");
+        internal static string TextCastSize { get { return ModLocalization.Get("TextCastSize", "Cast Size"); } }
         internal const string KeySingleCastCountBefore = "single_cast_count_before";
         internal const string KeySingleCastCountAfter = "single_cast_count_after";
         internal const string KeySingleCastIdListAdded = "single_cast_id_list_added";
-        internal static readonly string TextAddedMembers = ModLocalization.Get("TextAddedMembers", "Added Members: ");
+        internal static string TextAddedMembers { get { return ModLocalization.Get("TextAddedMembers", "Added Members: "); } }
         internal const string KeySingleCastIdListRemoved = "single_cast_id_list_removed";
-        internal static readonly string TextRemovedMembers = ModLocalization.Get("TextRemovedMembers", "Removed Members: ");
+        internal static string TextRemovedMembers { get { return ModLocalization.Get("TextRemovedMembers", "Removed Members: "); } }
         internal const string KeySingleRemovedIdolId = "single_removed_idol_id";
-        internal static readonly string TextReleaseDate = ModLocalization.Get("TextReleaseDate", "Release Date");
+        internal static string TextReleaseDate { get { return ModLocalization.Get("TextReleaseDate", "Release Date"); } }
         internal const string KeySingleReleaseDate = "single_release_date";
-        internal static readonly string LabelDistribution = ModLocalization.Get("LabelDistribution", "Distribution");
+        internal static string LabelDistribution { get { return ModLocalization.Get("LabelDistribution", "Distribution"); } }
         internal const string KeySingleIsDigital = "single_is_digital";
         internal const string CodeDigital = "digital";
         internal const string CodePhysical = "physical";
         internal const string CodeReleased = "released";
         internal const string CodeConcept = "concept";
         internal const string KeySingleLinkedElectionId = "single_linked_election_id";
-        internal static readonly string TextLinkedElection = ModLocalization.Get("TextLinkedElection", "Linked Election: #");
-        internal static readonly string TextTvShowCreated = ModLocalization.Get("TextTvShowCreated", "TV Show Created");
-        internal static readonly string TextTvShowReleased = ModLocalization.Get("TextTvShowReleased", "TV Show Released");
-        internal static readonly string TextTvShowCancelled = ModLocalization.Get("TextTvShowCancelled", "TV Show Cancelled");
-        internal static readonly string TextTvShowCastUpdated = ModLocalization.Get("TextTvShowCastUpdated", "TV Show Cast Updated");
-        internal static readonly string TextTvShowConfigurationUpdated = ModLocalization.Get("TextTvShowConfigurationUpdated", "TV Show Configuration Updated");
-        internal static readonly string TextTvShowRelaunchStarted = ModLocalization.Get("TextTvShowRelaunchStarted", "TV Show Relaunch Started");
-        internal static readonly string TextTvShowRelaunchFinished = ModLocalization.Get("TextTvShowRelaunchFinished", "TV Show Relaunch Finished");
-        internal static readonly string TextShowCreated = ModLocalization.Get("TextShowCreated", "Show Created");
-        internal static readonly string TextShowReleased = ModLocalization.Get("TextShowReleased", "Show Released");
-        internal static readonly string TextShowCancelled = ModLocalization.Get("TextShowCancelled", "Show Cancelled");
-        internal static readonly string TextShowCastUpdated = ModLocalization.Get("TextShowCastUpdated", "Show Cast Updated");
-        internal static readonly string TextShowConfigurationUpdated = ModLocalization.Get("TextShowConfigurationUpdated", "Show Configuration Updated");
-        internal static readonly string TextShowRelaunchStarted = ModLocalization.Get("TextShowRelaunchStarted", "Show Relaunch Started");
-        internal static readonly string TextShowRelaunchFinished = ModLocalization.Get("TextShowRelaunchFinished", "Show Relaunch Finished");
-        internal static readonly string TextShowActionCreated = ModLocalization.Get("TextShowActionCreated", "Created");
-        internal static readonly string TextShowActionReleased = ModLocalization.Get("TextShowActionReleased", "Released");
-        internal static readonly string TextShowActionCancelled = ModLocalization.Get("TextShowActionCancelled", "Cancelled");
-        internal static readonly string TextShowActionCastUpdated = ModLocalization.Get("TextShowActionCastUpdated", "Cast Updated");
-        internal static readonly string TextShowActionConfigurationUpdated = ModLocalization.Get("TextShowActionConfigurationUpdated", "Configuration Updated");
-        internal static readonly string TextShowActionRelaunchStarted = ModLocalization.Get("TextShowActionRelaunchStarted", "Relaunch Started");
-        internal static readonly string TextShowActionRelaunchFinished = ModLocalization.Get("TextShowActionRelaunchFinished", "Relaunch Finished");
-        internal static readonly string TextShowActionEpisodeReleased = ModLocalization.Get("TextShowActionEpisodeReleased", "Episode Released");
-        internal static readonly string TextShowActionStatusUpdated = ModLocalization.Get("TextShowActionStatusUpdated", "Status Updated");
-        internal static readonly string TextShowEventWithMediumFormat = ModLocalization.Get("TextShowEventWithMediumFormat", "{0} {1}");
-        internal static readonly string TextShowTypeWithMediumFormat = ModLocalization.Get("TextShowTypeWithMediumFormat", "{0} Show");
-        internal static readonly string TextShowTitleWithMediumPrefixFormat = ModLocalization.Get("TextShowTitleWithMediumPrefixFormat", "{0}: ");
-        internal static readonly string TextShowIdWithMediumPrefixFormat = ModLocalization.Get("TextShowIdWithMediumPrefixFormat", "{0} #");
-        internal static readonly string LabelMedium = ModLocalization.Get("LabelMedium", "Medium");
+        internal static string TextLinkedElection { get { return ModLocalization.Get("TextLinkedElection", "Linked Election: #"); } }
+        internal static string TextTvShowCreated { get { return ModLocalization.Get("TextTvShowCreated", "TV Show Created"); } }
+        internal static string TextTvShowReleased { get { return ModLocalization.Get("TextTvShowReleased", "TV Show Released"); } }
+        internal static string TextTvShowCancelled { get { return ModLocalization.Get("TextTvShowCancelled", "TV Show Cancelled"); } }
+        internal static string TextTvShowCastUpdated { get { return ModLocalization.Get("TextTvShowCastUpdated", "TV Show Cast Updated"); } }
+        internal static string TextTvShowConfigurationUpdated { get { return ModLocalization.Get("TextTvShowConfigurationUpdated", "TV Show Configuration Updated"); } }
+        internal static string TextTvShowRelaunchStarted { get { return ModLocalization.Get("TextTvShowRelaunchStarted", "TV Show Relaunch Started"); } }
+        internal static string TextTvShowRelaunchFinished { get { return ModLocalization.Get("TextTvShowRelaunchFinished", "TV Show Relaunch Finished"); } }
+        internal static string TextShowCreated { get { return ModLocalization.Get("TextShowCreated", "Show Created"); } }
+        internal static string TextShowReleased { get { return ModLocalization.Get("TextShowReleased", "Show Released"); } }
+        internal static string TextShowCancelled { get { return ModLocalization.Get("TextShowCancelled", "Show Cancelled"); } }
+        internal static string TextShowCastUpdated { get { return ModLocalization.Get("TextShowCastUpdated", "Show Cast Updated"); } }
+        internal static string TextShowConfigurationUpdated { get { return ModLocalization.Get("TextShowConfigurationUpdated", "Show Configuration Updated"); } }
+        internal static string TextShowRelaunchStarted { get { return ModLocalization.Get("TextShowRelaunchStarted", "Show Relaunch Started"); } }
+        internal static string TextShowRelaunchFinished { get { return ModLocalization.Get("TextShowRelaunchFinished", "Show Relaunch Finished"); } }
+        internal static string TextShowActionCreated { get { return ModLocalization.Get("TextShowActionCreated", "Created"); } }
+        internal static string TextShowActionReleased { get { return ModLocalization.Get("TextShowActionReleased", "Released"); } }
+        internal static string TextShowActionCancelled { get { return ModLocalization.Get("TextShowActionCancelled", "Cancelled"); } }
+        internal static string TextShowActionCastUpdated { get { return ModLocalization.Get("TextShowActionCastUpdated", "Cast Updated"); } }
+        internal static string TextShowActionConfigurationUpdated { get { return ModLocalization.Get("TextShowActionConfigurationUpdated", "Configuration Updated"); } }
+        internal static string TextShowActionRelaunchStarted { get { return ModLocalization.Get("TextShowActionRelaunchStarted", "Relaunch Started"); } }
+        internal static string TextShowActionRelaunchFinished { get { return ModLocalization.Get("TextShowActionRelaunchFinished", "Relaunch Finished"); } }
+        internal static string TextShowActionEpisodeReleased { get { return ModLocalization.Get("TextShowActionEpisodeReleased", "Episode Released"); } }
+        internal static string TextShowActionStatusUpdated { get { return ModLocalization.Get("TextShowActionStatusUpdated", "Status Updated"); } }
+        internal static string TextShowEventWithMediumFormat { get { return ModLocalization.Get("TextShowEventWithMediumFormat", "{0} {1}"); } }
+        internal static string TextShowTypeWithMediumFormat { get { return ModLocalization.Get("TextShowTypeWithMediumFormat", "{0} Show"); } }
+        internal static string TextShowTitleWithMediumPrefixFormat { get { return ModLocalization.Get("TextShowTitleWithMediumPrefixFormat", "{0}: "); } }
+        internal static string TextShowIdWithMediumPrefixFormat { get { return ModLocalization.Get("TextShowIdWithMediumPrefixFormat", "{0} #"); } }
+        internal static string LabelMedium { get { return ModLocalization.Get("LabelMedium", "Medium"); } }
         internal const string KeyShowMediumTitle = "show_medium_title";
-        internal static readonly string LabelGenre = ModLocalization.Get("LabelGenre", "Genre");
+        internal static string LabelGenre { get { return ModLocalization.Get("LabelGenre", "Genre"); } }
         internal const string KeyShowGenreTitle = "show_genre_title";
-        internal static readonly string LabelCast = ModLocalization.Get("LabelCast", "Cast");
-        internal static readonly string TextCastType = ModLocalization.Get("TextCastType", "Casting Style");
+        internal static string LabelCast { get { return ModLocalization.Get("LabelCast", "Cast"); } }
+        internal static string TextCastType { get { return ModLocalization.Get("TextCastType", "Casting Style"); } }
         internal const string KeyShowCastTypeBefore = "show_cast_type_before";
         internal const string KeyShowCastTypeAfter = "show_cast_type_after";
-        internal static readonly string TextShowTitle = ModLocalization.Get("TextShowTitle", "Show Title");
+        internal static string TextShowTitle { get { return ModLocalization.Get("TextShowTitle", "Show Title"); } }
         internal const string KeyShowTitleBefore = "show_title_before";
         internal const string KeyShowTitleAfter = "show_title_after";
-        internal static readonly string LabelMc = ModLocalization.Get("LabelMc", "MC");
+        internal static string LabelMc { get { return ModLocalization.Get("LabelMc", "MC"); } }
         internal const string KeyShowMcTitleBefore = "show_mc_title_before";
         internal const string KeyShowMcTitleAfter = "show_mc_title_after";
-        internal static readonly string TextTotalEpisodesReleased = ModLocalization.Get("TextTotalEpisodesReleased", "Total Episodes Released");
+        internal static string TextTotalEpisodesReleased { get { return ModLocalization.Get("TextTotalEpisodesReleased", "Total Episodes Released"); } }
         internal const string KeyShowCastCountBefore = "show_cast_count_before";
         internal const string KeyShowCastCountAfter = "show_cast_count_after";
         internal const string KeyShowCastIdListBefore = "show_cast_id_list_before";
         internal const string KeyShowCastIdListAfter = "show_cast_id_list_after";
         internal const string KeyShowCastIdListAdded = "show_cast_id_list_added";
-        internal static readonly string TextAddedCast = ModLocalization.Get("TextAddedCast", "Added Cast: ");
+        internal static string TextAddedCast { get { return ModLocalization.Get("TextAddedCast", "Added Cast: "); } }
         internal const string KeyShowCastIdListRemoved = "show_cast_id_list_removed";
-        internal static readonly string TextRemovedCast = ModLocalization.Get("TextRemovedCast", "Removed Cast: ");
+        internal static string TextRemovedCast { get { return ModLocalization.Get("TextRemovedCast", "Removed Cast: "); } }
         internal const string KeyShowRemovedIdolId = "show_removed_idol_id";
-        internal static readonly string TextAverageAudience = ModLocalization.Get("TextAverageAudience", "Average Audience");
-        internal static readonly string TextAverageRevenue = ModLocalization.Get("TextAverageRevenue", "Average Revenue");
-        internal static readonly string TextAverageNewFans = ModLocalization.Get("TextAverageNewFans", "Average New Fans");
-        internal static readonly string TextAverageBuzz = ModLocalization.Get("TextAverageBuzz", "Average Buzz");
-        internal static readonly string TextRelaunchCount = ModLocalization.Get("TextRelaunchCount", "Times Relaunched");
+        internal static string TextAverageAudience { get { return ModLocalization.Get("TextAverageAudience", "Average Audience"); } }
+        internal static string TextAverageRevenue { get { return ModLocalization.Get("TextAverageRevenue", "Average Revenue"); } }
+        internal static string TextAverageNewFans { get { return ModLocalization.Get("TextAverageNewFans", "Average New Fans"); } }
+        internal static string TextAverageBuzz { get { return ModLocalization.Get("TextAverageBuzz", "Average Buzz"); } }
+        internal static string TextRelaunchCount { get { return ModLocalization.Get("TextRelaunchCount", "Times Relaunched"); } }
         internal const string KeyShowRelaunchCount = "show_relaunch_count";
-        internal static readonly string TextLaunchDate = ModLocalization.Get("TextLaunchDate", "Launch Date");
+        internal static string TextLaunchDate { get { return ModLocalization.Get("TextLaunchDate", "Launch Date"); } }
         internal const string KeyShowLaunchDate = "show_launch_date";
         internal const string KeyShowProductionCostBefore = "show_production_cost_before";
         internal const string KeyShowProductionCostAfter = "show_production_cost_after";
-        internal static readonly string TextProductionCostPrefix = ModLocalization.Get("TextProductionCostPrefix", "Production Cost: ");
+        internal static string TextProductionCostPrefix { get { return ModLocalization.Get("TextProductionCostPrefix", "Production Cost: "); } }
         internal const string FormatNumberNoDecimal = "N0";
-        internal static readonly string TextContractOfferOpened = ModLocalization.Get("TextContractOfferOpened", "Contract Offer Opened");
-        internal static readonly string TextContractAccepted = ModLocalization.Get("TextContractAccepted", "Contract Accepted");
-        internal static readonly string TextContractCancelled = ModLocalization.Get("TextContractCancelled", "Contract Cancelled");
-        internal static readonly string LabelProduct = ModLocalization.Get("LabelProduct", "Product");
-        internal static readonly string TextContractType = ModLocalization.Get("TextContractType", "Contract Type");
-        internal static readonly string TextContractFocus = ModLocalization.Get("TextContractFocus", "Contract Focus");
-        internal static readonly string TextScope = ModLocalization.Get("TextScope", "Contract Applies To: ");
-        internal static readonly string TextGroupContract = ModLocalization.Get("TextGroupContract", "Entire Group");
-        internal static readonly string TextIdolContract = ModLocalization.Get("TextIdolContract", "One Idol");
-        internal static readonly string TextEndDate = ModLocalization.Get("TextEndDate", "End Date");
-        internal static readonly string TextDurationMonths = ModLocalization.Get("TextDurationMonths", "Duration (Months)");
-        internal static readonly string TextActivation = ModLocalization.Get("TextActivation", "Activation: ");
-        internal static readonly string LabelImmediate = ModLocalization.Get("LabelImmediate", "Immediate");
-        internal static readonly string LabelScheduled = ModLocalization.Get("LabelScheduled", "Scheduled");
-        internal static readonly string TextWeeklyPay = ModLocalization.Get("TextWeeklyPay", "Weekly Pay");
-        internal static readonly string TextWeeklyFans = ModLocalization.Get("TextWeeklyFans", "Weekly Fans");
-        internal static readonly string TextWeeklyBuzz = ModLocalization.Get("TextWeeklyBuzz", "Weekly Buzz");
-        internal static readonly string TextWeeklyFame = ModLocalization.Get("TextWeeklyFame", "Weekly Fame");
-        internal static readonly string TextWeeklyStamina = ModLocalization.Get("TextWeeklyStamina", "Weekly Stamina");
-        internal static readonly string TextLiability = ModLocalization.Get("TextLiability", "Liability: ");
-        internal static readonly string TextGroupCreated = ModLocalization.Get("TextGroupCreated", "Group Created");
-        internal static readonly string TextGroupDisbanded = ModLocalization.Get("TextGroupDisbanded", "Group Disbanded");
-        internal static readonly string TextGroupParameterPointsUpdated = ModLocalization.Get("TextGroupParameterPointsUpdated", "Group Parameter Points Updated");
-        internal static readonly string TextGroupAppealPointsSpent = ModLocalization.Get("TextGroupAppealPointsSpent", "Group Appeal Points Spent");
-        internal static readonly string TextGroupStatus = ModLocalization.Get("TextGroupStatus", "Group Status");
+        internal static string TextContractOfferOpened { get { return ModLocalization.Get("TextContractOfferOpened", "Contract Offer Opened"); } }
+        internal static string TextContractAccepted { get { return ModLocalization.Get("TextContractAccepted", "Contract Accepted"); } }
+        internal static string TextContractCancelled { get { return ModLocalization.Get("TextContractCancelled", "Contract Cancelled"); } }
+        internal static string LabelProduct { get { return ModLocalization.Get("LabelProduct", "Product"); } }
+        internal static string TextContractType { get { return ModLocalization.Get("TextContractType", "Contract Type"); } }
+        internal static string TextContractFocus { get { return ModLocalization.Get("TextContractFocus", "Contract Focus"); } }
+        internal static string TextScope { get { return ModLocalization.Get("TextScope", "Contract Applies To: "); } }
+        internal static string TextGroupContract { get { return ModLocalization.Get("TextGroupContract", "Entire Group"); } }
+        internal static string TextIdolContract { get { return ModLocalization.Get("TextIdolContract", "One Idol"); } }
+        internal static string TextEndDate { get { return ModLocalization.Get("TextEndDate", "End Date"); } }
+        internal static string TextDurationMonths { get { return ModLocalization.Get("TextDurationMonths", "Duration (Months)"); } }
+        internal static string TextActivation { get { return ModLocalization.Get("TextActivation", "Activation: "); } }
+        internal static string LabelImmediate { get { return ModLocalization.Get("LabelImmediate", "Immediate"); } }
+        internal static string LabelScheduled { get { return ModLocalization.Get("LabelScheduled", "Scheduled"); } }
+        internal static string TextWeeklyPay { get { return ModLocalization.Get("TextWeeklyPay", "Weekly Pay"); } }
+        internal static string TextWeeklyFans { get { return ModLocalization.Get("TextWeeklyFans", "Weekly Fans"); } }
+        internal static string TextWeeklyBuzz { get { return ModLocalization.Get("TextWeeklyBuzz", "Weekly Buzz"); } }
+        internal static string TextWeeklyFame { get { return ModLocalization.Get("TextWeeklyFame", "Weekly Fame"); } }
+        internal static string TextWeeklyStamina { get { return ModLocalization.Get("TextWeeklyStamina", "Weekly Stamina"); } }
+        internal static string TextLiability { get { return ModLocalization.Get("TextLiability", "Liability: "); } }
+        internal static string TextGroupCreated { get { return ModLocalization.Get("TextGroupCreated", "Group Created"); } }
+        internal static string TextGroupDisbanded { get { return ModLocalization.Get("TextGroupDisbanded", "Group Disbanded"); } }
+        internal static string TextGroupParameterPointsUpdated { get { return ModLocalization.Get("TextGroupParameterPointsUpdated", "Group Parameter Points Updated"); } }
+        internal static string TextGroupAppealPointsSpent { get { return ModLocalization.Get("TextGroupAppealPointsSpent", "Group Appeal Points Spent"); } }
+        internal static string TextGroupStatus { get { return ModLocalization.Get("TextGroupStatus", "Group Status"); } }
         internal const string KeyGroupStatus = "group_status";
         internal const string KeyGroupEventDate = "group_event_date";
-        internal static readonly string LabelMembers = ModLocalization.Get("LabelMembers", "Members");
+        internal static string LabelMembers { get { return ModLocalization.Get("LabelMembers", "Members"); } }
         internal const string KeyGroupMemberCount = "group_member_count";
-        internal static readonly string TextReleasedSingles = ModLocalization.Get("TextReleasedSingles", "Released Singles");
+        internal static string TextReleasedSingles { get { return ModLocalization.Get("TextReleasedSingles", "Released Singles"); } }
         internal const string KeyGroupSingleCount = "group_single_count";
-        internal static readonly string TextUnreleasedSingles = ModLocalization.Get("TextUnreleasedSingles", "Unreleased Singles");
+        internal static string TextUnreleasedSingles { get { return ModLocalization.Get("TextUnreleasedSingles", "Unreleased Singles"); } }
         internal const string KeyGroupNonReleasedSingleCount = "group_non_released_single_count";
-        internal static readonly string TextTargetGender = ModLocalization.Get("TextTargetGender", "Target Gender");
+        internal static string TextTargetGender { get { return ModLocalization.Get("TextTargetGender", "Target Gender"); } }
         internal const string KeyGroupAppealGender = "group_appeal_gender";
-        internal static readonly string TextTargetIntensity = ModLocalization.Get("TextTargetIntensity", "Target Intensity");
+        internal static string TextTargetIntensity { get { return ModLocalization.Get("TextTargetIntensity", "Target Intensity"); } }
         internal const string KeyGroupAppealHardcoreness = "group_appeal_hardcoreness";
-        internal static readonly string TextTargetAge = ModLocalization.Get("TextTargetAge", "Target Age");
+        internal static string TextTargetAge { get { return ModLocalization.Get("TextTargetAge", "Target Age"); } }
         internal const string KeyGroupAppealAge = "group_appeal_age";
-        internal static readonly string TextSourceParameter = ModLocalization.Get("TextSourceParameter", "Stat Used For This Change");
+        internal static string TextSourceParameter { get { return ModLocalization.Get("TextSourceParameter", "Stat Used For This Change"); } }
         internal const string KeyGroupSourceParamType = "group_source_param_type";
-        internal static readonly string TextTargetFanSegment = ModLocalization.Get("TextTargetFanSegment", "Target Fan Segment");
+        internal static string TextTargetFanSegment { get { return ModLocalization.Get("TextTargetFanSegment", "Target Fan Segment"); } }
         internal const string KeyGroupTargetFanType = "group_target_fan_type";
-        internal static readonly string TextParameterPoints = ModLocalization.Get("TextParameterPoints", "Parameter Points");
+        internal static string TextParameterPoints { get { return ModLocalization.Get("TextParameterPoints", "Parameter Points"); } }
         internal const string KeyGroupPointsBefore = "group_points_before";
         internal const string KeyGroupPointsAfter = "group_points_after";
-        internal static readonly string TextParameterDelta = ModLocalization.Get("TextParameterDelta", "Parameter Point Change");
+        internal static string TextParameterDelta { get { return ModLocalization.Get("TextParameterDelta", "Parameter Point Change"); } }
         internal const string KeyGroupPointsDelta = "group_points_delta";
-        internal static readonly string TextAvailablePoints = ModLocalization.Get("TextAvailablePoints", "Available Points");
+        internal static string TextAvailablePoints { get { return ModLocalization.Get("TextAvailablePoints", "Available Points"); } }
         internal const string KeyGroupAvailablePointsBefore = "group_available_points_before";
         internal const string KeyGroupAvailablePointsAfter = "group_available_points_after";
-        internal static readonly string TextSpentPoints = ModLocalization.Get("TextSpentPoints", "Spent Points");
+        internal static string TextSpentPoints { get { return ModLocalization.Get("TextSpentPoints", "Spent Points"); } }
         internal const string KeyGroupPointsSpentBefore = "group_points_spent_before";
         internal const string KeyGroupPointsSpentAfter = "group_points_spent_after";
-        internal static readonly string TextTargetPoints = ModLocalization.Get("TextTargetPoints", "Target Points");
+        internal static string TextTargetPoints { get { return ModLocalization.Get("TextTargetPoints", "Target Points"); } }
         internal const string KeyGroupTargetPointsBefore = "group_target_points_before";
         internal const string KeyGroupTargetPointsAfter = "group_target_points_after";
-        internal static readonly string TextRequestedPoints = ModLocalization.Get("TextRequestedPoints", "Requested Points");
+        internal static string TextRequestedPoints { get { return ModLocalization.Get("TextRequestedPoints", "Requested Points"); } }
         internal const string KeyGroupPointsRequested = "group_points_requested";
-        internal static readonly string TextAppliedPoints = ModLocalization.Get("TextAppliedPoints", "Applied Points");
+        internal static string TextAppliedPoints { get { return ModLocalization.Get("TextAppliedPoints", "Applied Points"); } }
         internal const string KeyGroupPointsApplied = "group_points_applied";
         internal const string SeparatorPipe = "|";
         internal const char SeparatorPipeCharacter = '|';
         internal const char SeparatorColonCharacter = ':';
         internal const char SeparatorCommaCharacter = ',';
         internal const string SeparatorSpaceSlashSpace = " / ";
-        internal static readonly string TextTimelineLimitedToLatestPrefix = ModLocalization.Get("TextTimelineLimitedToLatestPrefix", "Timeline limited to latest ");
-        internal static readonly string TextVisibleEventsForUiPerformanceSuffix = ModLocalization.Get("TextVisibleEventsForUiPerformanceSuffix", " visible events for UI performance.");
+        internal static string TextTimelineLimitedToLatestPrefix { get { return ModLocalization.Get("TextTimelineLimitedToLatestPrefix", "Timeline limited to latest "); } }
+        internal static string TextVisibleEventsForUiPerformanceSuffix { get { return ModLocalization.Get("TextVisibleEventsForUiPerformanceSuffix", " visible events for UI performance."); } }
         internal const string UiSuffixTimeline = "_Timeline";
         internal const string UiNameCareerDiaryTimelineAction = "CareerDiary_TimelineAction";
         internal const string UiNameCareerDiaryActionButtonRefreshTimeline = "CareerDiary_ActionButton_RefreshTimeline";
@@ -1834,8 +1834,8 @@ namespace IdolCareerDiary
         internal const string UiRowSeparator = "_Row_";
         internal const string UiNameCareerDiaryTimelineItemPrefix = "CareerDiary_TimelineItem_";
         internal const string UiSuffixTimelineFilters = "_TimelineFilters";
-        internal static readonly string TextShowPrefix = ModLocalization.Get("TextShowPrefix", "Show ");
-        internal static readonly string TextHidePrefix = ModLocalization.Get("TextHidePrefix", "Hide ");
+        internal static string TextShowPrefix { get { return ModLocalization.Get("TextShowPrefix", "Show "); } }
+        internal static string TextHidePrefix { get { return ModLocalization.Get("TextHidePrefix", "Hide "); } }
         internal const string UiNameCareerDiaryFilterToggle = "CareerDiary_FilterToggle";
         internal const string UiNameCareerDiaryFilterTogglePrefix = "CareerDiary_FilterToggle_";
         internal const string UiSuffixDetail = "_Detail";
@@ -1843,7 +1843,7 @@ namespace IdolCareerDiary
         internal const string UiNameCareerDiaryActionButtonIdolPrefix = "CareerDiary_ActionButton_Idol_";
         internal const string UiSuffixFooter = "_Footer";
         internal const string UiNameCareerDiaryActionButtonBackToTimeline = "CareerDiary_ActionButton_BackToTimeline";
-        internal static readonly string TextOpenFormationViewerForSingleSenbatsu = ModLocalization.Get("TextOpenFormationViewerForSingleSenbatsu", "Open the formation viewer to inspect this single's senbatsu using the base-game UI.");
+        internal static string TextOpenFormationViewerForSingleSenbatsu { get { return ModLocalization.Get("TextOpenFormationViewerForSingleSenbatsu", "Open the formation viewer to inspect this single's senbatsu using the base-game UI."); } }
         internal const string UiNameCareerDiaryActionButtonOpenSingleFormation = "CareerDiary_ActionButton_OpenSingleFormation";
         internal const string UiNameCareerDiaryActionButtonOpenSingleChart = "CareerDiary_ActionButton_OpenSingleChart";
         internal const string UiNameCareerDiaryTimelineParticipantRowPrefix = "CareerDiary_TimelineParticipants_Row_";
@@ -1860,143 +1860,143 @@ namespace IdolCareerDiary
         internal const string UiSuffixPortrait = "_Portrait";
         internal const string SeparatorColonSpace = ": ";
         internal const string SeparatorSlashOneHundred = "/100";
-        internal static readonly string TextFameOfSenbatsu = ModLocalization.Get("TextFameOfSenbatsu", "Fame of Senbatsu: ");
+        internal static string TextFameOfSenbatsu { get { return ModLocalization.Get("TextFameOfSenbatsu", "Fame of Senbatsu: "); } }
         internal const string SeparatorSlashTen = "/10";
         internal const string FormatSingleMetricOneDecimal = "0.#";
         internal const string UiNameCareerDiarySingleCardTextPrefix = "CareerDiary_SingleCardText_";
         internal const string FormatGuidCompact = "N";
         internal const string SeparatorDash = "-";
         internal const string SeparatorSpace = " ";
-        internal static readonly string TextSourceEntityOpened = ModLocalization.Get("TextSourceEntityOpened", "Related record opened.");
-        internal static readonly string TextUnableToOpenSourceEntity = ModLocalization.Get("TextUnableToOpenSourceEntity", "Unable to open related record: ");
-        internal static readonly string TextEventIsNull = ModLocalization.Get("TextEventIsNull", "Event is null.");
-        internal static readonly string TextInvalidSingleId = ModLocalization.Get("TextInvalidSingleId", "Invalid single id.");
-        internal static readonly string TextSingleNotFound = ModLocalization.Get("TextSingleNotFound", "Single not found.");
-        internal static readonly string TextSingleReleasePopupUnavailable = ModLocalization.Get("TextSingleReleasePopupUnavailable", "Single release popup unavailable.");
-        internal static readonly string TextSingleReleaseComponentUnavailable = ModLocalization.Get("TextSingleReleaseComponentUnavailable", "Single release component unavailable.");
-        internal static readonly string TextInvalidShowId = ModLocalization.Get("TextInvalidShowId", "Invalid show id.");
-        internal static readonly string TextShowNotFound = ModLocalization.Get("TextShowNotFound", "Show not found.");
-        internal static readonly string TextShowResultPopupUnavailable = ModLocalization.Get("TextShowResultPopupUnavailable", "Show result popup unavailable.");
-        internal static readonly string TextShowResultComponentUnavailable = ModLocalization.Get("TextShowResultComponentUnavailable", "Show result component unavailable.");
-        internal static readonly string TextInvalidTourId = ModLocalization.Get("TextInvalidTourId", "Invalid tour id.");
-        internal static readonly string TextTourNotFound = ModLocalization.Get("TextTourNotFound", "Tour not found.");
-        internal static readonly string TextTourPopupUnavailable = ModLocalization.Get("TextTourPopupUnavailable", "Tour popup unavailable.");
-        internal static readonly string TextTourComponentUnavailable = ModLocalization.Get("TextTourComponentUnavailable", "Tour component unavailable.");
-        internal static readonly string TextInvalidElectionId = ModLocalization.Get("TextInvalidElectionId", "Invalid election id.");
-        internal static readonly string TextElectionNotFound = ModLocalization.Get("TextElectionNotFound", "Election not found.");
-        internal static readonly string TextElectionPopupUnavailable = ModLocalization.Get("TextElectionPopupUnavailable", "Election popup unavailable.");
-        internal static readonly string TextElectionComponentUnavailable = ModLocalization.Get("TextElectionComponentUnavailable", "Election component unavailable.");
-        internal static readonly string TextSingleParticipationRecorded = ModLocalization.Get("TextSingleParticipationRecorded", "Single Participation Recorded");
-        internal static readonly string TextSingleReleased = ModLocalization.Get("TextSingleReleased", "Single Released");
-        internal static readonly string TextSingle = ModLocalization.Get("TextSingle", "Single #");
-        internal static readonly string TextSenbatsuRow = ModLocalization.Get("TextSenbatsuRow", "Senbatsu Row: ");
-        internal static readonly string TextPosition = ModLocalization.Get("TextPosition", "Position: ");
-        internal static readonly string TextCenter = ModLocalization.Get("TextCenter", "Center: ");
-        internal static readonly string TextChartPosition = ModLocalization.Get("TextChartPosition", "Chart Position: #");
-        internal static readonly string TextIdolStatusUpdated = ModLocalization.Get("TextIdolStatusUpdated", "Idol Status Updated");
-        internal static readonly string TextDatingStatusUpdated = ModLocalization.Get("TextDatingStatusUpdated", "Dating Status Updated");
-        internal static readonly string TextRoute = ModLocalization.Get("TextRoute", "Route: ");
-        internal static readonly string TextStage = ModLocalization.Get("TextStage", "Stage: ");
-        internal static readonly string TextDatingPartnerStatusUpdated = ModLocalization.Get("TextDatingPartnerStatusUpdated", "Dating Partner Status Updated");
-        internal static readonly string TextDatingHistoryHasDatedAnotherIdol = ModLocalization.Get("TextDatingHistoryHasDatedAnotherIdol", "Dating History: Has dated another idol");
-        internal static readonly string TextScandalHistoryYes = ModLocalization.Get("TextScandalHistoryYes", "Scandal History: Yes");
-        internal static readonly string TextUsedGoodsStatusYes = ModLocalization.Get("TextUsedGoodsStatusYes", "Known Dating History: Yes");
-        internal static readonly string TextStartedDatingAnotherIdol = ModLocalization.Get("TextStartedDatingAnotherIdol", "Started Dating Another Idol");
-        internal static readonly string TextDatingEnded = ModLocalization.Get("TextDatingEnded", "Dating Ended");
-        internal static readonly string TextRelationshipStatusUpdated = ModLocalization.Get("TextRelationshipStatusUpdated", "Relationship Status Updated");
-        internal static readonly string TextDynamic = ModLocalization.Get("TextDynamic", "Relationship Trend: ");
-        internal static readonly string TextPairStateDating = ModLocalization.Get("TextPairStateDating", "Pair State: Dating");
-        internal static readonly string TextRelationshipScore = ModLocalization.Get("TextRelationshipScore", "Relationship Score: ");
+        internal static string TextSourceEntityOpened { get { return ModLocalization.Get("TextSourceEntityOpened", "Related record opened."); } }
+        internal static string TextUnableToOpenSourceEntity { get { return ModLocalization.Get("TextUnableToOpenSourceEntity", "Unable to open related record: "); } }
+        internal static string TextEventIsNull { get { return ModLocalization.Get("TextEventIsNull", "Event is null."); } }
+        internal static string TextInvalidSingleId { get { return ModLocalization.Get("TextInvalidSingleId", "Invalid single id."); } }
+        internal static string TextSingleNotFound { get { return ModLocalization.Get("TextSingleNotFound", "Single not found."); } }
+        internal static string TextSingleReleasePopupUnavailable { get { return ModLocalization.Get("TextSingleReleasePopupUnavailable", "Single release popup unavailable."); } }
+        internal static string TextSingleReleaseComponentUnavailable { get { return ModLocalization.Get("TextSingleReleaseComponentUnavailable", "Single release component unavailable."); } }
+        internal static string TextInvalidShowId { get { return ModLocalization.Get("TextInvalidShowId", "Invalid show id."); } }
+        internal static string TextShowNotFound { get { return ModLocalization.Get("TextShowNotFound", "Show not found."); } }
+        internal static string TextShowResultPopupUnavailable { get { return ModLocalization.Get("TextShowResultPopupUnavailable", "Show result popup unavailable."); } }
+        internal static string TextShowResultComponentUnavailable { get { return ModLocalization.Get("TextShowResultComponentUnavailable", "Show result component unavailable."); } }
+        internal static string TextInvalidTourId { get { return ModLocalization.Get("TextInvalidTourId", "Invalid tour id."); } }
+        internal static string TextTourNotFound { get { return ModLocalization.Get("TextTourNotFound", "Tour not found."); } }
+        internal static string TextTourPopupUnavailable { get { return ModLocalization.Get("TextTourPopupUnavailable", "Tour popup unavailable."); } }
+        internal static string TextTourComponentUnavailable { get { return ModLocalization.Get("TextTourComponentUnavailable", "Tour component unavailable."); } }
+        internal static string TextInvalidElectionId { get { return ModLocalization.Get("TextInvalidElectionId", "Invalid election id."); } }
+        internal static string TextElectionNotFound { get { return ModLocalization.Get("TextElectionNotFound", "Election not found."); } }
+        internal static string TextElectionPopupUnavailable { get { return ModLocalization.Get("TextElectionPopupUnavailable", "Election popup unavailable."); } }
+        internal static string TextElectionComponentUnavailable { get { return ModLocalization.Get("TextElectionComponentUnavailable", "Election component unavailable."); } }
+        internal static string TextSingleParticipationRecorded { get { return ModLocalization.Get("TextSingleParticipationRecorded", "Single Participation Recorded"); } }
+        internal static string TextSingleReleased { get { return ModLocalization.Get("TextSingleReleased", "Single Released"); } }
+        internal static string TextSingle { get { return ModLocalization.Get("TextSingle", "Single #"); } }
+        internal static string TextSenbatsuRow { get { return ModLocalization.Get("TextSenbatsuRow", "Senbatsu Row: "); } }
+        internal static string TextPosition { get { return ModLocalization.Get("TextPosition", "Position: "); } }
+        internal static string TextCenter { get { return ModLocalization.Get("TextCenter", "Center: "); } }
+        internal static string TextChartPosition { get { return ModLocalization.Get("TextChartPosition", "Chart Position: #"); } }
+        internal static string TextIdolStatusUpdated { get { return ModLocalization.Get("TextIdolStatusUpdated", "Idol Status Updated"); } }
+        internal static string TextDatingStatusUpdated { get { return ModLocalization.Get("TextDatingStatusUpdated", "Dating Status Updated"); } }
+        internal static string TextRoute { get { return ModLocalization.Get("TextRoute", "Route: "); } }
+        internal static string TextStage { get { return ModLocalization.Get("TextStage", "Stage: "); } }
+        internal static string TextDatingPartnerStatusUpdated { get { return ModLocalization.Get("TextDatingPartnerStatusUpdated", "Dating Partner Status Updated"); } }
+        internal static string TextDatingHistoryHasDatedAnotherIdol { get { return ModLocalization.Get("TextDatingHistoryHasDatedAnotherIdol", "Dating History: Has dated another idol"); } }
+        internal static string TextScandalHistoryYes { get { return ModLocalization.Get("TextScandalHistoryYes", "Scandal History: Yes"); } }
+        internal static string TextUsedGoodsStatusYes { get { return ModLocalization.Get("TextUsedGoodsStatusYes", "Known Dating History: Yes"); } }
+        internal static string TextStartedDatingAnotherIdol { get { return ModLocalization.Get("TextStartedDatingAnotherIdol", "Started Dating Another Idol"); } }
+        internal static string TextDatingEnded { get { return ModLocalization.Get("TextDatingEnded", "Dating Ended"); } }
+        internal static string TextRelationshipStatusUpdated { get { return ModLocalization.Get("TextRelationshipStatusUpdated", "Relationship Status Updated"); } }
+        internal static string TextDynamic { get { return ModLocalization.Get("TextDynamic", "Relationship Trend: "); } }
+        internal static string TextPairStateDating { get { return ModLocalization.Get("TextPairStateDating", "Pair State: Dating"); } }
+        internal static string TextRelationshipScore { get { return ModLocalization.Get("TextRelationshipScore", "Relationship Score: "); } }
         internal const string FormatSingleMetricTwoDecimals = "0.##";
-        internal static readonly string TextBullyingStarted = ModLocalization.Get("TextBullyingStarted", "Bullying Started");
-        internal static readonly string TextBullyingEnded = ModLocalization.Get("TextBullyingEnded", "Bullying Ended");
-        internal static readonly string TextTargetIdol = ModLocalization.Get("TextTargetIdol", "Target Idol: ");
-        internal static readonly string TextLeaderIdol = ModLocalization.Get("TextLeaderIdol", "Leader Idol: ");
-        internal static readonly string TextKnownToProducer = ModLocalization.Get("TextKnownToProducer", "Known to Producer: ");
-        internal static readonly string TextContractSigned = ModLocalization.Get("TextContractSigned", "Contract Signed");
-        internal static readonly string TextContractBroken = ModLocalization.Get("TextContractBroken", "Contract Broken");
-        internal static readonly string TextContractCompleted = ModLocalization.Get("TextContractCompleted", "Contract Completed");
-        internal static readonly string TextAgent = ModLocalization.Get("TextAgent", "Agent: ");
-        internal static readonly string TextProduct = ModLocalization.Get("TextProduct", "Product: ");
-        internal static readonly string TextAgency = ModLocalization.Get("TextAgency", "Agency: ");
-        internal static readonly string TextContractTypePrefix = ModLocalization.Get("TextContractTypePrefix", "Contract Type: ");
-        internal static readonly string TextContractFocusPrefix = ModLocalization.Get("TextContractFocusPrefix", "Contract Focus: ");
-        internal static readonly string TextScopeGroupContract = ModLocalization.Get("TextScopeGroupContract", "Contract Applies To: Entire Group");
-        internal static readonly string TextStartDatePrefix = ModLocalization.Get("TextStartDatePrefix", "Start Date: ");
-        internal static readonly string TextEndDatePrefix = ModLocalization.Get("TextEndDatePrefix", "End Date: ");
-        internal static readonly string TextDuration = ModLocalization.Get("TextDuration", "Duration: ");
-        internal static readonly string TextMonthS = ModLocalization.Get("TextMonthS", " month(s)");
-        internal static readonly string TextActivationImmediate = ModLocalization.Get("TextActivationImmediate", "Activation: Immediate");
-        internal static readonly string TextWeeklyPayPrefix = ModLocalization.Get("TextWeeklyPayPrefix", "Weekly Pay: ");
-        internal static readonly string TextWeeklyBuzzPrefix = ModLocalization.Get("TextWeeklyBuzzPrefix", "Weekly Buzz: ");
-        internal static readonly string TextWeeklyFamePrefix = ModLocalization.Get("TextWeeklyFamePrefix", "Weekly Fame: ");
-        internal static readonly string TextWeeklyFansPrefix = ModLocalization.Get("TextWeeklyFansPrefix", "Weekly Fans: ");
-        internal static readonly string TextWeeklyStaminaPrefix = ModLocalization.Get("TextWeeklyStaminaPrefix", "Weekly Stamina: ");
-        internal static readonly string TextDamagesPaid = ModLocalization.Get("TextDamagesPaid", "Damages Paid: ");
-        internal static readonly string TextBreakContext = ModLocalization.Get("TextBreakContext", "Contract Break Trigger: ");
-        internal static readonly string TextDamagesAppliedYes = ModLocalization.Get("TextDamagesAppliedYes", "Damages Applied: Yes");
-        internal static readonly string TextCompletionContractReachedItsEndDate = ModLocalization.Get("TextCompletionContractReachedItsEndDate", "Completion: Contract reached its end date.");
-        internal static readonly string TextWeeklyContractBenefitsApplied = ModLocalization.Get("TextWeeklyContractBenefitsApplied", "Weekly Contract Benefits Applied");
-        internal static readonly string TextWeeklyContractPaymentReceived = ModLocalization.Get("TextWeeklyContractPaymentReceived", "Weekly Contract Payment Received");
-        internal static readonly string TextFans = ModLocalization.Get("TextFans", "Fans: ");
-        internal static readonly string TextBuzz = ModLocalization.Get("TextBuzz", "Buzz: ");
-        internal static readonly string TextFame = ModLocalization.Get("TextFame", "Fame: ");
-        internal static readonly string TextStamina = ModLocalization.Get("TextStamina", "Stamina: ");
-        internal static readonly string TextTrainingPoints = ModLocalization.Get("TextTrainingPoints", "Training Points: ");
-        internal static readonly string TextContractEnd = ModLocalization.Get("TextContractEnd", "Contract End: ");
-        internal static readonly string TextSalaryTitlePrefix = ModLocalization.Get("TextSalaryTitlePrefix", "Salary ");
-        internal static readonly string TextSalaryPrefix = ModLocalization.Get("TextSalaryPrefix", "Salary: ");
-        internal static readonly string TextChange = ModLocalization.Get("TextChange", "Change: ");
-        internal static readonly string TextSalarySatisfaction = ModLocalization.Get("TextSalarySatisfaction", "Salary Satisfaction: ");
-        internal static readonly string TextSatisfactionChange = ModLocalization.Get("TextSatisfactionChange", "Satisfaction Change: ");
-        internal static readonly string TextTvShowEpisodeReleased = ModLocalization.Get("TextTvShowEpisodeReleased", "TV Show Episode Released");
-        internal static readonly string TextTvShowStatusUpdated = ModLocalization.Get("TextTvShowStatusUpdated", "TV Show Status Updated");
-        internal static readonly string TextTvShow = ModLocalization.Get("TextTvShow", "TV Show #");
-        internal static readonly string TextShowEpisodeReleased = ModLocalization.Get("TextShowEpisodeReleased", "Show Episode Released");
-        internal static readonly string TextShowStatusUpdated = ModLocalization.Get("TextShowStatusUpdated", "Show Status Updated");
-        internal static readonly string TextShow = ModLocalization.Get("TextShow", "Show #");
-        internal static readonly string TextTheaterDailyPerformance = ModLocalization.Get("TextTheaterDailyPerformance", "Theater Daily Performance");
-        internal static readonly string TextTheaterOpened = ModLocalization.Get("TextTheaterOpened", "Theater Opened");
-        internal static readonly string TextTheaterClosed = ModLocalization.Get("TextTheaterClosed", "Theater Closed");
-        internal static readonly string TextTheater = ModLocalization.Get("TextTheater", "Theater #");
-        internal static readonly string TextProgramType = ModLocalization.Get("TextProgramType", "Theater Schedule: {0}");
-        internal static readonly string TextAttendance = ModLocalization.Get("TextAttendance", "Attendance: ");
-        internal static readonly string TextRevenue = ModLocalization.Get("TextRevenue", "Revenue: ");
-        internal static readonly string TextSubscriberChange = ModLocalization.Get("TextSubscriberChange", "Subscriber Change: ");
-        internal static readonly string TextSubscribers = ModLocalization.Get("TextSubscribers", "Subscribers: ");
-        internal static readonly string TextSevenDayAverageAttendance = ModLocalization.Get("TextSevenDayAverageAttendance", "7-Day Average Attendance: ");
-        internal static readonly string TextSevenDayAverageRevenue = ModLocalization.Get("TextSevenDayAverageRevenue", "7-Day Average Revenue: ");
-        internal static readonly string TextAgencyActivityPerformance = ModLocalization.Get("TextAgencyActivityPerformance", "Agency Activity: Performance");
-        internal static readonly string TextAgencyActivityPromotion = ModLocalization.Get("TextAgencyActivityPromotion", "Agency Activity: Promotion");
-        internal static readonly string TextAgencyActivitySpaTreatment = ModLocalization.Get("TextAgencyActivitySpaTreatment", "Agency Activity: Spa Treatment");
-        internal static readonly string TextAgencyWide = ModLocalization.Get("TextAgencyWide", "Agency-Wide");
-        internal static readonly string TextMoneyChangePrefix = ModLocalization.Get("TextMoneyChangePrefix", "Money Change: ");
-        internal static readonly string TextFanChange = ModLocalization.Get("TextFanChange", "Fan Change: ");
-        internal static readonly string TextPerIdolEarnings = ModLocalization.Get("TextPerIdolEarnings", "Per-Idol Earnings: ");
-        internal static readonly string TextStaminaCost = ModLocalization.Get("TextStaminaCost", "Stamina Cost: ");
-        internal static readonly string TextSpaRecovery = ModLocalization.Get("TextSpaRecovery", "Spa Recovery: ");
-        internal static readonly string TextTourStatusUpdated = ModLocalization.Get("TextTourStatusUpdated", "Tour Status Updated");
-        internal static readonly string TextCountries = ModLocalization.Get("TextCountries", "Countries: ");
-        internal static readonly string TextAudience = ModLocalization.Get("TextAudience", "Audience: ");
-        internal static readonly string TextNewFansPrefix = ModLocalization.Get("TextNewFansPrefix", "New Fans: ");
-        internal static readonly string TextElectionStatusUpdated = ModLocalization.Get("TextElectionStatusUpdated", "Election Status Updated");
-        internal static readonly string TextElectionResultRecorded = ModLocalization.Get("TextElectionResultRecorded", "Election Result Recorded");
-        internal static readonly string TextBroadcast = ModLocalization.Get("TextBroadcast", "Broadcast: ");
-        internal static readonly string TextFinalPlace = ModLocalization.Get("TextFinalPlace", "Final Place: #");
-        internal static readonly string TextScandalPointsUpdated = ModLocalization.Get("TextScandalPointsUpdated", "Scandal Points Updated");
-        internal static readonly string TextScandalPointsPrefix = ModLocalization.Get("TextScandalPointsPrefix", "Scandal Points: ");
-        internal static readonly string TextDelta = ModLocalization.Get("TextDelta", "Scandal Point Change: ");
-        internal static readonly string TextMedicalInjury = ModLocalization.Get("TextMedicalInjury", "Medical Injury");
-        internal static readonly string TextMedicalDepression = ModLocalization.Get("TextMedicalDepression", "Medical Depression");
-        internal static readonly string TextMedicalHiatusStarted = ModLocalization.Get("TextMedicalHiatusStarted", "Medical Hiatus Started");
-        internal static readonly string TextMedicalRecovery = ModLocalization.Get("TextMedicalRecovery", "Medical Recovery");
-        internal static readonly string TextMedicalHiatusFinished = ModLocalization.Get("TextMedicalHiatusFinished", "Medical Hiatus Finished");
-        internal static readonly string TextHiatusEnd = ModLocalization.Get("TextHiatusEnd", "Hiatus End: ");
-        internal static readonly string TextTimelineEntryRecorded = ModLocalization.Get("TextTimelineEntryRecorded", "Timeline entry recorded.");
-        internal static readonly string TextOtherIdol = ModLocalization.Get("TextOtherIdol", "Other Idol: ");
-        internal static readonly string TextStatusUpdatedSentence = ModLocalization.Get("TextStatusUpdatedSentence", "Status updated.");
-        internal static readonly string LabelShowCastContextTitle = ModLocalization.Get("LabelShowCastContextTitle", "Show Cast");
-        internal static readonly string TextShowCastMembersCapturedPrefix = ModLocalization.Get("TextShowCastMembersCapturedPrefix", "Idols involved across this show's run: ");
+        internal static string TextBullyingStarted { get { return ModLocalization.Get("TextBullyingStarted", "Bullying Started"); } }
+        internal static string TextBullyingEnded { get { return ModLocalization.Get("TextBullyingEnded", "Bullying Ended"); } }
+        internal static string TextTargetIdol { get { return ModLocalization.Get("TextTargetIdol", "Target Idol: "); } }
+        internal static string TextLeaderIdol { get { return ModLocalization.Get("TextLeaderIdol", "Leader Idol: "); } }
+        internal static string TextKnownToProducer { get { return ModLocalization.Get("TextKnownToProducer", "Known to Producer: "); } }
+        internal static string TextContractSigned { get { return ModLocalization.Get("TextContractSigned", "Contract Signed"); } }
+        internal static string TextContractBroken { get { return ModLocalization.Get("TextContractBroken", "Contract Broken"); } }
+        internal static string TextContractCompleted { get { return ModLocalization.Get("TextContractCompleted", "Contract Completed"); } }
+        internal static string TextAgent { get { return ModLocalization.Get("TextAgent", "Agent: "); } }
+        internal static string TextProduct { get { return ModLocalization.Get("TextProduct", "Product: "); } }
+        internal static string TextAgency { get { return ModLocalization.Get("TextAgency", "Agency: "); } }
+        internal static string TextContractTypePrefix { get { return ModLocalization.Get("TextContractTypePrefix", "Contract Type: "); } }
+        internal static string TextContractFocusPrefix { get { return ModLocalization.Get("TextContractFocusPrefix", "Contract Focus: "); } }
+        internal static string TextScopeGroupContract { get { return ModLocalization.Get("TextScopeGroupContract", "Contract Applies To: Entire Group"); } }
+        internal static string TextStartDatePrefix { get { return ModLocalization.Get("TextStartDatePrefix", "Start Date: "); } }
+        internal static string TextEndDatePrefix { get { return ModLocalization.Get("TextEndDatePrefix", "End Date: "); } }
+        internal static string TextDuration { get { return ModLocalization.Get("TextDuration", "Duration: "); } }
+        internal static string TextMonthS { get { return ModLocalization.Get("TextMonthS", " month(s)"); } }
+        internal static string TextActivationImmediate { get { return ModLocalization.Get("TextActivationImmediate", "Activation: Immediate"); } }
+        internal static string TextWeeklyPayPrefix { get { return ModLocalization.Get("TextWeeklyPayPrefix", "Weekly Pay: "); } }
+        internal static string TextWeeklyBuzzPrefix { get { return ModLocalization.Get("TextWeeklyBuzzPrefix", "Weekly Buzz: "); } }
+        internal static string TextWeeklyFamePrefix { get { return ModLocalization.Get("TextWeeklyFamePrefix", "Weekly Fame: "); } }
+        internal static string TextWeeklyFansPrefix { get { return ModLocalization.Get("TextWeeklyFansPrefix", "Weekly Fans: "); } }
+        internal static string TextWeeklyStaminaPrefix { get { return ModLocalization.Get("TextWeeklyStaminaPrefix", "Weekly Stamina: "); } }
+        internal static string TextDamagesPaid { get { return ModLocalization.Get("TextDamagesPaid", "Damages Paid: "); } }
+        internal static string TextBreakContext { get { return ModLocalization.Get("TextBreakContext", "Contract Break Trigger: "); } }
+        internal static string TextDamagesAppliedYes { get { return ModLocalization.Get("TextDamagesAppliedYes", "Damages Applied: Yes"); } }
+        internal static string TextCompletionContractReachedItsEndDate { get { return ModLocalization.Get("TextCompletionContractReachedItsEndDate", "Completion: Contract reached its end date."); } }
+        internal static string TextWeeklyContractBenefitsApplied { get { return ModLocalization.Get("TextWeeklyContractBenefitsApplied", "Weekly Contract Benefits Applied"); } }
+        internal static string TextWeeklyContractPaymentReceived { get { return ModLocalization.Get("TextWeeklyContractPaymentReceived", "Weekly Contract Payment Received"); } }
+        internal static string TextFans { get { return ModLocalization.Get("TextFans", "Fans: "); } }
+        internal static string TextBuzz { get { return ModLocalization.Get("TextBuzz", "Buzz: "); } }
+        internal static string TextFame { get { return ModLocalization.Get("TextFame", "Fame: "); } }
+        internal static string TextStamina { get { return ModLocalization.Get("TextStamina", "Stamina: "); } }
+        internal static string TextTrainingPoints { get { return ModLocalization.Get("TextTrainingPoints", "Training Points: "); } }
+        internal static string TextContractEnd { get { return ModLocalization.Get("TextContractEnd", "Contract End: "); } }
+        internal static string TextSalaryTitlePrefix { get { return ModLocalization.Get("TextSalaryTitlePrefix", "Salary "); } }
+        internal static string TextSalaryPrefix { get { return ModLocalization.Get("TextSalaryPrefix", "Salary: "); } }
+        internal static string TextChange { get { return ModLocalization.Get("TextChange", "Change: "); } }
+        internal static string TextSalarySatisfaction { get { return ModLocalization.Get("TextSalarySatisfaction", "Salary Satisfaction: "); } }
+        internal static string TextSatisfactionChange { get { return ModLocalization.Get("TextSatisfactionChange", "Satisfaction Change: "); } }
+        internal static string TextTvShowEpisodeReleased { get { return ModLocalization.Get("TextTvShowEpisodeReleased", "TV Show Episode Released"); } }
+        internal static string TextTvShowStatusUpdated { get { return ModLocalization.Get("TextTvShowStatusUpdated", "TV Show Status Updated"); } }
+        internal static string TextTvShow { get { return ModLocalization.Get("TextTvShow", "TV Show #"); } }
+        internal static string TextShowEpisodeReleased { get { return ModLocalization.Get("TextShowEpisodeReleased", "Show Episode Released"); } }
+        internal static string TextShowStatusUpdated { get { return ModLocalization.Get("TextShowStatusUpdated", "Show Status Updated"); } }
+        internal static string TextShow { get { return ModLocalization.Get("TextShow", "Show #"); } }
+        internal static string TextTheaterDailyPerformance { get { return ModLocalization.Get("TextTheaterDailyPerformance", "Theater Daily Performance"); } }
+        internal static string TextTheaterOpened { get { return ModLocalization.Get("TextTheaterOpened", "Theater Opened"); } }
+        internal static string TextTheaterClosed { get { return ModLocalization.Get("TextTheaterClosed", "Theater Closed"); } }
+        internal static string TextTheater { get { return ModLocalization.Get("TextTheater", "Theater #"); } }
+        internal static string TextProgramType { get { return ModLocalization.Get("TextProgramType", "Theater Schedule: {0}"); } }
+        internal static string TextAttendance { get { return ModLocalization.Get("TextAttendance", "Attendance: "); } }
+        internal static string TextRevenue { get { return ModLocalization.Get("TextRevenue", "Revenue: "); } }
+        internal static string TextSubscriberChange { get { return ModLocalization.Get("TextSubscriberChange", "Subscriber Change: "); } }
+        internal static string TextSubscribers { get { return ModLocalization.Get("TextSubscribers", "Subscribers: "); } }
+        internal static string TextSevenDayAverageAttendance { get { return ModLocalization.Get("TextSevenDayAverageAttendance", "7-Day Average Attendance: "); } }
+        internal static string TextSevenDayAverageRevenue { get { return ModLocalization.Get("TextSevenDayAverageRevenue", "7-Day Average Revenue: "); } }
+        internal static string TextAgencyActivityPerformance { get { return ModLocalization.Get("TextAgencyActivityPerformance", "Agency Activity: Performance"); } }
+        internal static string TextAgencyActivityPromotion { get { return ModLocalization.Get("TextAgencyActivityPromotion", "Agency Activity: Promotion"); } }
+        internal static string TextAgencyActivitySpaTreatment { get { return ModLocalization.Get("TextAgencyActivitySpaTreatment", "Agency Activity: Spa Treatment"); } }
+        internal static string TextAgencyWide { get { return ModLocalization.Get("TextAgencyWide", "Agency-Wide"); } }
+        internal static string TextMoneyChangePrefix { get { return ModLocalization.Get("TextMoneyChangePrefix", "Money Change: "); } }
+        internal static string TextFanChange { get { return ModLocalization.Get("TextFanChange", "Fan Change: "); } }
+        internal static string TextPerIdolEarnings { get { return ModLocalization.Get("TextPerIdolEarnings", "Per-Idol Earnings: "); } }
+        internal static string TextStaminaCost { get { return ModLocalization.Get("TextStaminaCost", "Stamina Cost: "); } }
+        internal static string TextSpaRecovery { get { return ModLocalization.Get("TextSpaRecovery", "Spa Recovery: "); } }
+        internal static string TextTourStatusUpdated { get { return ModLocalization.Get("TextTourStatusUpdated", "Tour Status Updated"); } }
+        internal static string TextCountries { get { return ModLocalization.Get("TextCountries", "Countries: "); } }
+        internal static string TextAudience { get { return ModLocalization.Get("TextAudience", "Audience: "); } }
+        internal static string TextNewFansPrefix { get { return ModLocalization.Get("TextNewFansPrefix", "New Fans: "); } }
+        internal static string TextElectionStatusUpdated { get { return ModLocalization.Get("TextElectionStatusUpdated", "Election Status Updated"); } }
+        internal static string TextElectionResultRecorded { get { return ModLocalization.Get("TextElectionResultRecorded", "Election Result Recorded"); } }
+        internal static string TextBroadcast { get { return ModLocalization.Get("TextBroadcast", "Broadcast: "); } }
+        internal static string TextFinalPlace { get { return ModLocalization.Get("TextFinalPlace", "Final Place: #"); } }
+        internal static string TextScandalPointsUpdated { get { return ModLocalization.Get("TextScandalPointsUpdated", "Scandal Points Updated"); } }
+        internal static string TextScandalPointsPrefix { get { return ModLocalization.Get("TextScandalPointsPrefix", "Scandal Points: "); } }
+        internal static string TextDelta { get { return ModLocalization.Get("TextDelta", "Scandal Point Change: "); } }
+        internal static string TextMedicalInjury { get { return ModLocalization.Get("TextMedicalInjury", "Medical Injury"); } }
+        internal static string TextMedicalDepression { get { return ModLocalization.Get("TextMedicalDepression", "Medical Depression"); } }
+        internal static string TextMedicalHiatusStarted { get { return ModLocalization.Get("TextMedicalHiatusStarted", "Medical Hiatus Started"); } }
+        internal static string TextMedicalRecovery { get { return ModLocalization.Get("TextMedicalRecovery", "Medical Recovery"); } }
+        internal static string TextMedicalHiatusFinished { get { return ModLocalization.Get("TextMedicalHiatusFinished", "Medical Hiatus Finished"); } }
+        internal static string TextHiatusEnd { get { return ModLocalization.Get("TextHiatusEnd", "Hiatus End: "); } }
+        internal static string TextTimelineEntryRecorded { get { return ModLocalization.Get("TextTimelineEntryRecorded", "Timeline entry recorded."); } }
+        internal static string TextOtherIdol { get { return ModLocalization.Get("TextOtherIdol", "Other Idol: "); } }
+        internal static string TextStatusUpdatedSentence { get { return ModLocalization.Get("TextStatusUpdatedSentence", "Status updated."); } }
+        internal static string LabelShowCastContextTitle { get { return ModLocalization.Get("LabelShowCastContextTitle", "Show Cast"); } }
+        internal static string TextShowCastMembersCapturedPrefix { get { return ModLocalization.Get("TextShowCastMembersCapturedPrefix", "Idols involved across this show's run: "); } }
         internal const string KeyPartnerId = "partner_id";
         internal const string KeyOtherId = "other_id";
         internal const string KeyIdolAId = "idol_a_id";
@@ -2006,25 +2006,25 @@ namespace IdolCareerDiary
         internal const string SuffixExtraCount = " +";
         internal const string FormatEightDigits = "D8";
         internal const string FormatDateKeyYyyyMMdd = "yyyyMMdd";
-        internal static readonly string TextTvShowTitlePrefix = ModLocalization.Get("TextTvShowTitlePrefix", "TV Show: ");
-        internal static readonly string TextShowTitlePrefix = ModLocalization.Get("TextShowTitlePrefix", "Show: ");
-        internal static readonly string TextSingleTitlePrefix = ModLocalization.Get("TextSingleTitlePrefix", "Single: ");
-        internal static readonly string TextRelationshipWith = ModLocalization.Get("TextRelationshipWith", "Relationship with {0}");
-        internal static readonly string TextBullying = ModLocalization.Get("TextBullying", "Bullying: ");
-        internal static readonly string TextRelationshipUnknownToProducer = ModLocalization.Get("TextRelationshipUnknownToProducer", "Relationship unknown to producer.");
-        internal static readonly string TextBullyingParticipantsUnknownToProducer = ModLocalization.Get("TextBullyingParticipantsUnknownToProducer", "Bullying participants unknown to producer.");
-        internal static readonly string TextTheaterTitlePrefix = ModLocalization.Get("TextTheaterTitlePrefix", "Theater: ");
-        internal static readonly string TextAgencyActivity = ModLocalization.Get("TextAgencyActivity", "Agency Activity: ");
-        internal static readonly string TextAgencyActivityFallback = ModLocalization.Get("TextAgencyActivityFallback", "Agency Activity");
-        internal static readonly string TextContract = ModLocalization.Get("TextContract", "Contract: ");
+        internal static string TextTvShowTitlePrefix { get { return ModLocalization.Get("TextTvShowTitlePrefix", "TV Show: "); } }
+        internal static string TextShowTitlePrefix { get { return ModLocalization.Get("TextShowTitlePrefix", "Show: "); } }
+        internal static string TextSingleTitlePrefix { get { return ModLocalization.Get("TextSingleTitlePrefix", "Single: "); } }
+        internal static string TextRelationshipWith { get { return ModLocalization.Get("TextRelationshipWith", "Relationship with {0}"); } }
+        internal static string TextBullying { get { return ModLocalization.Get("TextBullying", "Bullying: "); } }
+        internal static string TextRelationshipUnknownToProducer { get { return ModLocalization.Get("TextRelationshipUnknownToProducer", "Relationship unknown to producer."); } }
+        internal static string TextBullyingParticipantsUnknownToProducer { get { return ModLocalization.Get("TextBullyingParticipantsUnknownToProducer", "Bullying participants unknown to producer."); } }
+        internal static string TextTheaterTitlePrefix { get { return ModLocalization.Get("TextTheaterTitlePrefix", "Theater: "); } }
+        internal static string TextAgencyActivity { get { return ModLocalization.Get("TextAgencyActivity", "Agency Activity: "); } }
+        internal static string TextAgencyActivityFallback { get { return ModLocalization.Get("TextAgencyActivityFallback", "Agency Activity"); } }
+        internal static string TextContract { get { return ModLocalization.Get("TextContract", "Contract: "); } }
         internal const string SeparatorSpaceHash = " #";
         internal const string CodeLabelLocalizationKeyPrefix = "CodeLabel.";
         internal const string CodeEntireGroup = "entiregroup";
-        internal static readonly string TextEntireGroup = ModLocalization.Get("TextEntireGroup", "Entire Group");
+        internal static string TextEntireGroup { get { return ModLocalization.Get("TextEntireGroup", "Entire Group"); } }
         internal const string CodeRotatingCast = "rotatingcast";
-        internal static readonly string TextRotatingCast = ModLocalization.Get("TextRotatingCast", "Rotating Cast");
+        internal static string TextRotatingCast { get { return ModLocalization.Get("TextRotatingCast", "Rotating Cast"); } }
         internal const string CodePermanentCast = "permanentcast";
-        internal static readonly string TextPermanentCast = ModLocalization.Get("TextPermanentCast", "Permanent Cast");
+        internal static string TextPermanentCast { get { return ModLocalization.Get("TextPermanentCast", "Permanent Cast"); } }
         internal const string CodeActivityPrefix = "activity.";
         internal const string CodeEveryone = "everyone";
         internal const string CodePlayer = "player";
@@ -2032,38 +2032,38 @@ namespace IdolCareerDiary
         internal const string CodeStamina = "stamina";
         internal const string CodeStats = "stats";
         internal const string KeyTakenIdol = "taken_idol";
-        internal static readonly string TextDatingAnotherIdol = ModLocalization.Get("TextDatingAnotherIdol", "Dating Another Idol");
+        internal static string TextDatingAnotherIdol { get { return ModLocalization.Get("TextDatingAnotherIdol", "Dating Another Idol"); } }
         internal const string KeyTakenPlayer = "taken_player";
-        internal static readonly string TextDatingProducer = ModLocalization.Get("TextDatingProducer", "Dating Producer");
+        internal static string TextDatingProducer { get { return ModLocalization.Get("TextDatingProducer", "Dating Producer"); } }
         internal const string KeyTakenOutsideBf = "taken_outside_bf";
-        internal static readonly string TextDatingNonIdolBoyfriend = ModLocalization.Get("TextDatingNonIdolBoyfriend", "Dating Non-Idol (Boyfriend)");
+        internal static string TextDatingNonIdolBoyfriend { get { return ModLocalization.Get("TextDatingNonIdolBoyfriend", "Dating Non-Idol (Boyfriend)"); } }
         internal const string KeyTakenOutsideGf = "taken_outside_gf";
-        internal static readonly string TextDatingNonIdolGirlfriend = ModLocalization.Get("TextDatingNonIdolGirlfriend", "Dating Non-Idol (Girlfriend)");
+        internal static string TextDatingNonIdolGirlfriend { get { return ModLocalization.Get("TextDatingNonIdolGirlfriend", "Dating Non-Idol (Girlfriend)"); } }
         internal const string CodeFree = "free";
         internal const string CodeTv = "Tv";
         internal const string CodeSsk = "Ssk";
         internal const string CodeIncreased = "increased";
         internal const string CodeDecreased = "decreased";
         internal const string CodeLowered = "lowered";
-        internal static readonly string LabelFree = ModLocalization.Get("LabelFree","Free");
-        internal static readonly string LabelTV = ModLocalization.Get("LabelTV","TV");
-        internal static readonly string LabelSSK = ModLocalization.Get("LabelSSK","Idol Election");
-        internal static readonly string LabelIncreased = ModLocalization.Get("LabelIncreased", "Increased");
-        internal static readonly string LabelDecreased = ModLocalization.Get("LabelDecreased","Decreased");
-        internal static readonly string LabelLowered = ModLocalization.Get("LabelLowered","Lowered");
-        internal static readonly string LabelReduced = ModLocalization.Get("LabelReduced", "Reduced");
+        internal static string LabelFree { get { return ModLocalization.Get("LabelFree","Free"); } }
+        internal static string LabelTV { get { return ModLocalization.Get("LabelTV","TV"); } }
+        internal static string LabelSSK { get { return ModLocalization.Get("LabelSSK","Idol Election"); } }
+        internal static string LabelIncreased { get { return ModLocalization.Get("LabelIncreased", "Increased"); } }
+        internal static string LabelDecreased { get { return ModLocalization.Get("LabelDecreased","Decreased"); } }
+        internal static string LabelLowered { get { return ModLocalization.Get("LabelLowered","Lowered"); } }
+        internal static string LabelReduced { get { return ModLocalization.Get("LabelReduced", "Reduced"); } }
         internal const string KeyManualSet = "manual_set";
-        internal static readonly string LabelSet = ModLocalization.Get("LabelSet","Set");
-        internal static readonly string LabelSaved = ModLocalization.Get("LabelSaved","Saved");
+        internal static string LabelSet { get { return ModLocalization.Get("LabelSet","Set"); } }
+        internal static string LabelSaved { get { return ModLocalization.Get("LabelSaved","Saved"); } }
         internal const string CodeSet = "set";
         internal const string CodeSaved = "saved";
-        internal static readonly string LabelUpdated = ModLocalization.Get("LabelUpdated", "Updated");
-        internal static readonly string LabelYes = ModLocalization.Get("LabelYes", "Yes");
-        internal static readonly string LabelNo = ModLocalization.Get("LabelNo", "No");
+        internal static string LabelUpdated { get { return ModLocalization.Get("LabelUpdated", "Updated"); } }
+        internal static string LabelYes { get { return ModLocalization.Get("LabelYes", "Yes"); } }
+        internal static string LabelNo { get { return ModLocalization.Get("LabelNo", "No"); } }
         internal const string FormatZeroZeroZero = "+#,0;-#,0;0";
-        internal static readonly string TextGroup = ModLocalization.Get("TextGroup", "Group #");
-        internal static readonly string TextFilterModeInclude = ModLocalization.Get("TextFilterModeInclude", "Mode: Include");
-        internal static readonly string TextFilterModeExclude = ModLocalization.Get("TextFilterModeExclude", "Mode: Exclude");
+        internal static string TextGroup { get { return ModLocalization.Get("TextGroup", "Group #"); } }
+        internal static string TextFilterModeInclude { get { return ModLocalization.Get("TextFilterModeInclude", "Mode: Include"); } }
+        internal static string TextFilterModeExclude { get { return ModLocalization.Get("TextFilterModeExclude", "Mode: Exclude"); } }
         internal const string UiNameCareerDiaryTitlePrefix = "CareerDiary_Title_";
         internal const string UiNameCareerDiaryTextPrefix = "CareerDiary_Text_";
         internal const string UiNameCareerDiaryDividerPrefix = "CareerDiary_Divider_";
@@ -2071,7 +2071,7 @@ namespace IdolCareerDiary
         internal const string TypeNameSuperBlurFast = "SuperBlurFast";
         internal const string MemberNameInterpolation = "interpolation";
         internal const string MemberNameStart = "Start";
-        internal static readonly string TextImUiFrameworkInitializationCallFailed = ModLocalization.Get("TextImUiFrameworkInitializationCallFailed", "IMUIFramework initialization call failed: ");
+        internal static string TextImUiFrameworkInitializationCallFailed { get { return ModLocalization.Get("TextImUiFrameworkInitializationCallFailed", "IMUIFramework initialization call failed: "); } }
         internal const string MemberNameLoadSenbatsu = "LoadSenbatsu";
 
         // Literal constants used for numeric cleanup.
@@ -3928,6 +3928,7 @@ namespace IdolCareerDiary
     /// </summary>
     internal static class ModInfoCatalog
     {
+        private const string ModTitleLocalizationKeyPrefix = "ModTitle.";
         private static readonly object Sync = new object();
         private static readonly List<ModInfoEntry> Entries = new List<ModInfoEntry>();
         private static bool loaded;
@@ -3976,7 +3977,7 @@ namespace IdolCareerDiary
                 {
                     if (string.Equals(Entries[i].RootPath, normalizedRoot, StringComparison.OrdinalIgnoreCase))
                     {
-                        return Entries[i].Title;
+                        return ResolveLocalizedTitle(Entries[i]);
                     }
                 }
             }
@@ -4142,7 +4143,7 @@ namespace IdolCareerDiary
                     || TokenEquals(entry.Title, token)
                     || ListContainsToken(entry.DllNames, token))
                 {
-                    return entry.Title;
+                    return ResolveLocalizedTitle(entry);
                 }
             }
 
@@ -4169,11 +4170,26 @@ namespace IdolCareerDiary
                     || TokenContains(token, entry.FolderName)
                     || ListTokenContainedIn(token, entry.DllNames))
                 {
-                    return entry.Title;
+                    return ResolveLocalizedTitle(entry);
                 }
             }
 
             return string.Empty;
+        }
+
+        private static string ResolveLocalizedTitle(ModInfoEntry entry)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.Title))
+            {
+                return string.Empty;
+            }
+
+            string token = string.IsNullOrEmpty(entry.HarmonyId)
+                ? NormalizeInfoToken(entry.Title)
+                : entry.HarmonyId.Trim().ToLowerInvariant();
+            return string.IsNullOrEmpty(token)
+                ? entry.Title
+                : ModLocalization.Get(ModTitleLocalizationKeyPrefix + token, entry.Title);
         }
 
         private static bool IsInternalFrameworkEntry(ModInfoEntry entry)

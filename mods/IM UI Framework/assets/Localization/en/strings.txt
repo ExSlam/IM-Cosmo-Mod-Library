@@ -30,7 +30,7 @@ No Camera found. Pass a camera or wait until game scene initializes.=No Camera f
 No canvas found for tooltip widgets.=No canvas found for tooltip widgets.
 No ModernUIPack dropdown template found yet. Open a base settings popup first, then retry.=No ModernUIPack dropdown template found yet. Open a base settings popup first, then retry.
 Open UI bridge/helper showcase=Open UI bridge/helper showcase
-Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.=Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.
+bridge.showcase_intro=Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.
 Tooltip bridge demo=Tooltip bridge demo
 TryAddTopMenuButton failed: awards button not found.=TryAddTopMenuButton failed: awards button not found.
 TryCloneModernWindowManager failed: no WindowManager template found.=TryCloneModernWindowManager failed: no WindowManager template found.
@@ -42,4 +42,17 @@ UI Bridge Helpers=UI Bridge Helpers
 UI Bridge Showcase=UI Bridge Showcase
 UI Extensions Tooltips=UI Extensions Tooltips
 UIGradient Bridge=UIGradient Bridge
+
+(Hover)=(Hover)
+(Legacy)=(Legacy)
+AWARDS=Awards
+Disabled=Disabled
+Enabled=Enabled
+High=High
+Low=Low
+Medium=Medium
+Missing=Missing
+POPUP__CLOSE=Close
+Ready=Ready
+Ultra=Ultra
 

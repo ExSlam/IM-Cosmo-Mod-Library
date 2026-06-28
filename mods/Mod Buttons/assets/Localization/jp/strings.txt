@@ -1,7 +1,7 @@
 # Mod Buttons UI strings
 actionhub.button.label=アクションハブ
 actionhub.button.close=閉じる
-actionhub.search.placeholder=アクションハブを検索
+actionhub.search.placeholder=検索
 actionhub.error.inputs_unavailable=アクション入力を作成できませんでした。
 actionhub.error.input_unavailable=アクション入力を利用できません。
 actionhub.error.input_no_options={0}には選択肢がありません。
@@ -15,4 +15,4 @@ actionhub.error.target_class=対象のクラスが見つかりませんでした
 actionhub.error.target_method=一致する public static メソッドが見つかりませんでした。
 actionhub.error.invocation_failed=アクションに失敗しました: {0}
 actionhub.error.log_prefix=[ModButtons] アクションに失敗しました: {0}
-mod.title=Mod Buttons
+mod.title=MODボタン

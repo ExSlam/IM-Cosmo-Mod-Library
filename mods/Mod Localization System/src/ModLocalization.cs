@@ -21,6 +21,7 @@ namespace ModLocalizationSystem
         private readonly string modDirectory;
         private readonly Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private bool loaded;
+        private string loadedLanguage = string.Empty;
 
         internal ModLocalizer(string modDirectory)
         {
@@ -75,6 +76,7 @@ namespace ModLocalizationSystem
         {
             values.Clear();
             loaded = false;
+            loadedLanguage = string.Empty;
         }
 
         private string FindLocalizedAsset(string normalizedRelativePath, string language)
@@ -130,12 +132,15 @@ namespace ModLocalizationSystem
 
         private void EnsureLoaded()
         {
-            if (loaded)
+            string effectiveLanguage = ModLocalization.GetEffectiveLanguage();
+            if (loaded && string.Equals(loadedLanguage, effectiveLanguage, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
+            values.Clear();
             loaded = true;
+            loadedLanguage = effectiveLanguage ?? string.Empty;
             try
             {
                 if (string.IsNullOrEmpty(modDirectory))
@@ -146,7 +151,7 @@ namespace ModLocalizationSystem
                 string localizationDirectory = Path.Combine(modDirectory, LocalizationDirectoryName);
                 LoadFile(Path.Combine(localizationDirectory, EnglishFolderName, StringsFileName));
 
-                List<string> folders = BuildFolderCandidates(ModLocalization.GetEffectiveLanguage());
+                List<string> folders = BuildFolderCandidates(effectiveLanguage);
                 for (int i = 0; i < folders.Count; i++)
                 {
                     if (!string.Equals(folders[i], EnglishFolderName, StringComparison.OrdinalIgnoreCase))
@@ -449,16 +454,28 @@ namespace ModLocalizationSystem
 
         internal static string GetEffectiveLanguage()
         {
+            string gameLanguage;
             try
             {
-                string gameLanguage = staticVars.Settings == null ? string.Empty : staticVars.Settings.Language;
-                EnsureKoreanTmpFallback(gameLanguage);
-                return gameLanguage ?? string.Empty;
+                gameLanguage = staticVars.Settings == null ? string.Empty : staticVars.Settings.Language;
             }
             catch
             {
-                return string.Empty;
+                gameLanguage = string.Empty;
             }
+
+            // Font fallback setup must never invalidate an otherwise valid
+            // game-language code. Type-loading failures can occur before the
+            // fallback method's own body-level exception handler runs.
+            try
+            {
+                EnsureKoreanTmpFallback(gameLanguage);
+            }
+            catch
+            {
+            }
+
+            return gameLanguage ?? string.Empty;
         }
 
         private static string GetAssemblyDirectory(Assembly assembly)
@@ -466,12 +483,92 @@ namespace ModLocalizationSystem
             try
             {
                 string location = assembly.Location;
-                return string.IsNullOrEmpty(location) ? string.Empty : Path.GetDirectoryName(location) ?? string.Empty;
+                string locationDirectory = string.IsNullOrEmpty(location) ? string.Empty : Path.GetDirectoryName(location) ?? string.Empty;
+                if (!string.IsNullOrEmpty(locationDirectory))
+                {
+                    return locationDirectory;
+                }
+            }
+            catch
+            {
+            }
+
+            // Some mod loaders load Harmony assemblies from byte arrays and
+            // leave Assembly.Location empty. Resolve the owning mod from the
+            // game registry or local Mods directory in that case.
+            string assemblyFileName;
+            try
+            {
+                assemblyFileName = assembly.GetName().Name + ".dll";
             }
             catch
             {
                 return string.Empty;
             }
+
+            string registeredDirectory = FindRegisteredModDirectory(assemblyFileName);
+            if (!string.IsNullOrEmpty(registeredDirectory))
+            {
+                return registeredDirectory;
+            }
+
+            return FindLocalModDirectory(assemblyFileName);
+        }
+
+        private static string FindRegisteredModDirectory(string assemblyFileName)
+        {
+            try
+            {
+                if (Mods._Mods == null)
+                {
+                    return string.Empty;
+                }
+
+                for (int i = 0; i < Mods._Mods.Count; i++)
+                {
+                    Mods._mod mod = Mods._Mods[i];
+                    if (mod == null || string.IsNullOrEmpty(mod.Path))
+                    {
+                        continue;
+                    }
+
+                    if (File.Exists(Path.Combine(mod.Path, assemblyFileName)))
+                    {
+                        return mod.Path;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
+        }
+
+        private static string FindLocalModDirectory(string assemblyFileName)
+        {
+            try
+            {
+                string modsDirectory = Path.Combine(Application.persistentDataPath, "Mods");
+                if (!Directory.Exists(modsDirectory))
+                {
+                    return string.Empty;
+                }
+
+                string[] directories = Directory.GetDirectories(modsDirectory);
+                for (int i = 0; i < directories.Length; i++)
+                {
+                    if (File.Exists(Path.Combine(directories[i], assemblyFileName)))
+                    {
+                        return directories[i];
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
         }
 
         private static string NormalizeDirectory(string path)

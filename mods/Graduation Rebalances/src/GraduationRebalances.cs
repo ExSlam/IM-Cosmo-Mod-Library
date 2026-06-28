@@ -48,8 +48,10 @@ namespace GraduationRebalances
         internal const long MinPositiveLong = 1L;
 
         internal const string ModNotifOptionCloneName = "GraduationRebalances_NotificationOption";
-        internal static readonly string UnitMonth = ModLocalization.Get("notification.unit_month", "month");
-        internal static readonly string UnitDay = ModLocalization.Get("notification.unit_day", "day");
+        internal static string UnitMonth { get { return ModLocalization.Get("notification.unit_month", "month"); } }
+        internal static string UnitMonthPlural { get { return ModLocalization.Get("notification.unit_month_plural", "months"); } }
+        internal static string UnitDay { get { return ModLocalization.Get("notification.unit_day", "day"); } }
+        internal static string UnitDayPlural { get { return ModLocalization.Get("notification.unit_day_plural", "days"); } }
 
         internal const float PhysLow = 25f;
         internal const float PhysPen = -1f;
@@ -198,7 +200,6 @@ namespace GraduationRebalances
         internal const string QuantityUnitSeparator = " ";
         internal const string QuantitySegmentSeparator = ", ";
         internal const int SingularQuantity = 1;
-        internal const string PluralSuffix = "s";
         internal const string NotificationReasonSuffixFormatLocalizationKey = "notification.reason_suffix_format";
         internal const string NotificationReasonSuffixFormatFallback = " ({0})";
         internal const string NotificationMessageFormatLocalizationKey = "notification.message_format";
@@ -207,16 +208,16 @@ namespace GraduationRebalances
         internal const string NotificationTemplateNotFoundLogMessage = "[GraduationRebalances] Notification options template not found.";
         internal const string NotificationCloneMissingCheckboxLogMessage = "[GraduationRebalances] Notification option clone missing checkbox component.";
         internal const string NotificationOptionInjectedLogFormat = "[GraduationRebalances] Injected notification option: {0}";
-        internal static readonly string NotePrefix = ModLocalization.Get("notification.note_prefix", " graduation extended by ");
-        internal static readonly string ReasonMonthly = ModLocalization.Get("notification.reason_monthly", "monthly performance");
-        internal static readonly string ReasonCenter = ModLocalization.Get("notification.reason_center", "center milestone");
-        internal static readonly string ReasonWeekly = ModLocalization.Get("notification.reason_weekly", "weekly factors");
-        internal static readonly string ReasonWeeklyAnnounced = ModLocalization.Get("notification.reason_weekly_announced", "weekly factors (announced)");
+        internal static string NotePrefix { get { return ModLocalization.Get("notification.note_prefix", " graduation extended by "); } }
+        internal static string ReasonMonthly { get { return ModLocalization.Get("notification.reason_monthly", "monthly performance"); } }
+        internal static string ReasonCenter { get { return ModLocalization.Get("notification.reason_center", "center milestone"); } }
+        internal static string ReasonWeekly { get { return ModLocalization.Get("notification.reason_weekly", "weekly factors"); } }
+        internal static string ReasonWeeklyAnnounced { get { return ModLocalization.Get("notification.reason_weekly_announced", "weekly factors (announced)"); } }
 
         // Custom enum values for a mod-only notification category and its one-time init marker.
         internal const int ModNotifTypeRaw = 10001;
         internal const int ModNotifInitMarkerRaw = 10002;
-        internal static readonly string ModNotifLabel = ModLocalization.Get("notification.option_label", "Graduation day postponing");
+        internal static string ModNotifLabel { get { return ModLocalization.Get("notification.option_label", "Graduation day postponing"); } }
         internal static readonly NotificationManager._notification._type ModNotifType =
             (NotificationManager._notification._type)ModNotifTypeRaw;
         internal static readonly NotificationManager._notification._type ModNotifInitMarkerType =
@@ -1431,8 +1432,8 @@ namespace GraduationRebalances
             }
 
             string amount;
-            string monthAmount = months + C.QuantityUnitSeparator + Plural(C.UnitMonth, months);
-            string dayAmount = days + C.QuantityUnitSeparator + Plural(C.UnitDay, days);
+            string monthAmount = months + C.QuantityUnitSeparator + CountedUnit(C.UnitMonth, C.UnitMonthPlural, months);
+            string dayAmount = days + C.QuantityUnitSeparator + CountedUnit(C.UnitDay, C.UnitDayPlural, days);
             if (months > 0 && days > 0)
             {
                 amount = monthAmount + C.QuantitySegmentSeparator + dayAmount;
@@ -1467,9 +1468,9 @@ namespace GraduationRebalances
         }
 
         // Returns singular/plural unit text for a counted quantity.
-        private static string Plural(string unit, int n)
+        private static string CountedUnit(string singular, string plural, int count)
         {
-            return n == C.SingularQuantity ? unit : unit + C.PluralSuffix;
+            return count == C.SingularQuantity ? singular : plural;
         }
 
         // Locates an existing checkbox object for a specific notification type.

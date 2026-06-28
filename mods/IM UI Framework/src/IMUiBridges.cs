@@ -938,7 +938,9 @@ namespace IMUiFramework
             Text intro = IMUiKit.CreateLegacyText(
                 showcaseRoot.transform,
                 "Intro",
-                "Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient.",
+                ModLocalization.Get(
+                    "bridge.showcase_intro",
+                    "Ready-made helper panels for CinematicEffects, ImageEffects, ModernUIPack, UI Extensions, and UIGradient."),
                 13,
                 TextAnchor.MiddleLeft,
                 new Color32(52, 52, 52, 255));

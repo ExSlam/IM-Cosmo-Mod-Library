@@ -1,0 +1,182 @@
+[h1]Mod Localization System[/h1]
+
+Mod Localization System lets one Idol Manager mod include multiple languages and lets the game select the correct files. This way, you don't have to publish multiple versions of the same mod in different languages.
+
+[b]This is not an automatic translator.[/b] Authors or translators must write and include every translation. The framework only switches between supplied files, so one Idol Manager mod can serve every language.
+
+[h1]Requirements for mods with translations[/h1]
+
+[list]
+[*][url=https://github.com/ui3TD/IM-HarmonyIntegration]IM Harmony Integration[/url]
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863]IM Harmony[/url]
+[*]Mod Localization System (this mod)
+[/list]
+
+[h1]How Language Selection Works[/h1]
+
+The framework follows Idol Manager's selected language. There is no separate mod-language setting.
+
+Common language folder names are:
+
+[list]
+[*][code]en[/code] — English
+[*][code]cn[/code] — Chinese (中文)
+[*][code]jp[/code] — Japanese (日本語)
+[*][code]ru[/code] — Russian (Русский)
+[*][code]ptbr[/code] — Brazilian Portuguese (Português Brasileiro)
+[*][code]kr[/code] — Korean (한국어)
+[*][code]fr[/code] — French (Français)
+[/list]
+
+Every localized mod must include English under [code]Localization/en[/code] as its fallback.
+
+[h1]Adding a New Language to Idol Manager[/h1]
+
+The game languages that your mod can switch between are ones in the game directory, and new ones can be added. That language must also be using the same language-file and JSON structure as the game's other language folders:
+
+[code]Idol Manager\IM_Data\StreamingAssets\Languages\<language code>\[/code]
+
+For most Windows users, the full directory is:
+
+[code]C:\Program Files (x86)\Steam\steamapps\common\Idol Manager\IM_Data\StreamingAssets\Languages[/code]
+
+To find the full install directory through Steam:
+
+[olist]
+[*]Search for [b]Idol Manager[/b] in your Steam Library.
+[*]Right-click the game to open its context menu.
+[*]Hover over [b]Manage[/b].
+[*]Click [b]Browse Local Files[/b].
+[*]Open [code]IM_Data[/code], then [code]StreamingAssets[/code], then [code]Languages[/code].
+[/olist]
+
+Create the new short-code folder there and install the new base-game language files inside it. Mods can then use that same short code under their own [code]Localization[/code] folders. Restart the game after installing or changing a game language.
+
+[h1]Two Types of Localization[/h1]
+
+[h2]1. JSON Localization — No Coding Required[/h2]
+
+This is for stories, dialogue, random events, characters, trivia, policies, dating conversations, and similar JSON content.
+
+You do not need to know C# or make a Harmony DLL. You only need to organize the translated JSON files into the expected folders.
+
+[b]Basic steps[/b]
+
+[list]
+[*]Start with the complete English JSON files.
+[*]Put them under [code]Localization/en/JSON/[/code].
+[*]Make a folder for every translated language you include, such as [code]Localization/cn/[/code] or [code]Localization/jp/[/code].
+[*]Inside every language folder, copy the same [code]JSON[/code] folder structure and translate the player-facing text in those files.
+[*]Keep IDs, conditions, actions, filenames, and other functional JSON data synchronized between languages.
+[/list]
+
+Example for an event mod translated into English, Chinese, and Japanese:
+
+[code]My Event Mod/
+  info.json
+  Localization/
+    en/
+      JSON/
+        Events/
+          characters.json
+          dialogues.json
+          random_events.json
+    cn/
+      JSON/
+        Events/
+          characters.json
+          dialogues.json
+          random_events.json
+    jp/
+      JSON/
+        Events/
+          characters.json
+          dialogues.json
+          random_events.json
+  Textures/
+    ...[/code]
+
+Folders below [code]JSON[/code] must match Idol Manager's normal structure. [code]Events[/code], [code]Idols[/code], [code]Policies[/code], [code]Staff[/code], and [code]Shows[/code] can each contain their corresponding JSON files.
+
+Each language's JSON file is a complete replacement, not a partial translation patch. For example, Korean Idol Manager loads the copy under [code]Localization/kr/JSON/[/code]. If that copy is not included, the framework uses [code]Localization/en/JSON/[/code].
+
+A normal root file such as [code]JSON/Events/dialogues.json[/code] is not treated as an English localization. JSON localization explicitly opts in by supplying the matching file under [code]Localization/en/JSON/Events/dialogues.json[/code]. Mods that only use the normal root JSON structure are left untouched.
+
+Once organized this way, the story, dialogue, event, or other text is automatically read from the correct supplied language files.
+
+[h2]2. Harmony Mod UI Localization — C# Translation Keys[/h2]
+
+This option is for Harmony mods that create their own buttons, menus, labels, tooltips, popups, notifications, or other UI text in C#.
+
+The Harmony project references [code]com.cosmo.modlocalizationsystem.dll[/code], and its C# code requests text by a stable translation key instead of hard-coding one language.
+
+Complete C# example for a Harmony mod named "My Localized Mod" ([code]com.username.mylocalizedmod.dll[/code]):
+
+[code]using ModLocalizationSystem;
+
+public static class MyLocalizedModText
+{
+    public static string MenuTitle()
+    {
+        return ModLocalization.Get(
+            "mylocalizedmod.menu.title",
+            "My Localized Mod");
+    }
+
+    public static string SettingsButton()
+    {
+        return ModLocalization.Get(
+            "mylocalizedmod.button.settings",
+            "Settings");
+    }
+}[/code]
+
+The second argument is the fallback. Prefix keys with the mod name to keep them unique.
+
+Example English [code]Localization/en/strings.txt[/code]:
+
+[code]mylocalizedmod.menu.title=My Localized Mod
+mylocalizedmod.button.settings=Settings[/code]
+
+Example Korean [code]Localization/kr/strings.txt[/code]:
+
+[code]mylocalizedmod.menu.title=내 현지화 모드
+mylocalizedmod.button.settings=설정[/code]
+
+[code]Localization/en/strings.txt[/code] is the baseline. Other language files can contain every key or only the keys they override. Blank values are supported when a language intentionally needs no prefix or suffix.
+
+Reference Mod Localization System while compiling the Harmony DLL:
+
+[code]<Reference Include="com.cosmo.modlocalizationsystem">
+  <HintPath>path\to\com.cosmo.modlocalizationsystem.dll</HintPath>
+  <Private>false</Private>
+</Reference>[/code]
+
+[code]Private=false[/code] means only [code]com.cosmo.modlocalizationsystem.dll[/code] is not copied into your package. It does not prevent the mod from using any other framework.
+
+Put the Harmony DLL beside [code]info.json[/code] and [code]Localization[/code], as shown in the combined example below. [code]ModLocalization.Get(...)[/code] then finds that mod's localization files automatically; no directory-discovery code is needed.
+
+[h1]Using JSON and UI Localization Together[/h1]
+
+One mod can use both systems in the same [code]Localization[/code] tree. Each language folder contains its [code]strings.txt[/code] and its language-specific [code]JSON[/code] folder.
+
+[code]My Localized Mod/
+  info.json
+  com.username.mylocalizedmod.dll
+  Localization/
+    en/
+      strings.txt
+      JSON/
+        Events/
+          dialogues.json
+          random_events.json
+        Idols/
+          trivia.json
+    cn/    strings.txt + JSON/...
+    jp/    strings.txt + JSON/...
+    ru/    strings.txt + JSON/...
+    ptbr/  strings.txt + JSON/...
+  Textures/
+[/code]
+
+[code]...[/code] means to repeat the English JSON structure with that language's translated text.

@@ -2,3 +2,16 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+notification.unit_month=мес.
+notification.unit_month_plural=мес.
+notification.unit_day=дн.
+notification.unit_day_plural=дн.
+notification.note_prefix=: выпуск перенесён на 
+notification.reason_monthly=ежемесячные результаты
+notification.reason_center=достижение в центре
+notification.reason_weekly=еженедельные факторы
+notification.reason_weekly_announced=еженедельные факторы (объявлено)
+notification.option_label=Перенос дня выпуска
+notification.reason_suffix_format= ({0})
+notification.message_format={0}{1}{2}{3}. Новая дата: {4}
+

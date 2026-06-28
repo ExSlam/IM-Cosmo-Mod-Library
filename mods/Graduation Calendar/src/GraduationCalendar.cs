@@ -282,10 +282,10 @@ namespace GraduationCalendar
         private const string MenuButtonLabelFallbackText = "Calendar";
         private const string ModTitleLocalizationKey = "ui.title";
         private const string ModTitleFallbackLabel = "Graduation Calendar";
-        private static readonly string ButtonTooltip = ModLocalization.Get(MenuButtonTooltipLocalizationKey, MenuButtonTooltipFallbackLabel);
-        private static readonly string ButtonLabel = ModLocalization.Get(MenuButtonLabelLocalizationKey, MenuButtonLabelFallbackText);
+        private static string ButtonTooltip { get { return ModLocalization.Get(MenuButtonTooltipLocalizationKey, MenuButtonTooltipFallbackLabel); } }
+        private static string ButtonLabel { get { return ModLocalization.Get(MenuButtonLabelLocalizationKey, MenuButtonLabelFallbackText); } }
         private const string LogPrefix = "[GraduationCalendar]";
-        private static readonly string ModTitle = ModLocalization.Get(ModTitleLocalizationKey, ModTitleFallbackLabel);
+        private static string ModTitle { get { return ModLocalization.Get(ModTitleLocalizationKey, ModTitleFallbackLabel); } }
         private const string ModFolderFallback = "Graduation Calendar";
         private const int GridColumns = 6;
         private const float GridCellWidth = 110f;

@@ -2,3 +2,16 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+notification.unit_month=个月
+notification.unit_month_plural=个月
+notification.unit_day=天
+notification.unit_day_plural=天
+notification.note_prefix=的毕业日期延后了：
+notification.reason_monthly=月度表现
+notification.reason_center=中心成员里程碑
+notification.reason_weekly=每周因素
+notification.reason_weekly_announced=每周因素（已公布）
+notification.option_label=延后毕业日期
+notification.reason_suffix_format=（{0}）
+notification.message_format={0}{1}{2}{3}。新日期：{4}
+

@@ -2,3 +2,16 @@
 # Format: key=value
 # Only include keys you want to override from ../en/strings.txt
 
+notification.unit_month=mês
+notification.unit_month_plural=meses
+notification.unit_day=dia
+notification.unit_day_plural=dias
+notification.note_prefix= teve a formatura adiada por 
+notification.reason_monthly=desempenho mensal
+notification.reason_center=marco como center
+notification.reason_weekly=fatores semanais
+notification.reason_weekly_announced=fatores semanais (anunciados)
+notification.option_label=Adiamento da formatura
+notification.reason_suffix_format= ({0})
+notification.message_format={0}{1}{2}{3}. Nova data: {4}
+

@@ -540,8 +540,8 @@ namespace IMUiFramework
         private const string BridgePopupTitleFallback = "UI Bridge Helpers";
         private const float BridgePopupWidth = 940f;
         private const float BridgePopupHeight = 610f;
-        private static readonly string BridgeButtonLabel = ModLocalization.Get(BridgeButtonLabelLocalizationKey, BridgeButtonLabelFallback);
-        private static readonly string BridgeButtonTooltip = ModLocalization.Get(BridgeButtonTooltipLocalizationKey, BridgeButtonTooltipFallback);
+        private static string BridgeButtonLabel { get { return ModLocalization.Get(BridgeButtonLabelLocalizationKey, BridgeButtonLabelFallback); } }
+        private static string BridgeButtonTooltip { get { return ModLocalization.Get(BridgeButtonTooltipLocalizationKey, BridgeButtonTooltipFallback); } }
 
         private static bool creating;
         private static GameObject bridgeButton;

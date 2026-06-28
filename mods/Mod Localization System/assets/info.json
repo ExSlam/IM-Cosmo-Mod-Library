@@ -3,6 +3,6 @@
   "Description": "Shared localization runtime for Idol Manager mods, including localized UI strings and language-aware JSON assets that follow the game's selected language.",
   "Author": "Cosmo",
   "Version": "2.0.0",
-  "Tags": ["framework", "library", "localization"],
+  "Tags": ["framework", "library", "localization", "translation"],
   "HarmonyID": "com.cosmo.modlocalizationsystem"
 }

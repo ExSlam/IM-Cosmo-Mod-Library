@@ -1,5 +1,7 @@
 notification.unit_month=개월
+notification.unit_month_plural=개월
 notification.unit_day=일
+notification.unit_day_plural=일
 notification.note_prefix= 졸업이 다음 기간만큼 연기됨: 
 notification.reason_monthly=월간 성과
 notification.reason_center=센터 기념일
