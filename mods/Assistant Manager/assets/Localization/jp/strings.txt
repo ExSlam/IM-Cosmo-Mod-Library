@@ -1,10 +1,10 @@
 # Japanese localization for Assistant Manager.
 # Format: key=value
 
-staff.assistant_manager.title=課長補佐
-staff.assistant_manager.tooltip=課長補佐室に配置できます。
-staff.assistant_manager.limit_reached=課長補佐の上限に達しています。
-room.assistant_manager_office.title=課長補佐室
-room.assistant_manager_office.requires=必要スタッフ：課長補佐
-room.assistant_manager_office.limit=各事務所の設置上限：2室
-room.assistant_manager_office.no_available_loan_room=空いているマネージャー室または課長補佐室が必要です。
+staff.assistant_manager.title=アシスタントマネージャー
+staff.assistant_manager.tooltip=アシスタントマネージャー室に配置できます。
+staff.assistant_manager.limit_reached=アシスタントマネージャーの上限に達しました。
+room.assistant_manager_office.title=アシスタントマネージャー室
+room.assistant_manager_office.requires=必要スタッフ：アシスタントマネージャー
+room.assistant_manager_office.limit=事務所ごとの設置上限：2室
+room.assistant_manager_office.no_available_loan_room=空いているマネージャー室またはアシスタントマネージャー室が必要です。

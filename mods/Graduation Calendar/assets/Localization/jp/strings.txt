@@ -1,16 +1,18 @@
-# Japanese localization for Graduation Calendar.
+# Localization file
+# Base language (English): Localization/en/strings.txt
+# Per-language overrides: Localization/<lang>/strings.txt (jp, cn, ru, ptbr, ...)
 # Format: key=value
 
-profile.extras.graduation_label=卒業予定日：
+profile.extras.graduation_label=卒業日：
 common.unknown=不明
 common.close=閉じる
 menu.button_tooltip=卒業カレンダー
 menu.button_label=カレンダー
 ui.title=卒業カレンダー
 view.calendar=カレンダー表示
-view.graduations_only=卒業予定のみ
+view.graduations_only=卒業のみ
 view.yearly=年表示
 view.monthly=月表示
 empty.no_idols=表示できるアイドルがいません
-empty.no_graduations=卒業予定はありません
+empty.no_graduations=該当する卒業はありません
 empty.no_graduations_scheduled=卒業予定はありません

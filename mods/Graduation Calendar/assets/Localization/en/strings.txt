@@ -16,4 +16,3 @@ view.monthly=Monthly View
 empty.no_idols=No idols available
 empty.no_graduations=No graduations
 empty.no_graduations_scheduled=No graduations scheduled
-
