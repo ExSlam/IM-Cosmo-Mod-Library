@@ -1,6 +1,6 @@
 {
   "Title": "Cheats Mod",
-  "Description": "Adds cheat actions to the Mod Buttons action hub. Requires Mod Buttons and Mod Localization System (com.cosmo.modlocalizationsystem).",
+  "Description": "Adds cheat actions to the Mod Buttons action hub. Requires Mod Buttons.",
   "Author": "Cosmo",
   "Version": "1.1.0",
   "Tags": ["cheats", "ui"],

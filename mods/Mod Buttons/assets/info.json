@@ -1,6 +1,6 @@
 {
   "Title": "Mod Buttons",
-  "Description": "Adds an action hub where mods can provide buttons and typed action inputs. Requires Mod Localization System (com.cosmo.modlocalizationsystem).",
+  "Description": "Adds an action hub where mods can provide buttons and typed action inputs.",
   "Author": "Cosmo",
   "Version": "1.4.0",
   "Tags": ["ui", "modding"],
