@@ -44,6 +44,7 @@ namespace CheatsMod
         internal const string NotificationAddGeneralScandalPoints = "notification.add_general_scandal_points";
         internal const string NotificationAddIdolScandalPoints = "notification.add_idol_scandal_points";
         internal const string NotificationClearScandalPoints = "notification.clear_scandal_points";
+        internal const string NotificationBreakUpIdolDating = "notification.break_up_idol_dating";
         internal const string NotificationIncreaseInfluence = "notification.increase_influence";
         internal const string NotificationIncreaseFriendship = "notification.increase_friendship";
         internal const string NotificationIncreaseRomance = "notification.increase_romance";
@@ -67,6 +68,8 @@ namespace CheatsMod
         internal const string NotificationNoStaff = "notification.no_staff";
         internal const string NotificationNoResearch = "notification.no_research";
         internal const string NotificationNoRelationships = "notification.no_relationships";
+        internal const string NotificationNoIdolDatingRelationships = "notification.no_idol_dating_relationships";
+        internal const string NotificationNoScandalCandidates = "notification.no_scandal_candidates";
         internal const string NotificationNoCliques = "notification.no_cliques";
         internal const string NotificationNoBullying = "notification.no_bullying";
         internal const string NotificationGameUnavailable = "notification.game_unavailable";
@@ -87,6 +90,7 @@ namespace CheatsMod
         internal const string NotificationAddGeneralScandalPoints = "General scandal points increased by 1.";
         internal const string NotificationAddIdolScandalPoints = "Added 1 scandal point to all idols.";
         internal const string NotificationClearScandalPoints = "All scandal points set to 0.";
+        internal const string NotificationBreakUpIdolDating = "Idol dating relationships ended.";
         internal const string NotificationIncreaseInfluence = "Active idol influence increased.";
         internal const string NotificationIncreaseFriendship = "Active idol friendship increased.";
         internal const string NotificationIncreaseRomance = "Active idol romance increased.";
@@ -110,6 +114,8 @@ namespace CheatsMod
         internal const string NotificationNoStaff = "No staff found.";
         internal const string NotificationNoResearch = "Research categories are not available yet.";
         internal const string NotificationNoRelationships = "No matching relationships found.";
+        internal const string NotificationNoIdolDatingRelationships = "No non-producer idol dating relationships found.";
+        internal const string NotificationNoScandalCandidates = "No idol is eligible for a random dating scandal.";
         internal const string NotificationNoCliques = "No cliques found.";
         internal const string NotificationNoBullying = "No bullying targets found.";
         internal const string NotificationGameUnavailable = "Game data is not available yet.";
@@ -226,6 +232,16 @@ namespace CheatsMod
         public static void ClearAllScandalPoints()
         {
             Execute(ClearAllScandalPointsCore);
+        }
+
+        public static void BreakUpIdolDatingRelationships()
+        {
+            Execute(BreakUpIdolDatingRelationshipsCore);
+        }
+
+        public static void TriggerRandomScandal()
+        {
+            Execute(TriggerRandomScandalCore);
         }
 
         public static void IncreaseActiveIdolInfluence()
@@ -466,6 +482,127 @@ namespace CheatsMod
                 CheatLocalizationKeys.NotificationClearScandalPoints,
                 CheatFallbackText.NotificationClearScandalPoints,
                 NotificationManager._notification._type.resource_change);
+        }
+
+        private static void BreakUpIdolDatingRelationshipsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int breakupCount = CheatAmounts.ZeroCount;
+            if (Relationships.RelationshipsData != null)
+            {
+                for (int relationshipIndex = 0; relationshipIndex < Relationships.RelationshipsData.Count; relationshipIndex++)
+                {
+                    Relationships._relationship relationship = Relationships.RelationshipsData[relationshipIndex];
+                    if (relationship == null
+                        || !relationship.Dating
+                        || relationship.Girls == null
+                        || relationship.Girls.Count < 2
+                        || relationship.Girls[0] == null
+                        || relationship.Girls[1] == null)
+                    {
+                        continue;
+                    }
+
+                    bool firstStatusWasKnown = relationship.Girls[0].DatingData != null
+                        && relationship.Girls[0].DatingData.Is_Partner_Status_Known;
+                    bool secondStatusWasKnown = relationship.Girls[1].DatingData != null
+                        && relationship.Girls[1].DatingData.Is_Partner_Status_Known;
+                    relationship.BreakUp();
+                    RestoreDatingStatusKnowledgeAfterBreakup(relationship.Girls[0], firstStatusWasKnown);
+                    RestoreDatingStatusKnowledgeAfterBreakup(relationship.Girls[1], secondStatusWasKnown);
+                    breakupCount++;
+                }
+            }
+
+            ApplyToAllIdols(delegate(data_girls.girls idol)
+            {
+                if (idol.DatingData == null)
+                {
+                    return;
+                }
+
+                data_girls.girls._dating_data._partner_status status = idol.DatingData.Partner_Status;
+                if (status != data_girls.girls._dating_data._partner_status.taken_outside_bf
+                    && status != data_girls.girls._dating_data._partner_status.taken_outside_gf
+                    && status != data_girls.girls._dating_data._partner_status.taken_idol)
+                {
+                    return;
+                }
+
+                bool statusWasKnown = idol.DatingData.Is_Partner_Status_Known;
+                idol.DatingData.SetDatingStatus(data_girls.girls._dating_data._partner_status.free);
+                RestoreDatingStatusKnowledgeAfterBreakup(idol, statusWasKnown);
+                idol.getParam(data_girls._paramType.mentalStamina).add(-30f, false);
+                breakupCount++;
+            });
+
+            if (breakupCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationNoIdolDatingRelationships,
+                    CheatFallbackText.NotificationNoIdolDatingRelationships);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationBreakUpIdolDating,
+                CheatFallbackText.NotificationBreakUpIdolDating,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void RestoreDatingStatusKnowledgeAfterBreakup(data_girls.girls idol, bool statusWasKnown)
+        {
+            if (idol == null || idol.DatingData == null)
+            {
+                return;
+            }
+
+            idol.DatingData.Is_Partner_Status_Known = statusWasKnown;
+            if (statusWasKnown)
+            {
+                idol.DatingData.Partner_Status_Known_To_Player =
+                    data_girls.girls._dating_data._partner_status.free;
+            }
+        }
+
+        private static void TriggerRandomScandalCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            staticVars._playerData._option datingScandalsOption = staticVars.PlayerData.GetOption(
+                staticVars._playerData._options.datingScandals,
+                false);
+            bool datingScandalsWereEnabled = datingScandalsOption.Val;
+            bool testDatingWasEnabled = Event_Manager.TestDating;
+            try
+            {
+                datingScandalsOption.Val = true;
+                Event_Manager.TestDating = true;
+                Event_Templates.StartRandomEvent();
+            }
+            finally
+            {
+                datingScandalsOption.Val = datingScandalsWereEnabled;
+                Event_Manager.TestDating = testDatingWasEnabled;
+            }
+
+            if (Event_Templates.Active_Template == null)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationNoScandalCandidates,
+                    CheatFallbackText.NotificationNoScandalCandidates);
+                return;
+            }
+
+            Event_Overlord.Set_Event();
         }
 
         private static void IncreaseActiveIdolInfluenceCore()

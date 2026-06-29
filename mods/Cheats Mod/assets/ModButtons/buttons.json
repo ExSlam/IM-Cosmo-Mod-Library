@@ -100,6 +100,16 @@
 		"method": "ClearAllScandalPoints"
 	},
 	{
+		"label": "Trigger random scandal",
+		"codeLabel": "cheat.button.trigger_random_scandal",
+		"tooltip": "Trigger a random dating scandal for an eligible idol.",
+		"codeTooltip": "cheat.tooltip.trigger_random_scandal",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "TriggerRandomScandal"
+	},
+	{
 		"label": "+1 influence level",
 		"codeLabel": "cheat.button.increase_influence",
 		"tooltip": "Increase every active idol's influence by one level.",
@@ -268,6 +278,16 @@
 		"assembly": "com.cosmo.cheatsmod",
 		"class": "CheatsMod.Cheats",
 		"method": "RevealDatingPreference"
+	},
+	{
+		"label": "End idol dating",
+		"codeLabel": "cheat.button.break_up_idol_dating",
+		"tooltip": "End all idol dating relationships except relationships with the producer.",
+		"codeTooltip": "cheat.tooltip.break_up_idol_dating",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "BreakUpIdolDatingRelationships"
 	},
 	{
 		"label": "Reset event cooldowns",

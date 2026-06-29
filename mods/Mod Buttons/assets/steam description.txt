@@ -1,0 +1,139 @@
+[h1]ModButtons: The Action Hub Mod[/h1]
+
+[b]ModButtons[/b] is a centralized action hub for Idol Manager. It dynamically injects a custom menu popup that allows mods to cleanly integrate their own interactive UI buttons.
+
+Instead of writing complex Harmony UI patches for every single mod you create, you simply provide a JSON file and your target methods. ModButtons handles all the UI generation, layout, visual styling, and asynchronous icon loading. You just need to provide C# code for what your mod's buttons do.
+
+[i]Note: ModButtons is entirely standalone. While it is fully compatible with the ModMenu framework and will position itself cleanly next to it if detected, ModMenu is NOT required.[/i]
+
+[hr][/hr]
+
+[h1]🛠️ How to Add Your Own Buttons[/h1]
+
+Adding buttons to the hub requires absolutely zero UI code. You just need to create a JSON file in your mod's directory that tells ModButtons what methods to execute.
+
+[h2]1. The Directory Structure[/h2]
+Create a [b]ModButtons[/b] folder in your mod's root directory. Place your [b]buttons.json[/b] and any optional icons directly inside it:
+
+[code]
+YourModFolder/
+├── ModButtons/
+│   ├── buttons.json      <-- Your button configuration
+│   └── money_icon.png    <-- (Optional) Button icons
+└── YourMod.dll
+[/code]
+
+[h2]2. The buttons.json File[/h2]
+This JSON file is a simple array of objects. Every object represents one button you want to add to the menu under your mod's name.
+
+[code]
+[
+{
+"label": "Add 1,000,000 Yen",
+"codeLabel": "YourMod.Cheat.AddMoney",
+"icon": "money_icon.png",
+"assembly": "YourAwesomeMod",
+"class": "YourAwesomeMod.CheatManager",
+"method": "AddMoney"
+},
+{
+"label": "Restore Idol Stamina",
+"codeLabel": "YourMod.Cheat.RestoreStamina",
+"icon": "",
+"assembly": "YourAwesomeMod",
+"class": "YourAwesomeMod.CheatManager",
+"method": "RestoreStamina"
+}
+]
+[/code]
+
+[b]JSON Properties:[/b]
+[list]
+[*] [b]label[/b]: (Required) The fallback text displayed on the button or tooltip.
+[*] [b]codeLabel[/b]: (Optional) The translation key used for localizing this button's text.
+[*] [b]icon[/b]: (Optional) The exact filename of the PNG to use as the button graphic. Must be in the ModButtons folder alongside the JSON.
+[*] [b]assembly[/b]: (Required) The name of your compiled DLL (without the .dll extension).
+[*] [b]class[/b]: (Required) The full namespace and class name where your target method lives.
+[*] [b]method[/b]: (Required) The exact name of the C# method to execute.
+[/list]
+
+[h2]3. Your Target C# Method[/h2]
+The method you specify in your JSON [b]must be both public and static[/b], and it must take zero arguments.
+
+[code]
+namespace YourAwesomeMod
+{
+public class CheatManager
+{
+// This is perfectly valid!
+public static void AddMoney()
+{
+staticVars.company.money += 1000000;
+Debug.Log("Added 1,000,000 Yen!");
+}
+
+```
+    // This will FAIL (Not static)
+    public void RestoreStamina() { } 
+
+    // This will FAIL (Requires arguments)
+    public static void FireStaff(string staffID) { } 
+}
+
+```
+
+}
+[/code]
+
+[hr][/hr]
+
+[h1]🌍 How to Add Localizations[/h1]
+
+ModButtons features a built-in, multi-mod localization manager. It automatically detects the player's active language settings and translates your button labels, tooltips, and your Mod's title header.
+
+[h2]1. The Directory Structure[/h2]
+Create a [b]Localization[/b] folder in your mod's root directory. Inside, create folders for your supported language codes (e.g., en, jp, cn, ru).
+
+[code]
+YourModFolder/
+├── Localization/
+│   ├── en/
+│   │   └── strings.txt
+│   └── jp/
+│       └── strings.txt
+├── ModButtons/
+│   └── buttons.json
+└── YourMod.dll
+[/code]
+
+[h2]2. The strings.txt File[/h2]
+The localization file uses a simple key=value format.
+
+[b]Example Localization/en/strings.txt:[/b]
+[code]
+
+# This translates the main header above your grid of buttons
+
+mod.title=My Awesome Cheat Mod
+
+# These translate specific buttons based on the "codeLabel" in your JSON
+
+YourMod.Cheat.AddMoney=Add 1,000,000 Yen
+YourMod.Cheat.RestoreStamina=Restore Idol Stamina
+[/code]
+
+[b]Localization Logic:[/b]
+[list]
+[*] [b]No codeLabel provided in JSON?[/b] ModButtons will automatically generate a translation key using YourClass.YourMethod.
+[*] [b]Missing Translations?[/b] The manager will always load Localization/en/strings.txt as a baseline. If the user plays in Japanese but you haven't translated a specific button, it will safely fall back to your English baseline.
+[/list]
+
+[hr][/hr]
+
+[h1]🎨 Icon Guidelines[/h1]
+
+[list]
+[*] [b]Size Requirements:[/b] Square 1:1 ratio images are recommended.
+[*] [b]Format:[/b] PNG is highly recommended.
+[*] [b]Fallback:[/b] If you do not provide an icon, ModButtons automatically generates a standard, rectangular text-button cloned from the game's native UI style instead of using the icon grid.
+[/list]

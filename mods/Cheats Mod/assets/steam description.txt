@@ -1,0 +1,45 @@
+Don't cheat. Cheating is bad. But if you need to, for testing the mod you're making or something, here you go. Let me know if there are any other cheats you want me to add. Inspired by Shelon's cheat mod.
+
+Requires:
+1. IM Harmony : https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863 and https://github.com/ui3TD/IM-HarmonyIntegration
+2. Buttons Mod : https://steamcommunity.com/sharedfiles/filedetails/?id=3728516714
+
+Instructions to use:
+Click on the gear icon in the game on the left side of the screen. Click on Action Hub. Click on any cheat you want to use.
+
+List of cheats:
+
+[olist]
+    [*] Add 10k fans
+    [*] Add 10k fame
+    [*] Add 1B yen to company funds
+    [*] Add 100 buzz
+    [*] Set active idol physical stamina to 100
+    [*] Set active idol mental stamina to 100
+    [*] Reduce general scandal points by 1
+    [*] Add 1 general scandal point
+    [*] Add 1 scandal point to all idols
+    [*] Set general and idol scandal points to 0
+    [*] Trigger a random dating scandal
+    [*] Increase every active idol's influence by one level
+    [*] Increase every active idol's friendship by one level
+    [*] Increase every active idol's romance by one level
+    [*] Max active idol influence, friendship, and romance
+    [*] Add 25k EXP to all staff skills
+    [*] Set every staff skill level to 20
+    [*] Add 1k points to every research type
+    [*] Unlock all research and set every research level to 10
+    [*] Increase every idol's fame by one level
+    [*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
+    [*] Reveal idol friend relationships
+    [*] Reveal idol best friend relationships
+    [*] Reveal idol dislike and hate relationships
+    [*] Reveal all idol cliques
+    [*] Reveal all known bullying targets
+    [*] Reveal every idol's current dating status
+    [*] Reveal every idol's dating preference
+    [*] End all idol dating relationships except relationships with the producer
+    [*] Reset special event cooldowns
+    [*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
+    [*] Add custom amount of fans
+[/olist]

@@ -19,6 +19,7 @@ Adds cheat actions to the Mod Buttons action hub.
 - Add 1 general scandal point
 - Add 1 scandal point to all idols
 - Set all scandal points to 0
+- Trigger a random dating scandal
 - Increase active idol influence by one level
 - Increase active idol friendship by one level
 - Increase active idol romance by one level
@@ -35,5 +36,6 @@ Adds cheat actions to the Mod Buttons action hub.
 - Set all staff skill levels to 20
 - Reveal dating status
 - Reveal dating preference
+- End all idol dating relationships except relationships with the producer
 - Heal idols, cure injuries/depression, and return idols from hiatus
 - Max active idol influence, friendship, and romance
