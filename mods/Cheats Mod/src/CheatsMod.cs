@@ -1303,6 +1303,8 @@ namespace CheatsMod
             AddResearchParameters(researchParameters, singles.Lyrics);
             AddResearchParameters(researchParameters, singles.Choreography);
             AddResearchParameters(researchParameters, singles.Marketing);
+            AddResearchParameters(researchParameters, Shows.Genre);
+            AddResearchParameters(researchParameters, business.data);
 
             if (Research.Categories != null)
             {
@@ -1319,16 +1321,15 @@ namespace CheatsMod
             return researchParameters;
         }
 
-        private static void AddResearchParameters(List<singles._param> target, List<singles._param> source)
+        private static void AddResearchParameters(List<singles._param> target, IEnumerable<singles._param> source)
         {
             if (target == null || source == null)
             {
                 return;
             }
 
-            for (int parameterIndex = 0; parameterIndex < source.Count; parameterIndex++)
+            foreach (singles._param parameter in source)
             {
-                singles._param parameter = source[parameterIndex];
                 if (parameter != null && !target.Contains(parameter))
                 {
                     target.Add(parameter);
