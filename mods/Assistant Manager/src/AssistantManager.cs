@@ -271,11 +271,20 @@ namespace AssitantManagerMod
     /// </summary>
     internal static class AssistantManagerAuditionTracking
     {
+        // Staff IDs are stable only for the lifetime of one employee.  Assistant-manager
+        // audition cooldowns instead belong to one of the agency's fixed assistant-manager
+        // slots, so firing or replacing an employee cannot create a fresh cooldown lane.
+        // Negative keys cannot collide with the game's non-negative staff IDs.
+        private const int FirstAssistantSlotOwnerKey = -1000;
+
         private static readonly Dictionary<int, Dictionary<Auditions.type, DateTime>> cooldownsByManager =
             new Dictionary<int, Dictionary<Auditions.type, DateTime>>();
 
         private static readonly Dictionary<Auditions.data, int> ownerManagerByAudition =
             new Dictionary<Auditions.data, int>();
+
+        private static readonly Dictionary<int, int> assistantSlotByManager =
+            new Dictionary<int, int>();
 
         internal struct CooldownEntry
         {
@@ -289,6 +298,12 @@ namespace AssitantManagerMod
             internal int ManagerId;
             internal Auditions.type Type;
             internal float Progress;
+        }
+
+        internal struct SlotAssignmentEntry
+        {
+            internal int ManagerId;
+            internal int Slot;
         }
 
         internal struct GenerateState
@@ -306,6 +321,7 @@ namespace AssitantManagerMod
         {
             cooldownsByManager.Clear();
             ownerManagerByAudition.Clear();
+            assistantSlotByManager.Clear();
         }
 
         internal static bool CanProduce(agency._room room, Auditions.type type)
@@ -326,7 +342,7 @@ namespace AssitantManagerMod
             }
 
             int managerId;
-            if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+            if (!TryGetCooldownOwnerKey(room, out managerId))
             {
                 return 0;
             }
@@ -399,7 +415,7 @@ namespace AssitantManagerMod
             }
 
             int managerId;
-            if (AssistantManagerRules.TryGetManagerId(room, out managerId))
+            if (TryGetCooldownOwnerKey(room, out managerId))
             {
                 cooldownsByManager.Remove(managerId);
             }
@@ -421,7 +437,7 @@ namespace AssitantManagerMod
                 Girls = new List<Auditions.data._girl>()
             };
             int managerId;
-            if (AssistantManagerRules.TryGetManagerId(room, out managerId))
+            if (TryGetCooldownOwnerKey(room, out managerId))
             {
                 ownerManagerByAudition[audition] = managerId;
             }
@@ -527,7 +543,9 @@ namespace AssitantManagerMod
             {
                 foreach (KeyValuePair<Auditions.type, DateTime> cooldownEntry in managerEntry.Value)
                 {
-                    if (cooldownEntry.Value <= staticVars.dateTime)
+                    int cooldownDays = GetCooldownLengthDays(cooldownEntry.Key);
+                    if (cooldownDays <= 0 ||
+                        cooldownEntry.Value.AddDays(cooldownDays) <= staticVars.dateTime)
                     {
                         continue;
                     }
@@ -538,6 +556,21 @@ namespace AssitantManagerMod
                         LastAudition = cooldownEntry.Value
                     });
                 }
+            }
+            return entries;
+        }
+
+        internal static List<SlotAssignmentEntry> ExportSlotAssignments()
+        {
+            ReconcileSlotAssignments();
+            List<SlotAssignmentEntry> entries = new List<SlotAssignmentEntry>();
+            foreach (KeyValuePair<int, int> assignment in assistantSlotByManager)
+            {
+                entries.Add(new SlotAssignmentEntry
+                {
+                    ManagerId = assignment.Key,
+                    Slot = assignment.Value
+                });
             }
             return entries;
         }
@@ -586,13 +619,53 @@ namespace AssitantManagerMod
                     continue;
                 }
 
+                int ownerKey = NormalizePersistedOwnerKey(entry.ManagerId);
                 Dictionary<Auditions.type, DateTime> roomCooldowns;
-                if (!cooldownsByManager.TryGetValue(entry.ManagerId, out roomCooldowns))
+                if (!cooldownsByManager.TryGetValue(ownerKey, out roomCooldowns))
                 {
                     roomCooldowns = new Dictionary<Auditions.type, DateTime>();
-                    cooldownsByManager[entry.ManagerId] = roomCooldowns;
+                    cooldownsByManager[ownerKey] = roomCooldowns;
                 }
                 roomCooldowns[entry.Type] = entry.LastAudition;
+            }
+        }
+
+        internal static void ImportSlotAssignments(List<SlotAssignmentEntry> entries)
+        {
+            assistantSlotByManager.Clear();
+            if (entries == null)
+            {
+                return;
+            }
+
+            HashSet<int> claimedSlots = new HashSet<int>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                SlotAssignmentEntry entry = entries[i];
+                if (!IsValidAssistantSlot(entry.Slot) ||
+                    claimedSlots.Contains(entry.Slot) ||
+                    !IsEmployedAssistantManager(entry.ManagerId))
+                {
+                    continue;
+                }
+
+                assistantSlotByManager[entry.ManagerId] = entry.Slot;
+                claimedSlots.Add(entry.Slot);
+            }
+        }
+
+        internal static void ReleaseAssistantManager(staff._staff staffMember)
+        {
+            if (!AssistantManagerRules.IsAssistantManager(staffMember))
+            {
+                return;
+            }
+
+            if (assistantSlotByManager.Remove(staffMember.id))
+            {
+                // The slot cooldown deliberately remains.  The next employee assigned to this
+                // vacant slot inherits it.
+                AssistantManagerStatePersistence.MarkDirty();
             }
         }
 
@@ -614,7 +687,7 @@ namespace AssitantManagerMod
                 }
 
                 int managerId;
-                if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+                if (!TryGetCooldownOwnerKey(room, out managerId))
                 {
                     continue;
                 }
@@ -624,7 +697,8 @@ namespace AssitantManagerMod
                 {
                     for (int j = 0; j < entries.Count; j++)
                     {
-                        if (entries[j].ManagerId == managerId && entries[j].Type == room.auditionData.Type)
+                        if (NormalizePersistedOwnerKey(entries[j].ManagerId) == managerId &&
+                            entries[j].Type == room.auditionData.Type)
                         {
                             hasPersistedOwner = true;
                             room.auditionData.Progress = entries[j].Progress;
@@ -653,6 +727,172 @@ namespace AssitantManagerMod
                 return 90;
             }
             return 0;
+        }
+
+        private static bool TryGetCooldownOwnerKey(agency._room room, out int ownerKey)
+        {
+            ownerKey = -1;
+            int managerId;
+            if (!AssistantManagerRules.TryGetManagerId(room, out managerId))
+            {
+                return false;
+            }
+
+            if (!AssistantManagerRules.IsAssistantManagerOffice(room))
+            {
+                ownerKey = managerId;
+                return true;
+            }
+
+            int slot;
+            if (!TryGetOrAssignAssistantSlot(managerId, out slot))
+            {
+                return false;
+            }
+
+            ownerKey = GetAssistantSlotOwnerKey(slot);
+            return true;
+        }
+
+        private static bool TryGetOrAssignAssistantSlot(int managerId, out int slot)
+        {
+            slot = -1;
+            ReconcileSlotAssignments();
+            if (assistantSlotByManager.TryGetValue(managerId, out slot) && IsValidAssistantSlot(slot))
+            {
+                return true;
+            }
+
+            if (!IsEmployedAssistantManager(managerId))
+            {
+                return false;
+            }
+
+            HashSet<int> claimedSlots = new HashSet<int>(assistantSlotByManager.Values);
+            long bestBurden = long.MinValue;
+            int bestSlot = -1;
+            for (int candidate = 0; candidate < AssistantManagerConstants.MaximumAssistantManagersPerAgency; candidate++)
+            {
+                if (claimedSlots.Contains(candidate))
+                {
+                    continue;
+                }
+
+                long burden = GetCooldownBurden(GetAssistantSlotOwnerKey(candidate));
+                if (bestSlot < 0 || burden > bestBurden)
+                {
+                    bestSlot = candidate;
+                    bestBurden = burden;
+                }
+            }
+
+            if (bestSlot < 0)
+            {
+                return false;
+            }
+
+            assistantSlotByManager[managerId] = bestSlot;
+            slot = bestSlot;
+            AssistantManagerStatePersistence.MarkDirty();
+            return true;
+        }
+
+        private static void ReconcileSlotAssignments()
+        {
+            List<int> staleManagerIds = new List<int>();
+            HashSet<int> claimedSlots = new HashSet<int>();
+            foreach (KeyValuePair<int, int> assignment in assistantSlotByManager)
+            {
+                if (!IsValidAssistantSlot(assignment.Value) ||
+                    claimedSlots.Contains(assignment.Value) ||
+                    !IsEmployedAssistantManager(assignment.Key))
+                {
+                    staleManagerIds.Add(assignment.Key);
+                    continue;
+                }
+                claimedSlots.Add(assignment.Value);
+            }
+
+            if (staleManagerIds.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < staleManagerIds.Count; i++)
+            {
+                assistantSlotByManager.Remove(staleManagerIds[i]);
+            }
+            AssistantManagerStatePersistence.MarkDirty();
+        }
+
+        private static bool IsEmployedAssistantManager(int managerId)
+        {
+            if (staff.Staff == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < staff.Staff.Count; i++)
+            {
+                staff._staff staffMember = staff.Staff[i];
+                if (staffMember != null && staffMember.id == managerId &&
+                    AssistantManagerRules.IsAssistantManager(staffMember))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int NormalizePersistedOwnerKey(int ownerKey)
+        {
+            // Version 2 stored assistant cooldowns by staff ID.  When that employee still
+            // exists, migrate the entry into their persistent slot during the first v3 load.
+            if (ownerKey >= 0 && IsEmployedAssistantManager(ownerKey))
+            {
+                int slot;
+                if (TryGetOrAssignAssistantSlot(ownerKey, out slot))
+                {
+                    return GetAssistantSlotOwnerKey(slot);
+                }
+            }
+            return ownerKey;
+        }
+
+        private static long GetCooldownBurden(int ownerKey)
+        {
+            Dictionary<Auditions.type, DateTime> cooldowns;
+            if (!cooldownsByManager.TryGetValue(ownerKey, out cooldowns))
+            {
+                return 0L;
+            }
+
+            long burden = 0L;
+            DateTime lastAudition;
+            if (cooldowns.TryGetValue(Auditions.type.regional, out lastAudition))
+            {
+                burden += 15000L * GetRemainingCooldownDays(lastAudition, Auditions.type.regional);
+            }
+            if (cooldowns.TryGetValue(Auditions.type.nationwide, out lastAudition))
+            {
+                burden += 50000L * GetRemainingCooldownDays(lastAudition, Auditions.type.nationwide);
+            }
+            return burden;
+        }
+
+        private static int GetRemainingCooldownDays(DateTime lastAudition, Auditions.type type)
+        {
+            return Mathf.Max(0, GetCooldownLengthDays(type) - (staticVars.dateTime - lastAudition).Days);
+        }
+
+        private static int GetAssistantSlotOwnerKey(int slot)
+        {
+            return FirstAssistantSlotOwnerKey - slot;
+        }
+
+        private static bool IsValidAssistantSlot(int slot)
+        {
+            return slot >= 0 && slot < AssistantManagerConstants.MaximumAssistantManagersPerAgency;
         }
 
         private static bool CanGenerateAudition()
@@ -895,12 +1135,13 @@ namespace AssitantManagerMod
 
     internal static class AssistantManagerStatePersistence
     {
-        // v1 used room IDs, which the game does not persist.  Use a new key so invalid v1
-        // cooldowns cannot be restored as a shared cooldown after upgrading.
+        // v1 used room IDs, which the game does not persist.  v2 introduced this key; the v3
+        // payload keeps it so existing per-manager records can be migrated into durable slots.
         private const string StateKey = "assistant_manager_office_state_v2";
         private const string DateCooldownsKey = "date_cooldowns";
         private const string AuditionCooldownsKey = "audition_cooldowns";
         private const string AuditionOwnersKey = "audition_owners";
+        private const string AssistantSlotAssignmentsKey = "assistant_slot_assignments";
 
         private static bool restoreRequested;
         private static bool dirty;
@@ -952,12 +1193,14 @@ namespace AssitantManagerMod
                 {
                     JSONNode root = JSON.Parse(json);
                     AssistantManagerDateTracking.ImportEntries(ReadDateCooldowns(root));
+                    AssistantManagerAuditionTracking.ImportSlotAssignments(ReadAssistantSlotAssignments(root));
                     AssistantManagerAuditionTracking.ImportCooldownEntries(ReadAuditionCooldowns(root));
                     AssistantManagerAuditionTracking.RestoreOwners(agencyInstance, ReadAuditionOwners(root));
                 }
                 else
                 {
                     AssistantManagerDateTracking.ImportEntries(null);
+                    AssistantManagerAuditionTracking.ImportSlotAssignments(null);
                     AssistantManagerAuditionTracking.ImportCooldownEntries(null);
                     AssistantManagerAuditionTracking.RestoreOwners(agencyInstance, null);
                 }
@@ -984,10 +1227,11 @@ namespace AssitantManagerMod
             }
 
             JSONClass root = new JSONClass();
-            root["version"].AsInt = 2;
+            root["version"].AsInt = 3;
             root[DateCooldownsKey] = WriteDateCooldowns();
             root[AuditionCooldownsKey] = WriteAuditionCooldowns();
             root[AuditionOwnersKey] = WriteAuditionOwners();
+            root[AssistantSlotAssignmentsKey] = WriteAssistantSlotAssignments();
             if (AssistantManagerDataCoreApi.TrySetCustomJson(session, StateKey, root.ToString()))
             {
                 dirty = false;
@@ -1034,6 +1278,21 @@ namespace AssitantManagerMod
                 entry["manager_id"].AsInt = entries[i].ManagerId;
                 entry["type"].AsInt = (int)entries[i].Type;
                 entry["progress"].AsFloat = entries[i].Progress;
+                array.Add(entry);
+            }
+            return array;
+        }
+
+        private static JSONArray WriteAssistantSlotAssignments()
+        {
+            JSONArray array = new JSONArray();
+            List<AssistantManagerAuditionTracking.SlotAssignmentEntry> entries =
+                AssistantManagerAuditionTracking.ExportSlotAssignments();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                JSONClass entry = new JSONClass();
+                entry["manager_id"].AsInt = entries[i].ManagerId;
+                entry["slot"].AsInt = entries[i].Slot;
                 array.Add(entry);
             }
             return array;
@@ -1108,6 +1367,37 @@ namespace AssitantManagerMod
                     ManagerId = node["manager_id"].AsInt,
                     Type = (Auditions.type)node["type"].AsInt,
                     Progress = node["progress"].AsFloat
+                });
+            }
+            return entries;
+        }
+
+        private static List<AssistantManagerAuditionTracking.SlotAssignmentEntry> ReadAssistantSlotAssignments(JSONNode root)
+        {
+            List<AssistantManagerAuditionTracking.SlotAssignmentEntry> entries =
+                new List<AssistantManagerAuditionTracking.SlotAssignmentEntry>();
+            if (root == null)
+            {
+                return entries;
+            }
+
+            JSONArray assignmentArray = root[AssistantSlotAssignmentsKey].AsArray;
+            if (assignmentArray == null)
+            {
+                // Expected for a version 2 payload.
+                return entries;
+            }
+
+            foreach (JSONNode node in assignmentArray)
+            {
+                if (node == null)
+                {
+                    continue;
+                }
+                entries.Add(new AssistantManagerAuditionTracking.SlotAssignmentEntry
+                {
+                    ManagerId = node["manager_id"].AsInt,
+                    Slot = node["slot"].AsInt
                 });
             }
             return entries;
@@ -2727,6 +3017,30 @@ namespace AssitantManagerMod
         private static void Prefix()
         {
             AssistantManagerStatePersistence.Synchronize(AssistantManagerRules.GetAgency());
+        }
+    }
+
+    [HarmonyPatch(typeof(staff._staff), nameof(staff._staff.Fire), new Type[] { typeof(bool) })]
+    internal static class AssistantManagerFireAuditionSlotPatch
+    {
+        private static void Postfix(staff._staff __instance)
+        {
+            if (__instance != null && (staff.Staff == null || !staff.Staff.Contains(__instance)))
+            {
+                AssistantManagerAuditionTracking.ReleaseAssistantManager(__instance);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(staff._staff), nameof(staff._staff.Fire_Severance), new Type[0])]
+    internal static class AssistantManagerFireSeveranceAuditionSlotPatch
+    {
+        private static void Postfix(staff._staff __instance)
+        {
+            if (__instance != null && (staff.Staff == null || !staff.Staff.Contains(__instance)))
+            {
+                AssistantManagerAuditionTracking.ReleaseAssistantManager(__instance);
+            }
         }
     }
 
