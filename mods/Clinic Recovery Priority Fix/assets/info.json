@@ -1,0 +1,8 @@
+{
+  "Title": "Clinic Recovery Priority Fix",
+  "Description": "Makes automated clinics select low-stamina idols before competing auto-practice rooms.",
+  "Author": "Cosmo",
+  "Version": "1.0.1",
+  "Tags": ["gameplay", "fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.clinicrecoverypriorityfix"
+}

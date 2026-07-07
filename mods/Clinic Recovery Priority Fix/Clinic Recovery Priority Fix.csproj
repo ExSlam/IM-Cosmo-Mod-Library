@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Clinic Recovery Priority Fix</ModName>
+    <RootNamespace>ClinicRecoveryPriorityFix</RootNamespace>
+    <AssemblyName>com.cosmo.clinicrecoverypriorityfix</AssemblyName>
+    <Version>1.0.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\ClinicRecoveryPriorityFix.cs" />
+  </ItemGroup>
+</Project>
