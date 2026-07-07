@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Monthly Ledger</ModName>
+    <RootNamespace>MonthlyLedger</RootNamespace>
+    <AssemblyName>com.cosmo.monthlyledger</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IM Data Core\IM Data Core.csproj" Private="false" />
+    <ProjectReference Include="..\IM UI Framework\IM UI Framework.csproj" Private="false" Aliases="UiFrameworkReference" />
+  </ItemGroup>
+</Project>

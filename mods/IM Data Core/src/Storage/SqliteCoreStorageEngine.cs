@@ -37,6 +37,16 @@ namespace IMDataCore
         private const string SqlParameterCutoffDateTime = "@cutoff_datetime";
         private const string SqlParameterSourceSaveKey = "@source_save_key";
         private const string SqlParameterTargetSaveKey = "@target_save_key";
+        private const string SqlParameterStartDateKey = "@start_date_key";
+        private const string SqlParameterEndDateKey = "@end_date_key";
+        private const string SqlReadMoneyTransactions =
+            "SELECT event_id, game_date_key, game_datetime, idol_id, entity_kind, entity_id, event_type, source_patch, payload_json, namespace_id " +
+            "FROM event_stream WHERE save_key = @save_key AND event_type = @event_type " +
+            "AND game_date_key >= @start_date_key AND game_date_key < @end_date_key " +
+            "ORDER BY game_date_key ASC, event_id ASC LIMIT @limit_count;";
+        private const string SqlReadMoneyLedgerCoverageStart =
+            "SELECT game_datetime FROM event_stream WHERE save_key = @save_key AND event_type = @event_type " +
+            "ORDER BY game_date_key ASC, event_id ASC LIMIT 1;";
         private const string SqlSelectUserTableNames =
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';";
         private const string SqlDeleteEventStreamRowsAfterCutoff =
@@ -77,6 +87,8 @@ namespace IMDataCore
         private const string SqlCreateTableIfNotExistsPrefix = "CREATE TABLE IF NOT EXISTS ";
         private const string SqlCreateTableOpenParenthesis = " (";
         private const string SqlCreateTableCloseWithEventForeignKey = ", FOREIGN KEY(event_id) REFERENCES event_stream(event_id) ON DELETE CASCADE);";
+        private const string SqlAlterTablePrefix = "ALTER TABLE ";
+        private const string SqlAddColumnClause = " ADD COLUMN ";
         private const string SqlInsertOrReplaceIntoPrefix = "INSERT OR REPLACE INTO ";
         private const string SqlInsertValuesClauseSeparator = ") VALUES (";
         private const string SqlStatementTerminator = ";";
@@ -219,6 +231,7 @@ namespace IMDataCore
             RegisterBuiltInEventSchemaSource(map, CoreConstants.EventTypeDatingPartnerStatusChanged, nameof(CoreJsonUtility.SerializeDatingPartnerStatusPayload));
             RegisterBuiltInObjectEventSchemaSource<EconomyDailyTickEventPayload>(map, CoreConstants.EventTypeEconomyDailyTick);
             RegisterBuiltInObjectEventSchemaSource<EconomyWeeklyExpenseEventPayload>(map, CoreConstants.EventTypeEconomyWeeklyExpenseApplied);
+            RegisterBuiltInObjectEventSchemaSource<MoneyLedgerTransactionPayload>(map, MoneyLedgerConstants.EventTypeTransaction);
             RegisterBuiltInEventSchemaSource(map, CoreConstants.EventTypeElectionCancelled, nameof(CoreJsonUtility.SerializeElectionLifecyclePayload));
             RegisterBuiltInEventSchemaSource(map, CoreConstants.EventTypeElectionCreated, nameof(CoreJsonUtility.SerializeElectionLifecyclePayload));
             RegisterBuiltInEventSchemaSource(map, CoreConstants.EventTypeElectionFinished, nameof(CoreJsonUtility.SerializeElectionLifecyclePayload));
@@ -619,7 +632,42 @@ namespace IMDataCore
             List<EventPayloadFieldRow> schemaRows = ResolveBuiltInEventSchemaRows(eventType);
             ExecuteNonQuery(BuildCreateBuiltInEventTableSql(tableName, schemaRows));
             knownColumns = ReadTableColumns(tableName);
+            EnsureBuiltInEventPayloadColumnsExist(tableName, schemaRows, knownColumns);
             builtInEventTableColumnsByTableName[tableName] = knownColumns;
+        }
+
+        private void EnsureBuiltInEventPayloadColumnsExist(
+            string tableName,
+            IReadOnlyList<EventPayloadFieldRow> schemaRows,
+            HashSet<string> knownColumns)
+        {
+            if (schemaRows == null || knownColumns == null)
+            {
+                return;
+            }
+
+            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex; rowIndex < schemaRows.Count; rowIndex++)
+            {
+                EventPayloadFieldRow row = schemaRows[rowIndex];
+                if (row == null || string.IsNullOrEmpty(row.FieldKey))
+                {
+                    continue;
+                }
+
+                string columnName = BuildPayloadColumnName(row.FieldKey);
+                if (knownColumns.Contains(columnName))
+                {
+                    continue;
+                }
+
+                string alterSql =
+                    SqlAlterTablePrefix + QuoteSqlIdentifier(tableName)
+                    + SqlAddColumnClause + QuoteSqlIdentifier(columnName)
+                    + SqlSpaceSeparator + ResolveSqlColumnType(row)
+                    + SqlStatementTerminator;
+                ExecuteNonQuery(alterSql);
+                knownColumns.Add(columnName);
+            }
         }
 
         private void EnsureAllBuiltInEventTypeTablesExist()
@@ -1816,6 +1864,177 @@ namespace IMDataCore
                     return false;
                 }
             }
+        }
+
+        public bool TryReadMoneyTransactions(
+            string saveKey,
+            DateTime startInclusive,
+            DateTime endExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool wasTruncated,
+            out string errorMessage)
+        {
+            transactions = new List<IMDataCoreMoneyTransaction>();
+            wasTruncated = false;
+            errorMessage = string.Empty;
+
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                try
+                {
+                    int requestedCount = Math.Max(MoneyLedgerConstants.MinimumReadCount, maxCount);
+                    int queryCount = requestedCount + CoreConstants.LastElementOffsetFromCount;
+                    IntPtr statementHandle = PrepareStatement(SqlReadMoneyTransactions);
+                    try
+                    {
+                        BindParameters(
+                            statementHandle,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(CoreConstants.SqlParameterEventType, MoneyLedgerConstants.EventTypeTransaction),
+                            CreateParameter(SqlParameterStartDateKey, CoreDateTimeUtility.BuildGameDateKey(startInclusive)),
+                            CreateParameter(SqlParameterEndDateKey, CoreDateTimeUtility.BuildGameDateKey(endExclusive)),
+                            CreateParameter(CoreConstants.SqlParameterLimitCount, queryCount));
+
+                        while (transactions.Count < queryCount)
+                        {
+                            int stepResult = NativeMethods.sqlite3_step(statementHandle);
+                            if (stepResult == SqliteDone)
+                            {
+                                break;
+                            }
+
+                            if (stepResult != SqliteRow)
+                            {
+                                throw CreateSqliteException(stepResult);
+                            }
+
+                            IMDataCoreEvent eventRecord = ReadEventRow(statementHandle);
+                            IMDataCoreMoneyTransaction transaction = MoneyLedgerPayloadUtility.ToPublicModel(eventRecord);
+                            if (transaction != null)
+                            {
+                                transactions.Add(transaction);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        FinalizeStatement(statementHandle);
+                    }
+
+                    if (transactions.Count > requestedCount)
+                    {
+                        transactions.RemoveAt(transactions.Count - CoreConstants.LastElementOffsetFromCount);
+                        wasTruncated = true;
+                    }
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        public bool TryGetMoneyLedgerCoverageStart(string saveKey, out DateTime coverageStart, out string errorMessage)
+        {
+            coverageStart = DateTime.MinValue;
+            errorMessage = string.Empty;
+
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                try
+                {
+                    IntPtr statementHandle = PrepareStatement(SqlReadMoneyLedgerCoverageStart);
+                    try
+                    {
+                        BindParameters(
+                            statementHandle,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(CoreConstants.SqlParameterEventType, MoneyLedgerConstants.EventTypeCoverageStarted));
+
+                        int stepResult = NativeMethods.sqlite3_step(statementHandle);
+                        if (stepResult == SqliteDone)
+                        {
+                            return false;
+                        }
+
+                        if (stepResult != SqliteRow)
+                        {
+                            throw CreateSqliteException(stepResult);
+                        }
+
+                        string storedDate = GetColumnText(statementHandle, CoreConstants.ZeroBasedListStartIndex);
+                        return DateTime.TryParseExact(
+                            storedDate,
+                            CoreConstants.RoundTripDateFormat,
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.RoundtripKind,
+                            out coverageStart);
+                    }
+                    finally
+                    {
+                        FinalizeStatement(statementHandle);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        private IMDataCoreEvent ReadEventRow(IntPtr statementHandle)
+        {
+            string namespaceIdentifier = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexNamespaceIdentifier)
+                ? string.Empty
+                : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexNamespaceIdentifier);
+            string persistedPayloadJson = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexPayloadJson)
+                ? string.Empty
+                : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexPayloadJson);
+            long eventId = NativeMethods.sqlite3_column_int64(statementHandle, CoreConstants.EventStreamColumnIndexEventId);
+            string eventType = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexEventType)
+                ? string.Empty
+                : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexEventType);
+
+            return new IMDataCoreEvent
+            {
+                EventId = eventId,
+                GameDateKey = NativeMethods.sqlite3_column_int(statementHandle, CoreConstants.EventStreamColumnIndexGameDateKey),
+                GameDateTime = GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexGameDateTime),
+                IdolId = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexIdolId)
+                    ? CoreConstants.InvalidIdValue
+                    : NativeMethods.sqlite3_column_int(statementHandle, CoreConstants.EventStreamColumnIndexIdolId),
+                EntityKind = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexEntityKind)
+                    ? string.Empty
+                    : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexEntityKind),
+                EntityId = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexEntityId)
+                    ? string.Empty
+                    : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexEntityId),
+                EventType = eventType,
+                SourcePatch = IsColumnNull(statementHandle, CoreConstants.EventStreamColumnIndexSourcePatch)
+                    ? string.Empty
+                    : GetColumnText(statementHandle, CoreConstants.EventStreamColumnIndexSourcePatch),
+                PayloadJson = ResolvePayloadJsonForRead(eventId, eventType, namespaceIdentifier, persistedPayloadJson),
+                NamespaceId = namespaceIdentifier
+            };
         }
 
         public bool TryRollbackToGameDateTime(string saveKey, DateTime cutoffGameDateTime, out string errorMessage)

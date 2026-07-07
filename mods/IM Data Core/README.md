@@ -11,9 +11,10 @@ If you are new to modding, start with `docs/START_HERE.md`.
 
 ## What IM Data Core does
 
-IM Data Core provides 2 services:
+IM Data Core provides 3 services:
 1. Namespaced key/value storage for custom JSON (`TrySetCustomJson`, `TryGetCustomJson`, `TryRemoveCustomJson`)
 2. Timeline event ledger for built-in and custom events (`TryAppendCustomEvent`, `TryReadRecentEventsForIdol`)
+3. Exact save-scoped cash history (`TryReadMoneyTransactions`, `TryGetMoneyLedgerCoverageStart`)
 
 It also captures many base-game lifecycle changes (singles, shows, contracts, tours, relationships, finance, etc.) into its own event stream.
 
@@ -69,13 +70,17 @@ Methods:
 - `bool TryRemoveCustomJson(IMDataCoreSession session, string dataKey, out string errorMessage)`
 - `bool TryAppendCustomEvent(IMDataCoreSession session, int idolId, string entityKind, string entityId, string eventType, string payloadJson, string sourcePatch, out string errorMessage)`
 - `bool TryReadRecentEventsForIdol(int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage)`
+- `bool TryReadMoneyTransactions(DateTime startInclusive, DateTime endExclusive, int maxCount, out List<IMDataCoreMoneyTransaction> transactions, out bool wasTruncated, out string errorMessage)`
+- `bool TryGetMoneyLedgerCoverageStart(out DateTime coverageStart, out string errorMessage)`
 - `bool TryFlushNow(out string errorMessage)`
 - `bool TryGetActiveSaveKey(out string saveKey, out string errorMessage)`
 
 ## 1.0 API stability contract
 
 - `IMDataCoreApi` with compatibility alias `IMDataCoreAPI` public method signatures are stable for the `1.x` line.
-- `IMDataCoreSession.NamespaceIdentifier` and `IMDataCoreEvent` public properties are stable for `1.x` consumers.
+- `IMDataCoreSession.NamespaceIdentifier`, `IMDataCoreEvent`, and `IMDataCoreMoneyTransaction` public properties are stable for `1.x` consumers.
+- Money transactions expose `SectionCode` and optional structured `Details`. Structured details currently cover business contracts, single releases, show episodes, individual idol salaries, and individual staff salaries. Staff salary details include proficiency snapshots for every staff skill.
+- Single releases and show episodes are represented by paired income/expense records in one transaction group, preserving gross revenue and production cost/weekly budget separately. A zero-cost expense record is retained for digital-only singles.
 - Internal controller/storage/patch implementation details are not public API and may evolve without breaking semantic versioning.
 
 ## Token and quota rules

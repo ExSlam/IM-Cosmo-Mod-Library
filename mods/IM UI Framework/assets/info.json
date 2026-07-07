@@ -2,7 +2,7 @@
   "Title": "IM UI Framework",
   "Description": "Intermediary UI toolkit for modders: clone game-style controls, inject buttons, and build custom popups that fit Idol Manager.",
   "Author": "Cosmo",
-  "Version": "1.2.0",
+  "Version": "1.3.0",
   "Tags": ["ui", "framework", "modding"],
   "HarmonyID": "com.cosmo.imuiframework"
 }

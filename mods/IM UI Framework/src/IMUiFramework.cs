@@ -782,6 +782,8 @@ namespace IMUiFramework
 
     public sealed class PopupScaffold
     {
+        internal bool RegisteredWithPopupManager;
+
         public GameObject Root;
         public Popup Popup;
         public RectTransform PanelRect;
@@ -793,6 +795,11 @@ namespace IMUiFramework
         public bool IsValid
         {
             get { return Root != null && Popup != null && ContentRoot != null; }
+        }
+
+        public bool IsRegistered
+        {
+            get { return RegisteredWithPopupManager; }
         }
 
         public void Show()
@@ -820,6 +827,28 @@ namespace IMUiFramework
             {
                 onComplete();
             }
+        }
+
+        /// <summary>
+        /// Closes registered scaffolds through PopupManager so queue, pause, input,
+        /// blur, and backdrop state are advanced together. Unregistered scaffolds
+        /// retain direct-hide behavior.
+        /// </summary>
+        public void Close(Action onComplete = null)
+        {
+            if (RegisteredWithPopupManager)
+            {
+                try
+                {
+                    PopupManager.Close_(onComplete);
+                    return;
+                }
+                catch
+                {
+                }
+            }
+
+            Hide(onComplete);
         }
     }
 
@@ -1071,7 +1100,7 @@ namespace IMUiFramework
         private const string DefaultAwardsLabel = "Awards";
         private const string AwardsLocalizationKey = "AWARDS";
         private const string AwardsNameToken = "award";
-        private const string PopupCloseLocalizationKey = "POPUP__CLOSE";
+        private const string PopupCloseLocalizationKey = "CLOSE";
         private const string CloseFallbackLocalizationKey = "common.close";
         private const string CloseFallbackText = "Close";
         private const string BlurComponentTypePrimary = "SuperBlur";
@@ -1945,6 +1974,7 @@ namespace IMUiFramework
             root.SetActive(false);
 
             Popup popup = root.AddComponent<Popup>();
+            popup.OnOpen = new UnityEvent();
             popup.ShowAnimation = true;
             popup.HideAnimation = true;
             popup.HideFast = false;
@@ -2023,6 +2053,15 @@ namespace IMUiFramework
 
             if (TryRegisterPopup(type, created.Root, blurBackground, darkenBackground))
             {
+                created.RegisteredWithPopupManager = true;
+                if (created.CloseButton != null)
+                {
+                    created.CloseButton.onClick = new Button.ButtonClickedEvent();
+                    created.CloseButton.onClick.AddListener(delegate
+                    {
+                        created.Close(null);
+                    });
+                }
                 scaffold = created;
                 return true;
             }

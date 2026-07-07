@@ -442,7 +442,11 @@ namespace IMDataCore
                             continue;
                         }
 
-                        bool idolMatches = eventRecord.IdolId == idolId || eventRecord.IdolId < CoreConstants.MinimumValidIdolIdentifier;
+                        bool isLedgerInternalEvent =
+                            string.Equals(eventRecord.EventType, MoneyLedgerConstants.EventTypeTransaction, StringComparison.Ordinal)
+                            || string.Equals(eventRecord.EventType, MoneyLedgerConstants.EventTypeCoverageStarted, StringComparison.Ordinal);
+                        bool idolMatches = !isLedgerInternalEvent
+                            && (eventRecord.IdolId == idolId || eventRecord.IdolId < CoreConstants.MinimumValidIdolIdentifier);
                         if (idolMatches)
                         {
                             matchingEvents.Add(eventRecord);
@@ -486,6 +490,125 @@ namespace IMDataCore
                     }
 
                     return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        public bool TryReadMoneyTransactions(
+            string saveKey,
+            DateTime startInclusive,
+            DateTime endExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool wasTruncated,
+            out string errorMessage)
+        {
+            transactions = new List<IMDataCoreMoneyTransaction>();
+            wasTruncated = false;
+            errorMessage = string.Empty;
+
+            lock (storageLock)
+            {
+                try
+                {
+                    EnsureStateInitializedLocked();
+                    int startDateKey = CoreDateTimeUtility.BuildGameDateKey(startInclusive);
+                    int endDateKey = CoreDateTimeUtility.BuildGameDateKey(endExclusive);
+                    List<FlatFileEventRecord> matchingEvents = new List<FlatFileEventRecord>();
+                    for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < state.Events.Count; eventIndex++)
+                    {
+                        FlatFileEventRecord eventRecord = state.Events[eventIndex];
+                        if (eventRecord == null
+                            || !string.Equals(eventRecord.EventType, MoneyLedgerConstants.EventTypeTransaction, StringComparison.Ordinal)
+                            || eventRecord.GameDateKey < startDateKey
+                            || eventRecord.GameDateKey >= endDateKey)
+                        {
+                            continue;
+                        }
+
+                        matchingEvents.Add(eventRecord);
+                    }
+
+                    matchingEvents.Sort(CompareEventsAscending);
+                    int requestedCount = Math.Max(MoneyLedgerConstants.MinimumReadCount, maxCount);
+                    int resultCount = Math.Min(requestedCount, matchingEvents.Count);
+                    wasTruncated = matchingEvents.Count > requestedCount;
+                    for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < resultCount; resultIndex++)
+                    {
+                        FlatFileEventRecord source = matchingEvents[resultIndex];
+                        IMDataCoreEvent eventModel = new IMDataCoreEvent
+                        {
+                            EventId = source.EventId,
+                            GameDateKey = source.GameDateKey,
+                            GameDateTime = source.GameDateTime ?? string.Empty,
+                            IdolId = source.IdolId,
+                            EntityKind = source.EntityKind ?? string.Empty,
+                            EntityId = source.EntityId ?? string.Empty,
+                            EventType = source.EventType ?? string.Empty,
+                            SourcePatch = source.SourcePatch ?? string.Empty,
+                            PayloadJson = source.PayloadJson ?? CoreConstants.EmptyJsonObject,
+                            NamespaceId = source.NamespaceIdentifier ?? string.Empty
+                        };
+                        IMDataCoreMoneyTransaction transaction = MoneyLedgerPayloadUtility.ToPublicModel(eventModel);
+                        if (transaction != null)
+                        {
+                            transactions.Add(transaction);
+                        }
+                    }
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        public bool TryGetMoneyLedgerCoverageStart(string saveKey, out DateTime coverageStart, out string errorMessage)
+        {
+            coverageStart = DateTime.MinValue;
+            errorMessage = string.Empty;
+
+            lock (storageLock)
+            {
+                try
+                {
+                    EnsureStateInitializedLocked();
+                    FlatFileEventRecord earliest = null;
+                    for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < state.Events.Count; eventIndex++)
+                    {
+                        FlatFileEventRecord eventRecord = state.Events[eventIndex];
+                        if (eventRecord == null || !string.Equals(eventRecord.EventType, MoneyLedgerConstants.EventTypeCoverageStarted, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        if (earliest == null || CompareEventsAscending(eventRecord, earliest) < CoreConstants.ZeroBasedListStartIndex)
+                        {
+                            earliest = eventRecord;
+                        }
+                    }
+
+                    if (earliest == null)
+                    {
+                        return false;
+                    }
+
+                    return DateTime.TryParseExact(
+                        earliest.GameDateTime,
+                        CoreConstants.RoundTripDateFormat,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.RoundtripKind,
+                        out coverageStart);
                 }
                 catch (Exception exception)
                 {
@@ -1591,6 +1714,29 @@ namespace IMDataCore
             }
 
             return right.EventId.CompareTo(left.EventId);
+        }
+
+        private static int CompareEventsAscending(FlatFileEventRecord left, FlatFileEventRecord right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return CoreConstants.ZeroBasedListStartIndex;
+            }
+
+            if (left == null)
+            {
+                return CoreConstants.MinimumQueueSizeForFlush;
+            }
+
+            if (right == null)
+            {
+                return -CoreConstants.MinimumQueueSizeForFlush;
+            }
+
+            int dateComparison = left.GameDateKey.CompareTo(right.GameDateKey);
+            return dateComparison != CoreConstants.ZeroBasedListStartIndex
+                ? dateComparison
+                : left.EventId.CompareTo(right.EventId);
         }
     }
 

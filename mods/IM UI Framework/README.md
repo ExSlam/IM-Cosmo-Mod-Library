@@ -61,6 +61,9 @@ Core methods:
 - `ContentRoot`
 - `ScrollRect`
 - `CloseButton`
+- `IsRegistered`
+- `Close(...)` for queue-aware registered-popup closing
+- `Hide(...)` for direct scaffold hiding
 
 Bridge class: `IMUiBridges`
 
@@ -367,6 +370,8 @@ internal static class BridgeShowcasePatch
 - This framework reads style templates from base game popups/buttons when possible.
 - If templates are missing, it falls back to safe runtime-created controls.
 - Popup close/hide patching now resolves `PopupManager.Close` overloads dynamically and reconciles stale queue/blur/backdrop state more aggressively.
+- Registered popup scaffold close buttons call `PopupManager.Close_` so queued popups, pause state, input blocking, blur, and backdrop state advance together.
+- Runtime-created popup scaffolds initialize the vanilla `Popup.OnOpen` event before consumers register listeners or the popup is activated.
 - Runtime popup recovery can now be called directly through `TrySyncBackdropWithActiveManagedPopups(...)` and `TryRunPopupBackdropSafetyNet(...)`.
 - The built-in `UI Bridge` helper/showcase button is controlled by `IMUiFramework.config.ini` (`enable_bridge_showcase`).
 - Default release behavior keeps `enable_bridge_showcase=false` so dependency installs are non-intrusive.

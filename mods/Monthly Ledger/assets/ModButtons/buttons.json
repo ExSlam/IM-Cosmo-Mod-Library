@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Monthly Ledger",
+    "codeLabel": "button.open",
+    "tooltip": "Review income and expenses for completed months.",
+    "codeTooltip": "button.open.tooltip",
+    "icon": "",
+    "assembly": "com.cosmo.monthlyledger",
+    "class": "MonthlyLedger.MonthlyLedgerActions",
+    "method": "OpenLedger"
+  }
+]

@@ -52,6 +52,23 @@ namespace IMDataCore
         bool TryReadRecentEventsForIdol(string saveKey, int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage);
 
         /// <summary>
+        /// Returns money-ledger transactions inside a half-open game-date range.
+        /// </summary>
+        bool TryReadMoneyTransactions(
+            string saveKey,
+            DateTime startInclusive,
+            DateTime endExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool wasTruncated,
+            out string errorMessage);
+
+        /// <summary>
+        /// Returns the first game date at which exact money-ledger capture began.
+        /// </summary>
+        bool TryGetMoneyLedgerCoverageStart(string saveKey, out DateTime coverageStart, out string errorMessage);
+
+        /// <summary>
         /// Removes persisted rows that are newer than one loaded save snapshot date.
         /// </summary>
         bool TryRollbackToGameDateTime(string saveKey, DateTime cutoffGameDateTime, out string errorMessage);

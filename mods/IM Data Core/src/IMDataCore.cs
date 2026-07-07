@@ -224,6 +224,8 @@ namespace IMDataCore
         internal const string EventTypeSubstoryCompleted = "substory_completed";
         internal const string EventTypeEconomyWeeklyExpenseApplied = "economy_weekly_expense_applied";
         internal const string EventTypeEconomyDailyTick = "economy_daily_tick";
+        internal const string EventTypeMoneyTransaction = "money_transaction";
+        internal const string EventTypeMoneyLedgerCoverageStarted = "money_ledger_coverage_started";
         internal const string EventTypeInfluenceBlackmailQueued = "influence_blackmail_queued";
         internal const string EventTypeInfluenceBlackmailTriggered = "influence_blackmail_triggered";
         internal const string EventTypeMentorshipStarted = "mentorship_started";
@@ -840,6 +842,7 @@ namespace IMDataCore
             "SELECT event_id, game_date_key, game_datetime, idol_id, entity_kind, entity_id, event_type, source_patch, payload_json, namespace_id " +
             "FROM event_stream " +
             "WHERE save_key = @save_key AND (idol_id = @idol_id OR idol_id < 0 OR idol_id IS NULL) " +
+            "AND event_type NOT IN ('" + MoneyLedgerConstants.EventTypeTransaction + "', '" + MoneyLedgerConstants.EventTypeCoverageStarted + "') " +
             "ORDER BY CASE WHEN idol_id = @idol_id THEN 0 ELSE 1 END, game_date_key DESC, event_id DESC " +
             "LIMIT @limit_count;";
 
@@ -1582,6 +1585,36 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns exact cash mutations inside a half-open game-date range.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadMoneyTransactions(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool wasTruncated,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadMoneyTransactions(
+                startInclusive,
+                endExclusive,
+                maxCount,
+                out transactions,
+                out wasTruncated,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the first game date covered by the exact money ledger.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyLedgerCoverageStart(out DateTime coverageStart, out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyLedgerCoverageStart(out coverageStart, out errorMessage);
+        }
+
+        /// <summary>
         /// Forces immediate persistence of all currently queued records.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1698,6 +1731,36 @@ namespace IMDataCore
         public static bool TryReadRecentEventsForIdol(int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage)
         {
             return IMDataCoreController.Instance.TryReadRecentEventsForIdol(idolId, maxCount, out events, out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns exact cash mutations inside a half-open game-date range.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadMoneyTransactions(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool wasTruncated,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadMoneyTransactions(
+                startInclusive,
+                endExclusive,
+                maxCount,
+                out transactions,
+                out wasTruncated,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the first game date covered by the exact money ledger.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyLedgerCoverageStart(out DateTime coverageStart, out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyLedgerCoverageStart(out coverageStart, out errorMessage);
         }
 
         /// <summary>
