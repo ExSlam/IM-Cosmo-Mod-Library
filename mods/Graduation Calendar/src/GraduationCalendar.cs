@@ -6,6 +6,7 @@ using HarmonyLib;
 using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace GraduationCalendar
@@ -14,7 +15,6 @@ namespace GraduationCalendar
     {
         internal const string ProfileRenderTabExtras = "RenderTab_Extras";
         internal const string PopupManagerStart = "Start";
-        internal const string PopupManagerClose = "Close";
     }
 
     [HarmonyPatch(typeof(Profile_Popup), HarmonyTargetMethodNames.ProfileRenderTabExtras)]
@@ -125,95 +125,6 @@ namespace GraduationCalendar
         }
     }
 
-    [HarmonyPatch(typeof(PopupManager))]
-    internal static class PopupManager_Close_Patch
-    {
-        private const int ActionCallbackParameterCount = 1;
-        private const int NoArgumentParameterCount = 0;
-
-        private static MethodInfo cachedCloseMethod;
-
-        private static bool Prepare()
-        {
-            MethodInfo ignored;
-            return TryResolveTargetMethod(out ignored);
-        }
-
-        [HarmonyTargetMethod]
-        private static MethodBase TargetMethod()
-        {
-            MethodInfo target;
-            if (!TryResolveTargetMethod(out target))
-            {
-                return null;
-            }
-
-            return target;
-        }
-
-        private static bool TryResolveTargetMethod(out MethodInfo target)
-        {
-            if (cachedCloseMethod != null)
-            {
-                target = cachedCloseMethod;
-                return true;
-            }
-
-            MethodInfo actionCallbackCandidate = null;
-            MethodInfo noArgsCandidate = null;
-            MethodInfo fallbackCandidate = null;
-
-            MethodInfo[] methods = typeof(PopupManager).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            for (int i = 0; i < methods.Length; i++)
-            {
-                MethodInfo method = methods[i];
-                if (method == null)
-                {
-                    continue;
-                }
-
-                bool isCloseName =
-                    string.Equals(method.Name, HarmonyTargetMethodNames.PopupManagerClose, StringComparison.OrdinalIgnoreCase);
-                if (!isCloseName)
-                {
-                    continue;
-                }
-
-                if (fallbackCandidate == null)
-                {
-                    fallbackCandidate = method;
-                }
-
-                ParameterInfo[] parameters = method.GetParameters();
-                if (parameters == null)
-                {
-                    continue;
-                }
-
-                if (parameters.Length == ActionCallbackParameterCount && parameters[0].ParameterType == typeof(Action))
-                {
-                    actionCallbackCandidate = method;
-                    continue;
-                }
-
-                if (parameters.Length == NoArgumentParameterCount && noArgsCandidate == null)
-                {
-                    noArgsCandidate = method;
-                }
-            }
-
-            cachedCloseMethod = actionCallbackCandidate ?? noArgsCandidate ?? fallbackCandidate;
-            target = cachedCloseMethod;
-            return target != null;
-        }
-
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix(PopupManager __instance)
-        {
-            GraduationCalendarUI.OnPopupManagerClose(__instance);
-        }
-    }
-
     internal sealed class GraduationCalendarBootstrap : MonoBehaviour
     {
         private const float RetryIntervalSeconds = 2f;
@@ -227,44 +138,6 @@ namespace GraduationCalendar
             }
             nextTryTime = Time.unscaledTime + RetryIntervalSeconds;
             GraduationCalendarUI.TryInitialize();
-        }
-    }
-
-    internal sealed class GraduationCalendarPopupRecoveryTicker : MonoBehaviour
-    {
-        private const float TickIntervalSeconds = 0.5f;
-        private const float InitialDelaySeconds = 0.35f;
-        private float nextTickAt;
-
-        internal static void Ensure(PopupManager manager)
-        {
-            if (manager == null)
-            {
-                return;
-            }
-
-            if (manager.GetComponent<GraduationCalendarPopupRecoveryTicker>() != null)
-            {
-                return;
-            }
-
-            manager.gameObject.AddComponent<GraduationCalendarPopupRecoveryTicker>();
-        }
-
-        private void OnEnable()
-        {
-            nextTickAt = Time.unscaledTime + InitialDelaySeconds;
-        }
-
-        private void Update()
-        {
-            if (Time.unscaledTime < nextTickAt)
-            {
-                return;
-            }
-
-            nextTickAt = Time.unscaledTime + TickIntervalSeconds;
-            GraduationCalendarUI.RunBackdropRecoveryTick();
         }
     }
 
@@ -301,11 +174,7 @@ namespace GraduationCalendar
         private const float SelectorLabelHeight = 28f;
         private const float ArrowButtonWidth = 32f;
         private const float ArrowButtonHeight = 28f;
-        private const float BackdropSyncDurationSeconds = 0.1f;
-        private const float PopupGhostAlphaThreshold = 0.001f;
-        private const string SuperBlurTypeName = "SuperBlur";
-        private const string SuperBlurFastTypeName = "SuperBlurFast";
-        private const string InterpolationPropertyName = "interpolation";
+        private const int CustomPopupId = 1195594060; // ASCII "GCAL"
         private const int MonthsInYear = 12;
         private const int FirstMonthOfYear = 1;
         private const int UnknownGraduationYear = 1900;
@@ -313,8 +182,6 @@ namespace GraduationCalendar
         private const int DateKeyYearMultiplier = 100;
         private const float VisibleAlpha = 1f;
         private const float HiddenAlpha = 0f;
-        private const float DisabledBlurInterpolationValue = 0f;
-        private const float VisibleCanvasAlphaThreshold = 0.99f;
         private const float ScrollTopNormalizedPosition = 1f;
         private const string EmptyString = "";
         private const string SpaceSeparator = " ";
@@ -400,9 +267,7 @@ namespace GraduationCalendar
 
         private static bool initialized;
         private static bool initializing;
-        private static bool popupOpen;
         private static bool popupClosing;
-        private static bool backdropApplied;
         private static bool loggedFindAwardsFailure;
         private static bool loggedBootstrap;
         private static string logPath;
@@ -418,7 +283,6 @@ namespace GraduationCalendar
 
         private static GameObject buttonObject;
         private static GameObject popupRoot;
-        private static Popup popupComponent;
         private static TextMeshProUGUI yearLabel;
         private static GameObject yearRowObject;
         private static TextMeshProUGUI monthLabel;
@@ -453,7 +317,6 @@ namespace GraduationCalendar
                 manager.gameObject.AddComponent<GraduationCalendarBootstrap>();
             }
 
-            GraduationCalendarPopupRecoveryTicker.Ensure(manager);
             TryInitialize();
         }
 
@@ -525,7 +388,9 @@ namespace GraduationCalendar
             {
                 return false;
             }
-            return true;
+
+            PopupManager manager = GetPopupManager();
+            return TryRegisterPopup(manager, popupRoot);
         }
 
         private static GameObject FindExistingMenuButton()
@@ -597,7 +462,9 @@ namespace GraduationCalendar
             {
                 return;
             }
-            if (popupOpen || popupClosing)
+            PopupManager manager = GetPopupManager();
+            PopupManager._popup entry = manager != null ? manager.GetByType((PopupManager._type)CustomPopupId) : null;
+            if (entry != null && entry.open)
             {
                 Close();
             }
@@ -607,41 +474,9 @@ namespace GraduationCalendar
             }
         }
 
-        internal static void OnPopupManagerClose(PopupManager manager)
-        {
-            if (popupOpen && !popupClosing && IsCalendarPopupVisiblyActive())
-            {
-                Close();
-            }
-        }
-
-        internal static void RunBackdropRecoveryTick()
-        {
-            // Backdrop safety logic is intentionally disabled to avoid interfering
-            // with base-game popup queue and time flow.
-        }
-
-        internal static void CloseIfOpen()
-        {
-            if (popupOpen || popupClosing)
-            {
-                Close();
-            }
-        }
-
-        internal static bool NeedsSafetyNetRestore()
-        {
-            return false;
-        }
-
-        internal static void SafetyNetRestore()
-        {
-            backdropApplied = false;
-        }
-
         private static void Open()
         {
-            if (popupOpen || popupClosing || popupRoot == null)
+            if (popupClosing || popupRoot == null)
             {
                 return;
             }
@@ -655,16 +490,25 @@ namespace GraduationCalendar
             UpdateYearLabel();
             UpdateMonthLabel();
             RenderYear();
-            popupRoot.SetActive(true);
-            EnsurePopupVisible();
-            popupOpen = true;
+            PopupManager manager = GetPopupManager();
+            PopupManager._popup entry = manager != null ? manager.GetByType((PopupManager._type)CustomPopupId) : null;
+            if (entry == null || entry.obj != popupRoot)
+            {
+                return;
+            }
+            if (entry.open)
+            {
+                return;
+            }
+
+            PopupManager.OpenPopup((PopupManager._type)CustomPopupId);
             popupClosing = false;
             Log(string.Format(LogPopupOpenStateFormat, popupRoot.activeSelf, popupRoot.layer));
         }
 
         private static void Close()
         {
-            if ((!popupOpen && !popupClosing) || popupRoot == null)
+            if (popupRoot == null)
             {
                 return;
             }
@@ -673,414 +517,29 @@ namespace GraduationCalendar
                 return;
             }
 
-            popupClosing = true;
-            if (popupComponent != null && popupRoot.activeSelf)
+            PopupManager manager = GetPopupManager();
+            PopupManager._popup entry = manager != null ? manager.GetByType((PopupManager._type)CustomPopupId) : null;
+            if (manager != null && entry != null && entry.open)
             {
-                popupComponent.Hide(HandlePopupHidden);
+                popupClosing = true;
+                PopupManager.Close_(HandlePopupManagerCloseComplete);
                 return;
             }
 
-            popupRoot.SetActive(false);
             HandlePopupHidden();
+        }
+
+        private static void HandlePopupManagerCloseComplete()
+        {
+            popupClosing = false;
         }
 
         private static void HandlePopupHidden()
         {
-            popupOpen = false;
             popupClosing = false;
             if (popupRoot != null && popupRoot.activeSelf)
             {
                 popupRoot.SetActive(false);
-            }
-
-            backdropApplied = false;
-        }
-
-        private static void ApplyBackdrop()
-        {
-            backdropApplied = false;
-        }
-
-        private static void RestoreBackdrop()
-        {
-            popupOpen = false;
-            popupClosing = false;
-            backdropApplied = false;
-        }
-
-        private static void ApplyCalendarBackdropState(PopupManager manager)
-        {
-            if (manager == null)
-            {
-                return;
-            }
-
-            if (manager.BG != null)
-            {
-                manager.BG.SetActive(true);
-                CanvasGroup group = manager.BG.GetComponent<CanvasGroup>();
-                if (group != null)
-                {
-                    group.alpha = VisibleAlpha;
-                }
-            }
-
-            try
-            {
-                manager.BGBlur(true, BackdropSyncDurationSeconds);
-            }
-            catch
-            {
-            }
-
-            manager.BlockInput(true);
-            backdropApplied = true;
-        }
-
-        internal static bool TrySyncBackdropWithActiveManagedPopups(PopupManager manager)
-        {
-            if (manager == null)
-            {
-                return false;
-            }
-
-            if (IsCalendarPopupVisibleOrClosing())
-            {
-                ApplyCalendarBackdropState(manager);
-                return true;
-            }
-
-            if (manager.popups == null)
-            {
-                return false;
-            }
-
-            bool queueBusy = manager.queue != null && manager.queue.Count > 0;
-            bool allowRepair = !queueBusy;
-            bool hasActive = false;
-            bool requiresBlur = false;
-            bool requiresDarken = false;
-            RenderTexture activeRenderTexture = null;
-
-            for (int i = 0; i < manager.popups.Length; i++)
-            {
-                PopupManager._popup entry = manager.popups[i];
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                bool activeInHierarchy = entry.obj != null && entry.obj.activeInHierarchy;
-                if (allowRepair && entry.open && !activeInHierarchy)
-                {
-                    entry.open = false;
-                }
-
-                if (allowRepair && TryRepairGhostManagedPopupEntry(manager, entry, ref activeInHierarchy, queueBusy))
-                {
-                    entry.open = false;
-                }
-
-                if (!entry.open && !activeInHierarchy)
-                {
-                    continue;
-                }
-
-                hasActive = true;
-                if (entry.BGBlur)
-                {
-                    requiresBlur = true;
-                }
-
-                if (entry.BGDarken)
-                {
-                    requiresDarken = true;
-                }
-
-                if (activeRenderTexture == null && entry.BGRenderTexture != null)
-                {
-                    activeRenderTexture = entry.BGRenderTexture;
-                }
-            }
-
-            if (!hasActive)
-            {
-                return false;
-            }
-
-            try
-            {
-                manager.BGBlur(requiresBlur, BackdropSyncDurationSeconds);
-            }
-            catch
-            {
-            }
-
-            if (manager.BG != null)
-            {
-                CanvasGroup bgGroup = manager.BG.GetComponent<CanvasGroup>();
-                if (requiresDarken)
-                {
-                    manager.BG.SetActive(true);
-                    if (bgGroup != null)
-                    {
-                        bgGroup.alpha = VisibleAlpha;
-                    }
-                }
-                else
-                {
-                    if (bgGroup != null)
-                    {
-                        bgGroup.alpha = HiddenAlpha;
-                    }
-
-                    manager.BG.SetActive(false);
-                }
-            }
-
-            if (manager.BGImage != null)
-            {
-                CanvasGroup bgImageGroup = manager.BGImage.GetComponent<CanvasGroup>();
-                RawImage raw = manager.BGImage.GetComponent<RawImage>();
-                if (activeRenderTexture != null)
-                {
-                    manager.BGImage.SetActive(true);
-                    if (raw != null)
-                    {
-                        raw.texture = activeRenderTexture;
-                    }
-
-                    if (bgImageGroup != null)
-                    {
-                        bgImageGroup.alpha = VisibleAlpha;
-                    }
-                }
-                else
-                {
-                    if (bgImageGroup != null)
-                    {
-                        bgImageGroup.alpha = HiddenAlpha;
-                    }
-
-                    manager.BGImage.SetActive(false);
-                }
-            }
-
-            manager.BlockInput(true);
-            backdropApplied = true;
-            return true;
-        }
-
-        internal static bool TryRunPopupBackdropSafetyNet(PopupManager manager, bool resetPopupCounter)
-        {
-            if (manager == null)
-            {
-                return false;
-            }
-
-            if (ActiveDialogueController.ShowingDialogue)
-            {
-                return false;
-            }
-
-            if (manager.queue != null && manager.queue.Count > 0)
-            {
-                return false;
-            }
-
-            if (IsCalendarPopupVisibleOrClosing())
-            {
-                return false;
-            }
-
-            if (HasManagedPopupOpenOrActive(manager, true))
-            {
-                return false;
-            }
-
-            if (manager.BGImage != null)
-            {
-                CanvasGroup bgImageGroup = manager.BGImage.GetComponent<CanvasGroup>();
-                if (bgImageGroup != null)
-                {
-                    bgImageGroup.alpha = HiddenAlpha;
-                }
-
-                manager.BGImage.SetActive(false);
-            }
-
-            if (manager.BG != null)
-            {
-                CanvasGroup bgGroup = manager.BG.GetComponent<CanvasGroup>();
-                if (bgGroup != null)
-                {
-                    bgGroup.alpha = HiddenAlpha;
-                }
-
-                manager.BG.SetActive(false);
-            }
-
-            try
-            {
-                manager.BGBlur(false, BackdropSyncDurationSeconds);
-            }
-            catch
-            {
-            }
-
-            ForceDisableCameraBlur(manager);
-            manager.BlockInput(false);
-
-            if (resetPopupCounter && PopupManager.PopupCounter > 0)
-            {
-                PopupManager.PopupCounter = 0;
-            }
-
-            mainScript main = Camera.main != null ? Camera.main.GetComponent<mainScript>() : null;
-            if (main != null && ShouldResumeTimeAfterPopupClose())
-            {
-                main.Time_Resume();
-            }
-
-            backdropApplied = false;
-            return true;
-        }
-
-        private static bool HasManagedPopupOpenOrActive(PopupManager manager, bool repairStaleState)
-        {
-            if (manager == null || manager.popups == null)
-            {
-                return false;
-            }
-
-            bool queueBusy = manager.queue != null && manager.queue.Count > 0;
-            bool allowRepair = repairStaleState && !queueBusy;
-            for (int i = 0; i < manager.popups.Length; i++)
-            {
-                PopupManager._popup entry = manager.popups[i];
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                bool activeInHierarchy = entry.obj != null && entry.obj.activeInHierarchy;
-                if (allowRepair && entry.open && !activeInHierarchy)
-                {
-                    entry.open = false;
-                }
-
-                if (allowRepair && TryRepairGhostManagedPopupEntry(manager, entry, ref activeInHierarchy, queueBusy))
-                {
-                    entry.open = false;
-                }
-
-                if (entry.open || activeInHierarchy)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryRepairGhostManagedPopupEntry(
-            PopupManager manager,
-            PopupManager._popup entry,
-            ref bool activeInHierarchy,
-            bool queueBusy)
-        {
-            if (manager == null || entry == null || entry.obj == null || !activeInHierarchy)
-            {
-                return false;
-            }
-
-            Popup popup = entry.obj.GetComponent<Popup>();
-            CanvasGroup canvasGroup = entry.obj.GetComponent<CanvasGroup>();
-            if (popup == null)
-            {
-                return false;
-            }
-
-            bool hidden = canvasGroup != null && canvasGroup.alpha <= PopupGhostAlphaThreshold;
-            bool nonInteractive = canvasGroup != null && (!canvasGroup.blocksRaycasts || !canvasGroup.interactable);
-            bool staleClosedEntry = !entry.open && (!queueBusy || nonInteractive);
-            if (!hidden && !staleClosedEntry)
-            {
-                return false;
-            }
-
-            if (canvasGroup == null && entry.open && queueBusy)
-            {
-                return false;
-            }
-
-            entry.obj.SetActive(false);
-            activeInHierarchy = false;
-            if (popup.Increase_Popup_Counter && PopupManager.PopupCounter > 0)
-            {
-                PopupManager.PopupCounter--;
-            }
-
-            return true;
-        }
-
-        private static void ForceDisableCameraBlur(PopupManager manager)
-        {
-            Camera targetCamera = null;
-            if (manager != null && manager.MainCamera != null)
-            {
-                targetCamera = manager.MainCamera.GetComponent<Camera>();
-            }
-
-            if (targetCamera == null)
-            {
-                targetCamera = Camera.main;
-            }
-
-            if (targetCamera == null)
-            {
-                return;
-            }
-
-            DisableBlurComponent(targetCamera.gameObject, SuperBlurTypeName);
-            DisableBlurComponent(targetCamera.gameObject, SuperBlurFastTypeName);
-        }
-
-        private static void DisableBlurComponent(GameObject host, string typeName)
-        {
-            if (host == null || string.IsNullOrEmpty(typeName))
-            {
-                return;
-            }
-
-            Type blurType = AccessTools.TypeByName(typeName);
-            if (blurType == null)
-            {
-                return;
-            }
-
-            Component component = host.GetComponent(blurType);
-            if (component == null)
-            {
-                return;
-            }
-
-            Behaviour behaviour = component as Behaviour;
-            if (behaviour != null)
-            {
-                behaviour.enabled = false;
-            }
-
-            try
-            {
-                PropertyInfo interpolationProperty = blurType.GetProperty(InterpolationPropertyName, BindingFlags.Public | BindingFlags.Instance);
-                if (interpolationProperty != null && interpolationProperty.CanWrite)
-                {
-                    interpolationProperty.SetValue(component, DisabledBlurInterpolationValue, null);
-                }
-            }
-            catch
-            {
             }
         }
 
@@ -1113,51 +572,6 @@ namespace GraduationCalendar
             }
 
             return popup;
-        }
-
-        private static bool IsCalendarPopupVisibleOrClosing()
-        {
-            if (popupClosing)
-            {
-                return true;
-            }
-
-            return IsCalendarPopupVisiblyActive();
-        }
-
-        private static bool IsCalendarPopupVisiblyActive()
-        {
-            if (popupRoot == null || !popupRoot.activeInHierarchy)
-            {
-                return false;
-            }
-
-            CanvasGroup group = popupRoot.GetComponent<CanvasGroup>();
-            if (group == null)
-            {
-                return true;
-            }
-
-            return group.alpha > PopupGhostAlphaThreshold;
-        }
-
-        private static bool ShouldResumeTimeAfterPopupClose()
-        {
-            try
-            {
-                if (data_girls.new_girls != null && data_girls.new_girls.Count > 0)
-                {
-                    return false;
-                }
-                if (Substories_Manager.IntroGirls != null && Substories_Manager.IntroGirls.Count > 0)
-                {
-                    return false;
-                }
-            }
-            catch
-            {
-            }
-            return true;
         }
 
         private static void Log(string message)
@@ -1578,8 +992,6 @@ namespace GraduationCalendar
             canvasGroup.interactable = true;
             root.SetActive(false);
 
-            popupComponent = null;
-
             GameObject panel = CreateUIObject(panelObjectName, root.transform);
             RectTransform panelRect = panel.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(centerAnchor, centerAnchor);
@@ -1738,7 +1150,6 @@ namespace GraduationCalendar
             CreateScrollbar(scrollView.transform, scrollRect);
 
             contentRoot = content.transform;
-            popupRoot = root;
 
             Button closeButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1755,6 +1166,74 @@ namespace GraduationCalendar
             closeRect.pivot = new Vector2(centerAnchor, zeroAnchor);
             closeRect.anchoredPosition = new Vector2(zeroAnchor, closeButtonOffsetY);
             SetButtonBackgroundColor(closeButton != null ? closeButton.gameObject : null, GetButtonBackgroundColor());
+
+            Popup popup = root.AddComponent<Popup>();
+            popup.ShowAnimation = true;
+            popup.HideAnimation = true;
+            popup.HideFast = false;
+            popup.Increase_Popup_Counter = true;
+            popup.OnOpen = new UnityEvent();
+
+            PopupManager manager = GetPopupManager();
+            if (!TryRegisterPopup(manager, root))
+            {
+                contentRoot = null;
+                UnityEngine.Object.Destroy(root);
+                return;
+            }
+
+            popupRoot = root;
+        }
+
+        private static bool TryRegisterPopup(PopupManager manager, GameObject root)
+        {
+            if (manager == null || root == null)
+            {
+                return false;
+            }
+
+            PopupManager._type type = (PopupManager._type)CustomPopupId;
+            PopupManager._popup existing = manager.GetByType(type);
+            if (existing != null)
+            {
+                bool replacingRoot = existing.obj != root;
+                if (existing.obj != null && existing.obj != root)
+                {
+                    UnityEngine.Object.Destroy(existing.obj);
+                }
+                existing.obj = root;
+                if (replacingRoot)
+                {
+                    existing.open = false;
+                }
+                else if (existing.open && !root.activeInHierarchy)
+                {
+                    existing.open = false;
+                }
+                existing.BGBlur = true;
+                existing.BGDarken = true;
+                existing.BGRenderTexture = null;
+                return true;
+            }
+
+            PopupManager._popup calendarPopup = new PopupManager._popup
+            {
+                type = type,
+                obj = root,
+                open = false,
+                BGBlur = true,
+                BGDarken = true
+            };
+
+            if (manager.popups == null)
+            {
+                manager.popups = new PopupManager._popup[] { calendarPopup };
+                return true;
+            }
+
+            Array.Resize(ref manager.popups, manager.popups.Length + 1);
+            manager.popups[manager.popups.Length - 1] = calendarPopup;
+            return true;
         }
 
         private static Transform GetPopupParent()
@@ -3921,46 +3400,85 @@ namespace GraduationCalendar
         {
             if (girl == null)
             {
+                Log("OpenProfileFromCalendar skipped: girl is null.");
                 return;
             }
             PopupManager manager = GetPopupManager();
             if (manager == null)
             {
+                Log("OpenProfileFromCalendar skipped: PopupManager is null.");
                 return;
             }
-            if (popupComponent != null && popupOpen)
+            PopupManager._popup calendar = manager.GetByType((PopupManager._type)CustomPopupId);
+            bool calendarIsVisible = calendar != null && calendar.obj != null && calendar.obj.activeInHierarchy;
+            bool calendarIsOpen = calendar != null && (calendar.open || calendarIsVisible);
+
+            // Queue the profile behind the calendar, then let PopupManager advance
+            // the queue so the shared blur remains owned by the popup lifecycle.
+            if (calendarIsOpen)
+            {
+                calendar.open = true;
+                EnsureCalendarOwnsQueueFront(manager);
+            }
+
+            if (!OpenProfilePopup(manager, girl))
+            {
+                Log("OpenProfileFromCalendar skipped: profile popup entry is unavailable.");
+                return;
+            }
+
+            if (calendarIsOpen)
             {
                 popupClosing = true;
-                popupComponent.Hide(delegate
-                {
-                    popupOpen = false;
-                    popupClosing = false;
-                    OpenProfilePopup(manager, girl);
-                    RestoreBackdrop();
-                });
+                PopupManager.Close_(HandlePopupManagerCloseComplete);
                 return;
             }
-            Close();
-            OpenProfilePopup(manager, girl);
+
+            HandlePopupHidden();
         }
 
-        private static void OpenProfilePopup(PopupManager manager, data_girls.girls girl)
+        private static void EnsureCalendarOwnsQueueFront(PopupManager manager)
+        {
+            if (manager == null)
+            {
+                return;
+            }
+
+            if (manager.queue == null)
+            {
+                manager.queue = new List<PopupManager._type>();
+            }
+
+            PopupManager._type calendarType = (PopupManager._type)CustomPopupId;
+            for (int i = manager.queue.Count - 1; i >= 0; i--)
+            {
+                if (manager.queue[i] == calendarType)
+                {
+                    manager.queue.RemoveAt(i);
+                }
+            }
+
+            manager.queue.Insert(0, calendarType);
+        }
+
+        private static bool OpenProfilePopup(PopupManager manager, data_girls.girls girl)
         {
             if (manager == null || girl == null)
             {
-                return;
+                return false;
             }
             PopupManager._popup popup = manager.GetByType(PopupManager._type.girl_profile);
             if (popup == null || popup.obj == null)
             {
-                return;
+                return false;
             }
-            manager.Open(PopupManager._type.girl_profile, true);
+            PopupManager.OpenPopup(PopupManager._type.girl_profile);
             Profile_Popup profile = popup.obj.GetComponent<Profile_Popup>();
             if (profile != null)
             {
                 profile.Set(girl);
             }
+            return true;
         }
 
         private static string GetCloseLabel()
@@ -4325,26 +3843,6 @@ namespace GraduationCalendar
             catch
             {
                 return EmptyString;
-            }
-        }
-
-        private static void EnsurePopupVisible()
-        {
-            if (popupRoot == null)
-            {
-                return;
-            }
-            CanvasGroup group = popupRoot.GetComponent<CanvasGroup>();
-            if (group != null && group.alpha < VisibleCanvasAlphaThreshold)
-            {
-                group.alpha = VisibleAlpha;
-                group.blocksRaycasts = true;
-                group.interactable = true;
-            }
-            RectTransform rect = popupRoot.GetComponent<RectTransform>();
-            if (rect != null)
-            {
-                rect.localScale = Vector3.one;
             }
         }
 
