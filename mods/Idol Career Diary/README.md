@@ -14,6 +14,9 @@ This mod does not ship a separate persistence backend. It reads timeline events 
 - Adds a dedicated career diary view in idol profile flow.
 - Reads recent timeline events for the selected idol.
 - Groups and formats event types (career, contracts, singles, shows, finance, relationships, and more).
+- Searches player-facing timeline text and event payload keywords live from the timeline toolbar.
+- Shows complete election rankings (including votes and points), including rankings extended by Tel's Extended SSK.
+- Promotes election-attached single and concert events into the idol timeline and links to them from election details.
 - Keeps timeline rendering stable when dependencies are present; shows dependency errors when required mods are missing.
 - Lets content-only mods override diary text by shipping JSON files in an `Idol Career Diary` folder.
 
