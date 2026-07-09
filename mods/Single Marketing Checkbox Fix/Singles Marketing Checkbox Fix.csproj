@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Singles Marketing Checkbox Fix</ModName>
+    <RootNamespace>SinglesMarketingCheckboxFix</RootNamespace>
+    <AssemblyName>com.cosmo.singlesmarketingcheckboxfix</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\SinglesMarketingCheckboxFix.cs" />
+  </ItemGroup>
+</Project>
