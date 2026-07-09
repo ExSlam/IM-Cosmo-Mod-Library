@@ -109,3 +109,6 @@ cheat.tooltip.trigger_random_scandal=Gerar um escândalo de namoro aleatório pa
 notification.break_up_idol_dating=Os namoros das idols foram encerrados.
 notification.no_idol_dating_relationships=Nenhum namoro de idol fora do produtor foi encontrado.
 notification.no_scandal_candidates=Nenhuma idol está elegível para um escândalo de namoro aleatório.
+cheat.button.reveal_all_relationships=Revelar todas relações
+cheat.tooltip.reveal_all_relationships=Revela todas as relações entre idols, panelinhas e alvos de bullying.
+notification.reveal_all_relationships=Todas as relações, panelinhas e alvos de bullying foram revelados.

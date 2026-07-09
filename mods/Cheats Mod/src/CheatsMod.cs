@@ -57,6 +57,7 @@ namespace CheatsMod
         internal const string NotificationRevealDislikedIdols = "notification.reveal_disliked_idols";
         internal const string NotificationRevealCliques = "notification.reveal_cliques";
         internal const string NotificationRevealBullies = "notification.reveal_bullies";
+        internal const string NotificationRevealAllRelationships = "notification.reveal_all_relationships";
         internal const string NotificationMaxResearch = "notification.max_research";
         internal const string NotificationMaxStaffLevels = "notification.max_staff_levels";
         internal const string NotificationRevealDatingStatus = "notification.reveal_dating_status";
@@ -103,6 +104,7 @@ namespace CheatsMod
         internal const string NotificationRevealDislikedIdols = "Disliked idol relationships revealed.";
         internal const string NotificationRevealCliques = "Cliques revealed.";
         internal const string NotificationRevealBullies = "Bullying targets revealed.";
+        internal const string NotificationRevealAllRelationships = "All idol relationships, cliques, and bullying targets revealed.";
         internal const string NotificationMaxResearch = "All research unlocked and set to level 10.";
         internal const string NotificationMaxStaffLevels = "All staff levels set to 20.";
         internal const string NotificationRevealDatingStatus = "Dating statuses revealed.";
@@ -172,6 +174,12 @@ namespace CheatsMod
             Relationships_Player._type.Friendship,
             Relationships_Player._type.Romance
         };
+
+        private sealed class PlayerRelationshipTarget
+        {
+            internal data_girls.girls Idol;
+            internal Relationships_Player._type Type;
+        }
 
         public static void AddOneBillionYen()
         {
@@ -302,6 +310,11 @@ namespace CheatsMod
         public static void RevealBullies()
         {
             Execute(RevealBulliesCore);
+        }
+
+        public static void RevealAllRelationships()
+        {
+            Execute(RevealAllRelationshipsCore);
         }
 
         public static void MaxOutResearch()
@@ -887,6 +900,29 @@ namespace CheatsMod
                 NotificationManager._notification._type.idol_relationship_change);
         }
 
+        private static void RevealAllRelationshipsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = RevealAllRelationshipPairs();
+            appliedCount += RevealAllCliquesAndBullies();
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoRelationships, CheatFallbackText.NotificationNoRelationships);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationRevealAllRelationships,
+                CheatFallbackText.NotificationRevealAllRelationships,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
         private static void MaxOutResearchCore()
         {
             if (!RequireGameData())
@@ -1077,18 +1113,36 @@ namespace CheatsMod
                 return;
             }
 
-            int appliedCount = ApplyToActiveIdols(delegate(data_girls.girls idol)
-            {
-                for (int relationshipIndex = 0; relationshipIndex < PlayerRelationshipTypes.Length; relationshipIndex++)
-                {
-                    SetPlayerRelationshipToMaximum(idol, PlayerRelationshipTypes[relationshipIndex]);
-                }
-            });
-
-            if (appliedCount == CheatAmounts.ZeroCount)
+            List<data_girls.girls> activeIdols = data_girls.GetActiveGirls(null);
+            if (activeIdols == null || activeIdols.Count == CheatAmounts.ZeroCount)
             {
                 NotifyWarning(CheatLocalizationKeys.NotificationNoActiveIdols, CheatFallbackText.NotificationNoActiveIdols);
                 return;
+            }
+
+            PlayerRelationshipTarget visiblePopupTarget = GetRandomNotMaxedPlayerRelationship(activeIdols);
+            int maxPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
+            int preMaxPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel - CheatAmounts.RelationshipLevelIncrement);
+
+            ApplyToIdolList(activeIdols, delegate(data_girls.girls idol)
+            {
+                for (int relationshipIndex = 0; relationshipIndex < PlayerRelationshipTypes.Length; relationshipIndex++)
+                {
+                    Relationships_Player._type relationshipType = PlayerRelationshipTypes[relationshipIndex];
+                    if (IsSamePlayerRelationshipTarget(visiblePopupTarget, idol, relationshipType))
+                    {
+                        SetPlayerRelationshipPointsSilently(idol, relationshipType, preMaxPoints);
+                    }
+                    else
+                    {
+                        SetPlayerRelationshipPointsSilently(idol, relationshipType, maxPoints);
+                    }
+                }
+            });
+
+            if (visiblePopupTarget != null)
+            {
+                Relationships_Player.AddPoints(visiblePopupTarget.Type, visiblePopupTarget.Idol, maxPoints - preMaxPoints);
             }
 
             RefreshIdolList();
@@ -1218,6 +1272,150 @@ namespace CheatsMod
             {
                 Relationships_Player.AddPoints(relationshipType, idol, pointDelta);
             }
+        }
+
+        private static PlayerRelationshipTarget GetRandomNotMaxedPlayerRelationship(List<data_girls.girls> idols)
+        {
+            if (idols == null)
+            {
+                return null;
+            }
+
+            List<PlayerRelationshipTarget> targets = new List<PlayerRelationshipTarget>();
+            for (int idolIndex = 0; idolIndex < idols.Count; idolIndex++)
+            {
+                data_girls.girls idol = idols[idolIndex];
+                if (idol == null)
+                {
+                    continue;
+                }
+
+                for (int relationshipIndex = 0; relationshipIndex < PlayerRelationshipTypes.Length; relationshipIndex++)
+                {
+                    Relationships_Player._type relationshipType = PlayerRelationshipTypes[relationshipIndex];
+                    if (idol.GetRelationshipLevel(relationshipType) < CheatAmounts.MaximumPositiveRelationshipLevel)
+                    {
+                        targets.Add(new PlayerRelationshipTarget
+                        {
+                            Idol = idol,
+                            Type = relationshipType
+                        });
+                    }
+                }
+            }
+
+            if (targets.Count == CheatAmounts.ZeroCount)
+            {
+                return null;
+            }
+
+            return ExtensionMethods.GetRandomElement<PlayerRelationshipTarget>(targets);
+        }
+
+        private static bool IsSamePlayerRelationshipTarget(
+            PlayerRelationshipTarget target,
+            data_girls.girls idol,
+            Relationships_Player._type relationshipType)
+        {
+            return target != null && target.Idol == idol && target.Type == relationshipType;
+        }
+
+        private static void SetPlayerRelationshipPointsSilently(
+            data_girls.girls idol,
+            Relationships_Player._type relationshipType,
+            int points)
+        {
+            if (idol == null)
+            {
+                return;
+            }
+
+            int clampedPoints = ClampPlayerRelationshipPoints(points);
+            switch (relationshipType)
+            {
+                case Relationships_Player._type.Friendship:
+                    idol.Rel_Friendship_Points = clampedPoints;
+                    break;
+                case Relationships_Player._type.Influence:
+                    idol.Rel_Influence_Points = clampedPoints;
+                    break;
+                case Relationships_Player._type.Romance:
+                    idol.Rel_Romance_Points = clampedPoints;
+                    break;
+            }
+
+            idol.UpdateButton();
+        }
+
+        private static int ClampPlayerRelationshipPoints(int points)
+        {
+            int minPoints = Relationships_Player.GetPointsByLevel(-CheatAmounts.MaximumPositiveRelationshipLevel);
+            int maxPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
+            return Math.Max(minPoints, Math.Min(maxPoints, points));
+        }
+
+        private static int RevealAllRelationshipPairs()
+        {
+            if (Relationships.RelationshipsData == null)
+            {
+                return CheatAmounts.ZeroCount;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int relationshipIndex = 0; relationshipIndex < Relationships.RelationshipsData.Count; relationshipIndex++)
+            {
+                appliedCount += MarkRelationshipKnown(Relationships.RelationshipsData[relationshipIndex]);
+            }
+
+            return appliedCount;
+        }
+
+        private static int RevealAllCliquesAndBullies()
+        {
+            if (Relationships.Cliques == null)
+            {
+                return CheatAmounts.ZeroCount;
+            }
+
+            int appliedCount = CheatAmounts.ZeroCount;
+            for (int cliqueIndex = 0; cliqueIndex < Relationships.Cliques.Count; cliqueIndex++)
+            {
+                Relationships._clique clique = Relationships.Cliques[cliqueIndex];
+                if (clique == null)
+                {
+                    continue;
+                }
+
+                clique.Known = true;
+                appliedCount++;
+
+                if (clique.Bullied_Girls == null)
+                {
+                    continue;
+                }
+
+                if (clique.KnownBulliedGirls == null)
+                {
+                    clique.KnownBulliedGirls = new List<data_girls.girls>();
+                }
+
+                for (int targetIndex = 0; targetIndex < clique.Bullied_Girls.Count; targetIndex++)
+                {
+                    data_girls.girls target = clique.Bullied_Girls[targetIndex];
+                    if (target == null)
+                    {
+                        continue;
+                    }
+
+                    if (!clique.KnownBulliedGirls.Contains(target))
+                    {
+                        clique.AddKnownBulliedGirl(target);
+                    }
+                    appliedCount++;
+                }
+            }
+
+            return appliedCount;
         }
 
         private static void RevealRelationshipsByStatus(

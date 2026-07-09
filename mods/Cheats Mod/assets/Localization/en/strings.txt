@@ -110,3 +110,6 @@ cheat.tooltip.trigger_random_scandal=Trigger a random dating scandal for an elig
 notification.break_up_idol_dating=Idol dating relationships ended.
 notification.no_idol_dating_relationships=No non-producer idol dating relationships found.
 notification.no_scandal_candidates=No idol is eligible for a random dating scandal.
+cheat.button.reveal_all_relationships=Reveal all relationships
+cheat.tooltip.reveal_all_relationships=Reveal all idol relationships, cliques, and bullying targets.
+notification.reveal_all_relationships=All idol relationships, cliques, and bullying targets revealed.

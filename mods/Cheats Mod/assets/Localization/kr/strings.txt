@@ -106,3 +106,6 @@ cheat.tooltip.trigger_random_scandal=조건에 맞는 아이돌에게 무작위 
 notification.break_up_idol_dating=아이돌의 연애 관계를 종료했습니다.
 notification.no_idol_dating_relationships=프로듀서 이외의 상대와 연애 중인 아이돌이 없습니다.
 notification.no_scandal_candidates=무작위 연애 스캔들 대상이 될 아이돌이 없습니다.
+cheat.button.reveal_all_relationships=모든 관계 공개
+cheat.tooltip.reveal_all_relationships=아이돌 관계, 파벌, 괴롭힘 대상을 모두 공개합니다.
+notification.reveal_all_relationships=모든 아이돌 관계, 파벌, 괴롭힘 대상을 공개했습니다.

@@ -32,10 +32,11 @@ Adds cheat actions to the Mod Buttons action hub.
 - Reveal disliked idol relationships
 - Reveal cliques
 - Reveal bullying targets
+- Reveal all idol relationships, cliques, and bullying targets
 - Unlock all research and set research levels to 10
 - Set all staff skill levels to 20
 - Reveal dating status
 - Reveal dating preference
 - End all idol dating relationships except relationships with the producer
 - Heal idols, cure injuries/depression, and return idols from hiatus
-- Max active idol influence, friendship, and romance
+- Max active idol influence, friendship, and romance, with only one representative relationship popup

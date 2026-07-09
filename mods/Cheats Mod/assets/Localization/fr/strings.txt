@@ -106,3 +106,6 @@ cheat.tooltip.trigger_random_scandal=Déclenche un scandale amoureux aléatoire 
 notification.break_up_idol_dating=Les relations amoureuses des idoles ont pris fin.
 notification.no_idol_dating_relationships=Aucune relation amoureuse d'idole hors producteur n'a été trouvée.
 notification.no_scandal_candidates=Aucune idole n'est admissible à un scandale amoureux aléatoire.
+cheat.button.reveal_all_relationships=Révéler toutes les relations
+cheat.tooltip.reveal_all_relationships=Révèle toutes les relations entre idoles, les clans et les cibles de harcèlement.
+notification.reveal_all_relationships=Toutes les relations, clans et cibles de harcèlement ont été révélés.

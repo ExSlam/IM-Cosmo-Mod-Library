@@ -24,7 +24,7 @@ List of cheats:
     [*] Increase every active idol's influence by one level
     [*] Increase every active idol's friendship by one level
     [*] Increase every active idol's romance by one level
-    [*] Max active idol influence, friendship, and romance
+    [*] Max active idol influence, friendship, and romance with only one representative relationship popup
     [*] Add 25k EXP to all staff skills
     [*] Set every staff skill level to 20
     [*] Add 1k points to every research type
@@ -36,6 +36,7 @@ List of cheats:
     [*] Reveal idol dislike and hate relationships
     [*] Reveal all idol cliques
     [*] Reveal all known bullying targets
+    [*] Reveal all idol relationships, cliques, and bullying targets
     [*] Reveal every idol's current dating status
     [*] Reveal every idol's dating preference
     [*] End all idol dating relationships except relationships with the producer

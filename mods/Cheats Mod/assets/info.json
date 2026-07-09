@@ -2,7 +2,7 @@
   "Title": "Cheats Mod",
   "Description": "Adds cheat actions to the Mod Buttons action hub. Requires Mod Buttons.",
   "Author": "Cosmo",
-  "Version": "1.2.0",
+  "Version": "1.2.1",
   "Tags": ["cheats", "ui"],
   "HarmonyID": "com.cosmo.cheatsmod"
 }

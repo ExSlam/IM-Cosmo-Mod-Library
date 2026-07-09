@@ -260,6 +260,16 @@
 		"method": "RevealBullies"
 	},
 	{
+		"label": "Reveal all relationships",
+		"codeLabel": "cheat.button.reveal_all_relationships",
+		"tooltip": "Reveal all idol relationships, cliques, and bullying targets.",
+		"codeTooltip": "cheat.tooltip.reveal_all_relationships",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "RevealAllRelationships"
+	},
+	{
 		"label": "Reveal dating status",
 		"codeLabel": "cheat.button.reveal_dating_status",
 		"tooltip": "Reveal every idol's current dating status.",
