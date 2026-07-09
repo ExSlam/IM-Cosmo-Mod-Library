@@ -79,7 +79,7 @@ Methods:
 
 - `IMDataCoreApi` with compatibility alias `IMDataCoreAPI` public method signatures are stable for the `1.x` line.
 - `IMDataCoreSession.NamespaceIdentifier`, `IMDataCoreEvent`, and `IMDataCoreMoneyTransaction` public properties are stable for `1.x` consumers.
-- Money transactions expose `SectionCode` and optional structured `Details`. Structured details currently cover business contracts, single releases, show episodes, individual idol salaries, and individual staff salaries. Staff salary details include proficiency snapshots for every staff skill.
+- Money transactions expose `SectionCode` and optional structured `Details`. Structured details currently cover business contracts, single releases, show episodes, individual idol salaries, individual staff salaries, daily theater attendance, monthly theater streaming, daily cafe results, and concert costs/revenue. Staff salary details include the stable job-role code plus level and progress snapshots for every staff skill; concert details include the ordered song/talk setlist and accident outcomes.
 - Single releases and show episodes are represented by paired income/expense records in one transaction group, preserving gross revenue and production cost/weekly budget separately. A zero-cost expense record is retained for digital-only singles.
 - Internal controller/storage/patch implementation details are not public API and may evolve without breaking semantic versioning.
 

@@ -33,14 +33,38 @@ namespace IMDataCore
     [HarmonyPatch(typeof(SEvent_Concerts), nameof(SEvent_Concerts.StartConcert))]
     internal static class SEvent_Concerts_StartConcert_IMDataCoreCapture_Patch
     {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(SEvent_Concerts __instance)
+        {
+            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildConcertCapture(
+                __instance != null ? __instance.Concert : null,
+                false));
+        }
+
         /// <summary>
         /// Records one concert-started event after launch costs and UI flow are applied.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(SEvent_Concerts __instance)
         {
-            SEvent_Concerts._concert activeConcert = __instance != null ? __instance.Concert : null;
-            IMDataCoreController.Instance.CaptureConcertStarted(activeConcert);
+            try
+            {
+                SEvent_Concerts._concert activeConcert = __instance != null ? __instance.Concert : null;
+                IMDataCoreController.Instance.CaptureConcertStarted(activeConcert);
+            }
+            finally
+            {
+                MoneyLedgerAmbientContext.Clear();
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception)
+        {
+            MoneyLedgerAmbientContext.Clear();
+            return __exception;
         }
     }
 

@@ -17,6 +17,21 @@ namespace IMDataCore
         internal const string MethodShowGetProfit = "GetProfit";
         internal const string MethodShowRelease = "ReleaseShow";
         internal const string MethodShowOnNewDay = "OnNewDay";
+        internal const string TheaterIncomeAttendance = "attendance";
+        internal const string TheaterIncomeStreaming = "streaming";
+        internal const string SourceTypeTheaters = "Theaters";
+        internal const string SourceTypeCafes = "Cafes";
+        internal const string SourceTypeSingles = "singles";
+        internal const string SourceTypeShows = "Shows";
+        internal const string SourceTypeBusiness = "business";
+        internal const string SourceTypeConcertPopup = "Concert_Popup";
+        internal const string SourceTypeConcertSystem = "SEvent_Concerts";
+        internal const string SourceMethodTheaterCompleteDay = "CompleteDay";
+        internal const string SourceMethodCafeRender = "RenderCafe";
+        internal const string SourceMethodConcertStart = "StartConcert";
+        internal const string SourceMethodConcertFinish = "FinishConcert";
+        internal const string ConcertResultSuccess = "success";
+        internal const string ConcertResultCriticalFailure = "critical_failure";
         internal const string FansWatchHarmonyId = "com.tbs.fanswatch";
         internal const string FansWatchAssemblyName = "com.tbs.fanswatch";
         internal const string FansWatchAudiencePatchType = "FansWatchShows.GetAudiencePatch";
@@ -28,6 +43,8 @@ namespace IMDataCore
         internal const double ContractMetadataLookbackDays = -120d;
         internal const double ContractMetadataEndDateOffsetDays = 1d;
         internal const int ContractMetadataReadCount = 10000;
+        internal const int FirstDayOfMonth = 1;
+        internal const float PercentageScale = 100f;
     }
 
     internal sealed class MoneyLedgerContractRuntimeMetadata
@@ -40,6 +57,63 @@ namespace IMDataCore
     {
         internal MoneyLedgerDetailPayload Details;
         internal readonly List<MoneyLedgerAllocationSnapshot> Allocations = new List<MoneyLedgerAllocationSnapshot>();
+        internal Action PrepareForCapture;
+        internal string ExpectedSourceType = string.Empty;
+        internal string ExpectedSourceMethod = string.Empty;
+    }
+
+    internal sealed class MoneyLedgerConcertOutcomeCounts
+    {
+        internal int Successes;
+        internal int Failures;
+        internal int CriticalFailures;
+    }
+
+    internal static class MoneyLedgerConcertOutcomeTracker
+    {
+        private static readonly Dictionary<int, MoneyLedgerConcertOutcomeCounts> CountsByConcertId =
+            new Dictionary<int, MoneyLedgerConcertOutcomeCounts>();
+
+        internal static void Record(int concertId, string resultTypeCode)
+        {
+            if (concertId < CoreConstants.MinimumValidIdolIdentifier)
+            {
+                return;
+            }
+
+            MoneyLedgerConcertOutcomeCounts counts;
+            if (!CountsByConcertId.TryGetValue(concertId, out counts))
+            {
+                counts = new MoneyLedgerConcertOutcomeCounts();
+                CountsByConcertId[concertId] = counts;
+            }
+
+            if (string.Equals(resultTypeCode, MoneyLedgerDetailConstants.ConcertResultSuccess, StringComparison.Ordinal))
+            {
+                counts.Successes++;
+            }
+            else if (string.Equals(resultTypeCode, MoneyLedgerDetailConstants.ConcertResultCriticalFailure, StringComparison.Ordinal))
+            {
+                counts.CriticalFailures++;
+            }
+            else
+            {
+                counts.Failures++;
+            }
+        }
+
+        internal static MoneyLedgerConcertOutcomeCounts Get(int concertId)
+        {
+            MoneyLedgerConcertOutcomeCounts counts;
+            return CountsByConcertId.TryGetValue(concertId, out counts)
+                ? counts
+                : new MoneyLedgerConcertOutcomeCounts();
+        }
+
+        internal static void Remove(int concertId)
+        {
+            CountsByConcertId.Remove(concertId);
+        }
     }
 
     internal static class MoneyLedgerAmbientContext
@@ -57,7 +131,39 @@ namespace IMDataCore
         {
             MoneyLedgerAmbientCapture capture = current;
             current = null;
+            if (capture != null && capture.PrepareForCapture != null)
+            {
+                capture.PrepareForCapture();
+            }
+
             return capture;
+        }
+
+        internal static MoneyLedgerAmbientCapture Consume(string sourceType, string sourceMethod)
+        {
+            if (current == null)
+            {
+                return null;
+            }
+
+            if ((!string.IsNullOrEmpty(current.ExpectedSourceType)
+                    && !string.Equals(current.ExpectedSourceType, sourceType, StringComparison.Ordinal))
+                || (!string.IsNullOrEmpty(current.ExpectedSourceMethod)
+                    && !SourceMethodMatches(current.ExpectedSourceMethod, sourceMethod)))
+            {
+                return null;
+            }
+
+            return Consume();
+        }
+
+        private static bool SourceMethodMatches(string expectedSourceMethod, string actualSourceMethod)
+        {
+            return string.Equals(expectedSourceMethod, actualSourceMethod, StringComparison.Ordinal)
+                || (!string.IsNullOrEmpty(expectedSourceMethod)
+                    && !string.IsNullOrEmpty(actualSourceMethod)
+                    && actualSourceMethod.IndexOf(expectedSourceMethod, StringComparison.Ordinal)
+                        >= CoreConstants.ZeroBasedListStartIndex);
         }
 
         internal static void Clear()
@@ -122,7 +228,9 @@ namespace IMDataCore
                 return;
             }
 
-            MoneyLedgerAmbientCapture ambient = MoneyLedgerAmbientContext.Consume();
+            MoneyLedgerAmbientCapture ambient = MoneyLedgerAmbientContext.Consume(
+                snapshot.SourceType,
+                snapshot.SourceMethod);
             if (ambient != null)
             {
                 snapshot.Details = ambient.Details;
@@ -146,7 +254,9 @@ namespace IMDataCore
         {
             return new MoneyLedgerAmbientCapture
             {
-                Details = BuildProposalDetail(proposal)
+                Details = BuildProposalDetail(proposal),
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeBusiness,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.MethodAccept
             };
         }
 
@@ -154,13 +264,19 @@ namespace IMDataCore
         {
             return new MoneyLedgerAmbientCapture
             {
-                Details = BuildActiveContractDetail(activeContract)
+                Details = BuildActiveContractDetail(activeContract),
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeBusiness,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.MethodCancelContract
             };
         }
 
         internal static MoneyLedgerAmbientCapture BuildBrokenContractCapture(IEnumerable<business.active_proposal> contracts)
         {
-            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture();
+            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture
+            {
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeBusiness,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.MethodBreakContracts
+            };
             if (contracts == null)
             {
                 return capture;
@@ -189,7 +305,11 @@ namespace IMDataCore
 
         internal static MoneyLedgerAmbientCapture BuildSingleCapture(singles._single single)
         {
-            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture();
+            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture
+            {
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeSingles,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.MethodSingleAddMoney
+            };
             if (single == null)
             {
                 return capture;
@@ -219,7 +339,10 @@ namespace IMDataCore
 
         internal static MoneyLedgerAmbientCapture BuildShowCapture(Shows._show show)
         {
-            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture();
+            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture
+            {
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeShows
+            };
             if (show == null)
             {
                 return capture;
@@ -245,6 +368,305 @@ namespace IMDataCore
                 Details = details
             });
             return capture;
+        }
+
+        internal static MoneyLedgerAmbientCapture BuildTheaterCapture()
+        {
+            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture
+            {
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeTheaters,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.SourceMethodTheaterCompleteDay
+            };
+            if (Theaters.Theaters_ == null)
+            {
+                return capture;
+            }
+
+            for (int theaterIndex = CoreConstants.ZeroBasedListStartIndex; theaterIndex < Theaters.Theaters_.Count; theaterIndex++)
+            {
+                Theaters._theater theater = Theaters.Theaters_[theaterIndex];
+                if (theater == null)
+                {
+                    continue;
+                }
+
+                Theaters._theater._schedule performedSchedule = ResolvePerformedTheaterSchedule(theater);
+                bool hasAttendanceIncome =
+                    theater.Doing_Now == Theaters._theater._schedule._type.performance
+                    || theater.Doing_Now == Theaters._theater._schedule._type.manzai;
+                long attendanceIncome = hasAttendanceIncome ? theater.GetTicketSales() : MoneyLedgerConstants.ZeroMoney;
+                capture.Allocations.Add(new MoneyLedgerAllocationSnapshot
+                {
+                    Amount = attendanceIncome,
+                    CategoryCode = MoneyLedgerConstants.CategoryTheaters,
+                    DetailCode = MoneyLedgerConstants.DetailTheater,
+                    SectionCode = MoneyLedgerConstants.SectionIncome,
+                    IncludeWhenZero = true,
+                    Details = new MoneyLedgerDetailPayload
+                    {
+                        kind = MoneyLedgerConstants.DetailKindTheaterAttendance,
+                        theater_id = theater.ID,
+                        theater_title = theater.GetTitle() ?? string.Empty,
+                        theater_income_type = MoneyLedgerDetailConstants.TheaterIncomeAttendance,
+                        theater_ticket_price = theater.Ticket_Price,
+                        theater_performance_type = CoreEnumNameMapping.ToTheaterScheduleTypeCode(theater.Doing_Now),
+                        theater_audience_type = ResolveTheaterAudienceType(performedSchedule),
+                        theater_attendance = hasAttendanceIncome ? theater.GetAttendance() : CoreConstants.ZeroBasedListStartIndex,
+                        theater_subscription_price = theater.Subscription_Price,
+                        theater_subscriber_total = theater.GetSubscribers(),
+                        gross_revenue = attendanceIncome
+                    }
+                });
+
+                if (staticVars.dateTime.Day == MoneyLedgerDetailConstants.FirstDayOfMonth)
+                {
+                    long streamingIncome = theater.GetSubRevenue();
+                    capture.Allocations.Add(new MoneyLedgerAllocationSnapshot
+                    {
+                        Amount = streamingIncome,
+                        CategoryCode = MoneyLedgerConstants.CategoryTheaters,
+                        DetailCode = MoneyLedgerConstants.DetailStreamingIncome,
+                        SectionCode = MoneyLedgerConstants.SectionIncome,
+                        IncludeWhenZero = true,
+                        Details = new MoneyLedgerDetailPayload
+                        {
+                            kind = MoneyLedgerConstants.DetailKindTheaterStreaming,
+                            theater_id = theater.ID,
+                            theater_title = theater.GetTitle() ?? string.Empty,
+                            theater_income_type = MoneyLedgerDetailConstants.TheaterIncomeStreaming,
+                            theater_subscription_price = theater.Subscription_Price,
+                            theater_subscriber_total = theater.GetSubscribers(),
+                            gross_revenue = streamingIncome
+                        }
+                    });
+                }
+            }
+
+            capture.PrepareForCapture = delegate { FinalizeTheaterCapture(capture); };
+            return capture;
+        }
+
+        internal static MoneyLedgerAmbientCapture BuildCafeCapture(Cafes._cafe cafe)
+        {
+            MoneyLedgerAmbientCapture capture = new MoneyLedgerAmbientCapture
+            {
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeCafes,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.SourceMethodCafeRender
+            };
+            if (cafe == null)
+            {
+                return capture;
+            }
+
+            Cafes._cafe._dish dish = cafe.GetCurrentDish();
+            int amount = cafe.GetMoneyToAdd();
+            capture.Allocations.Add(new MoneyLedgerAllocationSnapshot
+            {
+                Amount = amount,
+                CategoryCode = MoneyLedgerConstants.CategoryCafes,
+                DetailCode = MoneyLedgerConstants.DetailCafe,
+                SectionCode = amount < CoreConstants.ZeroBasedListStartIndex
+                    ? MoneyLedgerConstants.SectionExpense
+                    : MoneyLedgerConstants.SectionIncome,
+                IncludeWhenZero = true,
+                Details = new MoneyLedgerDetailPayload
+                {
+                    kind = MoneyLedgerConstants.DetailKindCafeDaily,
+                    cafe_id = cafe.ID,
+                    cafe_title = cafe.GetTitle() ?? string.Empty,
+                    cafe_dish_title = dish != null ? dish.Title ?? string.Empty : string.Empty,
+                    cafe_dish_type = dish != null
+                        ? CoreEnumNameMapping.ToCafeDishTypeCode(dish.Type)
+                        : CoreConstants.StatusCodeUnknown,
+                    cafe_staff_names = ResolveIdolNames(cafe.WorkingGirls),
+                    cafe_new_fans = cafe.GetFansToAdd(),
+                    cafe_appeal_type = CoreEnumNameMapping.ToFanTypeCode(cafe.GetFanTypeToAdd()),
+                    gross_revenue = amount
+                }
+            });
+            return capture;
+        }
+
+        internal static MoneyLedgerAmbientCapture BuildConcertCapture(SEvent_Concerts._concert concert, bool finished)
+        {
+            return new MoneyLedgerAmbientCapture
+            {
+                Details = BuildConcertDetail(concert, finished),
+                ExpectedSourceType = finished
+                    ? MoneyLedgerDetailConstants.SourceTypeConcertPopup
+                    : MoneyLedgerDetailConstants.SourceTypeConcertSystem,
+                ExpectedSourceMethod = finished
+                    ? MoneyLedgerDetailConstants.SourceMethodConcertFinish
+                    : MoneyLedgerDetailConstants.SourceMethodConcertStart
+            };
+        }
+
+        internal static void CapturePendingZeroAllocations(string sourceType, string sourceMethod)
+        {
+            MoneyLedgerAmbientCapture capture = MoneyLedgerAmbientContext.Consume();
+            if (capture == null || capture.Allocations.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                return;
+            }
+
+            long allocationTotal = MoneyLedgerConstants.ZeroMoney;
+            for (int allocationIndex = CoreConstants.ZeroBasedListStartIndex; allocationIndex < capture.Allocations.Count; allocationIndex++)
+            {
+                allocationTotal += capture.Allocations[allocationIndex].Amount;
+            }
+
+            if (allocationTotal != MoneyLedgerConstants.ZeroMoney)
+            {
+                return;
+            }
+
+            MoneyMutationSnapshot snapshot = new MoneyMutationSnapshot
+            {
+                IsMoney = true,
+                BalanceBefore = resources.Money(),
+                GameDate = staticVars.dateTime,
+                SourceAssembly = MoneyLedgerConstants.AssemblyCSharpName,
+                SourceType = sourceType ?? MoneyLedgerConstants.UnknownSource,
+                SourceMethod = sourceMethod ?? MoneyLedgerConstants.UnknownSource
+            };
+            snapshot.Allocations.AddRange(capture.Allocations);
+            IMDataCoreController.Instance.CaptureMoneyMutation(snapshot);
+        }
+
+        private static string ResolveTheaterAudienceType(Theaters._theater._schedule schedule)
+        {
+            if (schedule == null)
+            {
+                return CoreConstants.StatusCodeUnknown;
+            }
+
+            return schedule.FanType_Everyone
+                ? CoreConstants.TheaterScheduleFanTypeEveryone
+                : CoreEnumNameMapping.ToFanTypeCode(schedule.FanType);
+        }
+
+        private static Theaters._theater._schedule ResolvePerformedTheaterSchedule(Theaters._theater theater)
+        {
+            if (theater != null
+                && theater.Stats != null
+                && theater.Stats.Count > CoreConstants.ZeroBasedListStartIndex)
+            {
+                Theaters._theater._stat latestStat = theater.Stats[theater.Stats.Count - MoneyLedgerDetailConstants.LastCollectionIndexOffset];
+                if (latestStat != null
+                    && latestStat.Schedule != null
+                    && latestStat.Schedule.Type == theater.Doing_Now)
+                {
+                    return latestStat.Schedule;
+                }
+            }
+
+            return theater != null ? theater.GetSchedule() : null;
+        }
+
+        private static void FinalizeTheaterCapture(MoneyLedgerAmbientCapture capture)
+        {
+            if (capture == null)
+            {
+                return;
+            }
+
+            for (int allocationIndex = CoreConstants.ZeroBasedListStartIndex; allocationIndex < capture.Allocations.Count; allocationIndex++)
+            {
+                MoneyLedgerDetailPayload details = capture.Allocations[allocationIndex].Details;
+                if (details == null || details.theater_id < CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    continue;
+                }
+
+                Theaters._theater theater = Theaters.GetTheater(details.theater_id);
+                if (theater == null)
+                {
+                    continue;
+                }
+
+                details.theater_subscriber_total = theater.GetSubscribers();
+                if (string.Equals(details.kind, MoneyLedgerConstants.DetailKindTheaterStreaming, StringComparison.Ordinal)
+                    && theater.Stats != null
+                    && theater.Stats.Count > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    Theaters._theater._stat latestStat = theater.Stats[theater.Stats.Count - MoneyLedgerDetailConstants.LastCollectionIndexOffset];
+                    details.theater_subscriber_delta = latestStat != null
+                        ? latestStat.Subscribers
+                        : CoreConstants.ZeroBasedListStartIndex;
+                }
+            }
+        }
+
+        private static MoneyLedgerDetailPayload BuildConcertDetail(SEvent_Concerts._concert concert, bool finished)
+        {
+            if (concert == null)
+            {
+                return null;
+            }
+
+            SEvent_Concerts._concert._projectedValues projected = concert.ProjectedValues;
+            MoneyLedgerConcertOutcomeCounts outcomes = MoneyLedgerConcertOutcomeTracker.Get(concert.ID);
+            return new MoneyLedgerDetailPayload
+            {
+                kind = MoneyLedgerConstants.DetailKindConcert,
+                concert_id = concert.ID,
+                concert_title = concert.GetTitle() ?? string.Empty,
+                concert_venue = CoreEnumNameMapping.ToConcertVenueCode(concert.Venue),
+                concert_ticket_price = projected != null ? projected.TicketPrice : CoreConstants.ZeroBasedListStartIndex,
+                concert_projected_attendance = projected != null ? projected.GetNumberOfSoldTickets() : MoneyLedgerConstants.ZeroMoney,
+                concert_projected_hype = projected != null
+                    ? Mathf.RoundToInt(projected.GetHype() * MoneyLedgerDetailConstants.PercentageScale)
+                    : CoreConstants.ZeroBasedListStartIndex,
+                production_cost = projected != null ? projected.GetProductionCost() : MoneyLedgerConstants.ZeroMoney,
+                concert_finished = finished,
+                concert_finished_hype = finished && projected != null
+                    ? projected.Actual_Hype
+                    : CoreConstants.ZeroBasedListStartIndex,
+                concert_finished_revenue = finished && projected != null
+                    ? projected.Actual_Revenue
+                    : MoneyLedgerConstants.ZeroMoney,
+                concert_finished_profit = finished && projected != null
+                    ? projected.GetActualProfit()
+                    : MoneyLedgerConstants.ZeroMoney,
+                concert_accident_count = concert.UsedAccidents != null
+                    ? concert.UsedAccidents.Count
+                    : CoreConstants.ZeroBasedListStartIndex,
+                concert_accident_successes = outcomes.Successes,
+                concert_accident_failures = outcomes.Failures,
+                concert_accident_critical_failures = outcomes.CriticalFailures,
+                concert_setlist = BuildConcertSetlist(concert)
+            };
+        }
+
+        private static List<MoneyLedgerConcertSetlistItemPayload> BuildConcertSetlist(SEvent_Concerts._concert concert)
+        {
+            List<MoneyLedgerConcertSetlistItemPayload> setlist = new List<MoneyLedgerConcertSetlistItemPayload>();
+            if (concert == null || concert.SetListItems == null)
+            {
+                return setlist;
+            }
+
+            for (int itemIndex = CoreConstants.ZeroBasedListStartIndex; itemIndex < concert.SetListItems.Count; itemIndex++)
+            {
+                SEvent_Concerts._concert.ISetlistItem item = concert.SetListItems[itemIndex];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                SEvent_Concerts._concert._song song = item as SEvent_Concerts._concert._song;
+                setlist.Add(new MoneyLedgerConcertSetlistItemPayload
+                {
+                    is_talk = item.isMC(),
+                    title = item.GetTitle() ?? string.Empty,
+                    center_name = song != null && song.Center != null
+                        ? song.Center.GetName(true) ?? string.Empty
+                        : string.Empty,
+                    idol_names = ResolveIdolNames(item.GetGirls(true))
+                });
+            }
+
+            return setlist;
         }
 
         internal static bool IsShowMoneyCall()
@@ -319,6 +741,7 @@ namespace IMDataCore
                 {
                     kind = MoneyLedgerConstants.DetailKindStaffSalary,
                     staff_name = staffer.GetName(true, false) ?? string.Empty,
+                    staff_role_code = CoreEnumNameMapping.ToStaffTypeCode(staffer.type),
                     salary_amount = salary,
                     staff_skills = BuildStaffSkillDetails(staffer)
                 };
@@ -799,6 +1222,26 @@ namespace IMDataCore
             {
                 MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildShowCapture(__instance));
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(Shows), MoneyLedgerDetailConstants.MethodShowRelease)]
+    internal static class Shows_ReleaseShow_IMDataCoreMoneyLedgerContextCleanup_Patch
+    {
+        [HarmonyFinalizer]
+        private static void Finalizer()
+        {
+            MoneyLedgerAmbientContext.Clear();
+        }
+    }
+
+    [HarmonyPatch(typeof(Shows), MoneyLedgerDetailConstants.MethodShowOnNewDay)]
+    internal static class Shows_OnNewDay_IMDataCoreMoneyLedgerContextCleanup_Patch
+    {
+        [HarmonyFinalizer]
+        private static void Finalizer()
+        {
+            MoneyLedgerAmbientContext.Clear();
         }
     }
 }

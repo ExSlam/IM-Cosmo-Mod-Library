@@ -33,6 +33,10 @@ namespace IMDataCore
         internal const string DetailKindShow = "show";
         internal const string DetailKindIdolSalary = "idol_salary";
         internal const string DetailKindStaffSalary = "staff_salary";
+        internal const string DetailKindTheaterAttendance = "theater_attendance";
+        internal const string DetailKindTheaterStreaming = "theater_streaming";
+        internal const string DetailKindCafeDaily = "cafe_daily";
+        internal const string DetailKindConcert = "concert";
 
         internal const string CategoryContracts = "contracts";
         internal const string CategorySingles = "singles";
@@ -119,6 +123,15 @@ namespace IMDataCore
     }
 
     [Serializable]
+    internal sealed class MoneyLedgerConcertSetlistItemPayload
+    {
+        public bool is_talk;
+        public string title = string.Empty;
+        public string center_name = string.Empty;
+        public List<string> idol_names = new List<string>();
+    }
+
+    [Serializable]
     internal sealed class MoneyLedgerDetailPayload
     {
         public string kind = string.Empty;
@@ -152,10 +165,43 @@ namespace IMDataCore
         public float show_fatigue;
         public long show_weekly_budget;
         public string staff_name = string.Empty;
+        public string staff_role_code = string.Empty;
         public long salary_amount;
         public int idol_fame;
         public int idol_scandal_points;
         public List<MoneyLedgerStaffSkillPayload> staff_skills = new List<MoneyLedgerStaffSkillPayload>();
+        public int theater_id = CoreConstants.InvalidIdValue;
+        public string theater_title = string.Empty;
+        public string theater_income_type = string.Empty;
+        public int theater_ticket_price;
+        public string theater_performance_type = string.Empty;
+        public string theater_audience_type = string.Empty;
+        public int theater_attendance;
+        public int theater_subscription_price;
+        public int theater_subscriber_delta;
+        public long theater_subscriber_total;
+        public int cafe_id = CoreConstants.InvalidIdValue;
+        public string cafe_title = string.Empty;
+        public string cafe_dish_title = string.Empty;
+        public string cafe_dish_type = string.Empty;
+        public List<string> cafe_staff_names = new List<string>();
+        public int cafe_new_fans;
+        public string cafe_appeal_type = string.Empty;
+        public int concert_id = CoreConstants.InvalidIdValue;
+        public string concert_title = string.Empty;
+        public string concert_venue = string.Empty;
+        public int concert_ticket_price;
+        public long concert_projected_attendance;
+        public int concert_projected_hype;
+        public int concert_finished_hype;
+        public bool concert_finished;
+        public long concert_finished_revenue;
+        public long concert_finished_profit;
+        public int concert_accident_count;
+        public int concert_accident_successes;
+        public int concert_accident_failures;
+        public int concert_accident_critical_failures;
+        public List<MoneyLedgerConcertSetlistItemPayload> concert_setlist = new List<MoneyLedgerConcertSetlistItemPayload>();
     }
 
     public sealed class IMDataCoreMoneyTransactionStaffSkill
@@ -163,6 +209,14 @@ namespace IMDataCore
         public string Code { get; internal set; }
         public int Level { get; internal set; }
         public float Progress { get; internal set; }
+    }
+
+    public sealed class IMDataCoreMoneyTransactionConcertSetlistItem
+    {
+        public bool IsTalk { get; internal set; }
+        public string Title { get; internal set; }
+        public string CenterName { get; internal set; }
+        public List<string> IdolNames { get; internal set; }
     }
 
     public sealed class IMDataCoreMoneyTransactionDetail
@@ -198,10 +252,43 @@ namespace IMDataCore
         public float ShowFatigue { get; internal set; }
         public long ShowWeeklyBudget { get; internal set; }
         public string StaffName { get; internal set; }
+        public string StaffRoleCode { get; internal set; }
         public long SalaryAmount { get; internal set; }
         public int IdolFame { get; internal set; }
         public int IdolScandalPoints { get; internal set; }
         public List<IMDataCoreMoneyTransactionStaffSkill> StaffSkills { get; internal set; }
+        public int TheaterId { get; internal set; }
+        public string TheaterTitle { get; internal set; }
+        public string TheaterIncomeType { get; internal set; }
+        public int TheaterTicketPrice { get; internal set; }
+        public string TheaterPerformanceType { get; internal set; }
+        public string TheaterAudienceType { get; internal set; }
+        public int TheaterAttendance { get; internal set; }
+        public int TheaterSubscriptionPrice { get; internal set; }
+        public int TheaterSubscriberDelta { get; internal set; }
+        public long TheaterSubscriberTotal { get; internal set; }
+        public int CafeId { get; internal set; }
+        public string CafeTitle { get; internal set; }
+        public string CafeDishTitle { get; internal set; }
+        public string CafeDishType { get; internal set; }
+        public List<string> CafeStaffNames { get; internal set; }
+        public int CafeNewFans { get; internal set; }
+        public string CafeAppealType { get; internal set; }
+        public int ConcertId { get; internal set; }
+        public string ConcertTitle { get; internal set; }
+        public string ConcertVenue { get; internal set; }
+        public int ConcertTicketPrice { get; internal set; }
+        public long ConcertProjectedAttendance { get; internal set; }
+        public int ConcertProjectedHype { get; internal set; }
+        public int ConcertFinishedHype { get; internal set; }
+        public bool ConcertFinished { get; internal set; }
+        public long ConcertFinishedRevenue { get; internal set; }
+        public long ConcertFinishedProfit { get; internal set; }
+        public int ConcertAccidentCount { get; internal set; }
+        public int ConcertAccidentSuccesses { get; internal set; }
+        public int ConcertAccidentFailures { get; internal set; }
+        public int ConcertAccidentCriticalFailures { get; internal set; }
+        public List<IMDataCoreMoneyTransactionConcertSetlistItem> ConcertSetlist { get; internal set; }
     }
 
     public sealed class IMDataCoreMoneyTransaction
@@ -345,6 +432,28 @@ namespace IMDataCore
                 }
             }
 
+            List<IMDataCoreMoneyTransactionConcertSetlistItem> concertSetlist =
+                new List<IMDataCoreMoneyTransactionConcertSetlistItem>();
+            if (payload.concert_setlist != null)
+            {
+                for (int itemIndex = MoneyLedgerConstants.CollectionStartIndex; itemIndex < payload.concert_setlist.Count; itemIndex++)
+                {
+                    MoneyLedgerConcertSetlistItemPayload item = payload.concert_setlist[itemIndex];
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    concertSetlist.Add(new IMDataCoreMoneyTransactionConcertSetlistItem
+                    {
+                        IsTalk = item.is_talk,
+                        Title = item.title ?? string.Empty,
+                        CenterName = item.center_name ?? string.Empty,
+                        IdolNames = item.idol_names ?? new List<string>()
+                    });
+                }
+            }
+
             return new IMDataCoreMoneyTransactionDetail
             {
                 Kind = payload.kind ?? string.Empty,
@@ -378,10 +487,43 @@ namespace IMDataCore
                 ShowFatigue = payload.show_fatigue,
                 ShowWeeklyBudget = payload.show_weekly_budget,
                 StaffName = payload.staff_name ?? string.Empty,
+                StaffRoleCode = payload.staff_role_code ?? string.Empty,
                 SalaryAmount = payload.salary_amount,
                 IdolFame = payload.idol_fame,
                 IdolScandalPoints = payload.idol_scandal_points,
-                StaffSkills = skills
+                StaffSkills = skills,
+                TheaterId = payload.theater_id,
+                TheaterTitle = payload.theater_title ?? string.Empty,
+                TheaterIncomeType = payload.theater_income_type ?? string.Empty,
+                TheaterTicketPrice = payload.theater_ticket_price,
+                TheaterPerformanceType = payload.theater_performance_type ?? string.Empty,
+                TheaterAudienceType = payload.theater_audience_type ?? string.Empty,
+                TheaterAttendance = payload.theater_attendance,
+                TheaterSubscriptionPrice = payload.theater_subscription_price,
+                TheaterSubscriberDelta = payload.theater_subscriber_delta,
+                TheaterSubscriberTotal = payload.theater_subscriber_total,
+                CafeId = payload.cafe_id,
+                CafeTitle = payload.cafe_title ?? string.Empty,
+                CafeDishTitle = payload.cafe_dish_title ?? string.Empty,
+                CafeDishType = payload.cafe_dish_type ?? string.Empty,
+                CafeStaffNames = payload.cafe_staff_names ?? new List<string>(),
+                CafeNewFans = payload.cafe_new_fans,
+                CafeAppealType = payload.cafe_appeal_type ?? string.Empty,
+                ConcertId = payload.concert_id,
+                ConcertTitle = payload.concert_title ?? string.Empty,
+                ConcertVenue = payload.concert_venue ?? string.Empty,
+                ConcertTicketPrice = payload.concert_ticket_price,
+                ConcertProjectedAttendance = payload.concert_projected_attendance,
+                ConcertProjectedHype = payload.concert_projected_hype,
+                ConcertFinishedHype = payload.concert_finished_hype,
+                ConcertFinished = payload.concert_finished,
+                ConcertFinishedRevenue = payload.concert_finished_revenue,
+                ConcertFinishedProfit = payload.concert_finished_profit,
+                ConcertAccidentCount = payload.concert_accident_count,
+                ConcertAccidentSuccesses = payload.concert_accident_successes,
+                ConcertAccidentFailures = payload.concert_accident_failures,
+                ConcertAccidentCriticalFailures = payload.concert_accident_critical_failures,
+                ConcertSetlist = concertSetlist
             };
         }
     }

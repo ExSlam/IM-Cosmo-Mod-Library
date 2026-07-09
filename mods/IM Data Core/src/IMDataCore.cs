@@ -1454,6 +1454,13 @@ namespace IMDataCore
         internal const string JsonFieldElectionGeneratedFamePoints = "election_generated_fame_points";
         internal const string JsonFieldElectionPlaceBefore = "election_place_before";
         internal const string JsonFieldElectionPlaceAfter = "election_place_after";
+        internal const string JsonFieldElectionRankingSummary = "election_ranking_summary";
+        internal const string JsonFieldElectionRankedIdolIdList = "election_ranked_idol_id_list";
+        internal const string JsonFieldElectionNumber = "election_number";
+        internal const string JsonFieldElectionProductionLevel = "election_production_level";
+        internal const string JsonFieldElectionLogisticsLevel = "election_logistics_level";
+        internal const string JsonFieldElectionProductionCost = "election_production_cost";
+        internal const string JsonFieldElectionTotalProductionCost = "election_total_production_cost";
         internal const string JsonFieldScandalPreviousPoints = "scandal_previous_points";
         internal const string JsonFieldScandalNewPoints = "scandal_new_points";
         internal const string JsonFieldScandalDeltaPoints = "scandal_delta_points";
@@ -1477,6 +1484,8 @@ namespace IMDataCore
         internal const string TourCountryLevelPairSeparator = "|";
         internal const string TourCountryLevelValueSeparator = ":";
         internal const string ConcertSetlistEntrySeparator = "|";
+        internal const string ElectionRankingEntrySeparator = "|";
+        internal const string ElectionRankingFieldSeparator = ":";
         internal const string ConcertSetlistValueSeparator = ":";
         internal const string ConcertSetlistEntryTypeSong = "song";
         internal const string ConcertSetlistEntryTypeMc = "mc";
@@ -5290,10 +5299,123 @@ namespace IMDataCore
                 ElectionConcertId = ResolveConcertIdOrInvalid(election.Concert),
                 ElectionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 ElectionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
+                ElectionRankingSummary = BuildElectionRankingSummary(election),
+                ElectionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election),
+                ElectionNumber = election.Count,
+                ElectionProductionLevel = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.production),
+                ElectionLogisticsLevel = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.logistics),
+                ElectionProductionCost = election.GetProductionCost(),
+                ElectionTotalProductionCost = election.TotalProductionCost(),
                 ElectionFinishDate = election.FinishDate == default(DateTime)
                     ? string.Empty
                     : CoreDateTimeUtility.ToRoundTripString(election.FinishDate)
             };
+        }
+
+        /// <summary>
+        /// Builds a portable, ordered election ranking as place:id:votes:points rows.
+        /// The payload format deliberately uses only primitive values so consumers do not
+        /// need a compile-time dependency on ranking-extension mods.
+        /// </summary>
+        private static string BuildElectionRankingSummary(SEvent_SSK._SSK election)
+        {
+            if (election == null || election.Results == null || election.Results.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return string.Empty;
+            }
+
+            List<SEvent_SSK._SSK._result> orderedResults = new List<SEvent_SSK._SSK._result>();
+            for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < election.Results.Count; resultIndex++)
+            {
+                SEvent_SSK._SSK._result result = election.Results[resultIndex];
+                if (result != null && result.Girl != null && result.Girl.id >= CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    orderedResults.Add(result);
+                }
+            }
+
+            orderedResults.Sort(delegate (SEvent_SSK._SSK._result left, SEvent_SSK._SSK._result right)
+            {
+                int byPlace = left.Place.CompareTo(right.Place);
+                return byPlace != CoreConstants.ZeroBasedListStartIndex
+                    ? byPlace
+                    : left.Girl.id.CompareTo(right.Girl.id);
+            });
+
+            StringBuilder summaryBuilder = new StringBuilder();
+            for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < orderedResults.Count; resultIndex++)
+            {
+                SEvent_SSK._SSK._result result = orderedResults[resultIndex];
+                if (resultIndex > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    summaryBuilder.Append(CoreConstants.ElectionRankingEntrySeparator);
+                }
+
+                summaryBuilder.Append(result.Place.ToString(CultureInfo.InvariantCulture));
+                summaryBuilder.Append(CoreConstants.ElectionRankingFieldSeparator);
+                summaryBuilder.Append(result.Girl.id.ToString(CultureInfo.InvariantCulture));
+                summaryBuilder.Append(CoreConstants.ElectionRankingFieldSeparator);
+                summaryBuilder.Append(result.Votes.ToString(CultureInfo.InvariantCulture));
+                summaryBuilder.Append(CoreConstants.ElectionRankingFieldSeparator);
+                summaryBuilder.Append(result.FamePoints.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return summaryBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Builds the ordered idol-id list that accompanies an election ranking snapshot.
+        /// </summary>
+        private static string BuildElectionRankedIdolIdentifierList(SEvent_SSK._SSK election)
+        {
+            if (election == null || election.Results == null)
+            {
+                return string.Empty;
+            }
+
+            List<SEvent_SSK._SSK._result> orderedResults = new List<SEvent_SSK._SSK._result>(election.Results);
+            orderedResults.Sort(delegate (SEvent_SSK._SSK._result left, SEvent_SSK._SSK._result right)
+            {
+                if (left == null || left.Girl == null)
+                {
+                    return right == null || right.Girl == null ? CoreConstants.ZeroBasedListStartIndex : CoreConstants.LastElementOffsetFromCount;
+                }
+
+                if (right == null || right.Girl == null)
+                {
+                    return -CoreConstants.LastElementOffsetFromCount;
+                }
+
+                return left.Place.CompareTo(right.Place);
+            });
+
+            List<int> idolIdentifiers = new List<int>();
+            for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < orderedResults.Count; resultIndex++)
+            {
+                SEvent_SSK._SSK._result result = orderedResults[resultIndex];
+                if (result != null && result.Girl != null && result.Girl.id >= CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    idolIdentifiers.Add(result.Girl.id);
+                }
+            }
+
+            return BuildDelimitedIdentifierList(idolIdentifiers);
+        }
+
+        /// <summary>
+        /// Reads one election preparation value without assuming the progressable exists.
+        /// </summary>
+        private static float ResolveElectionProgressableValue(
+            SEvent_SSK._SSK election,
+            SEvent_SSK._SSK._progressable._type progressableType)
+        {
+            if (election == null)
+            {
+                return 0f;
+            }
+
+            SEvent_SSK._SSK._progressable progressable = election.GetParam(progressableType);
+            return progressable != null ? progressable.val : 0f;
         }
 
         /// <summary>
@@ -7673,6 +7795,13 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionReleaseSingleId, payload.ElectionReleaseSingleId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionResultCount, payload.ElectionResultCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankingSummary, payload.ElectionRankingSummary ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankedIdolIdList, payload.ElectionRankedIdolIdList ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionNumber, payload.ElectionNumber, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldElectionProductionLevel, payload.ElectionProductionLevel, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldElectionLogisticsLevel, payload.ElectionLogisticsLevel, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldElectionProductionCost, payload.ElectionProductionCost, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldElectionTotalProductionCost, payload.ElectionTotalProductionCost, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionFinishDate, payload.ElectionFinishDate ?? string.Empty, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -7700,6 +7829,12 @@ namespace IMDataCore
             AppendLongProperty(builder, CoreConstants.JsonFieldElectionGeneratedVotes, payload.ElectionGeneratedVotes, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionGeneratedFamePoints, payload.ElectionGeneratedFamePoints, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionSingleId, payload.ElectionSingleId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionReleaseSingleId, payload.ElectionReleaseSingleId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionResultCount, payload.ElectionResultCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankingSummary, payload.ElectionRankingSummary ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankedIdolIdList, payload.ElectionRankedIdolIdList ?? string.Empty, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -7777,6 +7912,12 @@ namespace IMDataCore
             AppendLongProperty(builder, CoreConstants.JsonFieldElectionVotes, payload.ElectionVotes, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionFamePoints, payload.ElectionFamePoints, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionSingleId, payload.ElectionSingleId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionReleaseSingleId, payload.ElectionReleaseSingleId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldElectionResultCount, payload.ElectionResultCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankingSummary, payload.ElectionRankingSummary ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankedIdolIdList, payload.ElectionRankedIdolIdList ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionFinishDate, payload.ElectionFinishDate ?? string.Empty, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -9224,6 +9365,13 @@ namespace IMDataCore
         public int ElectionConcertId = CoreConstants.InvalidIdValue;
         public int ElectionReleaseSingleId = CoreConstants.InvalidIdValue;
         public int ElectionResultCount;
+        public string ElectionRankingSummary = string.Empty;
+        public string ElectionRankedIdolIdList = string.Empty;
+        public int ElectionNumber;
+        public float ElectionProductionLevel;
+        public float ElectionLogisticsLevel;
+        public long ElectionProductionCost;
+        public long ElectionTotalProductionCost;
         public string ElectionFinishDate = string.Empty;
     }
 
@@ -9240,6 +9388,12 @@ namespace IMDataCore
         public long ElectionGeneratedVotes;
         public int ElectionGeneratedFamePoints;
         public string ElectionBroadcastType = string.Empty;
+        public int ElectionSingleId = CoreConstants.InvalidIdValue;
+        public int ElectionConcertId = CoreConstants.InvalidIdValue;
+        public int ElectionReleaseSingleId = CoreConstants.InvalidIdValue;
+        public int ElectionResultCount;
+        public string ElectionRankingSummary = string.Empty;
+        public string ElectionRankedIdolIdList = string.Empty;
     }
 
     /// <summary>
@@ -9284,6 +9438,12 @@ namespace IMDataCore
         public long ElectionVotes;
         public int ElectionFamePoints;
         public string ElectionBroadcastType = string.Empty;
+        public int ElectionSingleId = CoreConstants.InvalidIdValue;
+        public int ElectionConcertId = CoreConstants.InvalidIdValue;
+        public int ElectionReleaseSingleId = CoreConstants.InvalidIdValue;
+        public int ElectionResultCount;
+        public string ElectionRankingSummary = string.Empty;
+        public string ElectionRankedIdolIdList = string.Empty;
         public string ElectionFinishDate = string.Empty;
     }
 
@@ -9838,6 +9998,11 @@ namespace IMDataCore
         public int election_concert_id = CoreConstants.InvalidIdValue;
         public int election_release_single_id = CoreConstants.InvalidIdValue;
         public int election_result_count;
+        public int election_number;
+        public float election_production_level;
+        public float election_logistics_level;
+        public long election_production_cost;
+        public long election_total_production_cost;
         public string election_finish_date = string.Empty;
         public long start_cost;
         public long money_before;

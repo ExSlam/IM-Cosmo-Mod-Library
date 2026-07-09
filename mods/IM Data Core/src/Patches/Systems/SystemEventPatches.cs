@@ -226,13 +226,32 @@ namespace IMDataCore
         private static void Prefix(out TheaterCompleteDaySnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateTheaterCompleteDaySnapshot();
+            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildTheaterCapture());
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(TheaterCompleteDaySnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureTheaterCompleteDay(__state);
+            try
+            {
+                IMDataCoreController.Instance.CaptureTheaterCompleteDay(__state);
+                MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
+                    MoneyLedgerDetailConstants.SourceTypeTheaters,
+                    MoneyLedgerDetailConstants.SourceMethodTheaterCompleteDay);
+            }
+            finally
+            {
+                MoneyLedgerAmbientContext.Clear();
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception)
+        {
+            MoneyLedgerAmbientContext.Clear();
+            return __exception;
         }
     }
 
@@ -282,13 +301,32 @@ namespace IMDataCore
         private static void Prefix(Cafes._cafe Cafe, out CafeRenderSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateCafeRenderSnapshot(Cafe);
+            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildCafeCapture(Cafe));
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(agency._room Room, Cafes._cafe Cafe, CafeRenderSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureCafeRenderResult(Room, Cafe, __state);
+            try
+            {
+                IMDataCoreController.Instance.CaptureCafeRenderResult(Room, Cafe, __state);
+                MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
+                    MoneyLedgerDetailConstants.SourceTypeCafes,
+                    MoneyLedgerDetailConstants.SourceMethodCafeRender);
+            }
+            finally
+            {
+                MoneyLedgerAmbientContext.Clear();
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception)
+        {
+            MoneyLedgerAmbientContext.Clear();
+            return __exception;
         }
     }
 
@@ -730,6 +768,9 @@ namespace IMDataCore
         {
             ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceConcertFinish);
             __state = IMDataCoreController.Instance.CreateConcertFinishSnapshot(__instance);
+            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildConcertCapture(
+                __instance != null ? __instance.Concert : null,
+                true));
         }
 
         [HarmonyPostfix]
@@ -742,6 +783,12 @@ namespace IMDataCore
             }
             finally
             {
+                if (__instance != null && __instance.Concert != null)
+                {
+                    MoneyLedgerConcertOutcomeTracker.Remove(__instance.Concert.ID);
+                }
+
+                MoneyLedgerAmbientContext.Clear();
                 ActivityEarningsSourceContext.Clear();
             }
         }
@@ -750,6 +797,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
+            MoneyLedgerAmbientContext.Clear();
             ActivityEarningsSourceContext.Clear();
             return __exception;
         }

@@ -506,6 +506,12 @@ namespace IMDataCore
                 DateTime gameDate = staticVars.dateTime;
                 string electionEntityIdentifier = election.ID.ToString(CultureInfo.InvariantCulture);
                 string electionBroadcastTypeCode = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast);
+                string electionRankingSummary = BuildElectionRankingSummary(election);
+                string electionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election);
+                int electionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex;
+                int electionSingleId = ResolveSingleIdOrInvalid(election.Single);
+                int electionConcertId = ResolveConcertIdOrInvalid(election.Concert);
+                int electionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle);
 
                 for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < data_girls.girl.Count; idolIndex++)
                 {
@@ -533,7 +539,13 @@ namespace IMDataCore
                         ElectionGeneratedPlace = generatedPlace,
                         ElectionGeneratedVotes = generatedVotes,
                         ElectionGeneratedFamePoints = generatedFamePoints,
-                        ElectionBroadcastType = electionBroadcastTypeCode
+                        ElectionBroadcastType = electionBroadcastTypeCode,
+                        ElectionSingleId = electionSingleId,
+                        ElectionConcertId = electionConcertId,
+                        ElectionReleaseSingleId = electionReleaseSingleId,
+                        ElectionResultCount = electionResultCount,
+                        ElectionRankingSummary = electionRankingSummary,
+                        ElectionRankedIdolIdList = electionRankedIdolIdList
                     };
 
                     EnqueueEventRecordLocked(
@@ -695,6 +707,12 @@ namespace IMDataCore
                 string electionFinishDate = CoreDateTimeUtility.ToRoundTripString(election.FinishDate);
                 string electionBroadcastCode = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast);
                 string electionEntityIdentifier = election.ID.ToString(CultureInfo.InvariantCulture);
+                string electionRankingSummary = BuildElectionRankingSummary(election);
+                string electionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election);
+                int electionResultCount = election.Results.Count;
+                int electionSingleId = ResolveSingleIdOrInvalid(election.Single);
+                int electionConcertId = ResolveConcertIdOrInvalid(election.Concert);
+                int electionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle);
                 ElectionLifecyclePayload lifecyclePayload = BuildElectionLifecyclePayload(election, CoreConstants.ElectionLifecycleActionFinished);
 
                 EnqueueEventRecordLocked(
@@ -722,6 +740,12 @@ namespace IMDataCore
                         ElectionVotes = result.Votes,
                         ElectionFamePoints = result.FamePoints,
                         ElectionBroadcastType = electionBroadcastCode,
+                        ElectionSingleId = electionSingleId,
+                        ElectionConcertId = electionConcertId,
+                        ElectionReleaseSingleId = electionReleaseSingleId,
+                        ElectionResultCount = electionResultCount,
+                        ElectionRankingSummary = electionRankingSummary,
+                        ElectionRankedIdolIdList = electionRankedIdolIdList,
                         ElectionFinishDate = electionFinishDate
                     };
 
@@ -3533,6 +3557,8 @@ namespace IMDataCore
                 return;
             }
 
+            MoneyLedgerConcertOutcomeTracker.Record(concertId, snapshotBefore.ResultTypeCode);
+
             float hypeAfter = concert != null ? concert.Hype : snapshotBefore.HypeBefore;
             ConcertCrisisAppliedEventPayload payload = new ConcertCrisisAppliedEventPayload
             {
@@ -3945,6 +3971,11 @@ namespace IMDataCore
                 election_concert_id = ResolveConcertIdOrInvalid(election.Concert),
                 election_release_single_id = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 election_result_count = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
+                election_number = election.Count,
+                election_production_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.production),
+                election_logistics_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.logistics),
+                election_production_cost = election.GetProductionCost(),
+                election_total_production_cost = election.TotalProductionCost(),
                 election_finish_date = CoreDateTimeUtility.ToRoundTripString(election.FinishDate),
                 start_cost = snapshot.StartCost,
                 money_before = snapshot.MoneyBefore,
