@@ -1,0 +1,15 @@
+# Notificações do Unavailable Idols Fix
+notification.blocked.single.singular=O single "{0}" não pode ser lançado até que {1} seja removida do elenco ou se recupere.
+notification.blocked.single.plural=O single "{0}" não pode ser lançado até que {1} sejam removidas do elenco ou se recuperem.
+notification.blocked.show.singular=O programa "{0}" não pode estrear até que {1} seja removida do elenco ou se recupere.
+notification.blocked.show.plural=O programa "{0}" não pode estrear até que {1} sejam removidas do elenco ou se recuperem.
+notification.blocked.concert.singular=O show "{0}" não pode começar até que {1} seja removida do elenco ou se recupere.
+notification.blocked.concert.plural=O show "{0}" não pode começar até que {1} sejam removidas do elenco ou se recuperem.
+notification.removed.single={0} foi removida do elenco do single ainda não lançado "{1}".
+notification.removed.show.unreleased={0} foi removida do elenco do programa ainda não estreado "{1}".
+notification.removed.show.running={0} foi removida do elenco do programa em exibição "{1}".
+notification.removed.concert={0} foi removida do elenco do show em produção "{1}".
+notification.removed.mentorship={0} foi removida da mentoria com {1}.
+notification.removed.push={0} foi removida de um espaço de promoção.
+label.unknown_idol=Idol desconhecida
+label.untitled_project=Projeto sem título

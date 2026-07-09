@@ -1,0 +1,15 @@
+# Unavailable Idols Fix 通知
+notification.blocked.single.singular=单曲“{0}”暂时无法发行，直到将{1}从选拔成员中移除或她恢复。
+notification.blocked.single.plural=单曲“{0}”暂时无法发行，直到将{1}从选拔成员中移除或她们恢复。
+notification.blocked.show.singular=节目“{0}”暂时无法播出，直到将{1}从演出阵容中移除或她恢复。
+notification.blocked.show.plural=节目“{0}”暂时无法播出，直到将{1}从演出阵容中移除或她们恢复。
+notification.blocked.concert.singular=演唱会“{0}”暂时无法开始，直到将{1}从演出阵容中移除或她恢复。
+notification.blocked.concert.plural=演唱会“{0}”暂时无法开始，直到将{1}从演出阵容中移除或她们恢复。
+notification.removed.single={0}已从未发行单曲“{1}”的选拔成员中移除。
+notification.removed.show.unreleased={0}已从尚未播出的节目“{1}”中移除。
+notification.removed.show.running={0}已从正在播出的节目“{1}”中移除。
+notification.removed.concert={0}已从制作中的演唱会“{1}”中移除。
+notification.removed.mentorship={0}与{1}的师徒关系已解除。
+notification.removed.push={0}已从重点推广栏位中移除。
+label.unknown_idol=未知偶像
+label.untitled_project=未命名企划

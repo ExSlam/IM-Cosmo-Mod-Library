@@ -1,0 +1,15 @@
+# Уведомления Unavailable Idols Fix
+notification.blocked.single.singular=Сингл «{0}» нельзя выпустить, пока {1} не будет удалена из состава или не восстановится.
+notification.blocked.single.plural=Сингл «{0}» нельзя выпустить, пока {1} не будут удалены из состава или не восстановятся.
+notification.blocked.show.singular=Шоу «{0}» нельзя запустить, пока {1} не будет удалена из состава или не восстановится.
+notification.blocked.show.plural=Шоу «{0}» нельзя запустить, пока {1} не будут удалены из состава или не восстановятся.
+notification.blocked.concert.singular=Концерт «{0}» нельзя начать, пока {1} не будет удалена из состава или не восстановится.
+notification.blocked.concert.plural=Концерт «{0}» нельзя начать, пока {1} не будут удалены из состава или не восстановятся.
+notification.removed.single={0} удалена из состава невыпущенного сингла «{1}».
+notification.removed.show.unreleased={0} удалена из состава ещё не вышедшего шоу «{1}».
+notification.removed.show.running={0} удалена из состава выходящего шоу «{1}».
+notification.removed.concert={0} удалена из состава концерта «{1}», находящегося в производстве.
+notification.removed.mentorship={0} удалена из наставнической пары с {1}.
+notification.removed.push={0} удалена из слота продвижения.
+label.unknown_idol=Неизвестный айдол
+label.untitled_project=Проект без названия

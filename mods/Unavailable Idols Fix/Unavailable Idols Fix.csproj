@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Unavailable Idols Fix</ModName>
+    <RootNamespace>UnavailableIdolsFix</RootNamespace>
+    <AssemblyName>com.cosmo.unavailableidolsfix</AssemblyName>
+    <Version>0.1.3</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\UnavailableIdolsFix.cs" />
+    <Compile Include="src\LifecyclePatches.cs" />
+    <Compile Include="src\RoomAssignmentPatches.cs" />
+    <Compile Include="src\LaunchValidationPatches.cs" />
+    <Compile Include="src\BusinessProposalPatches.cs" />
+    <Compile Include="src\TransactionalEditorPatches.cs" />
+    <Compile Include="src\GraduationSnapshotPatches.cs" />
+    <Compile Include="src\DateCompatibilityPatches.cs" />
+  </ItemGroup>
+</Project>

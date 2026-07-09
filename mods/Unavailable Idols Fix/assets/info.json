@@ -1,0 +1,8 @@
+{
+  "Title": "Unavailable Idols Fix",
+  "Description": "Prevents idol removal from silently corrupting planned casts, assignments, and other persistent state for depressed, injured, on hiatus, or graduated members. Also allows idols with announced graduation date (where idol will graduate within three months) to participate in activities, shows, singles, concerts if they are completed and released before the idol graduates.",
+  "Author": "Cosmo",
+  "Version": "0.1.3",
+  "Tags": ["gameplay", "fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.unavailableidolsfix"
+}

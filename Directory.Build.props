@@ -1,7 +1,5 @@
 <Project>
   <PropertyGroup>
-    <ModOutputDirDebug Condition="'$(ModOutputDirDebug)' == ''">$(MSBuildThisFileDirectory)artifacts\mods\Debug</ModOutputDirDebug>
-    <ModOutputDirRelease Condition="'$(ModOutputDirRelease)' == ''">$(MSBuildThisFileDirectory)artifacts\mods\Release</ModOutputDirRelease>
     <dllDir Condition="'$(dllDir)' == ''">$(MSBuildThisFileDirectory)..\dll</dllDir>
 
     <LangVersion>latest</LangVersion>
@@ -67,19 +65,12 @@
     </Reference>
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-    <ModOutputDir>$(ModOutputDirDebug)</ModOutputDir>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <ModOutputDir>$(ModOutputDirRelease)</ModOutputDir>
-  </PropertyGroup>
-
-  <Target Name="CleanModOutputDir" BeforeTargets="Clean" Condition="'$(ModName)' != '' and Exists('$(ModOutputDir)\$(ModName)')">
+  <!-- ModOutputDir is supplied explicitly by the packaging/deployment script. -->
+  <Target Name="CleanModOutputDir" BeforeTargets="Clean" Condition="'$(ModName)' != '' and '$(ModOutputDir)' != '' and Exists('$(ModOutputDir)\$(ModName)')">
     <RemoveDir Directories="$(ModOutputDir)\$(ModName)" />
   </Target>
 
-  <Target Name="CopyModArtifacts" AfterTargets="Build" Condition="'$(ModName)' != ''">
+  <Target Name="CopyModArtifacts" AfterTargets="Build" Condition="'$(ModName)' != '' and '$(ModOutputDir)' != ''">
     <MakeDir Directories="$(ModOutputDir)\$(ModName)" Condition="!Exists('$(ModOutputDir)\$(ModName)')" />
     <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(ModOutputDir)\$(ModName)\$(AssemblyName).dll" />
     <Copy

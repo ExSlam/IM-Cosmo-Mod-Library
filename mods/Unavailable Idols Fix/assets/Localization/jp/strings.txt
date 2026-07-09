@@ -1,0 +1,15 @@
+# Unavailable Idols Fix 通知
+notification.blocked.single.singular=シングル「{0}」は、{1}を選抜から外すか回復するまでリリースできません。
+notification.blocked.single.plural=シングル「{0}」は、{1}を選抜から外すか全員が回復するまでリリースできません。
+notification.blocked.show.singular=番組「{0}」は、{1}を出演者から外すか回復するまで開始できません。
+notification.blocked.show.plural=番組「{0}」は、{1}を出演者から外すか全員が回復するまで開始できません。
+notification.blocked.concert.singular=コンサート「{0}」は、{1}を出演者から外すか回復するまで開始できません。
+notification.blocked.concert.plural=コンサート「{0}」は、{1}を出演者から外すか全員が回復するまで開始できません。
+notification.removed.single={0}を未発売シングル「{1}」の選抜から外しました。
+notification.removed.show.unreleased={0}を未放送の番組「{1}」から外しました。
+notification.removed.show.running={0}を放送中の番組「{1}」から外しました。
+notification.removed.concert={0}を制作中のコンサート「{1}」から外しました。
+notification.removed.mentorship={0}と{1}のメンター関係を解除しました。
+notification.removed.push={0}をプッシュ枠から外しました。
+label.unknown_idol=不明なアイドル
+label.untitled_project=無題の企画

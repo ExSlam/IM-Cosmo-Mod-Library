@@ -1,0 +1,15 @@
+# Unavailable Idols Fix notifications
+notification.blocked.single.singular=Single "{0}" is unavailable for release until {1} is removed from the cast or recovers.
+notification.blocked.single.plural=Single "{0}" is unavailable for release until {1} are removed from the cast or recover.
+notification.blocked.show.singular=Show "{0}" is unavailable for release until {1} is removed from the cast or recovers.
+notification.blocked.show.plural=Show "{0}" is unavailable for release until {1} are removed from the cast or recover.
+notification.blocked.concert.singular=Concert "{0}" cannot launch until {1} is removed from the cast or recovers.
+notification.blocked.concert.plural=Concert "{0}" cannot launch until {1} are removed from the cast or recover.
+notification.removed.single={0} was removed from the unreleased single "{1}".
+notification.removed.show.unreleased={0} was removed from the unreleased show "{1}".
+notification.removed.show.running={0} was removed from the running show "{1}".
+notification.removed.concert={0} was removed from the in-production concert "{1}".
+notification.removed.mentorship={0} was removed from the mentorship with {1}.
+notification.removed.push={0} was removed from a promotional push slot.
+label.unknown_idol=Unknown idol
+label.untitled_project=Untitled project

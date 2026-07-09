@@ -1,0 +1,15 @@
+# Notifications d’Unavailable Idols Fix
+notification.blocked.single.singular=Le single « {0} » ne peut pas sortir tant que {1} n’a pas été retirée du casting ou ne s’est pas rétablie.
+notification.blocked.single.plural=Le single « {0} » ne peut pas sortir tant que {1} n’ont pas été retirées du casting ou ne se sont pas rétablies.
+notification.blocked.show.singular=L’émission « {0} » ne peut pas être lancée tant que {1} n’a pas été retirée du casting ou ne s’est pas rétablie.
+notification.blocked.show.plural=L’émission « {0} » ne peut pas être lancée tant que {1} n’ont pas été retirées du casting ou ne se sont pas rétablies.
+notification.blocked.concert.singular=Le concert « {0} » ne peut pas commencer tant que {1} n’a pas été retirée du casting ou ne s’est pas rétablie.
+notification.blocked.concert.plural=Le concert « {0} » ne peut pas commencer tant que {1} n’ont pas été retirées du casting ou ne se sont pas rétablies.
+notification.removed.single={0} a été retirée du casting du single inédit « {1} ».
+notification.removed.show.unreleased={0} a été retirée du casting de l’émission non diffusée « {1} ».
+notification.removed.show.running={0} a été retirée du casting de l’émission en cours « {1} ».
+notification.removed.concert={0} a été retirée du casting du concert en production « {1} ».
+notification.removed.mentorship={0} a été retirée du mentorat avec {1}.
+notification.removed.push={0} a été retirée d’un emplacement de promotion.
+label.unknown_idol=Idole inconnue
+label.untitled_project=Projet sans titre
