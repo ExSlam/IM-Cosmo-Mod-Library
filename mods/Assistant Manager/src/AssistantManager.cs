@@ -1620,6 +1620,22 @@ namespace AssitantManagerMod
             return room != null && IsManagerOfficeRoomType(room.type);
         }
 
+        internal static bool IsAvailableForManagerOfficeDate(agency._room room, data_girls.girls girl)
+        {
+            if (room == null || girl == null)
+            {
+                return false;
+            }
+
+            if (girl.room != null && girl.room != room)
+            {
+                return false;
+            }
+
+            return girl.status == data_girls._status.normal ||
+                   girl.status == data_girls._status.announced_graduation;
+        }
+
         internal static int CountAssistantManagers()
         {
             int count = 0;
@@ -3572,7 +3588,7 @@ namespace AssitantManagerMod
                        _girl != null &&
                        __instance.girl == null &&
                        __instance.status == agency._room._status.normal &&
-                       _girl.status == data_girls._status.normal &&
+                       AssistantManagerRules.IsAvailableForManagerOfficeDate(__instance, _girl) &&
                        (Dating.DEBUG ||
                         (AssistantManagerRules.IsAssistantManagerOffice(__instance)
                             ? AssistantManagerDateTracking.GetCooldownDays(__instance, _girl.id) <= 0
@@ -3597,6 +3613,8 @@ namespace AssitantManagerMod
     }
 
     [HarmonyPatch(typeof(agency._room), nameof(agency._room.assign), new Type[] { typeof(data_girls.girls), typeof(Nullable<data_girls._paramType>) })]
+    [HarmonyPriority(Priority.First)]
+    [HarmonyBefore(new string[] { "com.cosmo.roomassignmentfix" })]
     internal static class RoomAssignGirlPatch
     {
         private static bool Prefix(agency._room __instance, data_girls.girls _girl)
@@ -3613,7 +3631,8 @@ namespace AssitantManagerMod
                 return false;
             }
 
-            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance))
+            if (!AssistantManagerRules.IsAssistantManagerOffice(__instance) &&
+                _girl.status != data_girls._status.announced_graduation)
             {
                 return true;
             }
@@ -3635,8 +3654,10 @@ namespace AssitantManagerMod
             }
 
             // The game does not provide a dedicated "on date" idol status.  Practice is the
-            // standard unavailable state and therefore prevents training, scenes, or a second
-            // office from using this idol until the date is resolved.
+            // standard unavailable state for regular idols.  Announced-graduation idols reject
+            // non-graduated status changes in vanilla, so manager-office availability also keys
+            // off girl.room to prevent a second office from using the idol until the date is
+            // resolved.
             _girl.SetStatus(data_girls._status.practice);
             _girl.room = __instance;
         }
@@ -3752,12 +3773,19 @@ namespace AssitantManagerMod
     {
         private static bool Prefix(Room __instance, data_girls.girls Girl)
         {
-            if (__instance == null || !AssistantManagerRules.IsAssistantManagerOffice(__instance.room))
+            if (__instance == null || Girl == null || !AssistantManagerRules.IsManagerOffice(__instance.room))
             {
                 return true;
             }
 
-            int daysCooldown = AssistantManagerDateTracking.GetCooldownDays(__instance.room, Girl.id);
+            int daysCooldown = AssistantManagerRules.IsAssistantManagerOffice(__instance.room)
+                ? AssistantManagerDateTracking.GetCooldownDays(__instance.room, Girl.id)
+                : Dating.GetDaysCooldown(Girl);
+            if (daysCooldown <= 0)
+            {
+                return false;
+            }
+
             string str;
             if (daysCooldown > 1)
             {
