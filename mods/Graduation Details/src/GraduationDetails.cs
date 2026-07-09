@@ -118,11 +118,6 @@ namespace GraduationDetails
             return Path.Combine(GetSaveDir(), "Portraits");
         }
 
-        internal static string GetLegacyPortraitDir()
-        {
-            return Path.Combine(RootDir, "Portraits");
-        }
-
         internal static void TryMigrateLegacyFileOnce(string fileName)
         {
             string scoped = GetScopedFilePath(fileName);
@@ -217,14 +212,6 @@ namespace GraduationDetails
             }
         }
 
-        private static string LegacyDataPath
-        {
-            get
-            {
-                return GraduationDetailsPaths.GetLegacyFilePath("marriage_data.json");
-            }
-        }
-
         internal static MarriageRecord GetRecord(int girlId)
         {
             EnsureLoaded();
@@ -262,17 +249,9 @@ namespace GraduationDetails
                 GraduationDetailsPaths.TryMigrateLegacyFileOnce("marriage_data.json");
                 if (!File.Exists(DataPath))
                 {
-                    // Legacy fallback for users with old installs and no scoped files yet.
-                    if (!File.Exists(LegacyDataPath))
-                    {
-                        return;
-                    }
-                }
-                string loadPath = File.Exists(DataPath) ? DataPath : LegacyDataPath;
-                if (!File.Exists(loadPath))
-                {
                     return;
                 }
+                string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
                 if (string.IsNullOrEmpty(json))
                 {
@@ -416,12 +395,114 @@ namespace GraduationDetails
         }
     }
 
+    internal static class GraduationIdentity
+    {
+        internal static string TextureSignature(data_girls.girls girl)
+        {
+            return girl != null ? TextureSignature(girl.textureAssets) : "";
+        }
+
+        internal static string TextureSignature(staff._staff staffer)
+        {
+            return staffer != null ? TextureSignature(staffer.textureAssets) : "";
+        }
+
+        internal static string TextureSignature(List<data_girls.girls._textureAsset> assets)
+        {
+            if (assets == null || assets.Count == 0)
+            {
+                return "";
+            }
+            List<string> parts = new List<string>();
+            foreach (data_girls.girls._textureAsset asset in assets)
+            {
+                if (asset == null || asset.asset == null)
+                {
+                    continue;
+                }
+                string id = asset.asset.GetID();
+                if (string.IsNullOrEmpty(id))
+                {
+                    continue;
+                }
+                parts.Add(asset.type + "=" + id);
+            }
+            if (parts.Count == 0)
+            {
+                return "";
+            }
+            parts.Sort(StringComparer.Ordinal);
+            return string.Join("|", parts.ToArray());
+        }
+
+        internal static bool TextureAssetsMatch(List<data_girls.girls._textureAsset> first, List<data_girls.girls._textureAsset> second)
+        {
+            string firstSignature = TextureSignature(first);
+            string secondSignature = TextureSignature(second);
+            return !string.IsNullOrEmpty(firstSignature)
+                && !string.IsNullOrEmpty(secondSignature)
+                && string.Equals(firstSignature, secondSignature, StringComparison.Ordinal);
+        }
+
+        internal static bool NamesMatch(staff._staff staffer, data_girls.girls girl)
+        {
+            if (staffer == null || girl == null)
+            {
+                return false;
+            }
+            if (!string.IsNullOrEmpty(staffer.firstName) && !string.IsNullOrEmpty(staffer.lastName)
+                && !string.IsNullOrEmpty(girl.firstName) && !string.IsNullOrEmpty(girl.lastName))
+            {
+                if (string.Equals(staffer.firstName, girl.firstName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(staffer.lastName, girl.lastName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            if (!string.IsNullOrEmpty(staffer.nickname) && !string.IsNullOrEmpty(girl.nickname))
+            {
+                if (string.Equals(staffer.nickname, girl.nickname, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal static string ShortHash(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                value = "empty";
+            }
+            unchecked
+            {
+                uint hash = 2166136261U;
+                foreach (char c in value)
+                {
+                    hash ^= char.ToUpperInvariant(c);
+                    hash *= 16777619U;
+                }
+                return hash.ToString("x8");
+            }
+        }
+
+        internal static bool SameText(string left, string right)
+        {
+            return string.Equals(left ?? "", right ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     [Serializable]
     internal sealed class StaffIdolRecord
     {
         public int StaffId = -1;
         public int GirlId = -1;
         public bool CapturedAtHire;
+        public string FirstName = "";
+        public string LastName = "";
+        public string Nickname = "";
+        public string TextureSignature = "";
     }
 
     [Serializable]
@@ -441,14 +522,6 @@ namespace GraduationDetails
             get
             {
                 return GraduationDetailsPaths.GetScopedFilePath("staff_idol_map.json");
-            }
-        }
-
-        private static string LegacyDataPath
-        {
-            get
-            {
-                return GraduationDetailsPaths.GetLegacyFilePath("staff_idol_map.json");
             }
         }
 
@@ -490,14 +563,19 @@ namespace GraduationDetails
             if (TryGetRecord(staffer.id, out record))
             {
                 girlId = record.GirlId;
-                if (record.CapturedAtHire)
+                data_girls.girls mapped = data_girls.GetGirlByID(girlId);
+                if (mapped != null && RecordMatchesStaffer(staffer, record) && IsLikelyMatch(staffer, mapped))
                 {
+                    if (!RecordHasIdentity(record))
+                    {
+                        Upsert(staffer, girlId, record.CapturedAtHire);
+                    }
                     return true;
                 }
-                data_girls.girls mapped = data_girls.GetGirlByID(girlId);
-                if (IsLikelyMatch(staffer, mapped))
+                if (data_girls.girl == null)
                 {
-                    return true;
+                    girlId = -1;
+                    return false;
                 }
                 StaffToGirl.Remove(staffer.id);
                 Save();
@@ -512,16 +590,30 @@ namespace GraduationDetails
             {
                 return false;
             }
-            Upsert(staffer.id, girlId);
+            Upsert(staffer, girlId, false);
             return true;
         }
 
         internal static void Upsert(int staffId, int girlId)
         {
-            Upsert(staffId, girlId, false);
+            Upsert(null, staffId, girlId, false);
         }
 
         internal static void Upsert(int staffId, int girlId, bool capturedAtHire)
+        {
+            Upsert(null, staffId, girlId, capturedAtHire);
+        }
+
+        internal static void Upsert(staff._staff staffer, int girlId, bool capturedAtHire)
+        {
+            if (staffer == null)
+            {
+                return;
+            }
+            Upsert(staffer, staffer.id, girlId, capturedAtHire);
+        }
+
+        private static void Upsert(staff._staff staffer, int staffId, int girlId, bool capturedAtHire)
         {
             if (staffId < 0 || girlId < 0)
             {
@@ -546,6 +638,7 @@ namespace GraduationDetails
                     record.CapturedAtHire = true;
                 }
             }
+            ApplyIdentity(record, staffer);
             StaffToGirl[staffId] = record;
             Save();
         }
@@ -622,7 +715,7 @@ namespace GraduationDetails
                 {
                     continue;
                 }
-                if (NamesMatch(staffer, girl))
+                if (GraduationIdentity.NamesMatch(staffer, girl))
                 {
                     matches.Add(girl);
                 }
@@ -636,7 +729,7 @@ namespace GraduationDetails
                 data_girls.girls textureMatch = null;
                 foreach (data_girls.girls match in matches)
                 {
-                    if (TextureAssetsMatch(staffer.textureAssets, match.textureAssets))
+                    if (GraduationIdentity.TextureAssetsMatch(staffer.textureAssets, match.textureAssets))
                     {
                         if (textureMatch != null)
                         {
@@ -665,7 +758,7 @@ namespace GraduationDetails
                 {
                     continue;
                 }
-                if (TextureAssetsMatch(staffer.textureAssets, girl.textureAssets))
+                if (GraduationIdentity.TextureAssetsMatch(staffer.textureAssets, girl.textureAssets))
                 {
                     return girl.id;
                 }
@@ -679,7 +772,7 @@ namespace GraduationDetails
             {
                 return false;
             }
-            if (NamesMatch(staffer, girl))
+            if (GraduationIdentity.NamesMatch(staffer, girl))
             {
                 return true;
             }
@@ -687,71 +780,62 @@ namespace GraduationDetails
                 || string.IsNullOrEmpty(girl.firstName) || string.IsNullOrEmpty(girl.lastName);
             if (missingNames)
             {
-                return TextureAssetsMatch(staffer.textureAssets, girl.textureAssets);
+                return GraduationIdentity.TextureAssetsMatch(staffer.textureAssets, girl.textureAssets);
             }
             return false;
         }
 
-        private static bool NamesMatch(staff._staff staffer, data_girls.girls girl)
+        private static bool RecordHasIdentity(StaffIdolRecord record)
         {
-            if (staffer == null || girl == null)
-            {
-                return false;
-            }
-            if (!string.IsNullOrEmpty(staffer.firstName) && !string.IsNullOrEmpty(staffer.lastName)
-                && !string.IsNullOrEmpty(girl.firstName) && !string.IsNullOrEmpty(girl.lastName))
-            {
-                if (string.Equals(staffer.firstName, girl.firstName, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(staffer.lastName, girl.lastName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-            if (!string.IsNullOrEmpty(staffer.nickname) && !string.IsNullOrEmpty(girl.nickname))
-            {
-                if (string.Equals(staffer.nickname, girl.nickname, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-            return false;
+            return record != null
+                && (!string.IsNullOrEmpty(record.FirstName)
+                    || !string.IsNullOrEmpty(record.LastName)
+                    || !string.IsNullOrEmpty(record.Nickname)
+                    || !string.IsNullOrEmpty(record.TextureSignature));
         }
 
-        private static bool TextureAssetsMatch(List<data_girls.girls._textureAsset> staffAssets, List<data_girls.girls._textureAsset> girlAssets)
+        private static bool RecordMatchesStaffer(staff._staff staffer, StaffIdolRecord record)
         {
-            if (staffAssets == null || girlAssets == null)
+            if (staffer == null || record == null)
             {
                 return false;
             }
-            if (staffAssets.Count == 0 || girlAssets.Count == 0)
+            if (!RecordHasIdentity(record))
+            {
+                return true;
+            }
+            if (!string.IsNullOrEmpty(record.FirstName) && !GraduationIdentity.SameText(record.FirstName, staffer.firstName))
             {
                 return false;
             }
-            HashSet<string> staffIds = new HashSet<string>();
-            foreach (data_girls.girls._textureAsset asset in staffAssets)
-            {
-                if (asset == null || asset.asset == null)
-                {
-                    continue;
-                }
-                staffIds.Add(asset.asset.GetID());
-            }
-            if (staffIds.Count == 0)
+            if (!string.IsNullOrEmpty(record.LastName) && !GraduationIdentity.SameText(record.LastName, staffer.lastName))
             {
                 return false;
             }
-            foreach (data_girls.girls._textureAsset asset in girlAssets)
+            if (!string.IsNullOrEmpty(record.Nickname) && !GraduationIdentity.SameText(record.Nickname, staffer.nickname))
             {
-                if (asset == null || asset.asset == null)
-                {
-                    return false;
-                }
-                if (!staffIds.Contains(asset.asset.GetID()))
-                {
-                    return false;
-                }
+                return false;
+            }
+            string currentTextureSignature = GraduationIdentity.TextureSignature(staffer);
+            if (!string.IsNullOrEmpty(record.TextureSignature)
+                && !string.IsNullOrEmpty(currentTextureSignature)
+                && !string.Equals(record.TextureSignature, currentTextureSignature, StringComparison.Ordinal))
+            {
+                return false;
             }
             return true;
+        }
+
+        private static void ApplyIdentity(StaffIdolRecord record, staff._staff staffer)
+        {
+            if (record == null || staffer == null)
+            {
+                return;
+            }
+            record.FirstName = staffer.firstName ?? "";
+            record.LastName = staffer.lastName ?? "";
+            record.Nickname = staffer.nickname ?? "";
+            record.TextureSignature = GraduationIdentity.TextureSignature(staffer);
         }
 
         private static void EnsureLoaded()
@@ -769,16 +853,9 @@ namespace GraduationDetails
                 GraduationDetailsPaths.TryMigrateLegacyFileOnce("staff_idol_map.json");
                 if (!File.Exists(DataPath))
                 {
-                    if (!File.Exists(LegacyDataPath))
-                    {
-                        return;
-                    }
-                }
-                string loadPath = File.Exists(DataPath) ? DataPath : LegacyDataPath;
-                if (!File.Exists(loadPath))
-                {
                     return;
                 }
+                string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
                 if (string.IsNullOrEmpty(json))
                 {
@@ -847,7 +924,7 @@ namespace GraduationDetails
         {
             if (staffer != null && GirlId >= 0)
             {
-                StaffIdolStore.Upsert(staffer.id, GirlId, true);
+                StaffIdolStore.Upsert(staffer, GirlId, true);
             }
             Clear();
         }
@@ -866,6 +943,10 @@ namespace GraduationDetails
         public string Birthdate = "";
         public int AgeAtGraduation = -1;
         public string PortraitFile = "";
+        public string FirstName = "";
+        public string LastName = "";
+        public string Nickname = "";
+        public string TextureSignature = "";
         public List<FanSnapshot> Fans = new List<FanSnapshot>();
         public List<BondSectionSnapshot> Bonds = new List<BondSectionSnapshot>();
     }
@@ -931,27 +1012,11 @@ namespace GraduationDetails
             }
         }
 
-        private static string LegacyDataPath
-        {
-            get
-            {
-                return GraduationDetailsPaths.GetLegacyFilePath("graduation_snapshots.json");
-            }
-        }
-
         private static string PortraitDir
         {
             get
             {
                 return GraduationDetailsPaths.GetScopedPortraitDir();
-            }
-        }
-
-        private static string LegacyPortraitDir
-        {
-            get
-            {
-                return GraduationDetailsPaths.GetLegacyPortraitDir();
             }
         }
 
@@ -978,10 +1043,10 @@ namespace GraduationDetails
             {
                 snapshot = new GraduationSnapshot
                 {
-                    GirlId = girl.id,
-                    PortraitFile = girl.id + ".png"
+                    GirlId = girl.id
                 };
             }
+            RefreshIdentity(snapshot, girl);
 
             // Keep existing metadata if already captured; this avoids drifting "at graduation" data later.
             if (string.IsNullOrEmpty(snapshot.Birthdate))
@@ -1052,11 +1117,6 @@ namespace GraduationDetails
             if (File.Exists(scopedPath))
             {
                 return scopedPath;
-            }
-            string legacyPath = Path.Combine(LegacyPortraitDir, snapshot.PortraitFile);
-            if (File.Exists(legacyPath))
-            {
-                return legacyPath;
             }
             return scopedPath;
         }
@@ -1547,16 +1607,9 @@ namespace GraduationDetails
                 GraduationDetailsPaths.TryMigrateLegacyFileOnce("graduation_snapshots.json");
                 if (!File.Exists(DataPath))
                 {
-                    if (!File.Exists(LegacyDataPath))
-                    {
-                        return;
-                    }
-                }
-                string loadPath = File.Exists(DataPath) ? DataPath : LegacyDataPath;
-                if (!File.Exists(loadPath))
-                {
                     return;
                 }
+                string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
                 if (string.IsNullOrEmpty(json))
                 {
@@ -1675,6 +1728,52 @@ namespace GraduationDetails
                 // Ignore file copy errors to avoid breaking the game loop.
             }
         }
+
+        private static void RefreshIdentity(GraduationSnapshot snapshot, data_girls.girls girl)
+        {
+            if (snapshot == null || girl == null)
+            {
+                return;
+            }
+            snapshot.FirstName = girl.firstName ?? "";
+            snapshot.LastName = girl.lastName ?? "";
+            snapshot.Nickname = girl.nickname ?? "";
+            snapshot.TextureSignature = GraduationIdentity.TextureSignature(girl);
+
+            string expectedFile = BuildPortraitFileName(girl, snapshot.TextureSignature);
+            if (string.IsNullOrEmpty(snapshot.PortraitFile)
+                || IsLegacyPortraitFile(snapshot.PortraitFile, girl)
+                || !string.Equals(snapshot.PortraitFile, expectedFile, StringComparison.OrdinalIgnoreCase))
+            {
+                snapshot.PortraitFile = expectedFile;
+            }
+        }
+
+        private static bool IsLegacyPortraitFile(string portraitFile, data_girls.girls girl)
+        {
+            if (string.IsNullOrEmpty(portraitFile) || girl == null)
+            {
+                return true;
+            }
+            return string.Equals(portraitFile, girl.id + ".png", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildPortraitFileName(data_girls.girls girl, string textureSignature)
+        {
+            if (girl == null)
+            {
+                return "unknown.png";
+            }
+            string identity = string.Join("|", new string[]
+            {
+                girl.id.ToString(),
+                girl.firstName ?? "",
+                girl.lastName ?? "",
+                girl.nickname ?? "",
+                textureSignature ?? ""
+            });
+            return "girl_" + girl.id + "_" + GraduationIdentity.ShortHash(identity) + ".png";
+        }
     }
 
     internal static class GraduationDetailsState
@@ -1724,6 +1823,7 @@ namespace GraduationDetails
             {
                 return;
             }
+            GraduationSnapshotStore.Capture(girl);
             GraduationDetailsState.Begin(girl, false);
 
             OpenProfile(girl);
@@ -1745,6 +1845,7 @@ namespace GraduationDetails
             {
                 return;
             }
+            GraduationSnapshotStore.Capture(girl);
             GraduationDetailsState.Begin(girl, true);
             OpenProfile(girl);
         }
