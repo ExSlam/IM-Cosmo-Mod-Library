@@ -40,3 +40,4 @@ Adds cheat actions to the Mod Buttons action hub.
 - End all idol dating relationships except relationships with the producer
 - Heal idols, cure injuries/depression, and return idols from hiatus
 - Max active idol influence, friendship, and romance, with only one representative relationship popup
+- Max friendship, influence, and romance with Rivals Reborn rival idols when Rivals Reborn is enabled

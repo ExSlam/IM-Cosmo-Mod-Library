@@ -150,6 +150,16 @@
 		"method": "MaxOutActiveIdolPlayerRelationships"
 	},
 	{
+		"label": "Max relations with rivals",
+		"codeLabel": "cheat.button.max_rival_relationships",
+		"tooltip": "Max friendship, influence, and romance with every Rivals Reborn rival idol.",
+		"codeTooltip": "cheat.tooltip.max_rival_relationships",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "MaxRelationsWithRivals"
+	},
+	{
 		"label": "+25k staff EXP",
 		"codeLabel": "cheat.button.add_staff_experience",
 		"tooltip": "Add 25k EXP to all staff skills.",

@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using ModLocalizationSystem;
 using UnityEngine;
 
@@ -64,15 +66,18 @@ namespace CheatsMod
         internal const string NotificationRevealDatingPreference = "notification.reveal_dating_preference";
         internal const string NotificationHealAndEndHiatus = "notification.heal_and_end_hiatus";
         internal const string NotificationMaxPlayerRelationships = "notification.max_player_relationships";
+        internal const string NotificationMaxRivalRelationships = "notification.max_rival_relationships";
         internal const string NotificationNoActiveIdols = "notification.no_active_idols";
         internal const string NotificationNoIdols = "notification.no_idols";
         internal const string NotificationNoStaff = "notification.no_staff";
         internal const string NotificationNoResearch = "notification.no_research";
         internal const string NotificationNoRelationships = "notification.no_relationships";
+        internal const string NotificationNoRivalIdols = "notification.no_rival_idols";
         internal const string NotificationNoIdolDatingRelationships = "notification.no_idol_dating_relationships";
         internal const string NotificationNoScandalCandidates = "notification.no_scandal_candidates";
         internal const string NotificationNoCliques = "notification.no_cliques";
         internal const string NotificationNoBullying = "notification.no_bullying";
+        internal const string NotificationRivalsRebornUnavailable = "notification.rivals_reborn_unavailable";
         internal const string NotificationGameUnavailable = "notification.game_unavailable";
         internal const string NotificationCheatFailed = "notification.cheat_failed";
     }
@@ -111,15 +116,18 @@ namespace CheatsMod
         internal const string NotificationRevealDatingPreference = "Dating preferences revealed.";
         internal const string NotificationHealAndEndHiatus = "All idols healed and returned from hiatus.";
         internal const string NotificationMaxPlayerRelationships = "Active idol influence, friendship, and romance maxed.";
+        internal const string NotificationMaxRivalRelationships = "Rival idol friendship, influence, and romance maxed.";
         internal const string NotificationNoActiveIdols = "No active idols found.";
         internal const string NotificationNoIdols = "No idols found.";
         internal const string NotificationNoStaff = "No staff found.";
         internal const string NotificationNoResearch = "Research categories are not available yet.";
         internal const string NotificationNoRelationships = "No matching relationships found.";
+        internal const string NotificationNoRivalIdols = "No Rivals Reborn rival idols found.";
         internal const string NotificationNoIdolDatingRelationships = "No non-producer idol dating relationships found.";
         internal const string NotificationNoScandalCandidates = "No idol is eligible for a random dating scandal.";
         internal const string NotificationNoCliques = "No cliques found.";
         internal const string NotificationNoBullying = "No bullying targets found.";
+        internal const string NotificationRivalsRebornUnavailable = "Rivals Reborn is not enabled.";
         internal const string NotificationGameUnavailable = "Game data is not available yet.";
         internal const string NotificationCheatFailed = "Cheat action failed.";
     }
@@ -128,6 +136,45 @@ namespace CheatsMod
     {
         internal const string ExecutionFailedFormat = "[CheatsMod] Cheat action failed: {0}";
         internal const string NotificationFailedFormat = "[CheatsMod] Notification failed: {0}";
+    }
+
+    internal static class RivalsRebornIntegration
+    {
+        internal const BindingFlags InstanceBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        internal const BindingFlags StaticBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+
+        internal const string AssemblyName = "rivalsreborn";
+        internal const string HarmonyOwnerId = "rivalsreborn";
+        internal const string RootTypeName = "RivalsReborn.RR";
+        internal const string StateFieldName = "State";
+        internal const string EnsureInitMethodName = "EnsureInit";
+        internal const string StateLabelsFieldName = "Labels";
+        internal const string LabelDisbandedFieldName = "Disbanded";
+        internal const string LabelRelationWithPlayerFieldName = "RelationWithPlayer";
+        internal const string LabelRosterFieldName = "Roster";
+        internal const string IdolFriendshipFieldName = "RelFriendship";
+        internal const string IdolInfluenceFieldName = "RelInfluence";
+        internal const string IdolRomanceFieldName = "RelRomance";
+
+        internal const string HarmonyTypeName = "HarmonyLib.Harmony";
+        internal const string HarmonyGetAllPatchedMethodsMethodName = "GetAllPatchedMethods";
+        internal const string HarmonyGetPatchInfoMethodName = "GetPatchInfo";
+        internal const string HarmonyPatchOwnersMemberName = "Owners";
+        internal const string HarmonyPatchOwnerPropertyName = "Owner";
+        internal const string HarmonyPatchOwnerFieldName = "owner";
+        internal const string HarmonyPrefixPatchCollectionName = "Prefixes";
+        internal const string HarmonyPostfixPatchCollectionName = "Postfixes";
+        internal const string HarmonyTranspilerPatchCollectionName = "Transpilers";
+        internal const string HarmonyFinalizerPatchCollectionName = "Finalizers";
+
+        internal static readonly object[] EmptyArguments = new object[0];
+        internal static readonly string[] HarmonyPatchCollectionMemberNames = new string[]
+        {
+            HarmonyPrefixPatchCollectionName,
+            HarmonyPostfixPatchCollectionName,
+            HarmonyTranspilerPatchCollectionName,
+            HarmonyFinalizerPatchCollectionName
+        };
     }
 
     public static class Cheats
@@ -345,6 +392,11 @@ namespace CheatsMod
         public static void MaxOutActiveIdolPlayerRelationships()
         {
             Execute(MaxOutActiveIdolPlayerRelationshipsCore);
+        }
+
+        public static void MaxRelationsWithRivals()
+        {
+            Execute(MaxRelationsWithRivalsCore);
         }
 
         private static void AddOneBillionYenCore()
@@ -1152,6 +1204,94 @@ namespace CheatsMod
                 NotificationManager._notification._type.idol_relationship_change);
         }
 
+        private static void MaxRelationsWithRivalsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            Assembly rivalsAssembly = FindLoadedAssembly(RivalsRebornIntegration.AssemblyName);
+            if (rivalsAssembly == null || !IsRivalsRebornEnabledByHarmony(rivalsAssembly))
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationRivalsRebornUnavailable,
+                    CheatFallbackText.NotificationRivalsRebornUnavailable);
+                return;
+            }
+
+            object rivalsState = GetRivalsRebornState(rivalsAssembly);
+            IEnumerable rivalLabels = GetEnumerableFieldValue(rivalsState, RivalsRebornIntegration.StateLabelsFieldName);
+            if (rivalLabels == null)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationNoRivalIdols,
+                    CheatFallbackText.NotificationNoRivalIdols);
+                return;
+            }
+
+            int maximumRelationshipPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
+            int appliedCount = CheatAmounts.ZeroCount;
+            foreach (object rivalLabel in rivalLabels)
+            {
+                if (rivalLabel == null
+                    || GetBooleanFieldValue(rivalLabel, RivalsRebornIntegration.LabelDisbandedFieldName))
+                {
+                    continue;
+                }
+
+                SetIntegerFieldValue(
+                    rivalLabel,
+                    RivalsRebornIntegration.LabelRelationWithPlayerFieldName,
+                    maximumRelationshipPoints);
+
+                IEnumerable roster = GetEnumerableFieldValue(rivalLabel, RivalsRebornIntegration.LabelRosterFieldName);
+                if (roster == null)
+                {
+                    continue;
+                }
+
+                foreach (object rivalIdol in roster)
+                {
+                    if (rivalIdol == null)
+                    {
+                        continue;
+                    }
+
+                    bool updatedFriendship = SetIntegerFieldValue(
+                        rivalIdol,
+                        RivalsRebornIntegration.IdolFriendshipFieldName,
+                        maximumRelationshipPoints);
+                    bool updatedInfluence = SetIntegerFieldValue(
+                        rivalIdol,
+                        RivalsRebornIntegration.IdolInfluenceFieldName,
+                        maximumRelationshipPoints);
+                    bool updatedRomance = SetIntegerFieldValue(
+                        rivalIdol,
+                        RivalsRebornIntegration.IdolRomanceFieldName,
+                        maximumRelationshipPoints);
+
+                    if (updatedFriendship || updatedInfluence || updatedRomance)
+                    {
+                        appliedCount++;
+                    }
+                }
+            }
+
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationNoRivalIdols,
+                    CheatFallbackText.NotificationNoRivalIdols);
+                return;
+            }
+
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationMaxRivalRelationships,
+                CheatFallbackText.NotificationMaxRivalRelationships,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
         private static void Execute(Action cheatAction)
         {
             if (cheatAction == null)
@@ -1352,6 +1492,311 @@ namespace CheatsMod
             int minPoints = Relationships_Player.GetPointsByLevel(-CheatAmounts.MaximumPositiveRelationshipLevel);
             int maxPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
             return Math.Max(minPoints, Math.Min(maxPoints, points));
+        }
+
+        private static Assembly FindLoadedAssembly(string assemblyName)
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int assemblyIndex = 0; assemblyIndex < assemblies.Length; assemblyIndex++)
+            {
+                Assembly assembly = assemblies[assemblyIndex];
+                if (assembly == null)
+                {
+                    continue;
+                }
+
+                AssemblyName loadedAssemblyName = assembly.GetName();
+                if (loadedAssemblyName != null
+                    && string.Equals(loadedAssemblyName.Name, assemblyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return assembly;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsRivalsRebornEnabledByHarmony(Assembly rivalsAssembly)
+        {
+            if (rivalsAssembly == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                bool harmonyInspectionSucceeded;
+                bool harmonyOwnerFound = IsHarmonyOwnerLoaded(
+                    RivalsRebornIntegration.HarmonyOwnerId,
+                    out harmonyInspectionSucceeded);
+                if (harmonyInspectionSucceeded)
+                {
+                    return harmonyOwnerFound;
+                }
+            }
+            catch (Exception)
+            {
+                return true;
+            }
+
+            return true;
+        }
+
+        private static bool IsHarmonyOwnerLoaded(string harmonyOwnerId, out bool inspectionSucceeded)
+        {
+            inspectionSucceeded = false;
+            Type harmonyType = FindLoadedType(RivalsRebornIntegration.HarmonyTypeName);
+            if (harmonyType == null)
+            {
+                return false;
+            }
+
+            MethodInfo getAllPatchedMethods = harmonyType.GetMethod(
+                RivalsRebornIntegration.HarmonyGetAllPatchedMethodsMethodName,
+                RivalsRebornIntegration.StaticBindingFlags);
+            MethodInfo getPatchInfo = harmonyType.GetMethod(
+                RivalsRebornIntegration.HarmonyGetPatchInfoMethodName,
+                RivalsRebornIntegration.StaticBindingFlags,
+                null,
+                new Type[] { typeof(MethodBase) },
+                null);
+            if (getAllPatchedMethods == null || getPatchInfo == null)
+            {
+                return false;
+            }
+
+            IEnumerable patchedMethods = getAllPatchedMethods.Invoke(
+                null,
+                RivalsRebornIntegration.EmptyArguments) as IEnumerable;
+            if (patchedMethods == null)
+            {
+                return false;
+            }
+
+            inspectionSucceeded = true;
+            foreach (object patchedMethod in patchedMethods)
+            {
+                MethodBase methodBase = patchedMethod as MethodBase;
+                if (methodBase == null)
+                {
+                    continue;
+                }
+
+                object patchInfo = getPatchInfo.Invoke(
+                    null,
+                    new object[] { methodBase });
+                if (PatchInfoHasHarmonyOwner(patchInfo, harmonyOwnerId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static Type FindLoadedType(string typeName)
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int assemblyIndex = 0; assemblyIndex < assemblies.Length; assemblyIndex++)
+            {
+                Assembly assembly = assemblies[assemblyIndex];
+                if (assembly == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Type type = assembly.GetType(typeName, false);
+                    if (type != null)
+                    {
+                        return type;
+                    }
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool PatchInfoHasHarmonyOwner(object patchInfo, string harmonyOwnerId)
+        {
+            if (patchInfo == null)
+            {
+                return false;
+            }
+
+            IEnumerable owners = GetEnumerableMemberValue(
+                patchInfo,
+                RivalsRebornIntegration.HarmonyPatchOwnersMemberName);
+            if (EnumerableHasStringValue(owners, harmonyOwnerId))
+            {
+                return true;
+            }
+
+            for (int collectionIndex = 0;
+                collectionIndex < RivalsRebornIntegration.HarmonyPatchCollectionMemberNames.Length;
+                collectionIndex++)
+            {
+                IEnumerable patchCollection = GetEnumerableMemberValue(
+                    patchInfo,
+                    RivalsRebornIntegration.HarmonyPatchCollectionMemberNames[collectionIndex]);
+                if (PatchCollectionHasHarmonyOwner(patchCollection, harmonyOwnerId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool PatchCollectionHasHarmonyOwner(IEnumerable patchCollection, string harmonyOwnerId)
+        {
+            if (patchCollection == null)
+            {
+                return false;
+            }
+
+            foreach (object patch in patchCollection)
+            {
+                if (StringMemberEquals(
+                    patch,
+                    RivalsRebornIntegration.HarmonyPatchOwnerPropertyName,
+                    harmonyOwnerId)
+                    || StringMemberEquals(
+                        patch,
+                        RivalsRebornIntegration.HarmonyPatchOwnerFieldName,
+                        harmonyOwnerId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool EnumerableHasStringValue(IEnumerable values, string targetValue)
+        {
+            if (values == null)
+            {
+                return false;
+            }
+
+            foreach (object value in values)
+            {
+                string stringValue = value as string;
+                if (string.Equals(stringValue, targetValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool StringMemberEquals(object instance, string memberName, string targetValue)
+        {
+            object value = GetMemberValue(instance, memberName);
+            string stringValue = value as string;
+            return string.Equals(stringValue, targetValue, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static object GetRivalsRebornState(Assembly rivalsAssembly)
+        {
+            if (rivalsAssembly == null)
+            {
+                return null;
+            }
+
+            Type rootType = rivalsAssembly.GetType(RivalsRebornIntegration.RootTypeName, false);
+            if (rootType == null)
+            {
+                return null;
+            }
+
+            MethodInfo ensureInit = rootType.GetMethod(
+                RivalsRebornIntegration.EnsureInitMethodName,
+                RivalsRebornIntegration.StaticBindingFlags);
+            if (ensureInit != null)
+            {
+                ensureInit.Invoke(null, RivalsRebornIntegration.EmptyArguments);
+            }
+
+            FieldInfo stateField = rootType.GetField(
+                RivalsRebornIntegration.StateFieldName,
+                RivalsRebornIntegration.StaticBindingFlags);
+            return stateField != null ? stateField.GetValue(null) : null;
+        }
+
+        private static IEnumerable GetEnumerableFieldValue(object instance, string fieldName)
+        {
+            return GetFieldValue(instance, fieldName) as IEnumerable;
+        }
+
+        private static bool GetBooleanFieldValue(object instance, string fieldName)
+        {
+            object value = GetFieldValue(instance, fieldName);
+            return value is bool && (bool)value;
+        }
+
+        private static bool SetIntegerFieldValue(object instance, string fieldName, int value)
+        {
+            FieldInfo field = GetInstanceField(instance, fieldName);
+            if (field == null || field.FieldType != typeof(int))
+            {
+                return false;
+            }
+
+            field.SetValue(instance, value);
+            return true;
+        }
+
+        private static object GetFieldValue(object instance, string fieldName)
+        {
+            FieldInfo field = GetInstanceField(instance, fieldName);
+            return field != null ? field.GetValue(instance) : null;
+        }
+
+        private static FieldInfo GetInstanceField(object instance, string fieldName)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            return instance.GetType().GetField(
+                fieldName,
+                RivalsRebornIntegration.InstanceBindingFlags);
+        }
+
+        private static IEnumerable GetEnumerableMemberValue(object instance, string memberName)
+        {
+            return GetMemberValue(instance, memberName) as IEnumerable;
+        }
+
+        private static object GetMemberValue(object instance, string memberName)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            Type instanceType = instance.GetType();
+            PropertyInfo property = instanceType.GetProperty(
+                memberName,
+                RivalsRebornIntegration.InstanceBindingFlags);
+            if (property != null)
+            {
+                return property.GetValue(instance, null);
+            }
+
+            FieldInfo field = instanceType.GetField(
+                memberName,
+                RivalsRebornIntegration.InstanceBindingFlags);
+            return field != null ? field.GetValue(instance) : null;
         }
 
         private static int RevealAllRelationshipPairs()
