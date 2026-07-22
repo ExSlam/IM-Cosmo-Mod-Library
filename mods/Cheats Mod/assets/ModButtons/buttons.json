@@ -330,6 +330,16 @@
 		"method": "HealAndEndHiatus"
 	},
 	{
+		"label": "Recruit unique idol",
+		"codeLabel": "cheat.button.recruit_unique_idol",
+		"tooltip": "Open a picker to recruit any loaded unique idol.",
+		"codeTooltip": "cheat.tooltip.recruit_unique_idol",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenUniqueIdolRecruitmentPopup"
+	},
+	{
 		"label": "Add fans",
 		"codeLabel": "cheat.button.add_custom_fans",
 		"tooltip": "Add the specified number of fans.",

@@ -3,10 +3,20 @@
     <ModName>Cheats Mod</ModName>
     <RootNamespace>CheatsMod</RootNamespace>
     <AssemblyName>com.cosmo.cheatsmod</AssemblyName>
-    <Version>1.2.2</Version>
+    <Version>1.4.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\CheatsMod.cs" />
+    <Compile Include="src\UniqueIdolRecruitmentPopup.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="UnityEngine.UnityWebRequestModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

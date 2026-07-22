@@ -142,6 +142,7 @@ namespace CheatsMod
     {
         internal const BindingFlags InstanceBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         internal const BindingFlags StaticBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+        internal const int GroupRelationMaximumPoints = 100;
 
         internal const string AssemblyName = "rivalsreborn";
         internal const string HarmonyOwnerId = "rivalsreborn";
@@ -397,6 +398,11 @@ namespace CheatsMod
         public static void MaxRelationsWithRivals()
         {
             Execute(MaxRelationsWithRivalsCore);
+        }
+
+        public static void OpenUniqueIdolRecruitmentPopup()
+        {
+            Execute(UniqueIdolRecruitmentPopup.Open);
         }
 
         private static void AddOneBillionYenCore()
@@ -1230,7 +1236,8 @@ namespace CheatsMod
                 return;
             }
 
-            int maximumRelationshipPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
+            int maximumIdolRelationshipPoints = Relationships_Player.GetPointsByLevel(
+                CheatAmounts.MaximumPositiveRelationshipLevel);
             int appliedCount = CheatAmounts.ZeroCount;
             foreach (object rivalLabel in rivalLabels)
             {
@@ -1243,7 +1250,7 @@ namespace CheatsMod
                 SetIntegerFieldValue(
                     rivalLabel,
                     RivalsRebornIntegration.LabelRelationWithPlayerFieldName,
-                    maximumRelationshipPoints);
+                    RivalsRebornIntegration.GroupRelationMaximumPoints);
 
                 IEnumerable roster = GetEnumerableFieldValue(rivalLabel, RivalsRebornIntegration.LabelRosterFieldName);
                 if (roster == null)
@@ -1261,15 +1268,15 @@ namespace CheatsMod
                     bool updatedFriendship = SetIntegerFieldValue(
                         rivalIdol,
                         RivalsRebornIntegration.IdolFriendshipFieldName,
-                        maximumRelationshipPoints);
+                        maximumIdolRelationshipPoints);
                     bool updatedInfluence = SetIntegerFieldValue(
                         rivalIdol,
                         RivalsRebornIntegration.IdolInfluenceFieldName,
-                        maximumRelationshipPoints);
+                        maximumIdolRelationshipPoints);
                     bool updatedRomance = SetIntegerFieldValue(
                         rivalIdol,
                         RivalsRebornIntegration.IdolRomanceFieldName,
-                        maximumRelationshipPoints);
+                        maximumIdolRelationshipPoints);
 
                     if (updatedFriendship || updatedInfluence || updatedRomance)
                     {
