@@ -3421,7 +3421,8 @@ namespace GraduationCalendar
                 EnsureCalendarOwnsQueueFront(manager);
             }
 
-            if (!OpenProfilePopup(manager, girl))
+            Profile_Popup profile;
+            if (!QueueProfilePopup(manager, out profile))
             {
                 Log("OpenProfileFromCalendar skipped: profile popup entry is unavailable.");
                 return;
@@ -3431,10 +3432,13 @@ namespace GraduationCalendar
             {
                 popupClosing = true;
                 PopupManager.Close_(HandlePopupManagerCloseComplete);
-                return;
+            }
+            else
+            {
+                HandlePopupHidden();
             }
 
-            HandlePopupHidden();
+            PopulateProfilePopup(profile, girl);
         }
 
         private static void EnsureCalendarOwnsQueueFront(PopupManager manager)
@@ -3461,9 +3465,10 @@ namespace GraduationCalendar
             manager.queue.Insert(0, calendarType);
         }
 
-        private static bool OpenProfilePopup(PopupManager manager, data_girls.girls girl)
+        private static bool QueueProfilePopup(PopupManager manager, out Profile_Popup profile)
         {
-            if (manager == null || girl == null)
+            profile = null;
+            if (manager == null)
             {
                 return false;
             }
@@ -3472,13 +3477,42 @@ namespace GraduationCalendar
             {
                 return false;
             }
-            PopupManager.OpenPopup(PopupManager._type.girl_profile);
-            Profile_Popup profile = popup.obj.GetComponent<Profile_Popup>();
-            if (profile != null)
+            profile = popup.obj.GetComponent<Profile_Popup>();
+            if (profile == null)
+            {
+                return false;
+            }
+
+            // Queue only. If the calendar is in front, Profile_Popup is still
+            // inactive here and its Awake initialization has not necessarily run.
+            manager.Open(PopupManager._type.girl_profile, true);
+            return true;
+        }
+
+        private static void PopulateProfilePopup(Profile_Popup profile, data_girls.girls girl)
+        {
+            if (profile == null || girl == null)
+            {
+                return;
+            }
+
+            // PopupManager.Close_ advances the queue synchronously. At this point
+            // the profile object is active, Profile_Popup.Awake has initialized its
+            // texture service, and Set follows the same order as vanilla buttons.
+            if (!profile.gameObject.activeInHierarchy)
+            {
+                Log("Profile popup did not become active after queue handoff.");
+                return;
+            }
+
+            try
             {
                 profile.Set(girl);
             }
-            return true;
+            catch (Exception ex)
+            {
+                Log("Failed to populate profile popup: " + ex);
+            }
         }
 
         private static string GetCloseLabel()
