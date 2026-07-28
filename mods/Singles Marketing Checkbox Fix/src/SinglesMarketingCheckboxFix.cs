@@ -6,10 +6,10 @@ namespace SinglesMarketingCheckboxFix
 {
     /// <summary>
     /// SingleInDevelopmentButton.UpdateParam hides the Marketing checklist row when a
-    /// single has no marketing selected, but vanilla never explicitly re-enables that same
-    /// row when the rendered single does have marketing. This is visible after tab/list
-    /// refreshes because the row can inherit an inactive state while the underlying single
-    /// data remains valid.
+    /// single has no marketing selected. That makes the checklist inconsistent and makes
+    /// the row appear to have disappeared after list refreshes. Keep the progress row
+    /// visible for every in-development single; singles without marketing display the
+    /// existing zero-value parameter as unchecked.
     /// </summary>
     internal static class MarketingCheckboxVisibility
     {
@@ -36,12 +36,9 @@ namespace SinglesMarketingCheckboxFix
                 return;
             }
 
-            bool hasMarketing = button.single != null &&
-                                button.single.marketing != null &&
-                                button.single.marketing.Count > 0;
-            if (targetObj.activeSelf != hasMarketing)
+            if (!targetObj.activeSelf)
             {
-                targetObj.SetActive(hasMarketing);
+                targetObj.SetActive(true);
             }
         }
 

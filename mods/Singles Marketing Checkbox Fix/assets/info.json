@@ -1,8 +1,8 @@
 {
   "Title": "Singles Marketing Checkbox Fix",
-  "Description": "Fixes a bug where the Marketing checkbox for in-production Singles would disappear after switching back and forth from Singles tab and other tabs in the game.",
+  "Description": "Keeps the Marketing checkbox visible for in-production Singles, including Singles without a selected marketing campaign.",
   "Author": "Cosmo",
-  "Version": "1.0.0",
+  "Version": "1.0.1",
   "Tags": ["ui", "fix", "patch", "bugfix"],
   "HarmonyID": "com.cosmo.singlesmarketingcheckboxfix"
 }
