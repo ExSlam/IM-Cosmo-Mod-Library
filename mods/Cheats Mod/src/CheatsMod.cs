@@ -40,6 +40,7 @@ namespace CheatsMod
         internal const string NotificationAddFame = "notification.add_fame";
         internal const string NotificationAddBuzz = "notification.add_buzz";
         internal const string NotificationResetSpecialEventCooldowns = "notification.reset_special_event_cooldowns";
+        internal const string NotificationResetGroupTransferCooldowns = "notification.reset_group_transfer_cooldowns";
         internal const string NotificationRefreshPhysicalStamina = "notification.refresh_physical_stamina";
         internal const string NotificationRefreshMentalStamina = "notification.refresh_mental_stamina";
         internal const string NotificationReduceGeneralScandalPoints = "notification.reduce_general_scandal_points";
@@ -90,6 +91,7 @@ namespace CheatsMod
         internal const string NotificationAddFame = "Added 10k fame.";
         internal const string NotificationAddBuzz = "Added 100 buzz.";
         internal const string NotificationResetSpecialEventCooldowns = "Special event cooldowns reset.";
+        internal const string NotificationResetGroupTransferCooldowns = "Active idol group transfer cooldowns reset.";
         internal const string NotificationRefreshPhysicalStamina = "Active idol physical stamina set to 100.";
         internal const string NotificationRefreshMentalStamina = "Active idol mental stamina set to 100.";
         internal const string NotificationReduceGeneralScandalPoints = "General scandal points reduced by 1.";
@@ -180,6 +182,9 @@ namespace CheatsMod
 
     public static class Cheats
     {
+        private static readonly DateTime ClearedGroupTransferCooldownDate =
+            new DateTime(1900, 1, 1);
+
         private static readonly Research.type[] ResearchTypes = new Research.type[]
         {
             Research.type.player,
@@ -258,6 +263,11 @@ namespace CheatsMod
         public static void ResetSpecialEventCooldowns()
         {
             Execute(ResetSpecialEventCooldownsCore);
+        }
+
+        public static void ResetGroupTransferCooldowns()
+        {
+            Execute(ResetGroupTransferCooldownsCore);
         }
 
         public static void RefreshActiveIdolPhysicalStamina()
@@ -463,6 +473,32 @@ namespace CheatsMod
                 CheatLocalizationKeys.NotificationResetSpecialEventCooldowns,
                 CheatFallbackText.NotificationResetSpecialEventCooldowns,
                 NotificationManager._notification._type.other);
+        }
+
+        private static void ResetGroupTransferCooldownsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            int appliedCount = ApplyToActiveIdols(delegate(data_girls.girls idol)
+            {
+                idol.TransferDate = ClearedGroupTransferCooldownDate;
+            });
+            if (appliedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationNoActiveIdols,
+                    CheatFallbackText.NotificationNoActiveIdols);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationResetGroupTransferCooldowns,
+                CheatFallbackText.NotificationResetGroupTransferCooldowns,
+                NotificationManager._notification._type.idol_status_change);
         }
 
         private static void RefreshActiveIdolPhysicalStaminaCore()
