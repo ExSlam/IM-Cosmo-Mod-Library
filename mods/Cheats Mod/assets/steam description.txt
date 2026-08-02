@@ -44,5 +44,6 @@ List of cheats:
     [*] Reset special event cooldowns
     [*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
     [*] Recruit Unique Idol cheat with selection popup
+    [*] Reset cooldown for changing idol groups for all idols
     [*] Add custom amount of fans
 [/olist]
