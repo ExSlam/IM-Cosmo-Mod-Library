@@ -31,7 +31,8 @@ namespace IMDataCore
         /// </summary>
         internal static string GetRootDirectory()
         {
-            return Path.Combine(Application.persistentDataPath, CoreConstants.ModsFolderName, CoreConstants.ModFolderName);
+            // Bypasses the volatile 'Mods' directory to prevent Steam Workshop wipes every time the mod updates
+            return Path.Combine(Application.persistentDataPath, CoreConstants.ModFolderName);
         }
 
         /// <summary>

@@ -43,7 +43,8 @@ namespace GraduationDetails
         {
             get
             {
-                return Path.Combine(Application.persistentDataPath, "Mods", BaseFolder);
+                // Save in the game's own save directory parent folder to avoid data getting wiped by mod updates
+                return Path.Combine(Application.persistentDataPath, BaseFolder);
             }
         }
 
