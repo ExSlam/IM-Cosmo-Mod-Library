@@ -545,7 +545,8 @@ namespace IMDataCore
                         ElectionReleaseSingleId = electionReleaseSingleId,
                         ElectionResultCount = electionResultCount,
                         ElectionRankingSummary = electionRankingSummary,
-                        ElectionRankedIdolIdList = electionRankedIdolIdList
+                        ElectionRankedIdolIdList = electionRankedIdolIdList,
+                        ElectionNumber = ResolveSaveScopedElectionNumber(election)
                     };
 
                     EnqueueEventRecordLocked(
@@ -605,7 +606,8 @@ namespace IMDataCore
                 IdolId = snapshot.TargetIdolId,
                 ElectionPlaceBefore = snapshot.PreviousPlace,
                 ElectionPlaceAfter = adjustedPlace,
-                ElectionBroadcastType = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast)
+                ElectionBroadcastType = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast),
+                ElectionNumber = ResolveSaveScopedElectionNumber(election)
             };
 
             lock (runtimeLock)
@@ -658,6 +660,7 @@ namespace IMDataCore
                 ElectionConcertId = ResolveConcertIdOrInvalid(election.Concert),
                 ElectionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 ElectionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
+                ElectionNumber = ResolveSaveScopedElectionNumber(election),
                 ElectionFinishDate = CoreDateTimeUtility.ToRoundTripString(election.FinishDate)
             };
 
@@ -746,6 +749,7 @@ namespace IMDataCore
                         ElectionResultCount = electionResultCount,
                         ElectionRankingSummary = electionRankingSummary,
                         ElectionRankedIdolIdList = electionRankedIdolIdList,
+                        ElectionNumber = ResolveSaveScopedElectionNumber(election),
                         ElectionFinishDate = electionFinishDate
                     };
 
@@ -3971,7 +3975,7 @@ namespace IMDataCore
                 election_concert_id = ResolveConcertIdOrInvalid(election.Concert),
                 election_release_single_id = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 election_result_count = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
-                election_number = election.Count,
+                election_number = ResolveSaveScopedElectionNumber(election),
                 election_production_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.production),
                 election_logistics_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.logistics),
                 election_production_cost = election.GetProductionCost(),
