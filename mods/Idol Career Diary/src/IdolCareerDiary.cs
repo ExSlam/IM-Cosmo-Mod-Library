@@ -995,6 +995,8 @@ namespace IdolCareerDiary
         internal const string KeyConcertPreviousStatus = "concert_previous_status";
         internal const string KeyConcertNewStatus = "concert_new_status";
         internal const string KeyConcertStatus = "concert_status";
+        internal const string KeyConcertSetlistSummary = "concert_setlist_summary";
+        internal const string KeyConcertSetlistSummaryAfter = "concert_setlist_summary_after";
         internal static string LabelSongs { get { return ModLocalization.Get("LabelSongs", "Songs"); } }
         internal const string KeyConcertSongCount = "concert_song_count";
         internal static string LabelParticipants { get { return ModLocalization.Get("LabelParticipants", "Participants"); } }
@@ -1055,6 +1057,18 @@ namespace IdolCareerDiary
         internal const string KeyConcertFinishDate = "concert_finish_date";
         internal static string LabelDate { get { return ModLocalization.Get("LabelDate", "Date"); } }
         internal const string KeyEventDate = "event_date";
+        internal static string TitleConcertSetlist { get { return ModLocalization.Get("TitleConcertSetlist", "Concert Setlist"); } }
+        internal static string TitleConcertCardsUsed { get { return ModLocalization.Get("TitleConcertCardsUsed", "Cards Used"); } }
+        internal static string TitleConcertDisasters { get { return ModLocalization.Get("TitleConcertDisasters", "Disasters"); } }
+        internal static string TextTalkBreak { get { return ModLocalization.Get("TextTalkBreak", "Talk Break #"); } }
+        internal static string TextCenterIdol { get { return ModLocalization.Get("TextCenterIdol", "Center"); } }
+        internal static string TextMcs { get { return ModLocalization.Get("TextMcs", "MCs"); } }
+        internal static string TextFanSatisfaction { get { return ModLocalization.Get("TextFanSatisfaction", "Fan Satisfaction"); } }
+        internal static string TextSales { get { return ModLocalization.Get("TextSales", "Sales"); } }
+        internal static string TextStaminaPoints { get { return ModLocalization.Get("TextStaminaPoints", "Stamina"); } }
+        internal static string TextSkillValue { get { return ModLocalization.Get("TextSkillValue", "Skill Value"); } }
+        internal static string TextNoConcertCardsUsed { get { return ModLocalization.Get("TextNoConcertCardsUsed", "No cards were used."); } }
+        internal static string TextNoConcertDisasters { get { return ModLocalization.Get("TextNoConcertDisasters", "No disasters were faced."); } }
         internal static string TextStaffHired { get { return ModLocalization.Get("TextStaffHired", "Staff Hired"); } }
         internal static string TextStaffFired { get { return ModLocalization.Get("TextStaffFired", "Staff Fired"); } }
         internal static string TextStaffFiredWithSeverance { get { return ModLocalization.Get("TextStaffFiredWithSeverance", "Staff Fired With Severance"); } }
@@ -5068,6 +5082,7 @@ namespace IdolCareerDiary
         private bool injectionInProgress;
 
         private readonly List<IMDataCoreEvent> cachedEvents = new List<IMDataCoreEvent>();
+        private readonly List<IMDataCoreEvent> relatedConcertDetailEvents = new List<IMDataCoreEvent>();
         private readonly HashSet<string> selectedFilterEventTypes = new HashSet<string>(StringComparer.Ordinal);
         private bool filterModeIsExclude = true;
         private int maxEventsRenderCurrent = C.MaxEventsRender;
@@ -5111,6 +5126,20 @@ namespace IdolCareerDiary
             internal int IdolId;
             internal long Votes;
             internal int Points;
+        }
+
+        private sealed class ConcertSetlistRow
+        {
+            internal bool IsTalk;
+            internal string Title = string.Empty;
+            internal string GroupTitle = string.Empty;
+            internal int SingleId = C.InvalidId;
+            internal int CenterId = C.InvalidId;
+            internal readonly List<int> McIdolIds = new List<int>();
+            internal int FanSatisfaction;
+            internal long Sales;
+            internal float StaminaCost;
+            internal int SkillValue;
         }
 
         /// <summary>
@@ -5590,6 +5619,7 @@ namespace IdolCareerDiary
         private void LoadEvents()
         {
             cachedEvents.Clear();
+            relatedConcertDetailEvents.Clear();
             loadWarning = string.Empty;
 
             if (idol == null || idol.id < C.MinId)
@@ -5608,6 +5638,7 @@ namespace IdolCareerDiary
 
             if (events != null)
             {
+                HashSet<string> relevantConcertEntityIds = ResolveRelevantConcertEntityIds(events);
                 HashSet<string> supersedingEventKeys = BuildSupersedingEventKeys(events);
                 HashSet<string> singleReleaseIdentityKeys = new HashSet<string>(StringComparer.Ordinal);
                 HashSet<string> showCancelledIdentityKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -5619,12 +5650,24 @@ namespace IdolCareerDiary
                     events,
                     out attachedElectionSingleIds,
                     out attachedElectionConcertIds);
+                foreach (int attachedConcertId in attachedElectionConcertIds)
+                {
+                    relevantConcertEntityIds.Add(attachedConcertId.ToString(CultureInfo.InvariantCulture));
+                }
                 for (int i = C.ZeroIndex; i < events.Count; i++)
                 {
                     IMDataCoreEvent ev = events[i];
                     if (ev == null)
                     {
                         continue;
+                    }
+
+                    bool isRelatedConcertDetail =
+                        string.Equals(ev.EntityKind, C.KindConcert, StringComparison.Ordinal) &&
+                        relevantConcertEntityIds.Contains(ev.EntityId ?? string.Empty);
+                    if (isRelatedConcertDetail)
+                    {
+                        relatedConcertDetailEvents.Add(ev);
                     }
 
                     if (IsSuppressedSetStatusEvent(ev) || IsSuppressedTimelineNoiseEvent(ev))
@@ -5677,6 +5720,35 @@ namespace IdolCareerDiary
             {
                 selectedEventId = cachedEvents[C.ZeroIndex].EventId;
             }
+        }
+
+        /// <summary>
+        /// Resolves concerts whose payloads explicitly include the active idol.  Global
+        /// card/crisis rows do not repeat participant ids, so their concert identity is
+        /// used to retain them for the aggregate detail view.
+        /// </summary>
+        private HashSet<string> ResolveRelevantConcertEntityIds(List<IMDataCoreEvent> events)
+        {
+            HashSet<string> identifiers = new HashSet<string>(StringComparer.Ordinal);
+            if (events == null)
+            {
+                return identifiers;
+            }
+
+            for (int eventIndex = C.ZeroIndex; eventIndex < events.Count; eventIndex++)
+            {
+                IMDataCoreEvent candidate = events[eventIndex];
+                if (candidate == null ||
+                    !string.Equals(candidate.EntityKind, C.KindConcert, StringComparison.Ordinal) ||
+                    !IsRelevantToCurrentIdol(candidate))
+                {
+                    continue;
+                }
+
+                identifiers.Add(candidate.EntityId ?? string.Empty);
+            }
+
+            return identifiers;
         }
 
         /// <summary>
@@ -5808,6 +5880,14 @@ namespace IdolCareerDiary
                 return true;
             }
 
+            if (string.Equals(eventType, C.EventConcertCardUsed, StringComparison.Ordinal) ||
+                string.Equals(eventType, C.EventConcertCrisisDecision, StringComparison.Ordinal) ||
+                string.Equals(eventType, C.EventConcertCrisisApplied, StringComparison.Ordinal) ||
+                string.Equals(eventType, C.EventConcertFinalResolved, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
             if (string.Equals(eventType, C.EventStaffHired, StringComparison.Ordinal) ||
                 string.Equals(eventType, C.EventStaffFired, StringComparison.Ordinal) ||
                 string.Equals(eventType, C.EventStaffFiredSeverance, StringComparison.Ordinal))
@@ -5923,7 +6003,6 @@ namespace IdolCareerDiary
             AddLongLineIfPresent(lines, C.TextElectionPoints, payload,
                 type == C.EventElectionResultsGenerated ? C.JsonElectionGeneratedFamePoints : C.JsonElectionFamePoints);
             AddIntLineIfPresent(lines, C.TextResultCount, payload, C.JsonElectionResultCount);
-            AddIntLineIfPresent(lines, C.TextElection, payload, C.JsonElectionNumber);
             AddFloatLineIfPresent(lines, C.TextElectionProduction, payload, C.JsonElectionProductionLevel, "%");
             AddFloatLineIfPresent(lines, C.TextElectionLogistics, payload, C.JsonElectionLogisticsLevel, "%");
             AddLongLineIfPresent(lines, C.TextElectionCost, payload, C.JsonElectionProductionCost);
@@ -9023,7 +9102,10 @@ namespace IdolCareerDiary
             {
                 AddText(diaryDetailContentRoot, C.LabelWhenPrefix + p.Date);
                 AddText(diaryDetailContentRoot, C.LabelWhatPrefix + p.Title);
-                AddText(diaryDetailContentRoot, C.LabelWithWhomPrefix + p.WithWhom);
+                if (!string.Equals(ev.EntityKind, C.KindConcert, StringComparison.Ordinal))
+                {
+                    AddText(diaryDetailContentRoot, C.LabelWithWhomPrefix + p.WithWhom);
+                }
                 AddText(diaryDetailContentRoot, C.LabelSourcePrefix + p.Source);
                 if (!string.IsNullOrEmpty(p.ModSource))
                 {
@@ -9047,6 +9129,7 @@ namespace IdolCareerDiary
 
             RenderSingleSourceDetails(ev);
             RenderElectionRankingContext(ev, payload);
+            RenderConcertDetailContext(ev, payload);
             RenderDatingPartnerContext(ev, payload);
             RenderShowCastContext(ev, payload);
             RenderSocialRelationshipContext(ev, payload, p);
@@ -9253,22 +9336,50 @@ namespace IdolCareerDiary
             for (int rowIndex = C.ZeroIndex; rowIndex < rows.Count; rowIndex++)
             {
                 ElectionRankingRow row = rows[rowIndex];
-                string rankingLine = string.Concat(
-                    "#",
-                    row.Place.ToString(CultureInfo.InvariantCulture),
-                    C.SeparatorColonSpace,
-                    ResolveIdolNameById(row.IdolId),
-                    C.SeparatorSpace,
-                    "— ",
-                    row.Votes.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture),
-                    C.SeparatorSpace,
-                    C.LabelVotes,
-                    C.SeparatorSpace,
-                    "— ",
-                    row.Points.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture),
-                    C.SeparatorSpace,
-                    C.TextElectionPoints);
-                AddText(diaryDetailContentRoot, rankingLine);
+                data_girls.girls rankedIdol = data_girls.GetGirlByID(row.IdolId);
+                if (rankedIdol == null)
+                {
+                    AddText(
+                        diaryDetailContentRoot,
+                        C.SeparatorHash + row.Place.ToString(CultureInfo.InvariantCulture) +
+                        C.SeparatorColonSpace + ResolveIdolNameById(row.IdolId));
+                    continue;
+                }
+
+                GameObject rankingRow = CreateUiObject(
+                    "CareerDiary_ElectionRanking_" + rowIndex.ToString(CultureInfo.InvariantCulture),
+                    diaryDetailContentRoot);
+                HorizontalLayoutGroup rankingLayout = rankingRow.AddComponent<HorizontalLayoutGroup>();
+                rankingLayout.childControlWidth = true;
+                rankingLayout.childControlHeight = true;
+                rankingLayout.childForceExpandWidth = false;
+                rankingLayout.childForceExpandHeight = false;
+                rankingLayout.spacing = C.TimelineParticipantRowSpacing;
+                rankingLayout.childAlignment = TextAnchor.MiddleLeft;
+
+                GameObject rankText = AddCardText(
+                    rankingRow.transform,
+                    C.SeparatorHash + row.Place.ToString(CultureInfo.InvariantCulture),
+                    true);
+                LayoutElement rankElement = rankText != null ? rankText.GetComponent<LayoutElement>() : null;
+                if (rankElement != null)
+                {
+                    rankElement.preferredWidth = C.TimelineParticipantPortraitSize;
+                    rankElement.flexibleWidth = C.FloatZero;
+                }
+
+                AddTimelineParticipantCard(rankingRow.transform, rankedIdol, rowIndex, C.ZeroIndex);
+
+                AddCardText(
+                    rankingRow.transform,
+                    row.Votes.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture) +
+                    C.SeparatorSpace + C.LabelVotes,
+                    false);
+                AddCardText(
+                    rankingRow.transform,
+                    row.Points.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture) +
+                    C.SeparatorSpace + C.TextElectionPoints,
+                    false);
             }
         }
 
@@ -9489,6 +9600,385 @@ namespace IdolCareerDiary
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// Resolves an ordered setlist from the newest stored snapshot, with a live-object
+        /// fallback that upgrades legacy compact snapshots while the concert still exists.
+        /// </summary>
+        private List<ConcertSetlistRow> ResolveConcertSetlistRows(IMDataCoreEvent ev, JSONNode payload)
+        {
+            int concertId;
+            if (ev != null && TryParseInt(ev.EntityId, out concertId))
+            {
+                SEvent_Concerts._concert liveConcert = SEvent_Concerts.GetConcertByID(concertId);
+                if (liveConcert != null && liveConcert.SetListItems != null && liveConcert.SetListItems.Count > C.ZeroIndex)
+                {
+                    return BuildLiveConcertSetlistRows(liveConcert);
+                }
+            }
+
+            string summary = ReadStr(payload, C.KeyConcertSetlistSummaryAfter);
+            if (string.IsNullOrEmpty(summary))
+            {
+                summary = ReadStr(payload, C.KeyConcertSetlistSummary);
+            }
+
+            long newestSnapshotEventId = ev != null ? ev.EventId : C.InvalidEventId;
+            List<IMDataCoreEvent> concertEvents = ResolveConcertDetailEvents(ev != null ? ev.EntityId : string.Empty);
+            for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent candidate = concertEvents[eventIndex];
+                if (candidate == null || candidate.EventId < newestSnapshotEventId)
+                {
+                    continue;
+                }
+
+                JSONNode candidatePayload = ParsePayload(candidate.PayloadJson);
+                string candidateSummary = ReadStr(candidatePayload, C.KeyConcertSetlistSummaryAfter);
+                if (string.IsNullOrEmpty(candidateSummary))
+                {
+                    candidateSummary = ReadStr(candidatePayload, C.KeyConcertSetlistSummary);
+                }
+
+                if (!string.IsNullOrEmpty(candidateSummary))
+                {
+                    summary = candidateSummary;
+                    newestSnapshotEventId = candidate.EventId;
+                }
+            }
+
+            return ParseConcertSetlistSummary(summary);
+        }
+
+        private static List<ConcertSetlistRow> BuildLiveConcertSetlistRows(SEvent_Concerts._concert concert)
+        {
+            List<ConcertSetlistRow> rows = new List<ConcertSetlistRow>();
+            if (concert == null || concert.SetListItems == null)
+            {
+                return rows;
+            }
+
+            for (int itemIndex = C.ZeroIndex; itemIndex < concert.SetListItems.Count; itemIndex++)
+            {
+                SEvent_Concerts._concert.ISetlistItem item = concert.SetListItems[itemIndex];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                ConcertSetlistRow row = new ConcertSetlistRow
+                {
+                    IsTalk = item.isMC(),
+                    Title = item.GetTitle() ?? string.Empty,
+                    StaminaCost = item.GetStaminaCost(),
+                    SkillValue = item.GetSkillValue()
+                };
+
+                SEvent_Concerts._concert._song song = item as SEvent_Concerts._concert._song;
+                if (song != null)
+                {
+                    row.SingleId = song.Single != null ? song.Single.id : C.InvalidId;
+                    row.CenterId = song.Center != null ? song.Center.id : C.InvalidId;
+                    Groups._group group = song.Single != null ? song.Single.GetGroup() : null;
+                    row.GroupTitle = group != null ? group.Title ?? string.Empty : string.Empty;
+                    row.FanSatisfaction = song.Single != null && song.Single.ReleaseData != null
+                        ? song.Single.ReleaseData.Fan_Satisfaction
+                        : C.ZeroIndex;
+                    row.Sales = song.Single != null ? song.Single.GetTotalSales() : C.LongZero;
+                }
+                else
+                {
+                    List<data_girls.girls> mcs = item.GetGirls(true);
+                    if (mcs != null)
+                    {
+                        for (int mcIndex = C.ZeroIndex; mcIndex < mcs.Count && mcIndex < 3; mcIndex++)
+                        {
+                            if (mcs[mcIndex] != null)
+                            {
+                                row.McIdolIds.Add(mcs[mcIndex].id);
+                            }
+                        }
+                    }
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        /// <summary>
+        /// Parses both legacy and rich IM Data Core setlist summary formats.
+        /// </summary>
+        private static List<ConcertSetlistRow> ParseConcertSetlistSummary(string summary)
+        {
+            List<ConcertSetlistRow> rows = new List<ConcertSetlistRow>();
+            if (string.IsNullOrEmpty(summary))
+            {
+                return rows;
+            }
+
+            string[] entries = summary.Split(new[] { C.SeparatorPipeCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            for (int entryIndex = C.ZeroIndex; entryIndex < entries.Length; entryIndex++)
+            {
+                string[] fields = entries[entryIndex].Split(new[] { C.SeparatorColonCharacter }, StringSplitOptions.None);
+                if (fields.Length < 2)
+                {
+                    continue;
+                }
+
+                ConcertSetlistRow row = new ConcertSetlistRow();
+                if (string.Equals(fields[0], "song", StringComparison.Ordinal))
+                {
+                    row.IsTalk = false;
+                    if (fields.Length > 1)
+                    {
+                        int.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.SingleId);
+                    }
+                    if (fields.Length > 2)
+                    {
+                        int.TryParse(fields[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.CenterId);
+                    }
+                    row.Title = fields.Length > 3 ? fields[3] : string.Empty;
+                    row.GroupTitle = fields.Length > 4 ? fields[4] : string.Empty;
+                    if (fields.Length > 5)
+                    {
+                        int.TryParse(fields[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.FanSatisfaction);
+                    }
+                    if (fields.Length > 6)
+                    {
+                        long.TryParse(fields[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.Sales);
+                    }
+                    if (fields.Length > 7)
+                    {
+                        float.TryParse(fields[7], NumberStyles.Float, CultureInfo.InvariantCulture, out row.StaminaCost);
+                    }
+                    if (fields.Length > 8)
+                    {
+                        int.TryParse(fields[8], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.SkillValue);
+                    }
+                }
+                else if (string.Equals(fields[0], "mc", StringComparison.Ordinal))
+                {
+                    row.IsTalk = true;
+                    if (fields.Length > 1)
+                    {
+                        AddCsvIds(row.McIdolIds, fields[1], 3);
+                    }
+                    row.Title = fields.Length > 2 ? fields[2] : string.Empty;
+                    if (fields.Length > 3)
+                    {
+                        float.TryParse(fields[3], NumberStyles.Float, CultureInfo.InvariantCulture, out row.StaminaCost);
+                    }
+                    if (fields.Length > 4)
+                    {
+                        int.TryParse(fields[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out row.SkillValue);
+                    }
+                }
+                else
+                {
+                    row.Title = fields[1];
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private static void AddCsvIds(List<int> destination, string csv, int maxCount)
+        {
+            if (destination == null || string.IsNullOrEmpty(csv))
+            {
+                return;
+            }
+
+            string[] tokens = csv.Split(new[] { C.SeparatorCommaCharacter }, StringSplitOptions.RemoveEmptyEntries);
+            for (int tokenIndex = C.ZeroIndex; tokenIndex < tokens.Length && destination.Count < maxCount; tokenIndex++)
+            {
+                int idolId;
+                if (int.TryParse(tokens[tokenIndex], NumberStyles.Integer, CultureInfo.InvariantCulture, out idolId) &&
+                    idolId >= C.MinId)
+                {
+                    destination.Add(idolId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Renders the ordered setlist plus concert-wide card and disaster history.
+        /// </summary>
+        private void RenderConcertDetailContext(IMDataCoreEvent ev, JSONNode payload)
+        {
+            if (ev == null || !string.Equals(ev.EntityKind, C.KindConcert, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            List<ConcertSetlistRow> setlist = ResolveConcertSetlistRows(ev, payload);
+            if (setlist.Count > C.ZeroIndex)
+            {
+                AddDivider(diaryDetailContentRoot);
+                AddTitle(diaryDetailContentRoot, C.TitleConcertSetlist);
+                int talkBreakNumber = C.ZeroIndex;
+                for (int itemIndex = C.ZeroIndex; itemIndex < setlist.Count; itemIndex++)
+                {
+                    ConcertSetlistRow item = setlist[itemIndex];
+                    if (item == null)
+                    {
+                        continue;
+                    }
+
+                    if (item.IsTalk)
+                    {
+                        talkBreakNumber++;
+                        AddTitle(diaryDetailContentRoot, C.TextTalkBreak + talkBreakNumber.ToString(CultureInfo.InvariantCulture));
+                        AddText(diaryDetailContentRoot, BuildConcertSetlistStatLine(item));
+                        RenderConcertIdolCards(item.McIdolIds, C.TextMcs + C.SeparatorColonSpace, itemIndex);
+                        continue;
+                    }
+
+                    string songHeading = string.IsNullOrEmpty(item.GroupTitle)
+                        ? item.Title
+                        : item.Title + C.MetadataPipeSeparator + item.GroupTitle;
+                    AddTitle(diaryDetailContentRoot, Normalize(songHeading));
+                    AddText(
+                        diaryDetailContentRoot,
+                        C.TextFanSatisfaction + C.SeparatorColonSpace +
+                        item.FanSatisfaction.ToString(CultureInfo.InvariantCulture) + "%" +
+                        C.MetadataPipeSeparator +
+                        C.TextSales + C.SeparatorColonSpace +
+                        item.Sales.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture));
+                    AddText(diaryDetailContentRoot, BuildConcertSetlistStatLine(item));
+                    RenderConcertIdolCards(
+                        new List<int> { item.CenterId },
+                        C.TextCenterIdol + C.SeparatorColonSpace,
+                        itemIndex);
+                }
+            }
+
+            List<IMDataCoreEvent> concertEvents = ResolveConcertDetailEvents(ev.EntityId);
+            AddDivider(diaryDetailContentRoot);
+            AddTitle(diaryDetailContentRoot, C.TitleConcertCardsUsed);
+            int renderedCards = C.ZeroIndex;
+            for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent detailEvent = concertEvents[eventIndex];
+                if (detailEvent == null || !string.Equals(detailEvent.EventType, C.EventConcertCardUsed, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                JSONNode cardPayload = ParsePayload(detailEvent.PayloadJson);
+                renderedCards++;
+                AddText(
+                    diaryDetailContentRoot,
+                    C.SeparatorHash + renderedCards.ToString(CultureInfo.InvariantCulture) +
+                    C.SeparatorSpace + HumanizeUnknown(ReadStr(cardPayload, C.KeyCardType)) +
+                    C.MetadataPipeSeparator + C.TextCardLevel + C.SeparatorColonSpace +
+                    ReadInt(cardPayload, C.KeyCardLevel).ToString(CultureInfo.InvariantCulture) +
+                    C.MetadataPipeSeparator + C.TextCardEffect + C.SeparatorColonSpace +
+                    ReadInt(cardPayload, C.KeyCardEffectValue).ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (renderedCards == C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, C.TextNoConcertCardsUsed);
+            }
+
+            AddDivider(diaryDetailContentRoot);
+            AddTitle(diaryDetailContentRoot, C.TitleConcertDisasters);
+            int renderedDisasters = C.ZeroIndex;
+            for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent detailEvent = concertEvents[eventIndex];
+                if (detailEvent == null || !string.Equals(detailEvent.EventType, C.EventConcertCrisisApplied, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                JSONNode disasterPayload = ParsePayload(detailEvent.PayloadJson);
+                renderedDisasters++;
+                AddText(
+                    diaryDetailContentRoot,
+                    C.SeparatorHash + renderedDisasters.ToString(CultureInfo.InvariantCulture) +
+                    C.SeparatorSpace + NormalizeRawText(ReadStr(disasterPayload, C.KeyAccidentTitle)) +
+                    C.MetadataPipeSeparator + C.LabelResult + C.SeparatorColonSpace +
+                    HumanizeUnknown(ReadStr(disasterPayload, C.KeyResultType)));
+            }
+
+            if (renderedDisasters == C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, C.TextNoConcertDisasters);
+            }
+        }
+
+        private static string BuildConcertSetlistStatLine(ConcertSetlistRow item)
+        {
+            return C.TextStaminaPoints + C.SeparatorColonSpace +
+                item.StaminaCost.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture) +
+                C.MetadataPipeSeparator +
+                C.TextSkillValue + C.SeparatorColonSpace +
+                item.SkillValue.ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Returns retained rows for one concert in chronological capture order.
+        /// </summary>
+        private List<IMDataCoreEvent> ResolveConcertDetailEvents(string entityId)
+        {
+            List<IMDataCoreEvent> matches = new List<IMDataCoreEvent>();
+            for (int eventIndex = C.ZeroIndex; eventIndex < relatedConcertDetailEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent candidate = relatedConcertDetailEvents[eventIndex];
+                if (candidate != null &&
+                    string.Equals(candidate.EntityKind, C.KindConcert, StringComparison.Ordinal) &&
+                    string.Equals(candidate.EntityId ?? string.Empty, entityId ?? string.Empty, StringComparison.Ordinal))
+                {
+                    matches.Add(candidate);
+                }
+            }
+
+            matches.Sort(delegate (IMDataCoreEvent left, IMDataCoreEvent right)
+            {
+                if (left == null)
+                {
+                    return right == null ? C.ZeroIndex : C.LastFromCount;
+                }
+                if (right == null)
+                {
+                    return -C.LastFromCount;
+                }
+                return left.EventId.CompareTo(right.EventId);
+            });
+            return matches;
+        }
+
+        /// <summary>
+        /// Renders clickable portrait/name cards without social visibility filtering.
+        /// </summary>
+        private void RenderConcertIdolCards(List<int> idolIds, string label, int rowIndex)
+        {
+            if (idolIds == null || idolIds.Count == C.ZeroIndex)
+            {
+                return;
+            }
+
+            AddText(diaryDetailContentRoot, label);
+            Transform cardRow = CreateTimelineParticipantRow(diaryDetailContentRoot, rowIndex, C.ZeroIndex);
+            int rendered = C.ZeroIndex;
+            for (int idolIndex = C.ZeroIndex; idolIndex < idolIds.Count && idolIndex < 3; idolIndex++)
+            {
+                data_girls.girls girl = data_girls.GetGirlByID(idolIds[idolIndex]);
+                if (girl == null)
+                {
+                    continue;
+                }
+
+                AddTimelineParticipantCard(cardRow, girl, rowIndex, rendered);
+                rendered++;
+            }
         }
 
         /// <summary>
@@ -13425,6 +13915,13 @@ namespace IdolCareerDiary
                 outcomeLines.Add(C.TextStatusUpdatedSentence);
             }
 
+            if (string.Equals(ev.EntityKind, C.KindElection, StringComparison.Ordinal))
+            {
+                int electionNumber = ResolveElectionDisplayNumber(ev, payload);
+                p.WithWhom = C.TextElection + electionNumber.ToString(CultureInfo.InvariantCulture);
+                outcomeLines.Add(C.TextElection + C.SeparatorColonSpace + electionNumber.ToString(CultureInfo.InvariantCulture));
+            }
+
             if (string.IsNullOrEmpty(p.WithWhom))
             {
                 p.WithWhom = C.LabelUnknown;
@@ -13440,6 +13937,63 @@ namespace IdolCareerDiary
             }
 
             return p;
+        }
+
+        /// <summary>
+        /// Resolves an election ordinal only from election entities in the active save's
+        /// loaded diary rows.  A payload number larger than that ordinal is stale carryover.
+        /// </summary>
+        private int ResolveElectionDisplayNumber(IMDataCoreEvent selectedEvent, JSONNode selectedPayload)
+        {
+            if (selectedEvent == null)
+            {
+                return C.LastFromCount;
+            }
+
+            Dictionary<string, long> firstEventByElection = new Dictionary<string, long>(StringComparer.Ordinal);
+            for (int eventIndex = C.ZeroIndex; eventIndex < cachedEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent candidate = cachedEvents[eventIndex];
+                if (candidate == null || !string.Equals(candidate.EntityKind, C.KindElection, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string entityId = candidate.EntityId ?? string.Empty;
+                long firstEventId;
+                if (!firstEventByElection.TryGetValue(entityId, out firstEventId) || candidate.EventId < firstEventId)
+                {
+                    firstEventByElection[entityId] = candidate.EventId;
+                }
+            }
+
+            string selectedEntityId = selectedEvent.EntityId ?? string.Empty;
+            if (!firstEventByElection.ContainsKey(selectedEntityId))
+            {
+                firstEventByElection[selectedEntityId] = selectedEvent.EventId;
+            }
+
+            List<KeyValuePair<string, long>> ordered = new List<KeyValuePair<string, long>>(firstEventByElection);
+            ordered.Sort(delegate (KeyValuePair<string, long> left, KeyValuePair<string, long> right)
+            {
+                int byEvent = left.Value.CompareTo(right.Value);
+                return byEvent != C.ZeroIndex
+                    ? byEvent
+                    : string.Compare(left.Key, right.Key, StringComparison.Ordinal);
+            });
+
+            int ordinal = C.LastFromCount;
+            for (int index = C.ZeroIndex; index < ordered.Count; index++)
+            {
+                if (string.Equals(ordered[index].Key, selectedEntityId, StringComparison.Ordinal))
+                {
+                    ordinal = index + C.LastFromCount;
+                    break;
+                }
+            }
+
+            int payloadNumber = ReadInt(selectedPayload, C.JsonElectionNumber);
+            return payloadNumber > C.ZeroIndex ? Mathf.Min(payloadNumber, ordinal) : ordinal;
         }
 
         /// <summary>
