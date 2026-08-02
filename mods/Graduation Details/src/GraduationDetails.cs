@@ -48,6 +48,26 @@ namespace GraduationDetails
             }
         }
 
+        internal static void MigrateLegacySaveDataOnce()
+        {
+            try
+            {
+                // BaseFolder is likely "GraduationDetails"
+                string oldDirPath = Path.Combine(Application.persistentDataPath, "Mods", BaseFolder);
+                string newDirPath = Path.Combine(Application.persistentDataPath, BaseFolder);
+
+                if (Directory.Exists(oldDirPath) && !Directory.Exists(newDirPath))
+                {
+                    Directory.Move(oldDirPath, newDirPath);
+                    Debug.Log("[Graduation Details] Successfully migrated save data to the persistent directory.");
+                }
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError("[Graduation Details] Failed to migrate legacy save data: " + exception.Message);
+            }
+        }
+
         internal static string SavesRootDir
         {
             get
@@ -121,38 +141,41 @@ namespace GraduationDetails
 
         internal static void TryMigrateLegacyFileOnce(string fileName)
         {
-            string scoped = GetScopedFilePath(fileName);
-            if (File.Exists(scoped))
-            {
-                return;
-            }
-
-            string legacy = GetLegacyFilePath(fileName);
-            if (!File.Exists(legacy))
-            {
-                return;
-            }
-
             try
             {
-                if (Directory.Exists(SavesRootDir))
+                // We use BaseFolder to target the root of the mod's save location
+                string oldDirPath = Path.Combine(Application.persistentDataPath, "Mods", BaseFolder);
+                string newDirPath = Path.Combine(Application.persistentDataPath, BaseFolder);
+
+                // If the old Mods/GraduationDetails directory exists, move the whole thing
+                if (Directory.Exists(oldDirPath))
                 {
-                    string[] dirs = Directory.GetDirectories(SavesRootDir);
-                    if (dirs != null && dirs.Length > 0)
+                    if (!Directory.Exists(newDirPath))
                     {
-                        return;
+                        Directory.Move(oldDirPath, newDirPath);
+                        Debug.Log("[Graduation Details] Successfully migrated legacy save data.");
+                    }
+                    else
+                    {
+                        // If both exist (edge case), try to safely move the specific file
+                        string scoped = GetScopedFilePath(fileName);
+                        string legacy = Path.Combine(oldDirPath, "saves", GetSaveKey(), fileName); // Adjusted for legacy path structure
+                        
+                        if (!File.Exists(scoped) && File.Exists(legacy))
+                        {
+                            string dir = Path.GetDirectoryName(scoped);
+                            if (!Directory.Exists(dir))
+                            {
+                                Directory.CreateDirectory(dir);
+                            }
+                            File.Copy(legacy, scoped, false);
+                        }
                     }
                 }
-
-                string dir = Path.GetDirectoryName(scoped);
-                if (!Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                File.Copy(legacy, scoped, false);
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.LogWarning("[Graduation Details] File migration failed: " + ex.Message);
             }
         }
 

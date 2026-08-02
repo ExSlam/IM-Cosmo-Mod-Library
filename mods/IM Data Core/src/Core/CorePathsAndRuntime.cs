@@ -43,6 +43,29 @@ namespace IMDataCore
             return Path.Combine(GetRootDirectory(), CoreConstants.SaveFolderName);
         }
 
+        internal static void MigrateLegacyDataOnce()
+        {
+            try
+            {
+                // Old location: AppData/LocalLow/Glitch Pitch/Idol Manager/Mods/IM Data Core
+                string oldRootPath = Path.Combine(Application.persistentDataPath, "Mods", CoreConstants.ModFolderName);
+                
+                // New location: AppData/LocalLow/Glitch Pitch/Idol Manager/IM Data Core
+                string newRootPath = Path.Combine(Application.persistentDataPath, CoreConstants.ModFolderName);
+
+                // If the old data exists, and the new folder DOES NOT exist yet, move the entire directory
+                if (Directory.Exists(oldRootPath) && !Directory.Exists(newRootPath))
+                {
+                    Directory.Move(oldRootPath, newRootPath);
+                    CoreLog.Info("Successfully migrated legacy IM Data Core saves to the new persistent directory.");
+                }
+            }
+            catch (System.Exception exception)
+            {
+                CoreLog.Error("Failed to migrate legacy IM Data Core data: " + exception.Message);
+            }
+        }
+
         /// <summary>
         /// Stores one best-effort save-file path hint used for save-key derivation.
         /// </summary>

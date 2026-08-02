@@ -1850,6 +1850,9 @@ namespace IMDataCore
         /// </summary>
         internal void BootstrapIfNeeded()
         {
+            // Trigger migration before initializing storage
+            CorePaths.MigrateLegacyDataOnce(); 
+
             string errorMessage;
             if (!EnsureInitialized(out errorMessage))
             {
