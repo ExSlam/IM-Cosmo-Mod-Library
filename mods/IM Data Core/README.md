@@ -43,8 +43,8 @@ IM Data Core derives the active `save_key` from game state and keeps storage par
 At runtime, IM Data Core prefers native SQLite (`winsqlite3`). If unavailable, it falls back to flat JSON file storage.
 
 Per-save storage location:
-- `Application.persistentDataPath\IMDataCore\saves\<save_key>\im_data_core.db`
-- fallback: `Application.persistentDataPath\IMDataCore\saves\<save_key>\im_data_core.fallback.json`
+- `Application.persistentDataPath\IMDataCore\saves\<game-save-folder-name>\im_data_core.db`
+- fallback: `Application.persistentDataPath\IMDataCore\saves\<game-save-folder-name>\im_data_core.fallback.json`
 
 Typical Windows `Application.persistentDataPath`:
 - `%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager`

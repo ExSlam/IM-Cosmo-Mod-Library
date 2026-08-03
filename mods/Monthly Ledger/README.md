@@ -5,7 +5,7 @@ Monthly Ledger adds an Action Hub button that opens a queued, game-style popup c
 ## Dependencies
 
 - Mod Buttons
-- IM Data Core 1.2.0 or newer
+- IM Data Core 1.3.0 or newer
 - IM UI Framework 1.3.0 or newer
 
 The ledger records every company-money mutation. Business-contract entries retain the contract type, contractor, product, selected idol, payment, stamina, liability, multiplier, and negotiation count. Singles retain their title, group, participating idols, creative parameters, marketing, gross revenue, and production cost. Shows retain their title, medium, genre, host, cast, episode, audience, revenue, and weekly budget; when Fans Watch is active they also retain fan audience and fatigue.

@@ -22,6 +22,9 @@ namespace IdolCareerDiary
     {
         internal const string HarmonyId = "com.cosmo.idolcareerdiary";
         internal const string HarmonyIdImDataCore = "com.cosmo.imdatacore";
+        internal const string MinimumImDataCoreDisplayVersion = "1.3.0";
+        internal const string MinimumImDataCoreAssemblyVersionText = "1.3.0.0";
+        internal static readonly Version MinimumImDataCoreAssemblyVersion = new Version(MinimumImDataCoreAssemblyVersionText);
         internal const string HarmonyIdImUiFramework = "com.cosmo.imuiframework";
         internal const string HarmonyIdGraduationRebalances = "com.cosmo.graduationrebalances";
         internal const string HarmonyIdUiRecovery = "com.cosmo.uirecovery";
@@ -854,6 +857,7 @@ namespace IdolCareerDiary
         internal static string TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved { get { return ModLocalization.Get("TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved", "IM Data Core patches are present but API assembly could not be resolved."); } }
         internal static string TextImDataCoreModIsNotLoaded { get { return ModLocalization.Get("TextImDataCoreModIsNotLoaded", "IM Data Core mod is not loaded."); } }
         internal static string TextImDataCoreApiTypesWereNotFoundInAssembly { get { return ModLocalization.Get("TextImDataCoreApiTypesWereNotFoundInAssembly", "IM Data Core API types were not found in assembly."); } }
+        internal static string TextImDataCoreVersionTooOldFormat {get {return ModLocalization.Get("TextImDataCoreVersionTooOldFormat", "IM Data Core {0} or newer is required. " + "Installed version: {1}.");}}
         internal const string MemberNameIsReady = "IsReady";
         internal const string MemberNameTryRegisterNamespace = "TryRegisterNamespace";
         internal const string MemberNameTryGetCustomJson = "TryGetCustomJson";
@@ -2592,6 +2596,22 @@ namespace IdolCareerDiary
                 errorMessage = hasCorePatches
                     ? C.TextImDataCorePatchesArePresentButApiAssemblyCouldNotBeResolved
                     : C.TextImDataCoreModIsNotLoaded;
+                return false;
+            }
+
+            Version installedVersion =
+            targetAssembly.GetName().Version;
+
+            if (installedVersion == null || installedVersion < C.MinimumImDataCoreAssemblyVersion)
+            {
+                errorMessage = string.Format(
+                    CultureInfo.InvariantCulture,
+                    C.TextImDataCoreVersionTooOldFormat,
+                    C.MinimumImDataCoreDisplayVersion,
+                    installedVersion != null
+                        ? installedVersion.ToString()
+                        : C.TextUnknownError);
+
                 return false;
             }
 
