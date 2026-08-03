@@ -1850,8 +1850,6 @@ namespace IMDataCore
         /// </summary>
         internal void BootstrapIfNeeded()
         {
-            // Trigger migration before initializing storage
-            CorePaths.MigrateLegacyDataOnce(); 
 
             string errorMessage;
             if (!EnsureInitialized(out errorMessage))
@@ -2489,7 +2487,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Copies legacy agency-scoped storage into the new file-scoped location on first access.
+        /// Copies storage from older IM Data Core layouts into:
+        /// <game-save-root-parent>\IMDataCore\<game-save-folder-name>
         /// </summary>
         private void TryMigrateLegacyStorageIfNeeded(
             string normalizedSaveKey,
@@ -2500,8 +2499,15 @@ namespace IMDataCore
             out string copiedFromSaveKey)
         {
             copiedFromSaveKey = string.Empty;
-            string normalizedSourceSaveKey = NormalizeSaveKey(sourceSaveKeyForMigration);
-            bool targetStorageExists = File.Exists(sqliteDatabasePath) || File.Exists(flatFileDatabasePath);
+
+            string normalizedSourceSaveKey =
+                NormalizeSaveKey(sourceSaveKeyForMigration);
+
+            bool targetStorageExists =
+                File.Exists(sqliteDatabasePath) ||
+                File.Exists(flatFileDatabasePath);
+
+            // Save As needs to clone the currently active save into the target.
             if (overwriteTargetWithSourceStorage)
             {
                 if (TryCopyStorageFromSourceSaveKey(
@@ -2515,6 +2521,7 @@ namespace IMDataCore
                     return;
                 }
 
+                // Do not destroy an existing target when the source cannot be read.
                 if (targetStorageExists)
                 {
                     return;
@@ -2525,42 +2532,85 @@ namespace IMDataCore
                 return;
             }
 
-            if (TryCopyStorageFromSourceSaveKey(
-                normalizedSourceSaveKey,
-                normalizedSaveKey,
-                sqliteDatabasePath,
-                flatFileDatabasePath,
-                false))
-            {
-                copiedFromSaveKey = normalizedSourceSaveKey;
-                return;
-            }
+            List<string> migrationCandidateSaveKeys =
+                new List<string>();
 
-            string rawLegacyAgencySaveKey = CorePaths.GetLegacyAgencySaveKey();
-            if (rawLegacyAgencySaveKey.Length < CoreConstants.SaveKeyMinimumLength)
-            {
-                return;
-            }
+            // Current source, useful when switching or cloning saves.
+            AddMigrationCandidate(
+                migrationCandidateSaveKeys,
+                normalizedSourceSaveKey);
 
-            string legacyAgencySaveKey = NormalizeSaveKey(rawLegacyAgencySaveKey);
-            if (string.IsNullOrEmpty(legacyAgencySaveKey))
-            {
-                return;
-            }
+            // Same-key migration:
+            // IMDataCore\saves\<key> -> IMDataCore\<key>
+            AddMigrationCandidate(
+                migrationCandidateSaveKeys,
+                normalizedSaveKey);
 
-            if (TryCopyStorageFromSourceSaveKey(
-                legacyAgencySaveKey,
-                normalizedSaveKey,
-                sqliteDatabasePath,
-                flatFileDatabasePath,
-                false))
+            // Previous path-derived hashed key.
+            AddMigrationCandidate(
+                migrationCandidateSaveKeys,
+                NormalizeSaveKey(CorePaths.GetLegacyFileScopedSaveKey()));
+
+            // Old PlayerData.SaveFolderName/agency-derived key.
+            AddMigrationCandidate(
+                migrationCandidateSaveKeys,
+                NormalizeSaveKey(CorePaths.GetLegacyAgencySaveKey()));
+
+            for (
+                int candidateIndex = CoreConstants.ZeroBasedListStartIndex;
+                candidateIndex < migrationCandidateSaveKeys.Count;
+                candidateIndex++)
             {
-                copiedFromSaveKey = legacyAgencySaveKey;
+                string candidateSaveKey =
+                    migrationCandidateSaveKeys[candidateIndex];
+
+                if (!TryCopyStorageFromSourceSaveKey(
+                    candidateSaveKey,
+                    normalizedSaveKey,
+                    sqliteDatabasePath,
+                    flatFileDatabasePath,
+                    false))
+                {
+                    continue;
+                }
+
+                copiedFromSaveKey = candidateSaveKey;
+                return;
             }
         }
 
         /// <summary>
-        /// Copies storage from one source save-key into one target save-key.
+        /// Adds one unique, non-empty migration key.
+        /// </summary>
+        private static void AddMigrationCandidate(
+            List<string> migrationCandidates,
+            string saveKey)
+        {
+            if (string.IsNullOrEmpty(saveKey))
+            {
+                return;
+            }
+
+            for (
+                int candidateIndex = CoreConstants.ZeroBasedListStartIndex;
+                candidateIndex < migrationCandidates.Count;
+                candidateIndex++)
+            {
+                if (string.Equals(
+                    migrationCandidates[candidateIndex],
+                    saveKey,
+                    StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+
+            migrationCandidates.Add(saveKey);
+        }
+
+        /// <summary>
+        /// Searches current, persistent legacy, local-mod, and Workshop-adjacent
+        /// locations for storage belonging to a save key.
         /// </summary>
         private static bool TryCopyStorageFromSourceSaveKey(
             string sourceSaveKey,
@@ -2569,26 +2619,94 @@ namespace IMDataCore
             string targetFlatFileDatabasePath,
             bool replaceTargetStorageFiles)
         {
-            if (string.IsNullOrEmpty(sourceSaveKey))
+            if (string.IsNullOrEmpty(sourceSaveKey) ||
+                string.IsNullOrEmpty(targetSaveKey))
             {
                 return false;
             }
 
-            string normalizedSourceSaveKey = NormalizeSaveKey(sourceSaveKey);
-            if (string.IsNullOrEmpty(normalizedSourceSaveKey) ||
-                string.Equals(normalizedSourceSaveKey, targetSaveKey, StringComparison.Ordinal))
+            string normalizedSourceSaveKey =
+                NormalizeSaveKey(sourceSaveKey);
+
+            if (string.IsNullOrEmpty(normalizedSourceSaveKey))
             {
                 return false;
             }
 
-            string sourceSqliteDatabasePath = CorePaths.GetDatabasePath(normalizedSourceSaveKey);
-            string sourceFlatFileDatabasePath = CorePaths.GetFlatFileDatabasePath(normalizedSourceSaveKey);
-            string sourceSqliteWriteAheadLogPath = sourceSqliteDatabasePath + CoreConstants.SqliteWriteAheadLogFileSuffix;
-            string sourceSqliteSharedMemoryPath = sourceSqliteDatabasePath + CoreConstants.SqliteSharedMemoryFileSuffix;
-            string targetSqliteWriteAheadLogPath = targetSqliteDatabasePath + CoreConstants.SqliteWriteAheadLogFileSuffix;
-            string targetSqliteSharedMemoryPath = targetSqliteDatabasePath + CoreConstants.SqliteSharedMemoryFileSuffix;
+            List<string> sourceDirectories =
+                CorePaths.GetStorageSourceDirectories(
+                    normalizedSourceSaveKey);
+
+            for (
+                int directoryIndex = CoreConstants.ZeroBasedListStartIndex;
+                directoryIndex < sourceDirectories.Count;
+                directoryIndex++)
+            {
+                if (TryCopyStorageFromSourceDirectory(
+                    sourceDirectories[directoryIndex],
+                    targetSqliteDatabasePath,
+                    targetFlatFileDatabasePath,
+                    replaceTargetStorageFiles))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Copies SQLite or flat-file storage from one explicit directory.
+        /// </summary>
+        private static bool TryCopyStorageFromSourceDirectory(
+            string sourceDirectory,
+            string targetSqliteDatabasePath,
+            string targetFlatFileDatabasePath,
+            bool replaceTargetStorageFiles)
+        {
+            if (string.IsNullOrEmpty(sourceDirectory))
+            {
+                return false;
+            }
+
             try
             {
+                string targetDirectory =
+                    Path.GetDirectoryName(targetSqliteDatabasePath);
+
+                // The current destination is included among the probe paths.
+                // Never attempt to copy a file onto itself.
+                if (PathsReferToSameDirectory(
+                    sourceDirectory,
+                    targetDirectory))
+                {
+                    return false;
+                }
+
+                string sourceSqliteDatabasePath = Path.Combine(
+                    sourceDirectory,
+                    CoreConstants.DatabaseFileName);
+
+                string sourceFlatFileDatabasePath = Path.Combine(
+                    sourceDirectory,
+                    CoreConstants.FlatFileDatabaseFileName);
+
+                string sourceSqliteWriteAheadLogPath =
+                    sourceSqliteDatabasePath +
+                    CoreConstants.SqliteWriteAheadLogFileSuffix;
+
+                string sourceSqliteSharedMemoryPath =
+                    sourceSqliteDatabasePath +
+                    CoreConstants.SqliteSharedMemoryFileSuffix;
+
+                string targetSqliteWriteAheadLogPath =
+                    targetSqliteDatabasePath +
+                    CoreConstants.SqliteWriteAheadLogFileSuffix;
+
+                string targetSqliteSharedMemoryPath =
+                    targetSqliteDatabasePath +
+                    CoreConstants.SqliteSharedMemoryFileSuffix;
+
                 if (File.Exists(sourceSqliteDatabasePath))
                 {
                     if (replaceTargetStorageFiles)
@@ -2599,21 +2717,30 @@ namespace IMDataCore
                         DeleteFileIfExists(targetFlatFileDatabasePath);
                     }
 
-                    string targetDirectory = Path.GetDirectoryName(targetSqliteDatabasePath);
-                    if (!string.IsNullOrEmpty(targetDirectory) && !Directory.Exists(targetDirectory))
+                    string sqliteTargetDirectory =
+                        Path.GetDirectoryName(targetSqliteDatabasePath);
+
+                    if (!string.IsNullOrEmpty(sqliteTargetDirectory) &&
+                        !Directory.Exists(sqliteTargetDirectory))
                     {
-                        Directory.CreateDirectory(targetDirectory);
+                        Directory.CreateDirectory(sqliteTargetDirectory);
                     }
 
-                    File.Copy(sourceSqliteDatabasePath, targetSqliteDatabasePath, replaceTargetStorageFiles);
+                    File.Copy(
+                        sourceSqliteDatabasePath,
+                        targetSqliteDatabasePath,
+                        replaceTargetStorageFiles);
+
                     CopyOptionalFileIfExists(
                         sourceSqliteWriteAheadLogPath,
                         targetSqliteWriteAheadLogPath,
                         replaceTargetStorageFiles);
+
                     CopyOptionalFileIfExists(
                         sourceSqliteSharedMemoryPath,
                         targetSqliteSharedMemoryPath,
                         replaceTargetStorageFiles);
+
                     return true;
                 }
 
@@ -2627,22 +2754,74 @@ namespace IMDataCore
                         DeleteFileIfExists(targetFlatFileDatabasePath);
                     }
 
-                    string targetDirectory = Path.GetDirectoryName(targetFlatFileDatabasePath);
-                    if (!string.IsNullOrEmpty(targetDirectory) && !Directory.Exists(targetDirectory))
+                    string flatFileTargetDirectory =
+                        Path.GetDirectoryName(targetFlatFileDatabasePath);
+
+                    if (!string.IsNullOrEmpty(flatFileTargetDirectory) &&
+                        !Directory.Exists(flatFileTargetDirectory))
                     {
-                        Directory.CreateDirectory(targetDirectory);
+                        Directory.CreateDirectory(flatFileTargetDirectory);
                     }
 
-                    File.Copy(sourceFlatFileDatabasePath, targetFlatFileDatabasePath, replaceTargetStorageFiles);
+                    File.Copy(
+                        sourceFlatFileDatabasePath,
+                        targetFlatFileDatabasePath,
+                        replaceTargetStorageFiles);
+
                     return true;
                 }
             }
             catch (Exception exception)
             {
-                CoreLog.Warn(CoreConstants.MessageSaveDataMigrationFailedPrefix + exception.Message);
+                CoreLog.Warn(
+                    CoreConstants.MessageSaveDataMigrationFailedPrefix +
+                    exception.Message);
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Compares two directory paths after canonicalization.
+        /// </summary>
+        private static bool PathsReferToSameDirectory(
+            string firstDirectory,
+            string secondDirectory)
+        {
+            if (string.IsNullOrEmpty(firstDirectory) ||
+                string.IsNullOrEmpty(secondDirectory))
+            {
+                return false;
+            }
+
+            try
+            {
+                string normalizedFirstDirectory =
+                    Path.GetFullPath(firstDirectory).TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar);
+
+                string normalizedSecondDirectory =
+                    Path.GetFullPath(secondDirectory).TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar);
+
+                return string.Equals(
+                    normalizedFirstDirectory,
+                    normalizedSecondDirectory,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(
+                    firstDirectory.TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar),
+                    secondDirectory.TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         /// <summary>

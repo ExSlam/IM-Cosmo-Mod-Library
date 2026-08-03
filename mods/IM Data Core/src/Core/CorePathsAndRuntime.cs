@@ -25,45 +25,146 @@ namespace IMDataCore
         private const int SavePathHashLength = 16;
         private const int SavePathTokenLength = 32;
         private const char SavePathSeparatorReplacement = '_';
+        private const string LegacyDisplayModFolderName = "IM Data Core";
 
         /// <summary>
-        /// Returns the root directory where IM Data Core keeps all files.
+        /// Returns the stable IM Data Core root beside the game's data directory.
+        /// This path is independent of the Workshop or local mod installation path.
         /// </summary>
         internal static string GetRootDirectory()
         {
-            // Bypasses the volatile 'Mods' directory to prevent Steam Workshop wipes every time the mod updates
-            return Path.Combine(Application.persistentDataPath, CoreConstants.ModFolderName);
+            string gameSaveDirectory = Path.Combine(
+                Application.persistentDataPath,
+                GameDataRootFolderName);
+
+            string gameSaveParentDirectory = Path.GetDirectoryName(gameSaveDirectory);
+            if (string.IsNullOrEmpty(gameSaveParentDirectory))
+            {
+                gameSaveParentDirectory = Application.persistentDataPath;
+            }
+
+            return Path.Combine(
+                gameSaveParentDirectory,
+                CoreConstants.ModFolderName);
         }
 
         /// <summary>
-        /// Returns the root directory that contains per-save subdirectories.
+        /// The current layout stores game-save folders directly beneath IMDataCore.
         /// </summary>
         internal static string GetSavesRootDirectory()
         {
-            return Path.Combine(GetRootDirectory(), CoreConstants.SaveFolderName);
+            return Path.Combine(
+                GetRootDirectory(),
+                CoreConstants.SaveFolderName);
         }
 
-        internal static void MigrateLegacyDataOnce()
+        /// <summary>
+        /// Returns all current and historical directories from which storage may
+        /// need to be copied during migration.
+        /// </summary>
+        internal static List<string> GetStorageSourceDirectories(string saveKey)
         {
+            List<string> directories = new List<string>();
+
+            if (string.IsNullOrEmpty(saveKey))
+            {
+                return directories;
+            }
+
+            // Current layout:
+            // <persistent>\IMDataCore\<save-folder>
+            AddUniqueDirectory(
+                directories,
+                Path.Combine(GetRootDirectory(), saveKey));
+
+            // Previous persistent layout:
+            // <persistent>\IMDataCore\saves\<save-key>
+            AddUniqueDirectory(
+                directories,
+                Path.Combine(
+                    GetRootDirectory(),
+                    CoreConstants.SaveFolderName,
+                    saveKey));
+
+            string localModsDirectory = Path.Combine(
+                Application.persistentDataPath,
+                CoreConstants.ModsFolderName);
+
+            // Older local-mod layouts, including both folder spellings.
+            AddUniqueDirectory(
+                directories,
+                Path.Combine(
+                    localModsDirectory,
+                    CoreConstants.ModFolderName,
+                    CoreConstants.SaveFolderName,
+                    saveKey));
+
+            AddUniqueDirectory(
+                directories,
+                Path.Combine(
+                    localModsDirectory,
+                    LegacyDisplayModFolderName,
+                    CoreConstants.SaveFolderName,
+                    saveKey));
+
+            // Very old builds may have written beside the loaded DLL.
+            // This covers either a Workshop installation or a local installation.
             try
             {
-                // Old location: AppData/LocalLow/Glitch Pitch/Idol Manager/Mods/IM Data Core
-                string oldRootPath = Path.Combine(Application.persistentDataPath, "Mods", CoreConstants.ModFolderName);
-                
-                // New location: AppData/LocalLow/Glitch Pitch/Idol Manager/IM Data Core
-                string newRootPath = Path.Combine(Application.persistentDataPath, CoreConstants.ModFolderName);
+                string assemblyDirectory = Path.GetDirectoryName(
+                    Assembly.GetExecutingAssembly().Location);
 
-                // If the old data exists, and the new folder DOES NOT exist yet, move the entire directory
-                if (Directory.Exists(oldRootPath) && !Directory.Exists(newRootPath))
+                if (!string.IsNullOrEmpty(assemblyDirectory))
                 {
-                    Directory.Move(oldRootPath, newRootPath);
-                    CoreLog.Info("Successfully migrated legacy IM Data Core saves to the new persistent directory.");
+                    AddUniqueDirectory(
+                        directories,
+                        Path.Combine(
+                            assemblyDirectory,
+                            CoreConstants.SaveFolderName,
+                            saveKey));
+
+                    AddUniqueDirectory(
+                        directories,
+                        Path.Combine(
+                            assemblyDirectory,
+                            saveKey));
                 }
             }
-            catch (System.Exception exception)
+            catch
             {
-                CoreLog.Error("Failed to migrate legacy IM Data Core data: " + exception.Message);
+                // Migration probing is best-effort.
             }
+
+            return directories;
+        }
+
+        /// <summary>
+        /// Adds a directory without introducing duplicate migration candidates.
+        /// </summary>
+        private static void AddUniqueDirectory(
+            List<string> directories,
+            string directoryPath)
+        {
+            if (string.IsNullOrEmpty(directoryPath))
+            {
+                return;
+            }
+
+            for (
+                int directoryIndex = CoreConstants.ZeroBasedListStartIndex;
+                directoryIndex < directories.Count;
+                directoryIndex++)
+            {
+                if (string.Equals(
+                    directories[directoryIndex],
+                    directoryPath,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            directories.Add(directoryPath);
         }
 
         /// <summary>
@@ -79,27 +180,33 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Derives the active save key from game state, with safe fallbacks.
+        /// Derives the active save key from the actual game-save folder name.
         /// </summary>
         internal static string GetSaveKey()
         {
             try
             {
-                string saveFileKey = TryBuildSaveKeyFromActiveFilePathHint();
-                if (saveFileKey.Length >= CoreConstants.SaveKeyMinimumLength)
+                string saveFolderKey =
+                    TryBuildSaveFolderKeyFromActiveFilePathHint();
+
+                if (saveFolderKey.Length >= CoreConstants.SaveKeyMinimumLength)
                 {
-                    return saveFileKey;
+                    return saveFolderKey;
                 }
 
-                string legacyAgencySaveKey = BuildLegacyAgencySaveKeyFromPlayerData();
-                if (legacyAgencySaveKey.Length >= CoreConstants.SaveKeyMinimumLength)
+                string playerDataSaveKey =
+                    BuildLegacyAgencySaveKeyFromPlayerData();
+
+                if (playerDataSaveKey.Length >= CoreConstants.SaveKeyMinimumLength)
                 {
-                    return legacyAgencySaveKey;
+                    return playerDataSaveKey;
                 }
             }
             catch (Exception exception)
             {
-                CoreLog.Warn(CoreConstants.MessageSaveKeyDerivationFailurePrefix + exception.Message);
+                CoreLog.Warn(
+                    CoreConstants.MessageSaveKeyDerivationFailurePrefix +
+                    exception.Message);
             }
 
             return CoreConstants.DefaultSaveKey;
@@ -113,6 +220,80 @@ namespace IMDataCore
             try
             {
                 return BuildLegacyAgencySaveKeyFromPlayerData();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+                /// <summary>
+        /// Returns the folder name that directly owns the selected game-save file.
+        ///
+        /// Examples:
+        /// data\manual_saves\A1B2C3D4\save.json -> A1B2C3D4
+        /// data\story_mode\Agency_1234\manual_save.json -> Agency_1234
+        /// data\auto_save.json -> auto_save
+        /// </summary>
+        private static string TryBuildSaveFolderKeyFromActiveFilePathHint()
+        {
+            string normalizedSaveFilePath;
+
+            lock (saveScopeLock)
+            {
+                normalizedSaveFilePath = activeSaveFilePathHint;
+            }
+
+            if (string.IsNullOrEmpty(normalizedSaveFilePath))
+            {
+                return string.Empty;
+            }
+
+            string saveDirectoryPath =
+                Path.GetDirectoryName(normalizedSaveFilePath);
+
+            if (string.IsNullOrEmpty(saveDirectoryPath))
+            {
+                return string.Empty;
+            }
+
+            string trimmedSaveDirectoryPath = saveDirectoryPath.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+
+            string saveFolderName =
+                Path.GetFileName(trimmedSaveDirectoryPath);
+
+            if (string.IsNullOrEmpty(saveFolderName))
+            {
+                return string.Empty;
+            }
+
+            // Free-play auto_save.json/manual_save.json may live directly in data.
+            // In that case, use the save filename rather than the generic "data".
+            if (string.Equals(
+                saveFolderName,
+                GameDataRootFolderName,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                saveFolderName =
+                    Path.GetFileNameWithoutExtension(normalizedSaveFilePath);
+            }
+
+            return CoreTokenUtility.SanitizeToken(
+                saveFolderName,
+                CoreConstants.SaveKeyMaximumLength);
+        }
+
+        /// <summary>
+        /// Reconstructs the hashed file-scoped key used by prior versions.
+        /// It is retained only so their databases can be found and migrated.
+        /// </summary>
+        internal static string GetLegacyFileScopedSaveKey()
+        {
+            try
+            {
+                return TryBuildSaveKeyFromActiveFilePathHint();
             }
             catch
             {
@@ -318,7 +499,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Returns the full save-scoped directory path.
+        /// Returns:
+        /// <game-save-root-parent>\IMDataCore\saves\<game-save-folder-name>
         /// </summary>
         internal static string GetSaveDirectory(string saveKey)
         {
