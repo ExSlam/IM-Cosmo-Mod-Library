@@ -142,6 +142,19 @@ namespace CheatsMod
         internal const string NotificationFailedFormat = "[CheatsMod] Notification failed: {0}";
     }
 
+    internal static class AssistantManagerIntegration
+    {
+        internal const string AssemblyName = "com.cosmo.assistantmanager";
+        internal const string HarmonyOwnerId = "com.cosmo.assistantmanager";
+        internal const string AuditionTrackingTypeName = "AssitantManagerMod.AssistantManagerAuditionTracking";
+        internal const string StatePersistenceTypeName = "AssitantManagerMod.AssistantManagerStatePersistence";
+        internal const string ImportCooldownEntriesMethodName = "ImportCooldownEntries";
+        internal const string MarkDirtyMethodName = "MarkDirty";
+
+        internal const BindingFlags StaticBindingFlags =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+    }
+
     internal static class RivalsRebornIntegration
     {
         internal const BindingFlags InstanceBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -492,8 +505,18 @@ namespace CheatsMod
                 return;
             }
 
+            // Vanilla Idol Manager stores the producer audition cooldown in these two fields.
+            // Always clear them so Cheats Mod remains fully standalone when Assistant Manager
+            // is absent or disabled.
             Auditions.Regional_Date = ClearedAuditionCooldownDate;
             Auditions.Nationwide_Date = ClearedAuditionCooldownDate;
+
+            // Assistant Manager replaces the manager-office cooldown reads with its own
+            // per-manager tracker. If that Harmony owner is active, clear that authoritative
+            // tracker too. This remains late-bound so Cheats Mod has no Assistant Manager
+            // assembly dependency.
+            ResetAssistantManagerAuditionCooldownsIfEnabled();
+
             NotifySuccess(
                 CheatLocalizationKeys.NotificationResetAuditionCooldowns,
                 CheatFallbackText.NotificationResetAuditionCooldowns,
@@ -1560,6 +1583,59 @@ namespace CheatsMod
             int minPoints = Relationships_Player.GetPointsByLevel(-CheatAmounts.MaximumPositiveRelationshipLevel);
             int maxPoints = Relationships_Player.GetPointsByLevel(CheatAmounts.MaximumPositiveRelationshipLevel);
             return Math.Max(minPoints, Math.Min(maxPoints, points));
+        }
+
+        private static void ResetAssistantManagerAuditionCooldownsIfEnabled()
+        {
+            Assembly assistantManagerAssembly = FindLoadedAssembly(AssistantManagerIntegration.AssemblyName);
+            if (assistantManagerAssembly == null)
+            {
+                return;
+            }
+
+            bool harmonyInspectionSucceeded;
+            bool harmonyOwnerFound = IsHarmonyOwnerLoaded(
+                AssistantManagerIntegration.HarmonyOwnerId,
+                out harmonyInspectionSucceeded);
+            if (!harmonyInspectionSucceeded || !harmonyOwnerFound)
+            {
+                return;
+            }
+
+            Type auditionTrackingType = assistantManagerAssembly.GetType(
+                AssistantManagerIntegration.AuditionTrackingTypeName,
+                false);
+            Type statePersistenceType = assistantManagerAssembly.GetType(
+                AssistantManagerIntegration.StatePersistenceTypeName,
+                false);
+            if (auditionTrackingType == null || statePersistenceType == null)
+            {
+                throw new MissingMemberException(
+                    AssistantManagerIntegration.AssemblyName,
+                    "Assistant Manager audition tracking types");
+            }
+
+            MethodInfo importCooldownEntries = auditionTrackingType.GetMethod(
+                AssistantManagerIntegration.ImportCooldownEntriesMethodName,
+                AssistantManagerIntegration.StaticBindingFlags);
+            MethodInfo markDirty = statePersistenceType.GetMethod(
+                AssistantManagerIntegration.MarkDirtyMethodName,
+                AssistantManagerIntegration.StaticBindingFlags,
+                null,
+                Type.EmptyTypes,
+                null);
+            if (importCooldownEntries == null || markDirty == null)
+            {
+                throw new MissingMethodException(
+                    AssistantManagerIntegration.AssemblyName,
+                    "Assistant Manager audition cooldown integration");
+            }
+
+            // ImportCooldownEntries(null) intentionally clears only cooldownsByManager.
+            // It leaves active audition ownership and persistent assistant-slot assignments
+            // intact, which is exactly what this cheat needs.
+            importCooldownEntries.Invoke(null, new object[] { null });
+            markDirty.Invoke(null, RivalsRebornIntegration.EmptyArguments);
         }
 
         private static Assembly FindLoadedAssembly(string assemblyName)
