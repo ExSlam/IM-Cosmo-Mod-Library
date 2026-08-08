@@ -895,7 +895,7 @@ namespace ModButtons
             List<ButtonSectionLayout> sections = CollectButtonSections();
             PopupLayoutMetrics metrics = CalculatePopupLayoutMetrics(sections);
 
-            Scrollbar scrollbarTemplate = FindScrollbarTemplate(originalPopup);
+            Scrollbar scrollbarTemplate = FindScrollbarTemplate(originalPopup, pm);
             GameObject modButtonsObj = CreateActionHubPopupRoot(originalPopup);
             Transform panel = CreateActionHubPanel(originalPopup, modButtonsObj.transform, metrics);
             GameObject cancelButton = CreateCancelButton(originalPopup, actionTemplateButton, panel);
@@ -1758,12 +1758,17 @@ namespace ModButtons
             return scrollbar;
         }
 
-        private static Scrollbar FindScrollbarTemplate(GameObject sourcePopup)
+        private static Scrollbar FindScrollbarTemplate(
+            GameObject sourcePopup,
+            PopupManager popupManager)
         {
             Scrollbar template = FindScrollbarInRoot(sourcePopup);
-            if (template != null) return template;
+            if (template != null)
+            {
+                return template;
+            }
 
-            PopupManager._type[] preferredPopupTypes = new PopupManager._type[]
+            PopupManager._type[] preferredPopupTypes =
             {
                 PopupManager._type.settings_difficulty,
                 PopupManager._type.notifications,
@@ -1774,18 +1779,60 @@ namespace ModButtons
 
             for (int i = 0; i < preferredPopupTypes.Length; i++)
             {
-                GameObject popup = PopupManager.GetObject(preferredPopupTypes[i]);
+                GameObject popup = TryGetPopupObject(
+                    popupManager,
+                    preferredPopupTypes[i]);
+
+                if (popup == null)
+                {
+                    Debug.LogWarning(
+                        "[ModButtons] Popup template unavailable: " +
+                        preferredPopupTypes[i]);
+
+                    continue;
+                }
+
                 template = FindScrollbarInRoot(popup);
-                if (template != null) return template;
+                if (template != null)
+                {
+                    return template;
+                }
             }
 
-            Scrollbar[] sceneScrollbars = UnityEngine.Object.FindObjectsOfType<Scrollbar>();
+            Scrollbar[] sceneScrollbars =
+                UnityEngine.Object.FindObjectsOfType<Scrollbar>();
+
             for (int i = 0; i < sceneScrollbars.Length; i++)
             {
                 Scrollbar scrollbar = sceneScrollbars[i];
-                if (scrollbar != null && scrollbar.gameObject.activeInHierarchy)
+
+                if (scrollbar != null &&
+                    scrollbar.gameObject.activeInHierarchy)
                 {
                     return scrollbar;
+                }
+            }
+
+            return null;
+        }
+
+        private static GameObject TryGetPopupObject(
+            PopupManager popupManager,
+            PopupManager._type type)
+        {
+            if (popupManager == null || popupManager.popups == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < popupManager.popups.Length; i++)
+            {
+                PopupManager._popup entry = popupManager.popups[i];
+
+                // This also protects against empty/null serialized array entries.
+                if (entry != null && entry.type == type)
+                {
+                    return entry.obj;
                 }
             }
 
