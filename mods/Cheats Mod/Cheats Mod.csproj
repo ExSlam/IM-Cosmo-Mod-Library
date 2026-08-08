@@ -3,7 +3,7 @@
     <ModName>Cheats Mod</ModName>
     <RootNamespace>CheatsMod</RootNamespace>
     <AssemblyName>com.cosmo.cheatsmod</AssemblyName>
-    <Version>1.4.1</Version>
+    <Version>1.4.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

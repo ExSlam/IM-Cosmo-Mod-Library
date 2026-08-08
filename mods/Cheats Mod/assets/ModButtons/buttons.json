@@ -320,6 +320,16 @@
 		"method": "ResetSpecialEventCooldowns"
 	},
 	{
+		"label": "Reset audition cooldowns",
+		"codeLabel": "cheat.button.reset_audition_cooldowns",
+		"tooltip": "Reset regional and nationwide audition cooldowns.",
+		"codeTooltip": "cheat.tooltip.reset_audition_cooldowns",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "ResetAuditionCooldowns"
+	},
+	{
 		"label": "Reset group transfer cooldowns",
 		"codeLabel": "cheat.button.reset_group_transfer_cooldowns",
 		"tooltip": "Allow all active idols to transfer between sister groups immediately.",

@@ -13,6 +13,8 @@ Adds cheat actions to the Mod Buttons action hub.
 - Add 10k fame
 - Add 100 buzz
 - Reset special event cooldowns
+- Reset regional and nationwide audition cooldowns
+- Reset active idol group transfer cooldowns
 - Set active idol physical stamina to 100
 - Set active idol mental stamina to 100
 - Reduce general scandal points by 1

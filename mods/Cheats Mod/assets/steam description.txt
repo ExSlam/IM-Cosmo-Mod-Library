@@ -42,6 +42,7 @@ List of cheats:
     [*] Reveal every idol's dating preference
     [*] End all idol dating relationships except relationships with the producer
     [*] Reset special event cooldowns
+    [*] Reset regional and nationwide audition cooldowns
     [*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
     [*] Recruit Unique Idol cheat with selection popup
     [*] Reset cooldown for changing idol groups for all idols

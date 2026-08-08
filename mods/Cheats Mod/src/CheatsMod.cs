@@ -40,6 +40,7 @@ namespace CheatsMod
         internal const string NotificationAddFame = "notification.add_fame";
         internal const string NotificationAddBuzz = "notification.add_buzz";
         internal const string NotificationResetSpecialEventCooldowns = "notification.reset_special_event_cooldowns";
+        internal const string NotificationResetAuditionCooldowns = "notification.reset_audition_cooldowns";
         internal const string NotificationResetGroupTransferCooldowns = "notification.reset_group_transfer_cooldowns";
         internal const string NotificationRefreshPhysicalStamina = "notification.refresh_physical_stamina";
         internal const string NotificationRefreshMentalStamina = "notification.refresh_mental_stamina";
@@ -91,6 +92,7 @@ namespace CheatsMod
         internal const string NotificationAddFame = "Added 10k fame.";
         internal const string NotificationAddBuzz = "Added 100 buzz.";
         internal const string NotificationResetSpecialEventCooldowns = "Special event cooldowns reset.";
+        internal const string NotificationResetAuditionCooldowns = "Regional and nationwide audition cooldowns reset.";
         internal const string NotificationResetGroupTransferCooldowns = "Active idol group transfer cooldowns reset.";
         internal const string NotificationRefreshPhysicalStamina = "Active idol physical stamina set to 100.";
         internal const string NotificationRefreshMentalStamina = "Active idol mental stamina set to 100.";
@@ -182,6 +184,9 @@ namespace CheatsMod
 
     public static class Cheats
     {
+        private static readonly DateTime ClearedAuditionCooldownDate =
+            new DateTime(1960, 1, 1);
+
         private static readonly DateTime ClearedGroupTransferCooldownDate =
             new DateTime(1900, 1, 1);
 
@@ -263,6 +268,11 @@ namespace CheatsMod
         public static void ResetSpecialEventCooldowns()
         {
             Execute(ResetSpecialEventCooldownsCore);
+        }
+
+        public static void ResetAuditionCooldowns()
+        {
+            Execute(ResetAuditionCooldownsCore);
         }
 
         public static void ResetGroupTransferCooldowns()
@@ -472,6 +482,21 @@ namespace CheatsMod
             NotifySuccess(
                 CheatLocalizationKeys.NotificationResetSpecialEventCooldowns,
                 CheatFallbackText.NotificationResetSpecialEventCooldowns,
+                NotificationManager._notification._type.other);
+        }
+
+        private static void ResetAuditionCooldownsCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            Auditions.Regional_Date = ClearedAuditionCooldownDate;
+            Auditions.Nationwide_Date = ClearedAuditionCooldownDate;
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationResetAuditionCooldowns,
+                CheatFallbackText.NotificationResetAuditionCooldowns,
                 NotificationManager._notification._type.other);
         }
 
