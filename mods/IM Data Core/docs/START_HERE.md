@@ -2,6 +2,10 @@
 
 This guide explains exactly how to use IM Data Core from another Idol Manager mod, even if you are new to Harmony and mod persistence.
 
+IM Data Core stores each sidecar beside a mirrored representation of its exact
+vanilla save path. For the path examples and backward-compatible import rules,
+see [`STORAGE_LAYOUT.md`](STORAGE_LAYOUT.md).
+
 ## What you are building
 
 You will build a mod integration that can:

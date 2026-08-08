@@ -37,14 +37,32 @@ Base-game save data is oriented around restoring current game state, not preserv
 ## Runtime behavior and persistence model
 
 ### Save scope
-IM Data Core derives the active `save_key` from game state and keeps storage partitioned per save.
+IM Data Core binds to the exact vanilla save file selected for load or write. The
+visible sidecar directory mirrors that save's path below Idol Manager's `data`
+folder, while the internal `save_key` remains stable for existing API consumers.
 
 ### Storage backend
 At runtime, IM Data Core prefers native SQLite (`winsqlite3`). If unavailable, it falls back to flat JSON file storage.
 
-Per-save storage location:
-- `Application.persistentDataPath\IMDataCore\saves\<game-save-folder-name>\im_data_core.db`
-- fallback: `Application.persistentDataPath\IMDataCore\saves\<game-save-folder-name>\im_data_core.fallback.json`
+Per-save storage root:
+
+- `Application.persistentDataPath\IMDataCore\saves`
+
+Examples:
+
+- Vanilla `data\manual_saves\12\save.json` uses
+  `IMDataCore\saves\manual_saves\12\im_data_core.db`.
+- Vanilla `data\story_mode\<playthrough>\manual_saves\<slot>\save.json`
+  uses the matching `IMDataCore\saves\story_mode\...\<slot>` directory.
+- Vanilla `data\story_mode\<playthrough>\auto_save.json` uses
+  `IMDataCore\saves\story_mode\<playthrough>\auto_save`.
+- Vanilla `data\auto_save.json` uses
+  `IMDataCore\saves\auto_save`.
+
+The fallback filename in the same directory is
+`im_data_core.fallback.json`. See
+[`docs/STORAGE_LAYOUT.md`](docs/STORAGE_LAYOUT.md) for the complete mapping and
+legacy migration behavior.
 
 Typical Windows `Application.persistentDataPath`:
 - `%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager`

@@ -378,6 +378,9 @@ namespace IMDataCore
                 return false;
             }
 
+            bool databaseExistedBeforeInitialization =
+                File.Exists(databasePath);
+
             try
             {
                 string runtimeProbeErrorMessage;
@@ -405,6 +408,17 @@ namespace IMDataCore
             {
                 TryCloseHandleQuietly();
 
+                // Existing files may be migrated or user-owned history. Never erase
+                // them merely because this runtime cannot open or upgrade them.
+                if (databaseExistedBeforeInitialization)
+                {
+                    errorMessage =
+                        CoreConstants.MessageStorageInitializationFailure +
+                        exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+
                 string recoveryErrorMessage;
                 if (TryInitializeAfterDatabaseReset(databasePath, exception, out recoveryErrorMessage))
                 {
@@ -428,7 +442,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Tries a one-time recovery by recreating SQLite files after initialization failure.
+        /// Tries a one-time recovery only for artifacts created by this failed first
+        /// initialization. Callers never pass an existing database to this reset path.
         /// </summary>
         private bool TryInitializeAfterDatabaseReset(string databasePath, Exception firstInitializationException, out string errorMessage)
         {

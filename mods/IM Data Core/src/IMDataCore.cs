@@ -1815,6 +1815,23 @@ namespace IMDataCore
         private ICoreStorageEngine storageEngine;
         private bool initialized;
         private string activeSaveKey = CoreConstants.DefaultSaveKey;
+        private string activeSaveDirectory = string.Empty;
+        private bool activeSaveScopeIsTransient;
+        private CoreSaveScope activeSaveScope;
+        private bool saveLoadPreparationActive;
+        private staticVars._playerData pendingLoadedPlayerData;
+        private CoreSaveScope loadPriorSaveScope;
+        private string loadPriorSaveDirectory = string.Empty;
+        private bool loadPriorScopeWasTransient;
+        private CoreSaveScope loadTargetSaveScope;
+        private CoreSaveScope loadStagingSaveScope;
+        private string loadStagingSaveDirectory = string.Empty;
+        private bool loadStagingPrepared;
+        private bool loadStagingPreparationFailed;
+        private string loadTransactionToken = string.Empty;
+        private int loadBufferedEventBaseline;
+        private int loadBufferedSingleParticipationBaseline;
+        private int loadBufferedStatusTransitionBaseline;
         private DateTime nextFlushUtc;
         private int idempotencyDateKey = CoreConstants.UninitializedDateKey;
 
@@ -1855,6 +1872,20 @@ namespace IMDataCore
             if (!EnsureInitialized(out errorMessage))
             {
                 CoreLog.Warn(errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Captures the scope owned by the open storage engine. Unlike the current
+        /// hint, this is stable across nested vanilla LoadData overloads.
+        /// </summary>
+        internal CoreSaveScope CaptureActiveSaveScope()
+        {
+            lock (runtimeLock)
+            {
+                return initialized && activeSaveScope != null
+                    ? activeSaveScope
+                    : CorePaths.GetSaveScope();
             }
         }
 
@@ -2221,9 +2252,322 @@ namespace IMDataCore
         /// <summary>
         /// Captures one save-file path hint before load starts so storage rebinding resolves per file.
         /// </summary>
-        internal void OnSaveLoadStarting(string saveFilePath)
+        internal string OnSaveLoadStarting(string saveFilePath)
         {
-            CorePaths.SetActiveSaveFilePathHint(saveFilePath);
+            CoreSaveScope targetSaveScope;
+            if (!CorePaths.TryResolveSaveScope(
+                saveFilePath,
+                out targetSaveScope))
+            {
+                return string.Empty;
+            }
+
+            lock (runtimeLock)
+            {
+                if (saveLoadPreparationActive)
+                {
+                    return loadTargetSaveScope != null &&
+                        string.Equals(
+                            loadTargetSaveScope.SaveFilePath,
+                            targetSaveScope.SaveFilePath,
+                            StringComparison.OrdinalIgnoreCase)
+                                ? loadTransactionToken
+                                : string.Empty;
+                }
+
+                CoreSaveScope priorSaveScope =
+                    initialized && activeSaveScope != null
+                        ? activeSaveScope
+                        : CorePaths.GetSaveScope();
+
+                loadPriorSaveScope = priorSaveScope;
+                loadPriorSaveDirectory =
+                    initialized &&
+                    !string.IsNullOrEmpty(activeSaveDirectory)
+                        ? activeSaveDirectory
+                        : CorePaths.GetSaveDirectory(priorSaveScope);
+                loadPriorScopeWasTransient =
+                    priorSaveScope != null &&
+                    priorSaveScope.IsTransient;
+                loadTargetSaveScope = targetSaveScope;
+                loadStagingSaveScope = CorePaths.CreateStagingSaveScope(
+                    targetSaveScope,
+                    true);
+                loadStagingSaveDirectory = CorePaths.GetSaveDirectory(
+                    loadStagingSaveScope);
+                loadStagingPrepared = false;
+                loadStagingPreparationFailed = false;
+                loadTransactionToken = Guid.NewGuid().ToString("N");
+                loadBufferedEventBaseline = bufferedEvents.Count;
+                loadBufferedSingleParticipationBaseline =
+                    bufferedSingleParticipationRows.Count;
+                loadBufferedStatusTransitionBaseline =
+                    bufferedStatusTransitions.Count;
+                pendingLoadedPlayerData = null;
+                saveLoadPreparationActive = true;
+                return loadTransactionToken;
+            }
+        }
+
+        /// <summary>
+        /// Captures the PlayerData deserialized by vanilla before LoadEvent subscribers
+        /// can initialize storage using stale PlayerData from the prior game.
+        /// </summary>
+        internal void OnVanillaSaveDataRead(
+            SaveManager.SavedData loadedSaveData)
+        {
+            if (loadedSaveData == null)
+            {
+                return;
+            }
+
+            lock (runtimeLock)
+            {
+                if (!saveLoadPreparationActive)
+                {
+                    return;
+                }
+
+                pendingLoadedPlayerData =
+                    loadedSaveData.staticVars__PlayerData;
+
+                string preparationErrorMessage;
+                if (!PrepareLoadStagingLocked(
+                    out preparationErrorMessage))
+                {
+                    loadStagingPreparationFailed = true;
+                    CoreLog.Warn(
+                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
+                        preparationErrorMessage);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Flushes and closes the prior scope, clones the canonical target into a
+        /// private directory, and opens only that private copy during LoadEvent.
+        /// The canonical target remains byte-for-byte untouched until success commit.
+        /// </summary>
+        private bool PrepareLoadStagingLocked(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!saveLoadPreparationActive ||
+                loadTargetSaveScope == null ||
+                loadStagingSaveScope == null ||
+                string.IsNullOrEmpty(loadTransactionToken))
+            {
+                errorMessage = "No active save-load transaction is available.";
+                return false;
+            }
+
+            if (loadStagingPrepared)
+            {
+                return true;
+            }
+
+            if (initialized && storageEngine != null)
+            {
+                string flushErrorMessage;
+                if (!FlushLocked(true, out flushErrorMessage))
+                {
+                    errorMessage = CoreConstants.MessageFlushFailed +
+                        flushErrorMessage;
+                    return false;
+                }
+            }
+
+            // A successful flush leaves a precise baseline. Everything appended after
+            // this point was produced while applying the candidate load and is dropped
+            // if vanilla later throws, including same-save reloads with the same key.
+            loadBufferedEventBaseline = bufferedEvents.Count;
+            loadBufferedSingleParticipationBaseline =
+                bufferedSingleParticipationRows.Count;
+            loadBufferedStatusTransitionBaseline =
+                bufferedStatusTransitions.Count;
+
+            string canonicalTargetDirectory = CorePaths.GetSaveDirectory(
+                loadTargetSaveScope);
+            bool canonicalStorageExists = StorageDirectoryHasData(
+                canonicalTargetDirectory);
+
+            DisposeStorageLocked();
+            ResetStorageBindingLocked();
+            TryCleanupStagingSaveDirectory(loadStagingSaveDirectory);
+
+            if (canonicalStorageExists &&
+                !TryCopyStorageFromSourceDirectory(
+                    canonicalTargetDirectory,
+                    CorePaths.GetDatabasePath(loadStagingSaveScope),
+                    CorePaths.GetFlatFileDatabasePath(
+                        loadStagingSaveScope),
+                    false))
+            {
+                errorMessage =
+                    "The target sidecar could not be cloned into load staging.";
+                RestorePriorStorageAfterStagingFailureLocked();
+                return false;
+            }
+
+            CorePaths.UseSaveScope(loadStagingSaveScope);
+            string initializationErrorMessage;
+            if (!InitializeStorageLocked(
+                loadStagingSaveScope,
+                out initializationErrorMessage))
+            {
+                errorMessage = initializationErrorMessage;
+                RestorePriorStorageAfterStagingFailureLocked();
+                return false;
+            }
+
+            loadStagingPrepared = true;
+            loadStagingPreparationFailed = false;
+            return true;
+        }
+
+        /// <summary>
+        /// Reopens the exact scope that owned storage before a staging attempt failed.
+        /// This helper never publishes or mutates the canonical load target.
+        /// </summary>
+        private void RestorePriorStorageAfterStagingFailureLocked()
+        {
+            DisposeStorageLocked();
+            ResetStorageBindingLocked();
+            CorePaths.RestoreSaveScope(loadPriorSaveScope);
+            TryCleanupStagingSaveDirectory(loadStagingSaveDirectory);
+
+            if (loadPriorSaveScope == null)
+            {
+                return;
+            }
+
+            string restoreErrorMessage;
+            if (!InitializePreparedStorageLocked(
+                loadPriorSaveScope,
+                out restoreErrorMessage))
+            {
+                CoreLog.Warn(
+                    CoreConstants.MessageSaveLoadInitializationFailurePrefix +
+                    restoreErrorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Detaches the previous game and creates a fresh transient scope until the
+        /// first exact vanilla save target is supplied by DataSaver.
+        /// </summary>
+        internal void OnNewGameStarting()
+        {
+            lock (runtimeLock)
+            {
+                string priorSaveDirectory = activeSaveDirectory;
+                bool priorScopeWasTransient =
+                    activeSaveScopeIsTransient;
+
+                if (storageEngine != null)
+                {
+                    string flushErrorMessage;
+                    if (!FlushLocked(true, out flushErrorMessage))
+                    {
+                        CoreLog.Warn(
+                            CoreConstants.MessageStorageSaveSwitchFailure +
+                            CoreConstants.MessageFlushFailed +
+                            flushErrorMessage);
+                    }
+                }
+
+                DisposeStorageLocked();
+                bufferedEvents.Clear();
+                bufferedSingleParticipationRows.Clear();
+                bufferedStatusTransitions.Clear();
+                initialized = false;
+                activeSaveKey = CoreConstants.DefaultSaveKey;
+                activeSaveDirectory = string.Empty;
+                activeSaveScopeIsTransient = false;
+                activeSaveScope = null;
+                ClearSaveLoadPreparationStateLocked();
+                if (priorScopeWasTransient)
+                {
+                    TryCleanupTransientSaveDirectory(
+                        priorSaveDirectory);
+                }
+
+                CorePaths.ResetToTransientSaveScope();
+                ResetRuntimeCaptureStateLocked();
+            }
+        }
+
+        /// <summary>
+        /// Restores the scope that was active before vanilla attempted a failed load.
+        /// </summary>
+        internal void OnSaveLoadFailed(CoreSaveScope previousSaveScope)
+        {
+            lock (runtimeLock)
+            {
+                CoreSaveScope restoreSaveScope =
+                    loadPriorSaveScope ?? previousSaveScope;
+                if (restoreSaveScope == null)
+                {
+                    ClearSaveLoadPreparationStateLocked();
+                    return;
+                }
+
+                string restoreSaveDirectory =
+                    !string.IsNullOrEmpty(loadPriorSaveDirectory)
+                        ? loadPriorSaveDirectory
+                        : CorePaths.GetSaveDirectory(restoreSaveScope);
+
+                bool storageAlreadyMatchesRestoreScope =
+                    ActiveStorageMatchesScopeLocked(
+                        restoreSaveScope,
+                        restoreSaveDirectory);
+
+                if (!storageAlreadyMatchesRestoreScope &&
+                    initialized &&
+                    storageEngine != null)
+                {
+                    string failedTargetSaveKey = activeSaveKey;
+                    string restoreSaveKey =
+                        restoreSaveScope.InternalSaveKey;
+
+                    // Records captured while applying the rejected save belong only
+                    // to that failed target. Prior-scope records may still be buffered
+                    // after a persistence failure and must remain intact.
+                    if (!string.Equals(
+                        failedTargetSaveKey,
+                        restoreSaveKey,
+                        StringComparison.Ordinal))
+                    {
+                        RemoveBufferedDataForSaveKeyLocked(
+                            failedTargetSaveKey);
+                    }
+
+                    // Never flush the rejected target while unwinding a failed load.
+                    DisposeStorageLocked();
+                    initialized = false;
+                    activeSaveKey = CoreConstants.DefaultSaveKey;
+                    activeSaveDirectory = string.Empty;
+                    activeSaveScopeIsTransient = false;
+                    activeSaveScope = null;
+                }
+
+                CorePaths.RestoreSaveScope(restoreSaveScope);
+                ClearSaveLoadPreparationStateLocked();
+
+                if (storageAlreadyMatchesRestoreScope)
+                {
+                    return;
+                }
+
+                string initializationErrorMessage;
+                if (!InitializeStorageLocked(
+                    restoreSaveScope,
+                    out initializationErrorMessage))
+                {
+                    CoreLog.Warn(
+                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
+                        initializationErrorMessage);
+                }
+            }
         }
 
         /// <summary>
@@ -2232,6 +2576,11 @@ namespace IMDataCore
         /// </summary>
         internal void OnSaveWriteStarting(string saveFilePath)
         {
+            if (!CorePaths.IsSupportedGameSavePath(saveFilePath))
+            {
+                return;
+            }
+
             lock (runtimeLock)
             {
                 string initializationErrorMessage;
@@ -2242,10 +2591,25 @@ namespace IMDataCore
                 }
 
                 string sourceSaveKey = activeSaveKey;
+                string sourceSaveDirectory = activeSaveDirectory;
+                CoreSaveScope sourceSaveScope = activeSaveScope ??
+                    CorePaths.GetSaveScope();
+                bool sourceScopeWasTransient =
+                    activeSaveScopeIsTransient;
                 CorePaths.SetActiveSaveFilePathHint(saveFilePath);
-                string targetSaveKey = NormalizeSaveKey(CorePaths.GetSaveKey());
+                CoreSaveScope targetSaveScope = CorePaths.GetSaveScope();
+                string targetSaveKey = NormalizeSaveKey(
+                    targetSaveScope.InternalSaveKey);
+                string targetSaveDirectory = CorePaths.GetSaveDirectory(
+                    targetSaveScope);
                 if (string.IsNullOrEmpty(targetSaveKey) ||
-                    string.Equals(targetSaveKey, sourceSaveKey, StringComparison.Ordinal))
+                    (string.Equals(
+                        targetSaveKey,
+                        sourceSaveKey,
+                        StringComparison.Ordinal) &&
+                     PathsReferToSameDirectory(
+                        targetSaveDirectory,
+                        sourceSaveDirectory)))
                 {
                     return;
                 }
@@ -2260,12 +2624,45 @@ namespace IMDataCore
 
                 string switchInitializationErrorMessage;
                 if (!InitializeStorageLocked(
-                    targetSaveKey,
+                    targetSaveScope,
+                    sourceSaveDirectory,
                     sourceSaveKey,
                     true,
                     out switchInitializationErrorMessage))
                 {
                     CoreLog.Warn(CoreConstants.MessageSaveWritePreparationFailurePrefix + switchInitializationErrorMessage);
+
+                    CorePaths.RestoreSaveScope(sourceSaveScope);
+                    string sourceRestoreErrorMessage;
+                    if (!InitializeStorageLocked(
+                        sourceSaveScope,
+                        out sourceRestoreErrorMessage))
+                    {
+                        CoreLog.Warn(
+                            CoreConstants.MessageStorageSaveSwitchFailure +
+                            sourceRestoreErrorMessage);
+                    }
+
+                    return;
+                }
+
+                if (sourceScopeWasTransient)
+                {
+                    if (saveLoadPreparationActive)
+                    {
+                        if (loadPriorSaveScope == null)
+                        {
+                            loadPriorSaveScope = sourceSaveScope;
+                            loadPriorSaveDirectory =
+                                sourceSaveDirectory;
+                            loadPriorScopeWasTransient = true;
+                        }
+                    }
+                    else
+                    {
+                        TryCleanupTransientSaveDirectory(
+                            sourceSaveDirectory);
+                    }
                 }
             }
         }
@@ -2275,6 +2672,11 @@ namespace IMDataCore
         /// </summary>
         internal void OnSaveLoaded(string saveFilePath)
         {
+            if (!CorePaths.IsSupportedGameSavePath(saveFilePath))
+            {
+                return;
+            }
+
             lock (runtimeLock)
             {
                 CorePaths.SetActiveSaveFilePathHint(saveFilePath);
@@ -2283,12 +2685,14 @@ namespace IMDataCore
                 if (!EnsureInitializedLocked(out initializationErrorMessage))
                 {
                     CoreLog.Warn(CoreConstants.MessageSaveLoadInitializationFailurePrefix + initializationErrorMessage);
+                    ClearSaveLoadPreparationStateLocked();
                     return;
                 }
 
                 if (storageEngine == null)
                 {
                     CoreLog.Warn(CoreConstants.MessageStorageUnavailable);
+                    ClearSaveLoadPreparationStateLocked();
                     return;
                 }
 
@@ -2301,6 +2705,19 @@ namespace IMDataCore
 
                 RemoveBufferedDataForSaveKeyLocked(activeSaveKey);
                 ResetRuntimeCaptureStateLocked();
+
+                if (loadPriorScopeWasTransient &&
+                    !SaveScopesReferToSameStorage(
+                        loadPriorSaveScope,
+                        loadPriorSaveDirectory,
+                        activeSaveScope,
+                        activeSaveDirectory))
+                {
+                    TryCleanupTransientSaveDirectory(
+                        loadPriorSaveDirectory);
+                }
+
+                ClearSaveLoadPreparationStateLocked();
             }
         }
 
@@ -2376,14 +2793,26 @@ namespace IMDataCore
         private bool EnsureInitializedLocked(out string errorMessage)
         {
             errorMessage = string.Empty;
+            CoreSaveScope currentSaveScope = CorePaths.GetSaveScope();
 
             if (!initialized || storageEngine == null)
             {
-                return InitializeStorageLocked(CorePaths.GetSaveKey(), activeSaveKey, out errorMessage);
+                return InitializeStorageLocked(
+                    currentSaveScope,
+                    out errorMessage);
             }
 
-            string currentSaveKey = NormalizeSaveKey(CorePaths.GetSaveKey());
-            if (string.Equals(currentSaveKey, activeSaveKey, StringComparison.Ordinal))
+            string currentSaveKey = NormalizeSaveKey(
+                currentSaveScope.InternalSaveKey);
+            string currentSaveDirectory = CorePaths.GetSaveDirectory(
+                currentSaveScope);
+            if (string.Equals(
+                    currentSaveKey,
+                    activeSaveKey,
+                    StringComparison.Ordinal) &&
+                PathsReferToSameDirectory(
+                    currentSaveDirectory,
+                    activeSaveDirectory))
             {
                 return true;
             }
@@ -2394,12 +2823,39 @@ namespace IMDataCore
                 CoreLog.Warn(CoreConstants.MessageStorageSaveSwitchFailure + CoreConstants.MessageFlushFailed + flushErrorMessage);
             }
 
-            string previousSaveKey = activeSaveKey;
+            string previousSaveDirectory = activeSaveDirectory;
+            bool previousScopeWasTransient =
+                activeSaveScopeIsTransient;
+            CoreSaveScope previousSaveScope = activeSaveScope;
+
             DisposeStorageLocked();
-            if (!InitializeStorageLocked(currentSaveKey, previousSaveKey, out errorMessage))
+            if (!InitializeStorageLocked(
+                currentSaveScope,
+                out errorMessage))
             {
                 errorMessage = CoreConstants.MessageStorageSaveSwitchFailure + errorMessage;
                 return false;
+            }
+
+            if (previousScopeWasTransient)
+            {
+                if (saveLoadPreparationActive)
+                {
+                    // A failed target load must be able to reopen this exact transient
+                    // scope. Cleanup is committed only by OnSaveLoaded.
+                    if (loadPriorSaveScope == null)
+                    {
+                        loadPriorSaveScope = previousSaveScope;
+                        loadPriorSaveDirectory =
+                            previousSaveDirectory;
+                        loadPriorScopeWasTransient = true;
+                    }
+                }
+                else
+                {
+                    TryCleanupTransientSaveDirectory(
+                        previousSaveDirectory);
+                }
             }
 
             return true;
@@ -2408,41 +2864,82 @@ namespace IMDataCore
         /// <summary>
         /// Creates and initializes a storage engine for one save key.
         /// </summary>
-        private bool InitializeStorageLocked(string saveKey, out string errorMessage)
+        private bool InitializeStorageLocked(
+            CoreSaveScope saveScope,
+            out string errorMessage)
         {
-            return InitializeStorageLocked(saveKey, string.Empty, false, out errorMessage);
+            return InitializeStorageLocked(
+                saveScope,
+                string.Empty,
+                string.Empty,
+                false,
+                false,
+                out errorMessage);
         }
 
         /// <summary>
-        /// Creates and initializes a storage engine for one save key with optional source-save migration.
+        /// Opens storage that was already validated and key-normalized in a private
+        /// transaction directory. This avoids repeating legacy scans and full-table
+        /// remaps after the directory is published at its canonical path.
         /// </summary>
-        private bool InitializeStorageLocked(string saveKey, string sourceSaveKeyForMigration, out string errorMessage)
+        private bool InitializePreparedStorageLocked(
+            CoreSaveScope saveScope,
+            out string errorMessage)
         {
-            return InitializeStorageLocked(saveKey, sourceSaveKeyForMigration, false, out errorMessage);
+            return InitializeStorageLocked(
+                saveScope,
+                string.Empty,
+                string.Empty,
+                false,
+                true,
+                out errorMessage);
         }
 
         /// <summary>
         /// Creates and initializes one storage engine with optional source-save copy semantics.
         /// </summary>
         private bool InitializeStorageLocked(
-            string saveKey,
+            CoreSaveScope saveScope,
+            string sourceSaveDirectoryForCopy,
             string sourceSaveKeyForMigration,
             bool overwriteTargetWithSourceStorage,
+            bool storageFilesAlreadyPrepared,
             out string errorMessage)
         {
             errorMessage = string.Empty;
 
-            string normalizedSaveKey = NormalizeSaveKey(saveKey);
-            string sqliteDatabasePath = CorePaths.GetDatabasePath(normalizedSaveKey);
-            string flatFileDatabasePath = CorePaths.GetFlatFileDatabasePath(normalizedSaveKey);
-            string copiedFromSaveKey;
-            TryMigrateLegacyStorageIfNeeded(
-                normalizedSaveKey,
-                sourceSaveKeyForMigration,
-                sqliteDatabasePath,
-                flatFileDatabasePath,
-                overwriteTargetWithSourceStorage,
-                out copiedFromSaveKey);
+            if (saveScope == null)
+            {
+                errorMessage = CoreConstants.MessageStorageInitializationFailure +
+                    CoreConstants.MessageDatabasePathEmpty;
+                return false;
+            }
+
+            string normalizedSaveKey = NormalizeSaveKey(
+                saveScope.InternalSaveKey);
+            string saveDirectory = CorePaths.GetSaveDirectory(saveScope);
+            string sqliteDatabasePath = CorePaths.GetDatabasePath(saveScope);
+            string flatFileDatabasePath = CorePaths.GetFlatFileDatabasePath(
+                saveScope);
+            if (!storageFilesAlreadyPrepared)
+            {
+                TryMigrateLegacyStorageIfNeeded(
+                    saveScope,
+                    sourceSaveDirectoryForCopy,
+                    sqliteDatabasePath,
+                    flatFileDatabasePath,
+                    overwriteTargetWithSourceStorage,
+                    out errorMessage);
+            }
+
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                storageEngine = null;
+                initialized = false;
+                errorMessage = CoreConstants.MessageStorageInitializationFailure +
+                    errorMessage;
+                return false;
+            }
 
             ICoreStorageEngine newStorageEngine;
             if (!TryCreateAndInitializeStorageEngine(sqliteDatabasePath, flatFileDatabasePath, out newStorageEngine, out errorMessage))
@@ -2453,32 +2950,60 @@ namespace IMDataCore
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(copiedFromSaveKey)
-                && !string.Equals(copiedFromSaveKey, normalizedSaveKey, StringComparison.Ordinal))
+            if (!storageFilesAlreadyPrepared)
             {
-                string remapErrorMessage;
-                if (!newStorageEngine.TryRemapSaveKey(copiedFromSaveKey, normalizedSaveKey, out remapErrorMessage))
+                List<string> plausibleLegacySaveKeys =
+                    CorePaths.GetPlausibleLegacySaveKeys(
+                        saveScope,
+                        pendingLoadedPlayerData);
+                AddMigrationCandidate(
+                    plausibleLegacySaveKeys,
+                    sourceSaveKeyForMigration);
+                for (
+                    int legacyKeyIndex = CoreConstants.ZeroBasedListStartIndex;
+                    legacyKeyIndex < plausibleLegacySaveKeys.Count;
+                    legacyKeyIndex++)
+                {
+                    string legacySaveKey = plausibleLegacySaveKeys[legacyKeyIndex];
+                    if (string.IsNullOrEmpty(legacySaveKey) ||
+                        string.Equals(
+                            legacySaveKey,
+                            normalizedSaveKey,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    string remapErrorMessage;
+                    if (!newStorageEngine.TryRemapSaveKey(
+                        legacySaveKey,
+                        normalizedSaveKey,
+                        out remapErrorMessage))
+                    {
+                        newStorageEngine.Dispose();
+                        storageEngine = null;
+                        initialized = false;
+                        errorMessage = CoreConstants.MessageStorageInitializationFailure + remapErrorMessage;
+                        return false;
+                    }
+                }
+
+                string normalizeSaveKeyErrorMessage;
+                if (!newStorageEngine.TryRemapSaveKey(string.Empty, normalizedSaveKey, out normalizeSaveKeyErrorMessage))
                 {
                     newStorageEngine.Dispose();
                     storageEngine = null;
                     initialized = false;
-                    errorMessage = CoreConstants.MessageStorageInitializationFailure + remapErrorMessage;
+                    errorMessage = CoreConstants.MessageStorageInitializationFailure + normalizeSaveKeyErrorMessage;
                     return false;
                 }
             }
 
-            string normalizeSaveKeyErrorMessage;
-            if (!newStorageEngine.TryRemapSaveKey(string.Empty, normalizedSaveKey, out normalizeSaveKeyErrorMessage))
-            {
-                newStorageEngine.Dispose();
-                storageEngine = null;
-                initialized = false;
-                errorMessage = CoreConstants.MessageStorageInitializationFailure + normalizeSaveKeyErrorMessage;
-                return false;
-            }
-
             storageEngine = newStorageEngine;
             activeSaveKey = normalizedSaveKey;
+            activeSaveDirectory = saveDirectory;
+            activeSaveScopeIsTransient = saveScope.IsTransient;
+            activeSaveScope = saveScope;
             initialized = true;
             nextFlushUtc = DateTime.UtcNow.AddSeconds(CoreConstants.FlushIntervalSeconds);
             ResetRuntimeCaptureStateLocked();
@@ -2487,45 +3012,38 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Copies storage from older IM Data Core layouts into:
-        /// <game-save-root-parent>\IMDataCore\<game-save-folder-name>
+        /// Copies storage from older keyed layouts into the mirrored save directory.
+        /// Save As uses the explicit active source directory and never searches a stale
+        /// legacy directory by key.
         /// </summary>
         private void TryMigrateLegacyStorageIfNeeded(
-            string normalizedSaveKey,
-            string sourceSaveKeyForMigration,
+            CoreSaveScope saveScope,
+            string sourceSaveDirectoryForCopy,
             string sqliteDatabasePath,
             string flatFileDatabasePath,
             bool overwriteTargetWithSourceStorage,
-            out string copiedFromSaveKey)
+            out string errorMessage)
         {
-            copiedFromSaveKey = string.Empty;
-
-            string normalizedSourceSaveKey =
-                NormalizeSaveKey(sourceSaveKeyForMigration);
-
+            errorMessage = string.Empty;
             bool targetStorageExists =
                 File.Exists(sqliteDatabasePath) ||
                 File.Exists(flatFileDatabasePath);
 
-            // Save As needs to clone the currently active save into the target.
             if (overwriteTargetWithSourceStorage)
             {
-                if (TryCopyStorageFromSourceSaveKey(
-                    normalizedSourceSaveKey,
-                    normalizedSaveKey,
+                if (!string.IsNullOrEmpty(sourceSaveDirectoryForCopy) &&
+                    TryCopyStorageFromSourceDirectory(
+                    sourceSaveDirectoryForCopy,
                     sqliteDatabasePath,
                     flatFileDatabasePath,
                     true))
                 {
-                    copiedFromSaveKey = normalizedSourceSaveKey;
                     return;
                 }
 
-                // Do not destroy an existing target when the source cannot be read.
-                if (targetStorageExists)
-                {
-                    return;
-                }
+                errorMessage =
+                    "The active source sidecar could not be cloned into the target save.";
+                return;
             }
             else if (targetStorageExists)
             {
@@ -2533,28 +3051,9 @@ namespace IMDataCore
             }
 
             List<string> migrationCandidateSaveKeys =
-                new List<string>();
-
-            // Current source, useful when switching or cloning saves.
-            AddMigrationCandidate(
-                migrationCandidateSaveKeys,
-                normalizedSourceSaveKey);
-
-            // Same-key migration:
-            // IMDataCore\saves\<key> -> IMDataCore\<key>
-            AddMigrationCandidate(
-                migrationCandidateSaveKeys,
-                normalizedSaveKey);
-
-            // Previous path-derived hashed key.
-            AddMigrationCandidate(
-                migrationCandidateSaveKeys,
-                NormalizeSaveKey(CorePaths.GetLegacyFileScopedSaveKey()));
-
-            // Old PlayerData.SaveFolderName/agency-derived key.
-            AddMigrationCandidate(
-                migrationCandidateSaveKeys,
-                NormalizeSaveKey(CorePaths.GetLegacyAgencySaveKey()));
+                CorePaths.GetPlausibleLegacySaveKeys(
+                    saveScope,
+                    pendingLoadedPlayerData);
 
             for (
                 int candidateIndex = CoreConstants.ZeroBasedListStartIndex;
@@ -2566,7 +3065,7 @@ namespace IMDataCore
 
                 if (!TryCopyStorageFromSourceSaveKey(
                     candidateSaveKey,
-                    normalizedSaveKey,
+                    saveScope.InternalSaveKey,
                     sqliteDatabasePath,
                     flatFileDatabasePath,
                     false))
@@ -2574,7 +3073,6 @@ namespace IMDataCore
                     continue;
                 }
 
-                copiedFromSaveKey = candidateSaveKey;
                 return;
             }
         }
@@ -2626,7 +3124,9 @@ namespace IMDataCore
             }
 
             string normalizedSourceSaveKey =
-                NormalizeSaveKey(sourceSaveKey);
+                CoreTokenUtility.SanitizeToken(
+                    sourceSaveKey,
+                    CoreConstants.SaveKeyMaximumLength);
 
             if (string.IsNullOrEmpty(normalizedSourceSaveKey))
             {
@@ -2695,10 +3195,6 @@ namespace IMDataCore
                     sourceSqliteDatabasePath +
                     CoreConstants.SqliteWriteAheadLogFileSuffix;
 
-                string sourceSqliteSharedMemoryPath =
-                    sourceSqliteDatabasePath +
-                    CoreConstants.SqliteSharedMemoryFileSuffix;
-
                 string targetSqliteWriteAheadLogPath =
                     targetSqliteDatabasePath +
                     CoreConstants.SqliteWriteAheadLogFileSuffix;
@@ -2707,15 +3203,35 @@ namespace IMDataCore
                     targetSqliteDatabasePath +
                     CoreConstants.SqliteSharedMemoryFileSuffix;
 
-                if (File.Exists(sourceSqliteDatabasePath))
+                bool sourceSqliteExists =
+                    File.Exists(sourceSqliteDatabasePath);
+                bool sourceFlatFileExists =
+                    File.Exists(sourceFlatFileDatabasePath);
+                if (!sourceSqliteExists && !sourceFlatFileExists)
                 {
-                    if (replaceTargetStorageFiles)
-                    {
-                        DeleteFileIfExists(targetSqliteDatabasePath);
-                        DeleteFileIfExists(targetSqliteWriteAheadLogPath);
-                        DeleteFileIfExists(targetSqliteSharedMemoryPath);
-                        DeleteFileIfExists(targetFlatFileDatabasePath);
-                    }
+                    return false;
+                }
+
+                if (!replaceTargetStorageFiles &&
+                    sourceSqliteExists &&
+                    !File.Exists(targetSqliteDatabasePath))
+                {
+                    // A WAL has no meaning without its original main database. Never
+                    // pair an orphan from an interrupted prior attempt with migration.
+                    DeleteFileIfExists(targetSqliteWriteAheadLogPath);
+                    DeleteFileIfExists(targetSqliteSharedMemoryPath);
+                }
+
+                if (replaceTargetStorageFiles)
+                {
+                    DeleteFileIfExists(targetSqliteDatabasePath);
+                    DeleteFileIfExists(targetSqliteWriteAheadLogPath);
+                    DeleteFileIfExists(targetSqliteSharedMemoryPath);
+                    DeleteFileIfExists(targetFlatFileDatabasePath);
+                }
+
+                if (sourceSqliteExists)
+                {
 
                     string sqliteTargetDirectory =
                         Path.GetDirectoryName(targetSqliteDatabasePath);
@@ -2735,25 +3251,13 @@ namespace IMDataCore
                         sourceSqliteWriteAheadLogPath,
                         targetSqliteWriteAheadLogPath,
                         replaceTargetStorageFiles);
-
-                    CopyOptionalFileIfExists(
-                        sourceSqliteSharedMemoryPath,
-                        targetSqliteSharedMemoryPath,
-                        replaceTargetStorageFiles);
-
-                    return true;
                 }
 
-                if (File.Exists(sourceFlatFileDatabasePath))
-                {
-                    if (replaceTargetStorageFiles)
-                    {
-                        DeleteFileIfExists(targetSqliteDatabasePath);
-                        DeleteFileIfExists(targetSqliteWriteAheadLogPath);
-                        DeleteFileIfExists(targetSqliteSharedMemoryPath);
-                        DeleteFileIfExists(targetFlatFileDatabasePath);
-                    }
+                // SQLite shared-memory files are transient and must be rebuilt by SQLite.
+                DeleteFileIfExists(targetSqliteSharedMemoryPath);
 
+                if (sourceFlatFileExists)
+                {
                     string flatFileTargetDirectory =
                         Path.GetDirectoryName(targetFlatFileDatabasePath);
 
@@ -2767,9 +3271,9 @@ namespace IMDataCore
                         sourceFlatFileDatabasePath,
                         targetFlatFileDatabasePath,
                         replaceTargetStorageFiles);
-
-                    return true;
                 }
+
+                return true;
             }
             catch (Exception exception)
             {
@@ -2779,6 +3283,57 @@ namespace IMDataCore
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Returns true when the open engine owns one exact save scope and directory.
+        /// </summary>
+        private bool ActiveStorageMatchesScopeLocked(
+            CoreSaveScope saveScope,
+            string saveDirectory)
+        {
+            return initialized &&
+                storageEngine != null &&
+                SaveScopesReferToSameStorage(
+                    activeSaveScope,
+                    activeSaveDirectory,
+                    saveScope,
+                    saveDirectory);
+        }
+
+        /// <summary>
+        /// Compares both the persisted key and exact storage directory of two scopes.
+        /// </summary>
+        private static bool SaveScopesReferToSameStorage(
+            CoreSaveScope firstSaveScope,
+            string firstSaveDirectory,
+            CoreSaveScope secondSaveScope,
+            string secondSaveDirectory)
+        {
+            if (firstSaveScope == null || secondSaveScope == null)
+            {
+                return false;
+            }
+
+            return string.Equals(
+                    firstSaveScope.InternalSaveKey,
+                    secondSaveScope.InternalSaveKey,
+                    StringComparison.Ordinal) &&
+                PathsReferToSameDirectory(
+                    firstSaveDirectory,
+                    secondSaveDirectory);
+        }
+
+        /// <summary>
+        /// Clears state retained only for one in-flight vanilla load transaction.
+        /// </summary>
+        private void ClearSaveLoadPreparationStateLocked()
+        {
+            saveLoadPreparationActive = false;
+            pendingLoadedPlayerData = null;
+            loadPriorSaveScope = null;
+            loadPriorSaveDirectory = string.Empty;
+            loadPriorScopeWasTransient = false;
         }
 
         /// <summary>
@@ -2889,6 +3444,20 @@ namespace IMDataCore
             createdStorageEngine = null;
             errorMessage = string.Empty;
 
+            bool sqliteStorageExists = File.Exists(sqliteDatabasePath);
+            bool flatFileStorageExists = File.Exists(flatFileDatabasePath);
+
+            // Preserve the backend format of migrated or existing saves. Creating a
+            // new empty SQLite database beside an existing fallback file would hide
+            // the fallback data on every subsequent launch.
+            if (flatFileStorageExists && !sqliteStorageExists)
+            {
+                return TryInitializeFlatFileStorageEngine(
+                    flatFileDatabasePath,
+                    out createdStorageEngine,
+                    out errorMessage);
+            }
+
             string runtimeDependencyErrorMessage;
             if (CoreRuntimeCapabilities.TryEnsureSqliteRuntimeSupport(out runtimeDependencyErrorMessage))
             {
@@ -2899,12 +3468,64 @@ namespace IMDataCore
                 }
 
                 CoreLog.Warn(CoreConstants.MessageSqliteUnavailableFallbackPrefix + sqliteInitializationError);
+
+                if (flatFileStorageExists)
+                {
+                    return TryInitializeFlatFileStorageEngine(
+                        flatFileDatabasePath,
+                        out createdStorageEngine,
+                        out errorMessage);
+                }
+
+                if (sqliteStorageExists)
+                {
+                    errorMessage = sqliteInitializationError;
+                    return false;
+                }
             }
             else
             {
                 CoreLog.Warn(CoreConstants.MessageRuntimeDependencyProbeFailedPrefix + runtimeDependencyErrorMessage);
+
+                if (sqliteStorageExists && !flatFileStorageExists)
+                {
+                    errorMessage = runtimeDependencyErrorMessage;
+                    return false;
+                }
             }
 
+            return TryInitializeFlatFileStorageEngine(
+                flatFileDatabasePath,
+                out createdStorageEngine,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Cleans up temporary pre-save storage without ever touching legacy sources.
+        /// </summary>
+        private static void TryCleanupTransientSaveDirectory(
+            string saveDirectory)
+        {
+            string cleanupErrorMessage;
+            if (!CorePaths.TryDeleteTransientSaveDirectory(
+                saveDirectory,
+                out cleanupErrorMessage))
+            {
+                CoreLog.Warn(
+                    CoreConstants.MessageSaveDataMigrationFailedPrefix +
+                    cleanupErrorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Initializes the flat-file backend without creating a competing storage format.
+        /// </summary>
+        private static bool TryInitializeFlatFileStorageEngine(
+            string flatFileDatabasePath,
+            out ICoreStorageEngine createdStorageEngine,
+            out string errorMessage)
+        {
+            createdStorageEngine = null;
             ICoreStorageEngine flatFileStorageEngine = new FlatFileCoreStorageEngine();
             if (!flatFileStorageEngine.Initialize(flatFileDatabasePath, out errorMessage))
             {

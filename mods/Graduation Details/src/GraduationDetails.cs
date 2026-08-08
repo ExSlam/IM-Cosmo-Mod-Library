@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using ModLocalizationSystem;
 using TMPro;
@@ -37,34 +39,29 @@ namespace GraduationDetails
 
     internal static class GraduationDetailsPaths
     {
-        private const string BaseFolder = "GraduationDetails";
+        internal const string BaseFolder = "GraduationDetails";
+        internal const string DisplayFolder = "Graduation Details";
+        internal const string SavesFolder = "saves";
+        internal const string PortraitsFolder = "Portraits";
+        internal const string MarriageFile = "marriage_data.json";
+        internal const string StaffMapFile = "staff_idol_map.json";
+        internal const string SnapshotsFile = "graduation_snapshots.json";
+
+        private const string GameDataFolder = "data";
+        private const string JsonExtension = ".json";
+        private const string GenericSaveFile = "save.json";
+        private const string GlobalDataFile = "global_data.json";
+        private const string UnboundScope = "<unbound>";
+
+        private static string activeVanillaSaveFilePath = "";
+        private static string activeSaveDirectory = "";
+        private static string workingPortraitSession = Guid.NewGuid().ToString("N");
 
         internal static string RootDir
         {
             get
             {
-                // Save in the game's own save directory parent folder to avoid data getting wiped by mod updates
                 return Path.Combine(Application.persistentDataPath, BaseFolder);
-            }
-        }
-
-        internal static void MigrateLegacySaveDataOnce()
-        {
-            try
-            {
-                // BaseFolder is likely "GraduationDetails"
-                string oldDirPath = Path.Combine(Application.persistentDataPath, "Mods", BaseFolder);
-                string newDirPath = Path.Combine(Application.persistentDataPath, BaseFolder);
-
-                if (Directory.Exists(oldDirPath) && !Directory.Exists(newDirPath))
-                {
-                    Directory.Move(oldDirPath, newDirPath);
-                    Debug.Log("[Graduation Details] Successfully migrated save data to the persistent directory.");
-                }
-            }
-            catch (System.Exception exception)
-            {
-                Debug.LogError("[Graduation Details] Failed to migrate legacy save data: " + exception.Message);
             }
         }
 
@@ -72,17 +69,373 @@ namespace GraduationDetails
         {
             get
             {
-                return Path.Combine(RootDir, "saves");
+                return Path.Combine(RootDir, SavesFolder);
             }
         }
 
-        internal static string GetSaveKey()
+        internal static bool HasActiveSaveScope
+        {
+            get
+            {
+                return !string.IsNullOrEmpty(activeSaveDirectory);
+            }
+        }
+
+        internal static string ActiveVanillaSaveFilePath
+        {
+            get
+            {
+                return activeVanillaSaveFilePath;
+            }
+        }
+
+        internal static string GetScopeId()
+        {
+            return HasActiveSaveScope ? activeSaveDirectory : UnboundScope;
+        }
+
+        internal static string GetSaveDir()
+        {
+            return activeSaveDirectory;
+        }
+
+        internal static string GetScopedFilePath(string fileName)
+        {
+            if (!HasActiveSaveScope || string.IsNullOrEmpty(fileName))
+            {
+                return "";
+            }
+            return Path.Combine(activeSaveDirectory, fileName);
+        }
+
+        internal static string GetScopedPortraitDir()
+        {
+            if (!HasActiveSaveScope)
+            {
+                return "";
+            }
+            return Path.Combine(activeSaveDirectory, PortraitsFolder);
+        }
+
+        internal static string GetWorkingPortraitDir()
+        {
+            return Path.Combine(
+                Path.GetTempPath(),
+                BaseFolder,
+                workingPortraitSession,
+                PortraitsFolder);
+        }
+
+        internal static void BeginFreshWorkingPortraitScope()
+        {
+            // A fresh temporary overlay prevents portraits captured before a save from leaking
+            // into a subsequently loaded game while avoiding destructive cleanup of old caches.
+            workingPortraitSession = Guid.NewGuid().ToString("N");
+        }
+
+        internal static void Bind(string vanillaSaveFilePath, string saveDirectory)
+        {
+            if (IsGlobalDataFilePath(vanillaSaveFilePath))
+            {
+                ClearBinding();
+                return;
+            }
+            activeVanillaSaveFilePath = vanillaSaveFilePath ?? "";
+            activeSaveDirectory = saveDirectory ?? "";
+        }
+
+        internal static void ClearBinding()
+        {
+            activeVanillaSaveFilePath = "";
+            activeSaveDirectory = "";
+        }
+
+        internal static string ResolveDataSaverOutputPath(string dataFileName, bool fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(dataFileName))
+            {
+                return "";
+            }
+
+            try
+            {
+                // Match DataSaver.saveData exactly. Non-full-path saves always append .json,
+                // while a rooted filename replaces the game's data directory.
+                string candidatePath = dataFileName;
+                if (!fullPath)
+                {
+                    candidatePath = Path.Combine(
+                        Application.persistentDataPath,
+                        GameDataFolder);
+                    candidatePath = Path.Combine(
+                        candidatePath,
+                        dataFileName + JsonExtension);
+                }
+                return Path.GetFullPath(candidatePath);
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        internal static string ResolveDataSaverLoadPath(string dataFileName)
+        {
+            if (string.IsNullOrWhiteSpace(dataFileName))
+            {
+                return "";
+            }
+
+            try
+            {
+                // Match DataSaver.loadData, including its duplicate-extension cleanup.
+                string candidatePath = Path.Combine(
+                    Application.persistentDataPath,
+                    GameDataFolder);
+                candidatePath = Path.Combine(
+                    candidatePath,
+                    dataFileName + JsonExtension);
+                candidatePath = candidatePath.Replace(JsonExtension + JsonExtension, JsonExtension);
+                return Path.GetFullPath(candidatePath);
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        internal static string GetQuickSaveDataFileName(bool autoSave)
+        {
+            try
+            {
+                // Match SaveManager.GetSaveFileName(bool). The false branch is used by
+                // LoadData(false); autosave selection remains delegated to vanilla's
+                // GetLatestAutosavePath so its existing directory scan only runs once.
+                string relativePath = "";
+                if (staticVars.IsStoryMode())
+                {
+                    relativePath = Path.Combine(
+                        "story_mode",
+                        staticVars.PlayerData.GetSaveFolderName());
+                }
+                return Path.Combine(
+                    relativePath,
+                    autoSave ? "auto_save" : "manual_save");
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        internal static bool TryResolveSaveDirectory(
+            string vanillaSaveFilePath,
+            out string normalizedVanillaSaveFilePath,
+            out string saveDirectory)
+        {
+            normalizedVanillaSaveFilePath = "";
+            saveDirectory = "";
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(vanillaSaveFilePath))
+                {
+                    return false;
+                }
+
+                string dataRoot = Path.GetFullPath(Path.Combine(
+                    Application.persistentDataPath,
+                    GameDataFolder)).TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar);
+                string dataRootPrefix = dataRoot + Path.DirectorySeparatorChar;
+                normalizedVanillaSaveFilePath = Path.GetFullPath(vanillaSaveFilePath);
+                if (!normalizedVanillaSaveFilePath.StartsWith(
+                    dataRootPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedVanillaSaveFilePath = "";
+                    return false;
+                }
+
+                string relativeFilePath = normalizedVanillaSaveFilePath.Substring(dataRootPrefix.Length);
+                if (string.IsNullOrEmpty(relativeFilePath))
+                {
+                    normalizedVanillaSaveFilePath = "";
+                    return false;
+                }
+                if (IsGlobalDataFilePath(relativeFilePath))
+                {
+                    // global_data.json contains process-wide settings, not a game save. It must
+                    // never acquire a Graduation Details scope even if a caller supplies it from
+                    // inside vanilla's data directory.
+                    normalizedVanillaSaveFilePath = "";
+                    return false;
+                }
+                if (!IsVanillaGameSaveRelativePath(relativeFilePath))
+                {
+                    // Only bind files emitted by vanilla's game-save writers. Other JSON in the
+                    // data directory (settings, backups, or files owned by another mod) is not a
+                    // Graduation Details save scope.
+                    normalizedVanillaSaveFilePath = "";
+                    return false;
+                }
+
+                string relativeDirectory = Path.GetDirectoryName(relativeFilePath) ?? "";
+                string fileStem = Path.GetFileNameWithoutExtension(relativeFilePath);
+                string relativeSaveDirectory = string.Equals(
+                    Path.GetFileName(relativeFilePath),
+                    GenericSaveFile,
+                    StringComparison.OrdinalIgnoreCase)
+                        ? relativeDirectory
+                        : Path.Combine(relativeDirectory, fileStem);
+                if (string.IsNullOrEmpty(relativeSaveDirectory))
+                {
+                    normalizedVanillaSaveFilePath = "";
+                    return false;
+                }
+
+                string savesRoot = Path.GetFullPath(SavesRootDir).TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+                string savesRootPrefix = savesRoot + Path.DirectorySeparatorChar;
+                saveDirectory = Path.GetFullPath(Path.Combine(savesRoot, relativeSaveDirectory));
+                if (!saveDirectory.StartsWith(savesRootPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    normalizedVanillaSaveFilePath = "";
+                    saveDirectory = "";
+                    return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                normalizedVanillaSaveFilePath = "";
+                saveDirectory = "";
+                return false;
+            }
+        }
+
+        private static bool IsGlobalDataFilePath(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                return string.Equals(
+                    Path.GetFileName(filePath),
+                    GlobalDataFile,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsVanillaGameSaveRelativePath(string relativeFilePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativeFilePath))
+            {
+                return false;
+            }
+
+            string normalizedPath = relativeFilePath.Replace(
+                Path.AltDirectorySeparatorChar,
+                Path.DirectorySeparatorChar);
+            string[] parts = normalizedPath.Split(
+                new char[] { Path.DirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length == 1)
+            {
+                return IsQuickSaveFile(parts[0]);
+            }
+
+            if (parts.Length == 3
+                && string.Equals(parts[0], "manual_saves", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(parts[1])
+                && string.Equals(parts[2], GenericSaveFile, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (parts.Length < 3
+                || !string.Equals(parts[0], "story_mode", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(parts[1]))
+            {
+                return false;
+            }
+
+            if (parts.Length == 3)
+            {
+                return IsQuickSaveFile(parts[2]);
+            }
+
+            if (parts.Length == 4
+                && IsChapterSaveFolder(parts[2])
+                && string.Equals(parts[3], GenericSaveFile, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return parts.Length == 5
+                && string.Equals(parts[2], "manual_saves", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(parts[3])
+                && string.Equals(parts[4], GenericSaveFile, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsQuickSaveFile(string fileName)
+        {
+            return string.Equals(fileName, "auto_save.json", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(fileName, "manual_save.json", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsChapterSaveFolder(string folderName)
+        {
+            const string chapterPrefix = "chapter_";
+            return !string.IsNullOrEmpty(folderName)
+                && folderName.Length == chapterPrefix.Length + 1
+                && folderName.StartsWith(chapterPrefix, StringComparison.OrdinalIgnoreCase)
+                && folderName[chapterPrefix.Length] >= '0'
+                && folderName[chapterPrefix.Length] <= '6';
+        }
+
+        internal static string GetLegacyOwnerKey(string normalizedVanillaSaveFilePath)
+        {
+            try
+            {
+                string ownerDirectory = Path.GetDirectoryName(normalizedVanillaSaveFilePath);
+                if (string.IsNullOrEmpty(ownerDirectory))
+                {
+                    return "";
+                }
+                string owner = Path.GetFileName(ownerDirectory.TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar));
+                if (string.Equals(owner, GameDataFolder, StringComparison.OrdinalIgnoreCase))
+                {
+                    owner = Path.GetFileNameWithoutExtension(normalizedVanillaSaveFilePath);
+                }
+                return owner ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        internal static string GetLegacyFolderKey()
         {
             try
             {
                 if (staticVars.PlayerData == null)
                 {
-                    return "default";
+                    return "";
                 }
 
                 string folder = staticVars.PlayerData.SaveFolderName;
@@ -90,96 +443,40 @@ namespace GraduationDetails
                 {
                     folder = staticVars.PlayerData.GetSaveFolderName();
                 }
-                if (!string.IsNullOrEmpty(folder))
+                string folderToken = SanitizeLegacyFileToken(folder);
+                return folderToken;
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        internal static string GetLegacyFallbackKey()
+        {
+            try
+            {
+                if (staticVars.PlayerData == null)
                 {
-                    string fromFolder = SanitizeFileToken(folder);
-                    if (!string.IsNullOrEmpty(fromFolder))
-                    {
-                        return fromFolder;
-                    }
+                    return "";
                 }
 
-                string fallback = string.Join("_", new string[]
+                return SanitizeLegacyFileToken(string.Join("_", new string[]
                 {
                     staticVars.PlayerData.IsStoryMode ? "story" : "freeplay",
                     staticVars.PlayerData.FirstName ?? "",
                     staticVars.PlayerData.LastName ?? "",
                     staticVars.PlayerData.GroupName ?? "",
                     staticVars.PlayerData.Chapter.ToString()
-                });
-                string token = SanitizeFileToken(fallback);
-                if (!string.IsNullOrEmpty(token))
-                {
-                    return token;
-                }
+                }));
             }
             catch
             {
-            }
-            return "default";
-        }
-
-        internal static string GetSaveDir()
-        {
-            return Path.Combine(SavesRootDir, GetSaveKey());
-        }
-
-        internal static string GetScopedFilePath(string fileName)
-        {
-            return Path.Combine(GetSaveDir(), fileName);
-        }
-
-        internal static string GetLegacyFilePath(string fileName)
-        {
-            return Path.Combine(RootDir, fileName);
-        }
-
-        internal static string GetScopedPortraitDir()
-        {
-            return Path.Combine(GetSaveDir(), "Portraits");
-        }
-
-        internal static void TryMigrateLegacyFileOnce(string fileName)
-        {
-            try
-            {
-                // We use BaseFolder to target the root of the mod's save location
-                string oldDirPath = Path.Combine(Application.persistentDataPath, "Mods", BaseFolder);
-                string newDirPath = Path.Combine(Application.persistentDataPath, BaseFolder);
-
-                // If the old Mods/GraduationDetails directory exists, move the whole thing
-                if (Directory.Exists(oldDirPath))
-                {
-                    if (!Directory.Exists(newDirPath))
-                    {
-                        Directory.Move(oldDirPath, newDirPath);
-                        Debug.Log("[Graduation Details] Successfully migrated legacy save data.");
-                    }
-                    else
-                    {
-                        // If both exist (edge case), try to safely move the specific file
-                        string scoped = GetScopedFilePath(fileName);
-                        string legacy = Path.Combine(oldDirPath, "saves", GetSaveKey(), fileName); // Adjusted for legacy path structure
-                        
-                        if (!File.Exists(scoped) && File.Exists(legacy))
-                        {
-                            string dir = Path.GetDirectoryName(scoped);
-                            if (!Directory.Exists(dir))
-                            {
-                                Directory.CreateDirectory(dir);
-                            }
-                            File.Copy(legacy, scoped, false);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning("[Graduation Details] File migration failed: " + ex.Message);
+                return "";
             }
         }
 
-        private static string SanitizeFileToken(string value)
+        internal static string SanitizeLegacyFileToken(string value)
         {
             if (string.IsNullOrEmpty(value))
             {
@@ -222,6 +519,471 @@ namespace GraduationDetails
         }
     }
 
+    internal static class GraduationDetailsLegacyMigration
+    {
+        private const string RootFlatMigrationMarker = ".root_flat_data_migrated";
+        private const string AssemblyFileName = "com.cosmo.graduationdetails.dll";
+        private const string SteamAppsFolderName = "steamapps";
+        private const string SteamCommonFolderName = "common";
+        private const string SteamWorkshopFolderName = "workshop";
+        private const string SteamWorkshopContentFolderName = "content";
+        private const string IdolManagerSteamAppId = "821880";
+        private const string LegacyGraduationDetailsWorkshopId = "3646637689";
+
+        internal static void TryMigrateForScope(string targetDirectory, string vanillaSaveFilePath)
+        {
+            if (string.IsNullOrEmpty(targetDirectory) || string.IsNullOrEmpty(vanillaSaveFilePath))
+            {
+                return;
+            }
+
+            try
+            {
+                List<string> legacyKeys = GetLegacyKeys(vanillaSaveFilePath);
+                List<string> sourceRoots = GetLegacySourceRoots();
+                bool foundScopedData = false;
+
+                // Search every historical root for the most specific agency key before trying
+                // owner-folder fallbacks. This prevents a broad chapter/slot key in one root from
+                // winning over the exact agency data in another root.
+                foreach (string legacyKey in legacyKeys)
+                {
+                    foreach (string sourceRoot in sourceRoots)
+                    {
+                        string savesSource = Path.Combine(
+                            sourceRoot,
+                            GraduationDetailsPaths.SavesFolder,
+                            legacyKey);
+                        string directSource = Path.Combine(sourceRoot, legacyKey);
+                        foundScopedData |= HasAnyDataFile(savesSource);
+                        foundScopedData |= HasAnyDataFile(directSource);
+                        TryCopyMissingData(savesSource, targetDirectory);
+                        TryCopyMissingData(directSource, targetDirectory);
+                    }
+                }
+
+                // Some historical installs split portraits into a keyed folder while leaving the
+                // JSON at the root. Portraits alone must not suppress this guarded flat fallback.
+                if (!foundScopedData && !HasAnyDataFile(targetDirectory))
+                {
+                    TryMigrateRootFlatDataOnce(sourceRoots, targetDirectory);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Legacy migration failed: " + exception.Message);
+            }
+        }
+
+        private static List<string> GetLegacyKeys(string vanillaSaveFilePath)
+        {
+            List<string> keys = new List<string>();
+            // Both forms shipped: story normally used SaveFolderName, while freeplay and some
+            // transitional saves used the identity fallback even when a folder name existed.
+            AddUnique(keys, GraduationDetailsPaths.GetLegacyFolderKey());
+            AddUnique(keys, GraduationDetailsPaths.GetLegacyFallbackKey());
+
+            string ownerKey = GraduationDetailsPaths.GetLegacyOwnerKey(vanillaSaveFilePath);
+            AddUnique(keys, ownerKey);
+            AddUnique(keys, GraduationDetailsPaths.SanitizeLegacyFileToken(ownerKey));
+            return keys;
+        }
+
+        private static List<string> GetLegacySourceRoots()
+        {
+            List<string> roots = new List<string>();
+            AddUnique(roots, GraduationDetailsPaths.RootDir);
+            AddUnique(roots, Path.Combine(
+                Application.persistentDataPath,
+                "Mods",
+                GraduationDetailsPaths.BaseFolder));
+            AddUnique(roots, Path.Combine(
+                Application.persistentDataPath,
+                "Mods",
+                GraduationDetailsPaths.DisplayFolder));
+
+            try
+            {
+                AddUnique(roots, Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                // A locally deployed DLL may not be represented by the old subscribed Workshop
+                // item in Mods._Mods. Derive its known installation from the active Steam library.
+                DirectoryInfo dataDirectory = new DirectoryInfo(Application.dataPath);
+                DirectoryInfo gameDirectory = dataDirectory.Parent;
+                DirectoryInfo commonDirectory = gameDirectory != null ? gameDirectory.Parent : null;
+                DirectoryInfo steamAppsDirectory = commonDirectory != null ? commonDirectory.Parent : null;
+                if (commonDirectory != null
+                    && steamAppsDirectory != null
+                    && string.Equals(commonDirectory.Name, SteamCommonFolderName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(steamAppsDirectory.Name, SteamAppsFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    AddUnique(roots, Path.Combine(
+                        steamAppsDirectory.FullName,
+                        SteamWorkshopFolderName,
+                        SteamWorkshopContentFolderName,
+                        IdolManagerSteamAppId,
+                        LegacyGraduationDetailsWorkshopId));
+                }
+            }
+            catch
+            {
+                // Steam paths are optional on non-Steam builds and alternate deployments.
+            }
+
+            try
+            {
+                if (Mods._Mods != null)
+                {
+                    foreach (Mods._mod mod in Mods._Mods)
+                    {
+                        if (mod == null || string.IsNullOrEmpty(mod.Path))
+                        {
+                            continue;
+                        }
+                        bool matchingTitle = string.Equals(
+                            mod.Title,
+                            GraduationDetailsPaths.DisplayFolder,
+                            StringComparison.OrdinalIgnoreCase);
+                        bool matchingFolder = string.Equals(
+                            mod.ModName,
+                            GraduationDetailsPaths.BaseFolder,
+                            StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(
+                                mod.ModName,
+                                GraduationDetailsPaths.DisplayFolder,
+                                StringComparison.OrdinalIgnoreCase);
+                        bool matchingAssembly = File.Exists(Path.Combine(mod.Path, AssemblyFileName));
+                        if (matchingTitle || matchingFolder || matchingAssembly)
+                        {
+                            AddUnique(roots, mod.Path);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Installed-mod discovery is best effort; explicit roots above remain available.
+            }
+
+            return roots;
+        }
+
+        private static void TryMigrateRootFlatDataOnce(
+            List<string> sourceRoots,
+            string targetDirectory)
+        {
+            string markerPath = Path.Combine(
+                GraduationDetailsPaths.RootDir,
+                RootFlatMigrationMarker);
+            if (File.Exists(markerPath))
+            {
+                return;
+            }
+
+            bool importedRootData = false;
+            foreach (string sourceRoot in sourceRoots)
+            {
+                bool sourceHasData = HasAnyDataFile(sourceRoot);
+                TryCopyMissingData(sourceRoot, targetDirectory);
+                importedRootData |= sourceHasData && HasAnyDataFile(targetDirectory);
+            }
+
+            // Portrait-only roots are useful to merge, but are not evidence that the ambiguous
+            // flat JSON fallback was consumed. Mark only after importing at least one data file.
+            if (importedRootData)
+            {
+                Directory.CreateDirectory(GraduationDetailsPaths.RootDir);
+                File.WriteAllText(markerPath, targetDirectory);
+                Debug.Log("[Graduation Details] Imported root-level legacy data into " + targetDirectory);
+            }
+        }
+
+        private static bool TryCopyMissingData(string sourceDirectory, string targetDirectory)
+        {
+            if (string.IsNullOrEmpty(sourceDirectory)
+                || string.IsNullOrEmpty(targetDirectory)
+                || !Directory.Exists(sourceDirectory)
+                || PathsReferToSameDirectory(sourceDirectory, targetDirectory))
+            {
+                return false;
+            }
+
+            bool copied = false;
+            copied |= CopyFileIfMissing(
+                Path.Combine(sourceDirectory, GraduationDetailsPaths.MarriageFile),
+                Path.Combine(targetDirectory, GraduationDetailsPaths.MarriageFile));
+            copied |= CopyFileIfMissing(
+                Path.Combine(sourceDirectory, GraduationDetailsPaths.StaffMapFile),
+                Path.Combine(targetDirectory, GraduationDetailsPaths.StaffMapFile));
+            copied |= CopyFileIfMissing(
+                Path.Combine(sourceDirectory, GraduationDetailsPaths.SnapshotsFile),
+                Path.Combine(targetDirectory, GraduationDetailsPaths.SnapshotsFile));
+
+            string sourcePortraits = Path.Combine(
+                sourceDirectory,
+                GraduationDetailsPaths.PortraitsFolder);
+            string targetPortraits = Path.Combine(
+                targetDirectory,
+                GraduationDetailsPaths.PortraitsFolder);
+            copied |= CopyDirectoryFilesIfMissing(sourcePortraits, targetPortraits);
+
+            if (copied)
+            {
+                Debug.Log("[Graduation Details] Copied legacy save data from " + sourceDirectory);
+            }
+            return copied;
+        }
+
+        private static bool CopyFileIfMissing(string sourceFile, string targetFile)
+        {
+            if (!File.Exists(sourceFile) || File.Exists(targetFile))
+            {
+                return false;
+            }
+
+            string targetParent = Path.GetDirectoryName(targetFile);
+            if (!string.IsNullOrEmpty(targetParent) && !Directory.Exists(targetParent))
+            {
+                Directory.CreateDirectory(targetParent);
+            }
+            File.Copy(sourceFile, targetFile, false);
+            return true;
+        }
+
+        private static bool CopyDirectoryFilesIfMissing(string sourceDirectory, string targetDirectory)
+        {
+            if (!Directory.Exists(sourceDirectory))
+            {
+                return false;
+            }
+
+            bool copied = false;
+            foreach (string sourceFile in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+            {
+                string relativePath = sourceFile.Substring(
+                    sourceDirectory.TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar).Length)
+                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                copied |= CopyFileIfMissing(sourceFile, Path.Combine(targetDirectory, relativePath));
+            }
+            return copied;
+        }
+
+        private static bool HasAnyDataFile(string directory)
+        {
+            return File.Exists(Path.Combine(directory, GraduationDetailsPaths.MarriageFile))
+                || File.Exists(Path.Combine(directory, GraduationDetailsPaths.StaffMapFile))
+                || File.Exists(Path.Combine(directory, GraduationDetailsPaths.SnapshotsFile));
+        }
+
+        private static bool PathsReferToSameDirectory(string firstPath, string secondPath)
+        {
+            try
+            {
+                string first = Path.GetFullPath(firstPath).TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+                string second = Path.GetFullPath(secondPath).TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+                return string.Equals(first, second, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static void AddUnique(List<string> values, string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return;
+            }
+            foreach (string existing in values)
+            {
+                if (string.Equals(existing, value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+            values.Add(value);
+        }
+    }
+
+    internal static class GraduationDetailsPersistence
+    {
+        private static bool loadInProgress;
+        private static bool loadPathCaptured;
+        private static bool awaitingLatestAutosavePath;
+        private static string stagedVanillaSaveFilePath = "";
+        private static string stagedSaveDirectory = "";
+
+        internal static bool LoadInProgress
+        {
+            get
+            {
+                return loadInProgress;
+            }
+        }
+
+        internal static void BeginLoad(bool expectLatestAutosavePath = false)
+        {
+            loadInProgress = true;
+            loadPathCaptured = false;
+            awaitingLatestAutosavePath = expectLatestAutosavePath;
+            stagedVanillaSaveFilePath = "";
+            stagedSaveDirectory = "";
+        }
+
+        internal static void CaptureLoadPath(string vanillaSaveFilePath, bool replaceCapturedPath = false)
+        {
+            if (!loadInProgress || (loadPathCaptured && !replaceCapturedPath))
+            {
+                return;
+            }
+            loadPathCaptured = true;
+            stagedVanillaSaveFilePath = "";
+            stagedSaveDirectory = "";
+
+            string normalizedPath;
+            string saveDirectory;
+            if (GraduationDetailsPaths.TryResolveSaveDirectory(
+                vanillaSaveFilePath,
+                out normalizedPath,
+                out saveDirectory))
+            {
+                stagedVanillaSaveFilePath = normalizedPath;
+                stagedSaveDirectory = saveDirectory;
+            }
+        }
+
+        internal static void CaptureLatestAutosavePath(string vanillaSaveFilePath)
+        {
+            if (!loadInProgress || !awaitingLatestAutosavePath)
+            {
+                return;
+            }
+            // Other save mods may resolve the selector in their own LoadData prefix. Keep the
+            // override armed so vanilla's later selector result remains authoritative.
+            CaptureLoadPath(vanillaSaveFilePath, true);
+        }
+
+        internal static void CompleteLoad(bool loadSucceeded)
+        {
+            bool capturedPath = loadPathCaptured;
+            string vanillaSaveFilePath = stagedVanillaSaveFilePath;
+            string saveDirectory = stagedSaveDirectory;
+            loadInProgress = false;
+            loadPathCaptured = false;
+            awaitingLatestAutosavePath = false;
+            stagedVanillaSaveFilePath = "";
+            stagedSaveDirectory = "";
+
+            if (!loadSucceeded || !capturedPath)
+            {
+                // The active scope and cached records were never changed while the load was
+                // staged, so cancelling naturally restores the pre-load Graduation Details state.
+                return;
+            }
+
+            GraduationDetailsPaths.BeginFreshWorkingPortraitScope();
+            if (!string.IsNullOrEmpty(saveDirectory))
+            {
+                GraduationDetailsLegacyMigration.TryMigrateForScope(
+                    saveDirectory,
+                    vanillaSaveFilePath);
+                GraduationDetailsPaths.Bind(vanillaSaveFilePath, saveDirectory);
+            }
+            else
+            {
+                // A successful load outside the canonical game data directory must not inherit
+                // records from the previously loaded save.
+                GraduationDetailsPaths.ClearBinding();
+            }
+
+            MarriageRecordStore.ResetForScopeChange();
+            StaffIdolStore.ResetForScopeChange();
+            GraduationSnapshotStore.ResetForScopeChange();
+
+            // The normal LoadFunction postfixes are suppressed while SaveManager dispatches its
+            // LoadEvent. Run their backfills only after the exact mod scope has been loaded.
+            GraduationSnapshotStore.Backfill(data_girls.girl);
+            StaffIdolStore.BackfillFromStaff();
+        }
+
+        internal static void CancelLoad()
+        {
+            loadInProgress = false;
+            loadPathCaptured = false;
+            awaitingLatestAutosavePath = false;
+            stagedVanillaSaveFilePath = "";
+            stagedSaveDirectory = "";
+        }
+
+        internal static void ResetForNewGame()
+        {
+            CancelLoad();
+            GraduationDetailsPaths.ClearBinding();
+            GraduationDetailsPaths.BeginFreshWorkingPortraitScope();
+            MarriageRecordStore.ResetForScopeChange();
+            StaffIdolStore.ResetForScopeChange();
+            GraduationSnapshotStore.ResetForScopeChange();
+        }
+
+        internal static void OnVanillaSaveScheduled(string dataFileName, bool fullPath)
+        {
+            if (loadInProgress)
+            {
+                return;
+            }
+
+            string outputPath = GraduationDetailsPaths.ResolveDataSaverOutputPath(
+                dataFileName,
+                fullPath);
+            string normalizedPath;
+            string saveDirectory;
+            if (!GraduationDetailsPaths.TryResolveSaveDirectory(
+                outputPath,
+                out normalizedPath,
+                out saveDirectory))
+            {
+                Debug.LogWarning("[Graduation Details] Ignored non-canonical save path: " + outputPath);
+                return;
+            }
+
+            try
+            {
+                // Save As must serialize the live dictionaries even when they are empty. This
+                // deliberately overwrites stale JSON left behind when vanilla reuses a deleted slot.
+                MarriageRecordStore.EnsureReady();
+                StaffIdolStore.EnsureReady();
+                GraduationSnapshotStore.EnsureReady();
+                MarriageRecordStore.SaveToDirectory(saveDirectory);
+                StaffIdolStore.SaveToDirectory(saveDirectory);
+                GraduationSnapshotStore.SaveToDirectory(saveDirectory);
+
+                // Rebinding after the snapshot preserves the live cached state instead of clearing
+                // it and loading an older destination when the player uses Save As.
+                GraduationDetailsPaths.Bind(normalizedPath, saveDirectory);
+                MarriageRecordStore.RebindLoadedScope();
+                StaffIdolStore.RebindLoadedScope();
+                GraduationSnapshotStore.RebindLoadedScope();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Failed to snapshot save data: " + exception.Message);
+            }
+        }
+    }
+
     internal static class MarriageRecordStore
     {
         private static readonly Dictionary<int, MarriageRecord> Records = new Dictionary<int, MarriageRecord>();
@@ -232,7 +994,8 @@ namespace GraduationDetails
         {
             get
             {
-                return GraduationDetailsPaths.GetScopedFilePath("marriage_data.json");
+                return GraduationDetailsPaths.GetScopedFilePath(
+                    GraduationDetailsPaths.MarriageFile);
             }
         }
 
@@ -258,9 +1021,43 @@ namespace GraduationDetails
             Save();
         }
 
+        internal static void EnsureReady()
+        {
+            EnsureLoaded();
+        }
+
+        internal static void ResetForScopeChange()
+        {
+            loaded = false;
+            loadedScope = "";
+            Records.Clear();
+        }
+
+        internal static void RebindLoadedScope()
+        {
+            loaded = true;
+            loadedScope = GraduationDetailsPaths.GetScopeId();
+        }
+
+        internal static void SaveToDirectory(string directory)
+        {
+            if (string.IsNullOrEmpty(directory))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(directory);
+            MarriageRecordList list = new MarriageRecordList();
+            list.Records = Records.Values.ToList();
+            string json = JsonUtility.ToJson(list, true);
+            File.WriteAllText(
+                Path.Combine(directory, GraduationDetailsPaths.MarriageFile),
+                json);
+        }
+
         private static void EnsureLoaded()
         {
-            string scope = GraduationDetailsPaths.GetSaveKey();
+            string scope = GraduationDetailsPaths.GetScopeId();
             if (loaded && loadedScope == scope)
             {
                 return;
@@ -270,8 +1067,7 @@ namespace GraduationDetails
             Records.Clear();
             try
             {
-                GraduationDetailsPaths.TryMigrateLegacyFileOnce("marriage_data.json");
-                if (!File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
                 {
                     return;
                 }
@@ -304,22 +1100,8 @@ namespace GraduationDetails
 
         private static void Save()
         {
-            try
-            {
-                string dir = Path.GetDirectoryName(DataPath);
-                if (!Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                MarriageRecordList list = new MarriageRecordList();
-                list.Records = Records.Values.ToList();
-                string json = JsonUtility.ToJson(list, true);
-                File.WriteAllText(DataPath, json);
-            }
-            catch
-            {
-                // Ignore persistence errors to avoid breaking the game loop.
-            }
+            // Keep changes in memory until vanilla schedules a matching game-save write.
+            // The DataSaver patch snapshots every store together into that exact save scope.
         }
     }
 
@@ -545,7 +1327,8 @@ namespace GraduationDetails
         {
             get
             {
-                return GraduationDetailsPaths.GetScopedFilePath("staff_idol_map.json");
+                return GraduationDetailsPaths.GetScopedFilePath(
+                    GraduationDetailsPaths.StaffMapFile);
             }
         }
 
@@ -692,6 +1475,46 @@ namespace GraduationDetails
                 }
             }
             Save();
+        }
+
+        internal static void EnsureReady()
+        {
+            EnsureLoaded();
+        }
+
+        internal static void ResetForScopeChange()
+        {
+            loaded = false;
+            loadedScope = "";
+            StaffToGirl.Clear();
+        }
+
+        internal static void RebindLoadedScope()
+        {
+            loaded = true;
+            loadedScope = GraduationDetailsPaths.GetScopeId();
+        }
+
+        internal static void SaveToDirectory(string directory)
+        {
+            if (string.IsNullOrEmpty(directory))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(directory);
+            StaffIdolRecordList list = new StaffIdolRecordList();
+            foreach (KeyValuePair<int, StaffIdolRecord> entry in StaffToGirl)
+            {
+                if (entry.Value != null)
+                {
+                    list.Records.Add(entry.Value);
+                }
+            }
+            string json = JsonUtility.ToJson(list, true);
+            File.WriteAllText(
+                Path.Combine(directory, GraduationDetailsPaths.StaffMapFile),
+                json);
         }
 
         private static int TryResolveGirlId(staff._staff staffer)
@@ -864,7 +1687,7 @@ namespace GraduationDetails
 
         private static void EnsureLoaded()
         {
-            string scope = GraduationDetailsPaths.GetSaveKey();
+            string scope = GraduationDetailsPaths.GetScopeId();
             if (loaded && loadedScope == scope)
             {
                 return;
@@ -874,8 +1697,7 @@ namespace GraduationDetails
             StaffToGirl.Clear();
             try
             {
-                GraduationDetailsPaths.TryMigrateLegacyFileOnce("staff_idol_map.json");
-                if (!File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
                 {
                     return;
                 }
@@ -908,28 +1730,7 @@ namespace GraduationDetails
 
         private static void Save()
         {
-            try
-            {
-                string dir = Path.GetDirectoryName(DataPath);
-                if (!Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                StaffIdolRecordList list = new StaffIdolRecordList();
-                foreach (KeyValuePair<int, StaffIdolRecord> entry in StaffToGirl)
-                {
-                    if (entry.Value != null)
-                    {
-                        list.Records.Add(entry.Value);
-                    }
-                }
-                string json = JsonUtility.ToJson(list, true);
-                File.WriteAllText(DataPath, json);
-            }
-            catch
-            {
-                // Ignore persistence errors to avoid breaking the game loop.
-            }
+            // Mutations stay in memory until the matching vanilla save is scheduled.
         }
     }
 
@@ -1025,6 +1826,8 @@ namespace GraduationDetails
     internal static class GraduationSnapshotStore
     {
         private static readonly Dictionary<int, GraduationSnapshot> Records = new Dictionary<int, GraduationSnapshot>();
+        private static readonly Dictionary<string, HashSet<string>> PendingPortraitTargets =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         private static bool loaded;
         private static string loadedScope = "";
 
@@ -1032,7 +1835,8 @@ namespace GraduationDetails
         {
             get
             {
-                return GraduationDetailsPaths.GetScopedFilePath("graduation_snapshots.json");
+                return GraduationDetailsPaths.GetScopedFilePath(
+                    GraduationDetailsPaths.SnapshotsFile);
             }
         }
 
@@ -1041,6 +1845,14 @@ namespace GraduationDetails
             get
             {
                 return GraduationDetailsPaths.GetScopedPortraitDir();
+            }
+        }
+
+        private static string WorkingPortraitDir
+        {
+            get
+            {
+                return GraduationDetailsPaths.GetWorkingPortraitDir();
             }
         }
 
@@ -1123,8 +1935,22 @@ namespace GraduationDetails
                 {
                     continue;
                 }
-                if (GetSnapshot(girl.id) != null)
+                GraduationSnapshot existing = GetSnapshot(girl.id);
+                if (existing != null)
                 {
+                    // Older saves may contain the snapshot JSON but have missed an asynchronous
+                    // portrait capture. Complete that already-persisted snapshot in its fixed
+                    // scope when the recreated temporary portrait becomes available.
+                    if (string.IsNullOrEmpty(existing.PortraitFile))
+                    {
+                        Capture(girl);
+                        existing = GetSnapshot(girl.id);
+                    }
+                    else
+                    {
+                        TryCapturePortrait(girl, existing);
+                    }
+                    RegisterScopedPortraitRepair(existing);
                     continue;
                 }
                 Capture(girl);
@@ -1137,12 +1963,21 @@ namespace GraduationDetails
             {
                 return "";
             }
-            string scopedPath = Path.Combine(PortraitDir, snapshot.PortraitFile);
-            if (File.Exists(scopedPath))
+            string workingPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
+            if (File.Exists(workingPath))
             {
-                return scopedPath;
+                return workingPath;
             }
-            return scopedPath;
+
+            if (!string.IsNullOrEmpty(PortraitDir))
+            {
+                string scopedPath = Path.Combine(PortraitDir, snapshot.PortraitFile);
+                if (File.Exists(scopedPath))
+                {
+                    return scopedPath;
+                }
+            }
+            return workingPath;
         }
 
         internal static long GetTotalFans(GraduationSnapshot snapshot)
@@ -1616,9 +2451,69 @@ namespace GraduationDetails
             Save();
         }
 
+        internal static void EnsureReady()
+        {
+            EnsureLoaded();
+        }
+
+        internal static void ResetForScopeChange()
+        {
+            loaded = false;
+            loadedScope = "";
+            Records.Clear();
+        }
+
+        internal static void RebindLoadedScope()
+        {
+            loaded = true;
+            loadedScope = GraduationDetailsPaths.GetScopeId();
+        }
+
+        internal static void SaveToDirectory(string directory)
+        {
+            if (string.IsNullOrEmpty(directory))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(directory);
+            GraduationSnapshotList list = new GraduationSnapshotList();
+            list.Records = Records.Values.ToList();
+            string json = JsonUtility.ToJson(list, true);
+            File.WriteAllText(
+                Path.Combine(directory, GraduationDetailsPaths.SnapshotsFile),
+                json);
+
+            string targetPortraitDirectory = Path.Combine(
+                directory,
+                GraduationDetailsPaths.PortraitsFolder);
+            foreach (GraduationSnapshot snapshot in Records.Values)
+            {
+                if (snapshot == null || string.IsNullOrEmpty(snapshot.PortraitFile))
+                {
+                    continue;
+                }
+
+                string sourcePath = GetPortraitPath(snapshot);
+                string targetPath = Path.Combine(targetPortraitDirectory, snapshot.PortraitFile);
+                if (!File.Exists(sourcePath))
+                {
+                    // Portrait generation is asynchronous. Bind this already-written snapshot to
+                    // its exact save target so the late result cannot follow a later active scope.
+                    RegisterPendingPortraitTarget(sourcePath, targetPath);
+                    continue;
+                }
+                if (PathsReferToSameFile(sourcePath, targetPath))
+                {
+                    continue;
+                }
+                CopyPortrait(sourcePath, targetPath);
+            }
+        }
+
         private static void EnsureLoaded()
         {
-            string scope = GraduationDetailsPaths.GetSaveKey();
+            string scope = GraduationDetailsPaths.GetScopeId();
             if (loaded && loadedScope == scope)
             {
                 return;
@@ -1628,8 +2523,7 @@ namespace GraduationDetails
             Records.Clear();
             try
             {
-                GraduationDetailsPaths.TryMigrateLegacyFileOnce("graduation_snapshots.json");
-                if (!File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
                 {
                     return;
                 }
@@ -1662,39 +2556,25 @@ namespace GraduationDetails
 
         private static void Save()
         {
-            try
-            {
-                string dir = Path.GetDirectoryName(DataPath);
-                if (!Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                GraduationSnapshotList list = new GraduationSnapshotList();
-                list.Records = Records.Values.ToList();
-                string json = JsonUtility.ToJson(list, true);
-                File.WriteAllText(DataPath, json);
-            }
-            catch
-            {
-                // Ignore persistence errors to avoid breaking the game loop.
-            }
+            // Mutations stay in memory until the matching vanilla save is scheduled.
         }
 
         private static void TryCapturePortrait(data_girls.girls girl, GraduationSnapshot snapshot)
         {
-            string destPath = GetPortraitPath(snapshot);
-            if (string.IsNullOrEmpty(destPath))
+            string existingPath = GetPortraitPath(snapshot);
+            if (!string.IsNullOrEmpty(existingPath) && File.Exists(existingPath))
             {
                 return;
             }
-            if (File.Exists(destPath))
+            if (snapshot == null || string.IsNullOrEmpty(snapshot.PortraitFile))
             {
                 return;
             }
+            string destPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
             string sourcePath = GetSourcePortraitPath(girl);
             if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
             {
-                CopyPortrait(sourcePath, destPath);
+                CopyWorkingPortraitAndPendingTargets(sourcePath, destPath);
                 return;
             }
             mainScript main = Camera.main != null ? Camera.main.GetComponent<mainScript>() : null;
@@ -1729,14 +2609,86 @@ namespace GraduationDetails
                 string sourcePath = GetSourcePortraitPath(girl);
                 if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
                 {
-                    CopyPortrait(sourcePath, destPath);
+                    CopyWorkingPortraitAndPendingTargets(sourcePath, destPath);
                     yield break;
                 }
                 yield return null;
             }
         }
 
-        private static void CopyPortrait(string sourcePath, string destPath)
+        private static void RegisterPendingPortraitTarget(string sourcePath, string targetPath)
+        {
+            if (string.IsNullOrEmpty(sourcePath)
+                || string.IsNullOrEmpty(targetPath)
+                || PathsReferToSameFile(sourcePath, targetPath))
+            {
+                return;
+            }
+
+            HashSet<string> targets;
+            if (!PendingPortraitTargets.TryGetValue(sourcePath, out targets))
+            {
+                targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                PendingPortraitTargets[sourcePath] = targets;
+            }
+            targets.Add(targetPath);
+        }
+
+        private static void RegisterScopedPortraitRepair(GraduationSnapshot snapshot)
+        {
+            if (snapshot == null
+                || string.IsNullOrEmpty(snapshot.PortraitFile)
+                || string.IsNullOrEmpty(PortraitDir))
+            {
+                return;
+            }
+
+            string workingPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
+            string scopedPath = Path.Combine(PortraitDir, snapshot.PortraitFile);
+            if (File.Exists(scopedPath))
+            {
+                return;
+            }
+            if (File.Exists(workingPath))
+            {
+                CopyPortrait(workingPath, scopedPath);
+                return;
+            }
+            RegisterPendingPortraitTarget(workingPath, scopedPath);
+        }
+
+        private static void CopyWorkingPortraitAndPendingTargets(
+            string sourcePath,
+            string workingPath)
+        {
+            if (!CopyPortrait(sourcePath, workingPath))
+            {
+                return;
+            }
+
+            HashSet<string> targets;
+            if (!PendingPortraitTargets.TryGetValue(workingPath, out targets))
+            {
+                return;
+            }
+
+            HashSet<string> failedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string targetPath in targets)
+            {
+                if (!CopyPortrait(workingPath, targetPath))
+                {
+                    failedTargets.Add(targetPath);
+                }
+            }
+
+            PendingPortraitTargets.Remove(workingPath);
+            if (failedTargets.Count > 0)
+            {
+                PendingPortraitTargets[workingPath] = failedTargets;
+            }
+        }
+
+        private static bool CopyPortrait(string sourcePath, string destPath)
         {
             try
             {
@@ -1746,10 +2698,27 @@ namespace GraduationDetails
                     Directory.CreateDirectory(dir);
                 }
                 File.Copy(sourcePath, destPath, true);
+                return true;
             }
             catch
             {
                 // Ignore file copy errors to avoid breaking the game loop.
+                return false;
+            }
+        }
+
+        private static bool PathsReferToSameFile(string firstPath, string secondPath)
+        {
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(firstPath),
+                    Path.GetFullPath(secondPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(firstPath, secondPath, StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -3114,6 +4083,306 @@ namespace GraduationDetails
         }
     }
 
+    /// <summary>
+    /// Injects save-scope capture into vanilla's non-generic SavedData writer call sites.
+    /// Patching a constructed DataSaver generic is unsafe on Mono because reference-type
+    /// instantiations share native code with GlobalData.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class VanillaSavedDataWrite_GraduationDetails_Patch
+    {
+        private const string DataSaverSaveMethodName = "saveData";
+
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return RequireMethod(
+                typeof(SaveManager),
+                nameof(SaveManager.SaveData),
+                new Type[] { typeof(bool), typeof(bool) });
+            yield return RequireMethod(
+                typeof(SaveManager),
+                nameof(SaveManager.SaveChapter),
+                new Type[] { typeof(tasks._chapter) });
+            yield return RequireMethod(
+                typeof(Popup_Save),
+                "Save",
+                Type.EmptyTypes);
+            yield return RequireMethod(
+                typeof(Popup_Load_Story),
+                "Do_Overwrite_Save",
+                new Type[] { typeof(Popup_Load_Story.save_info) });
+            yield return RequireMethod(
+                typeof(Popup_Load_Story),
+                nameof(Popup_Load_Story.Do_New_Save),
+                new Type[] { typeof(string) });
+        }
+
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions,
+            ILGenerator generator,
+            MethodBase __originalMethod)
+        {
+            List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
+            LocalBuilder dataToSaveLocal = generator.DeclareLocal(
+                typeof(SaveManager.SavedData));
+            LocalBuilder dataFileNameLocal = generator.DeclareLocal(typeof(string));
+            LocalBuilder isJsonLocal = generator.DeclareLocal(typeof(bool));
+            LocalBuilder fullPathLocal = generator.DeclareLocal(typeof(bool));
+            MethodInfo captureMethod = AccessTools.Method(
+                typeof(GraduationDetailsPersistence),
+                nameof(GraduationDetailsPersistence.OnVanillaSaveScheduled),
+                new Type[] { typeof(string), typeof(bool) });
+            int injectedWriteCount = 0;
+
+            foreach (CodeInstruction instruction in codes)
+            {
+                if (!IsSavedDataWrite(instruction))
+                {
+                    yield return instruction;
+                    continue;
+                }
+
+                // Preserve the exact four vanilla arguments, schedule the game save unchanged,
+                // and snapshot/rebind this mod only after DataSaver returns successfully.
+                CodeInstruction firstInjectedInstruction =
+                    new CodeInstruction(OpCodes.Stloc, fullPathLocal);
+                firstInjectedInstruction.labels.AddRange(instruction.labels);
+                firstInjectedInstruction.blocks.AddRange(instruction.blocks);
+                instruction.labels.Clear();
+                instruction.blocks.Clear();
+
+                yield return firstInjectedInstruction;
+                yield return new CodeInstruction(OpCodes.Stloc, isJsonLocal);
+                yield return new CodeInstruction(OpCodes.Stloc, dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Stloc, dataToSaveLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
+                yield return instruction;
+                yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
+                yield return new CodeInstruction(OpCodes.Call, captureMethod);
+                injectedWriteCount++;
+            }
+
+            if (injectedWriteCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "Expected exactly one SavedData write in " +
+                    (__originalMethod == null
+                        ? "an unknown vanilla save caller."
+                        : __originalMethod.DeclaringType.FullName +
+                          "." +
+                          __originalMethod.Name +
+                          "."));
+            }
+        }
+
+        private static bool IsSavedDataWrite(CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction.operand as MethodInfo;
+            if (calledMethod == null
+                || calledMethod.DeclaringType != typeof(DataSaver)
+                || !string.Equals(
+                    calledMethod.Name,
+                    DataSaverSaveMethodName,
+                    StringComparison.Ordinal)
+                || !calledMethod.IsGenericMethod)
+            {
+                return false;
+            }
+
+            Type[] genericArguments = calledMethod.GetGenericArguments();
+            return genericArguments.Length == 1
+                && genericArguments[0] == typeof(SaveManager.SavedData);
+        }
+
+        private static MethodBase RequireMethod(
+            Type declaringType,
+            string methodName,
+            Type[] parameterTypes)
+        {
+            MethodInfo method = AccessTools.Method(
+                declaringType,
+                methodName,
+                parameterTypes);
+            if (method == null)
+            {
+                throw new MissingMethodException(declaringType.FullName, methodName);
+            }
+            return method;
+        }
+    }
+
+    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.GetLatestAutosavePath))]
+    internal static class SaveManager_GetLatestAutosavePath_GraduationDetails_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(string __result)
+        {
+            if (!GraduationDetailsPersistence.LoadInProgress)
+            {
+                return;
+            }
+
+            // GetLatestAutosavePath deserializes every candidate before returning the path that
+            // LoadData(bool) actually selects. Its result is authoritative over those previews.
+            GraduationDetailsPersistence.CaptureLatestAutosavePath(
+                GraduationDetailsPaths.ResolveDataSaverLoadPath(__result));
+        }
+    }
+
+    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.LoadData), new Type[] { typeof(string) })]
+    internal static class SaveManager_LoadDataPath_GraduationDetails_Patch
+    {
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(string path)
+        {
+            GraduationDetailsPersistence.BeginLoad();
+            GraduationDetailsPersistence.CaptureLoadPath(
+                GraduationDetailsPaths.ResolveDataSaverLoadPath(path));
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(SaveManager __instance)
+        {
+            GraduationDetailsPersistence.CompleteLoad(
+                __instance != null && __instance.Data != null);
+        }
+
+        [HarmonyFinalizer]
+        private static void Finalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                GraduationDetailsPersistence.CancelLoad();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.LoadData), new Type[] { typeof(bool) })]
+    internal static class SaveManager_LoadDataFlag_GraduationDetails_Patch
+    {
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(bool autoSave)
+        {
+            GraduationDetailsPersistence.BeginLoad(autoSave);
+            if (!autoSave)
+            {
+                GraduationDetailsPersistence.CaptureLoadPath(
+                    GraduationDetailsPaths.ResolveDataSaverLoadPath(
+                        GraduationDetailsPaths.GetQuickSaveDataFileName(false)));
+            }
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(SaveManager __instance)
+        {
+            GraduationDetailsPersistence.CompleteLoad(
+                __instance != null && __instance.Data != null);
+        }
+
+        [HarmonyFinalizer]
+        private static void Finalizer(Exception __exception)
+        {
+            if (__exception != null)
+            {
+                GraduationDetailsPersistence.CancelLoad();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Vanilla creates a relationship before resolving its saved girl IDs, then removes the
+    /// relationship in CheckForCopies when either idol no longer exists. Some Recalc postfixes
+    /// assume both resolved entries are non-null and throw before vanilla reaches that cleanup.
+    /// Guard only the Recalc call inside the relationship-load overload; valid relationships
+    /// still execute vanilla Recalc and every patch attached to it.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class Relationships_LoadDataRelationships_GraduationDetails_Patch
+    {
+        private const string LoadDataMethodName = "LoadData";
+
+        private static MethodBase TargetMethod()
+        {
+            MethodInfo method = AccessTools.Method(
+                typeof(Relationships),
+                LoadDataMethodName,
+                new Type[] { typeof(List<Relationships.SaveData_Rel>) });
+            if (method == null)
+            {
+                throw new MissingMethodException(
+                    typeof(Relationships).FullName,
+                    LoadDataMethodName);
+            }
+            return method;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions)
+        {
+            List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
+            MethodInfo recalcMethod = AccessTools.Method(
+                typeof(Relationships._relationship),
+                nameof(Relationships._relationship.Recalc),
+                new Type[] { typeof(bool) });
+            MethodInfo guardedRecalcMethod = AccessTools.Method(
+                typeof(Relationships_LoadDataRelationships_GraduationDetails_Patch),
+                nameof(RecalcIfRelationshipMembersResolve),
+                new Type[] { typeof(Relationships._relationship), typeof(bool) });
+
+            int replacementCount = 0;
+            foreach (CodeInstruction instruction in codes)
+            {
+                if (Equals(instruction.operand, recalcMethod))
+                {
+                    // Mutate the original instruction so all labels and exception blocks stay
+                    // attached to the same point in the method body.
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = guardedRecalcMethod;
+                    replacementCount++;
+                }
+            }
+
+            if (replacementCount != 1)
+            {
+                throw new InvalidProgramException(
+                    "Expected exactly one relationship Recalc call in Relationships.LoadData, found "
+                    + replacementCount);
+            }
+            return codes;
+        }
+
+        private static void RecalcIfRelationshipMembersResolve(
+            Relationships._relationship relationship,
+            bool updateStatus)
+        {
+            if (relationship == null ||
+                relationship.Girls == null ||
+                relationship.Girls.Count < 2 ||
+                relationship.Girls[0] == null ||
+                relationship.Girls[1] == null)
+            {
+                return;
+            }
+
+            relationship.Recalc(updateStatus);
+        }
+    }
+
+    [HarmonyPatch(typeof(MainMenu_LoadGameManager), nameof(MainMenu_LoadGameManager.StartNewGame))]
+    internal static class MainMenu_LoadGameManager_StartNewGame_GraduationDetails_Patch
+    {
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix()
+        {
+            GraduationDetailsPersistence.ResetForNewGame();
+        }
+    }
+
     [HarmonyPatch(typeof(Dating), nameof(Dating.Marriage_Girl_Quits))]
     internal static class Dating_Marriage_Girl_Quits_Patch
     {
@@ -3214,6 +4483,10 @@ namespace GraduationDetails
     {
         private static void Postfix()
         {
+            if (GraduationDetailsPersistence.LoadInProgress)
+            {
+                return;
+            }
             StaffIdolStore.BackfillFromStaff();
         }
     }
@@ -3232,6 +4505,10 @@ namespace GraduationDetails
     {
         private static void Postfix()
         {
+            if (GraduationDetailsPersistence.LoadInProgress)
+            {
+                return;
+            }
             GraduationSnapshotStore.Backfill(data_girls.girl);
         }
     }
