@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Text;
 using HarmonyLib;
 using ModLocalizationSystem;
 using TMPro;
@@ -46,6 +47,11 @@ namespace GraduationDetails
         internal const string MarriageFile = "marriage_data.json";
         internal const string StaffMapFile = "staff_idol_map.json";
         internal const string SnapshotsFile = "graduation_snapshots.json";
+        internal const string TransactionsFolder = ".transactions";
+        internal const string CommittedSnapshotsFolder = ".snapshots";
+        internal const string ActiveSnapshotFile = ".active_snapshot";
+        internal const string ActiveSnapshotBackupFile = ".active_snapshot.bak";
+        internal const string SnapshotManifestFile = "snapshot_manifest.json";
 
         private const string GameDataFolder = "data";
         private const string JsonExtension = ".json";
@@ -55,6 +61,8 @@ namespace GraduationDetails
 
         private static string activeVanillaSaveFilePath = "";
         private static string activeSaveDirectory = "";
+        private static string activeDataDirectory = "";
+        private static bool activeScopeWritable;
         private static string workingPortraitSession = Guid.NewGuid().ToString("N");
 
         internal static string RootDir
@@ -81,6 +89,22 @@ namespace GraduationDetails
             }
         }
 
+        internal static bool CanWriteActiveScope
+        {
+            get
+            {
+                return HasActiveSaveScope && activeScopeWritable;
+            }
+        }
+
+        internal static string ActiveDataDirectory
+        {
+            get
+            {
+                return activeDataDirectory;
+            }
+        }
+
         internal static string ActiveVanillaSaveFilePath
         {
             get
@@ -91,7 +115,9 @@ namespace GraduationDetails
 
         internal static string GetScopeId()
         {
-            return HasActiveSaveScope ? activeSaveDirectory : UnboundScope;
+            return HasActiveSaveScope
+                ? activeVanillaSaveFilePath + "|" + activeDataDirectory
+                : UnboundScope;
         }
 
         internal static string GetSaveDir()
@@ -101,20 +127,26 @@ namespace GraduationDetails
 
         internal static string GetScopedFilePath(string fileName)
         {
-            if (!HasActiveSaveScope || string.IsNullOrEmpty(fileName))
+            string path;
+            if (!HasActiveSaveScope
+                || string.IsNullOrEmpty(activeDataDirectory)
+                || !TryGetSafeLeafPath(activeDataDirectory, fileName, out path))
             {
                 return "";
             }
-            return Path.Combine(activeSaveDirectory, fileName);
+            return path;
         }
 
         internal static string GetScopedPortraitDir()
         {
-            if (!HasActiveSaveScope)
+            string path;
+            if (!HasActiveSaveScope
+                || string.IsNullOrEmpty(activeDataDirectory)
+                || !TryGetContainedPath(activeDataDirectory, PortraitsFolder, out path))
             {
                 return "";
             }
-            return Path.Combine(activeSaveDirectory, PortraitsFolder);
+            return path;
         }
 
         internal static string GetWorkingPortraitDir()
@@ -142,12 +174,154 @@ namespace GraduationDetails
             }
             activeVanillaSaveFilePath = vanillaSaveFilePath ?? "";
             activeSaveDirectory = saveDirectory ?? "";
+            activeDataDirectory = "";
+            activeScopeWritable = false;
+
+            string readableDirectory;
+            GraduationDetailsSnapshotResolution resolution =
+                GraduationDetailsSnapshotStorage.ResolveReadableSnapshot(
+                    activeSaveDirectory,
+                    activeVanillaSaveFilePath,
+                    out readableDirectory);
+            if (resolution == GraduationDetailsSnapshotResolution.Valid)
+            {
+                activeDataDirectory = readableDirectory;
+                activeScopeWritable = true;
+            }
+            else if (resolution == GraduationDetailsSnapshotResolution.Missing)
+            {
+                // A save without sidecar data is a valid empty scope. Its first verified vanilla
+                // save will create an authoritative committed snapshot.
+                activeDataDirectory = activeSaveDirectory;
+                activeScopeWritable = true;
+            }
         }
 
         internal static void ClearBinding()
         {
             activeVanillaSaveFilePath = "";
             activeSaveDirectory = "";
+            activeDataDirectory = "";
+            activeScopeWritable = false;
+        }
+
+        internal static bool IsSafeLeafFileName(string fileName)
+        {
+            return GraduationDetailsPersistenceIO.IsSafeLeafFileName(fileName);
+        }
+
+        internal static bool IsSafePortraitFileName(string fileName)
+        {
+            if (!IsSafeLeafFileName(fileName)
+                || fileName.Length > 96
+                || !fileName.EndsWith(".png", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string stem = fileName.Substring(0, fileName.Length - 4);
+            if (stem.Length == 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < stem.Length; i++)
+            {
+                char c = stem[i];
+                if (!((c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_'
+                    || c == '-'))
+                {
+                    return false;
+                }
+            }
+            string upperStem = stem.ToUpperInvariant();
+            if (upperStem == "CON"
+                || upperStem == "PRN"
+                || upperStem == "AUX"
+                || upperStem == "NUL")
+            {
+                return false;
+            }
+            return !(upperStem.Length == 4
+                && (upperStem.StartsWith("COM", StringComparison.Ordinal)
+                    || upperStem.StartsWith("LPT", StringComparison.Ordinal))
+                && upperStem[3] >= '1'
+                && upperStem[3] <= '9');
+        }
+
+        internal static bool TryGetSafePortraitPath(
+            string rootDirectory,
+            string fileName,
+            bool forWrite,
+            out string path)
+        {
+            path = "";
+            return IsSafePortraitFileName(fileName)
+                && GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    rootDirectory,
+                    fileName,
+                    forWrite,
+                    out path);
+        }
+
+        internal static bool TryGetSafeLeafPath(string rootDirectory, string fileName, out string path)
+        {
+            path = "";
+            return GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                rootDirectory,
+                fileName,
+                true,
+                out path);
+        }
+
+        internal static bool TryGetContainedPath(string rootDirectory, string relativePath, out string path)
+        {
+            return GraduationDetailsPersistenceIO.TryGetContainedPath(
+                rootDirectory,
+                relativePath,
+                true,
+                out path);
+        }
+
+        internal static bool IsPathContainedBy(string rootDirectory, string candidatePath)
+        {
+            return GraduationDetailsPersistenceIO.IsPathContainedBy(rootDirectory, candidatePath);
+        }
+
+        internal static bool TryValidateOwnedDataDirectory(
+            string directory,
+            out string validatedDirectory)
+        {
+            validatedDirectory = "";
+            return IsPathContainedBy(RootDir, directory)
+                && GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                    Application.persistentDataPath,
+                    directory,
+                    false,
+                    out validatedDirectory);
+        }
+
+        internal static string GetVanillaRelativePath(string normalizedVanillaSaveFilePath)
+        {
+            try
+            {
+                string dataRoot = Path.GetFullPath(Path.Combine(
+                    Application.persistentDataPath,
+                    GameDataFolder)).TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar);
+                string dataRootPrefix = dataRoot + Path.DirectorySeparatorChar;
+                string normalized = Path.GetFullPath(normalizedVanillaSaveFilePath);
+                return normalized.StartsWith(dataRootPrefix, StringComparison.OrdinalIgnoreCase)
+                    ? normalized.Substring(dataRootPrefix.Length)
+                    : "";
+            }
+            catch
+            {
+                return "";
+            }
         }
 
         internal static string ResolveDataSaverOutputPath(string dataFileName, bool fullPath)
@@ -519,9 +693,1462 @@ namespace GraduationDetails
         }
     }
 
+    internal enum GraduationDetailsSnapshotResolution
+    {
+        Missing = 0,
+        Valid = 1,
+        Invalid = 2
+    }
+
+    [Serializable]
+    internal sealed class GraduationDetailsSnapshotManifest
+    {
+        public int SchemaVersion = 1;
+        public string TransactionId = "";
+        public string TargetVanillaRelativePath = "";
+        public string ExpectedVanillaSha256 = "";
+        public long ExpectedVanillaLength = -1L;
+        public bool PreWriteExisted;
+        public string PreWriteSha256 = "";
+        public long PreWriteLength = -1L;
+        public long PreWriteLastWriteUtcTicks;
+        public long CreatedUtcTicks;
+        public string SourceKind = "live_save";
+    }
+
+    internal sealed class GraduationDetailsPreparedSave
+    {
+        internal string TransactionId = "";
+        internal string NormalizedVanillaSaveFilePath = "";
+        internal string SaveDirectory = "";
+        internal string StageDirectory = "";
+        internal string FinalDirectory = "";
+        internal string ExpectedVanillaSha256 = "";
+        internal long ExpectedVanillaLength;
+        internal GraduationDetailsPersistenceIO.FileFingerprint PreWriteFingerprint;
+        internal int RuntimeEpoch;
+        internal long Sequence;
+        internal float Deadline;
+        internal bool WriteObserved;
+        internal bool Expired;
+        internal float MatchingSince = -1f;
+        internal float NextPoll;
+    }
+
+    internal static class GraduationDetailsSnapshotStorage
+    {
+        private const int ManifestSchemaVersion = 1;
+        private static readonly long AbandonedTransactionRetentionTicks =
+            TimeSpan.FromHours(24).Ticks;
+
+        internal static GraduationDetailsSnapshotResolution ResolveReadableSnapshot(
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath,
+            out string readableDirectory)
+        {
+            readableDirectory = "";
+            if (string.IsNullOrEmpty(saveDirectory)
+                || string.IsNullOrEmpty(normalizedVanillaSaveFilePath))
+            {
+                return GraduationDetailsSnapshotResolution.Invalid;
+            }
+
+            string pointerPath;
+            string backupPath;
+            bool pointerPathsValid = TryGetPointerPaths(
+                saveDirectory,
+                out pointerPath,
+                out backupPath);
+            bool pointerExists = PointerArtifactExists(saveDirectory);
+
+            string token;
+            string generationDirectory;
+            if (pointerPathsValid && TryResolvePointer(
+                pointerPath,
+                saveDirectory,
+                normalizedVanillaSaveFilePath,
+                out token,
+                out generationDirectory))
+            {
+                readableDirectory = generationDirectory;
+                return GraduationDetailsSnapshotResolution.Valid;
+            }
+
+            // File.Replace retains the previous pointer as a backup. Validate its contents and
+            // referenced generation before using it; never restore untrusted pointer text.
+            if (pointerPathsValid && TryResolvePointer(
+                backupPath,
+                saveDirectory,
+                normalizedVanillaSaveFilePath,
+                out token,
+                out generationDirectory))
+            {
+                try
+                {
+                    WriteActivePointer(saveDirectory, token);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[Graduation Details] Failed to repair snapshot pointer: " + exception.Message);
+                }
+                readableDirectory = generationDirectory;
+                return GraduationDetailsSnapshotResolution.Valid;
+            }
+
+            if (pointerExists)
+            {
+                return GraduationDetailsSnapshotResolution.Invalid;
+            }
+
+            bool hasLegacyData;
+            if (!ValidateLegacyDirectory(saveDirectory, out hasLegacyData))
+            {
+                return GraduationDetailsSnapshotResolution.Invalid;
+            }
+            if (hasLegacyData)
+            {
+                readableDirectory = saveDirectory;
+                return GraduationDetailsSnapshotResolution.Valid;
+            }
+            return GraduationDetailsSnapshotResolution.Missing;
+        }
+
+        internal static bool TryStageLiveSnapshot(
+            string normalizedVanillaSaveFilePath,
+            string saveDirectory,
+            byte[] expectedVanillaPayload,
+            GraduationDetailsPersistenceIO.FileFingerprint preWriteFingerprint,
+            int runtimeEpoch,
+            long sequence,
+            out GraduationDetailsPreparedSave prepared)
+        {
+            prepared = null;
+            if (expectedVanillaPayload == null
+                || preWriteFingerprint == null
+                || !MarriageRecordStore.CanSnapshot
+                || !StaffIdolStore.CanSnapshot
+                || !GraduationSnapshotStore.CanSnapshot)
+            {
+                return false;
+            }
+
+            string relativeVanillaPath = GraduationDetailsPaths.GetVanillaRelativePath(
+                normalizedVanillaSaveFilePath);
+            if (string.IsNullOrEmpty(relativeVanillaPath))
+            {
+                return false;
+            }
+
+            string transactionId = Guid.NewGuid().ToString("N");
+            string transactionsDirectory;
+            string committedDirectory;
+            string stageDirectory;
+            string finalDirectory;
+            if (!TryGetTransactionPaths(
+                saveDirectory,
+                transactionId,
+                out transactionsDirectory,
+                out committedDirectory,
+                out stageDirectory,
+                out finalDirectory))
+            {
+                return false;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(transactionsDirectory);
+                Directory.CreateDirectory(stageDirectory);
+                MarriageRecordStore.SaveToDirectory(stageDirectory);
+                StaffIdolStore.SaveToDirectory(stageDirectory);
+                GraduationSnapshotStore.SaveToDirectory(stageDirectory);
+
+                if (!ValidateCompleteDataDirectory(stageDirectory))
+                {
+                    throw new InvalidDataException("The staged sidecar snapshot failed validation.");
+                }
+
+                GraduationDetailsSnapshotManifest manifest = new GraduationDetailsSnapshotManifest
+                {
+                    SchemaVersion = ManifestSchemaVersion,
+                    TransactionId = transactionId,
+                    TargetVanillaRelativePath = relativeVanillaPath,
+                    ExpectedVanillaSha256 = GraduationDetailsPersistenceIO.ComputeSha256(
+                        expectedVanillaPayload),
+                    ExpectedVanillaLength = expectedVanillaPayload.LongLength,
+                    PreWriteExisted = preWriteFingerprint.Exists,
+                    PreWriteSha256 = preWriteFingerprint.Sha256 ?? "",
+                    PreWriteLength = preWriteFingerprint.Length,
+                    PreWriteLastWriteUtcTicks = preWriteFingerprint.LastWriteUtcTicks,
+                    CreatedUtcTicks = DateTime.UtcNow.Ticks,
+                    SourceKind = "live_save"
+                };
+                string manifestPath;
+                if (!GraduationDetailsPaths.TryGetSafeLeafPath(
+                    stageDirectory,
+                    GraduationDetailsPaths.SnapshotManifestFile,
+                    out manifestPath))
+                {
+                    throw new InvalidDataException("The staged manifest path escaped its transaction.");
+                }
+                GraduationDetailsPersistenceIO.WriteUtf8Durable(
+                    manifestPath,
+                    JsonUtility.ToJson(manifest, true));
+
+                prepared = new GraduationDetailsPreparedSave
+                {
+                    TransactionId = transactionId,
+                    NormalizedVanillaSaveFilePath = normalizedVanillaSaveFilePath,
+                    SaveDirectory = saveDirectory,
+                    StageDirectory = stageDirectory,
+                    FinalDirectory = finalDirectory,
+                    ExpectedVanillaSha256 = manifest.ExpectedVanillaSha256,
+                    ExpectedVanillaLength = manifest.ExpectedVanillaLength,
+                    PreWriteFingerprint = preWriteFingerprint,
+                    RuntimeEpoch = runtimeEpoch,
+                    Sequence = sequence
+                };
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Failed to stage sidecar snapshot: " + exception.Message);
+                TryDeleteOwnedTransactionDirectory(saveDirectory, stageDirectory);
+                return false;
+            }
+        }
+
+        internal static bool TryPublishPreparedSnapshot(
+            GraduationDetailsPreparedSave prepared,
+            out string committedDirectory)
+        {
+            committedDirectory = "";
+            if (prepared == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                GraduationDetailsPersistenceIO.FileFingerprint current;
+                if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                    prepared.NormalizedVanillaSaveFilePath,
+                    out current)
+                    || !FingerprintMatchesExpected(
+                        current,
+                        prepared.ExpectedVanillaSha256,
+                        prepared.ExpectedVanillaLength))
+                {
+                    return false;
+                }
+
+                GraduationDetailsSnapshotManifest manifest;
+                if (!TryReadAndValidateManifest(
+                    prepared.StageDirectory,
+                    prepared.TransactionId,
+                    prepared.NormalizedVanillaSaveFilePath,
+                    current,
+                    out manifest)
+                    || !ValidateCompleteDataDirectory(prepared.StageDirectory))
+                {
+                    return false;
+                }
+
+                string committedRoot;
+                string ignoredTransactionsRoot;
+                string ignoredStage;
+                string expectedFinal;
+                if (!TryGetTransactionPaths(
+                    prepared.SaveDirectory,
+                    prepared.TransactionId,
+                    out ignoredTransactionsRoot,
+                    out committedRoot,
+                    out ignoredStage,
+                    out expectedFinal)
+                    || !string.Equals(
+                        expectedFinal,
+                        prepared.FinalDirectory,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                Directory.CreateDirectory(committedRoot);
+                if (!Directory.Exists(prepared.FinalDirectory))
+                {
+                    GraduationSnapshotStore.RemovePendingPortraitTargetsUnderDirectory(
+                        prepared.StageDirectory);
+                    Directory.Move(prepared.StageDirectory, prepared.FinalDirectory);
+                }
+                else
+                {
+                    GraduationDetailsSnapshotManifest existingManifest;
+                    if (!TryReadAndValidateManifest(
+                            prepared.FinalDirectory,
+                            prepared.TransactionId,
+                            prepared.NormalizedVanillaSaveFilePath,
+                            current,
+                            out existingManifest)
+                        || !ValidateCompleteDataDirectory(prepared.FinalDirectory))
+                    {
+                        return false;
+                    }
+                }
+                WriteActivePointer(prepared.SaveDirectory, prepared.TransactionId);
+                committedDirectory = prepared.FinalDirectory;
+                GraduationSnapshotStore.RegisterPendingPortraitTargetsForDirectory(
+                    committedDirectory);
+                PruneCommittedGenerations(prepared.SaveDirectory);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Failed to publish sidecar snapshot: " + exception.Message);
+                return false;
+            }
+        }
+
+        internal static bool TryRecoverForVanillaSave(
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath)
+        {
+            GraduationDetailsPersistenceIO.FileFingerprint current;
+            if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                normalizedVanillaSaveFilePath,
+                out current)
+                || current == null
+                || !current.Exists)
+            {
+                return false;
+            }
+
+            List<RecoveryCandidate> candidates = new List<RecoveryCandidate>();
+            CollectRecoveryCandidates(
+                saveDirectory,
+                normalizedVanillaSaveFilePath,
+                current,
+                GraduationDetailsPaths.CommittedSnapshotsFolder,
+                false,
+                candidates);
+            CollectRecoveryCandidates(
+                saveDirectory,
+                normalizedVanillaSaveFilePath,
+                current,
+                GraduationDetailsPaths.TransactionsFolder,
+                true,
+                candidates);
+
+            RecoveryCandidate selected = candidates
+                .OrderByDescending(candidate => candidate.CreatedUtcTicks)
+                .FirstOrDefault();
+            if (selected == null)
+            {
+                RollBackStagingDirectories(
+                    saveDirectory,
+                    normalizedVanillaSaveFilePath,
+                    current,
+                    "",
+                    false);
+                return false;
+            }
+
+            try
+            {
+                string currentActiveToken = "";
+                string currentActiveDirectory;
+                string pointerPath;
+                string backupPath;
+                if (TryGetPointerPaths(saveDirectory, out pointerPath, out backupPath))
+                {
+                    TryResolvePointer(
+                        pointerPath,
+                        saveDirectory,
+                        normalizedVanillaSaveFilePath,
+                        out currentActiveToken,
+                        out currentActiveDirectory);
+                }
+                string finalDirectory = selected.Directory;
+                if (selected.IsStaging)
+                {
+                    string transactionsRoot;
+                    string committedRoot;
+                    string expectedStage;
+                    if (!TryGetTransactionPaths(
+                        saveDirectory,
+                        selected.TransactionId,
+                        out transactionsRoot,
+                        out committedRoot,
+                        out expectedStage,
+                        out finalDirectory)
+                        || !string.Equals(
+                            expectedStage,
+                            selected.Directory,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+                    Directory.CreateDirectory(committedRoot);
+                    if (!Directory.Exists(finalDirectory))
+                    {
+                        GraduationSnapshotStore.RemovePendingPortraitTargetsUnderDirectory(
+                            selected.Directory);
+                        Directory.Move(selected.Directory, finalDirectory);
+                    }
+                    else
+                    {
+                        GraduationDetailsSnapshotManifest existingManifest;
+                        if (!TryReadAndValidateManifest(
+                                finalDirectory,
+                                selected.TransactionId,
+                                normalizedVanillaSaveFilePath,
+                                current,
+                                out existingManifest)
+                            || !ValidateCompleteDataDirectory(finalDirectory))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                if (!string.Equals(
+                    currentActiveToken,
+                    selected.TransactionId,
+                    StringComparison.Ordinal))
+                {
+                    WriteActivePointer(saveDirectory, selected.TransactionId);
+                }
+                RollBackStagingDirectories(
+                    saveDirectory,
+                    normalizedVanillaSaveFilePath,
+                    current,
+                    "",
+                    true);
+                PruneCommittedGenerations(saveDirectory);
+                Debug.Log("[Graduation Details] Recovered committed sidecar snapshot " +
+                    selected.TransactionId);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Sidecar recovery failed: " + exception.Message);
+                return false;
+            }
+        }
+
+        internal static bool TryInstallMigratedSnapshot(
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath,
+            string scopedSourceDirectory,
+            string relatedRootFlatDirectory,
+            string sourceKind)
+        {
+            GraduationDetailsPersistenceIO.FileFingerprint current;
+            if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                normalizedVanillaSaveFilePath,
+                out current)
+                || current == null
+                || !current.Exists)
+            {
+                return false;
+            }
+
+            string transactionId = Guid.NewGuid().ToString("N");
+            string transactionsRoot;
+            string committedRoot;
+            string stageDirectory;
+            string finalDirectory;
+            if (!TryGetTransactionPaths(
+                saveDirectory,
+                transactionId,
+                out transactionsRoot,
+                out committedRoot,
+                out stageDirectory,
+                out finalDirectory))
+            {
+                return false;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(transactionsRoot);
+                Directory.CreateDirectory(stageDirectory);
+                if (!StageMigratedDataFile(
+                        saveDirectory,
+                        scopedSourceDirectory,
+                        relatedRootFlatDirectory,
+                        stageDirectory,
+                        GraduationDetailsPaths.MarriageFile,
+                        MarriageRecordStore.TryValidateFile,
+                        MarriageRecordStore.GetEmptyJson())
+                    || !StageMigratedDataFile(
+                        saveDirectory,
+                        scopedSourceDirectory,
+                        relatedRootFlatDirectory,
+                        stageDirectory,
+                        GraduationDetailsPaths.StaffMapFile,
+                        StaffIdolStore.TryValidateFile,
+                        StaffIdolStore.GetEmptyJson())
+                    || !StageMigratedDataFile(
+                        saveDirectory,
+                        scopedSourceDirectory,
+                        relatedRootFlatDirectory,
+                        stageDirectory,
+                        GraduationDetailsPaths.SnapshotsFile,
+                        GraduationSnapshotStore.TryValidateFile,
+                        GraduationSnapshotStore.GetEmptyJson()))
+                {
+                    throw new InvalidDataException(
+                        "A corrupt current sidecar file had no validated recovery source.");
+                }
+
+                CopyValidatedPortraitLeaves(saveDirectory, stageDirectory);
+                CopyValidatedPortraitLeaves(scopedSourceDirectory, stageDirectory);
+                CopyValidatedPortraitLeaves(relatedRootFlatDirectory, stageDirectory);
+
+                if (!ValidateCompleteDataDirectory(stageDirectory))
+                {
+                    throw new InvalidDataException("The migrated sidecar snapshot failed validation.");
+                }
+
+                GraduationDetailsSnapshotManifest manifest = new GraduationDetailsSnapshotManifest
+                {
+                    SchemaVersion = ManifestSchemaVersion,
+                    TransactionId = transactionId,
+                    TargetVanillaRelativePath = GraduationDetailsPaths.GetVanillaRelativePath(
+                        normalizedVanillaSaveFilePath),
+                    ExpectedVanillaSha256 = current.Sha256,
+                    ExpectedVanillaLength = current.Length,
+                    PreWriteExisted = current.Exists,
+                    PreWriteSha256 = current.Sha256,
+                    PreWriteLength = current.Length,
+                    PreWriteLastWriteUtcTicks = current.LastWriteUtcTicks,
+                    CreatedUtcTicks = DateTime.UtcNow.Ticks,
+                    SourceKind = IsKnownMigrationSourceKind(sourceKind)
+                        ? sourceKind
+                        : "legacy_migration"
+                };
+                string manifestPath;
+                if (!GraduationDetailsPaths.TryGetSafeLeafPath(
+                    stageDirectory,
+                    GraduationDetailsPaths.SnapshotManifestFile,
+                    out manifestPath))
+                {
+                    throw new InvalidDataException("The migration manifest path was unsafe.");
+                }
+                GraduationDetailsPersistenceIO.WriteUtf8Durable(
+                    manifestPath,
+                    JsonUtility.ToJson(manifest, true));
+
+                GraduationDetailsPreparedSave prepared = new GraduationDetailsPreparedSave
+                {
+                    TransactionId = transactionId,
+                    NormalizedVanillaSaveFilePath = normalizedVanillaSaveFilePath,
+                    SaveDirectory = saveDirectory,
+                    StageDirectory = stageDirectory,
+                    FinalDirectory = finalDirectory,
+                    ExpectedVanillaSha256 = current.Sha256,
+                    ExpectedVanillaLength = current.Length,
+                    PreWriteFingerprint = current
+                };
+                string publishedDirectory;
+                return TryPublishPreparedSnapshot(prepared, out publishedDirectory);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Validated legacy migration failed: " + exception.Message);
+                TryDeleteOwnedTransactionDirectory(saveDirectory, stageDirectory);
+                return false;
+            }
+        }
+
+        internal static void DiscardPreparedSnapshot(GraduationDetailsPreparedSave prepared)
+        {
+            if (prepared != null)
+            {
+                GraduationSnapshotStore.RemovePendingPortraitTargetsUnderDirectory(
+                    prepared.StageDirectory);
+                TryDeleteOwnedTransactionDirectory(
+                    prepared.SaveDirectory,
+                    prepared.StageDirectory);
+            }
+        }
+
+        internal static bool IsPreparedSnapshotValidForCurrentPayload(
+            GraduationDetailsPreparedSave prepared,
+            GraduationDetailsPersistenceIO.FileFingerprint current)
+        {
+            try
+            {
+                GraduationDetailsSnapshotManifest manifest;
+                return prepared != null
+                    && FingerprintMatchesExpected(
+                        current,
+                        prepared.ExpectedVanillaSha256,
+                        prepared.ExpectedVanillaLength)
+                    && TryReadAndValidateManifest(
+                        prepared.StageDirectory,
+                        prepared.TransactionId,
+                        prepared.NormalizedVanillaSaveFilePath,
+                        current,
+                        out manifest)
+                    && ValidateCompleteDataDirectory(prepared.StageDirectory);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool ValidateCompleteDataDirectory(string directory)
+        {
+            string marriagePath;
+            string staffPath;
+            string snapshotsPath;
+            return TryGetDataPaths(directory, out marriagePath, out staffPath, out snapshotsPath)
+                && File.Exists(marriagePath)
+                && File.Exists(staffPath)
+                && File.Exists(snapshotsPath)
+                && MarriageRecordStore.TryValidateFile(marriagePath)
+                && StaffIdolStore.TryValidateFile(staffPath)
+                && GraduationSnapshotStore.TryValidateFile(snapshotsPath);
+        }
+
+        internal static bool ValidateLegacyDirectory(string directory, out bool hasData)
+        {
+            hasData = false;
+            string marriagePath;
+            string staffPath;
+            string snapshotsPath;
+            if (!TryGetDataPaths(directory, out marriagePath, out staffPath, out snapshotsPath))
+            {
+                return false;
+            }
+            string[] paths = new string[] { marriagePath, staffPath, snapshotsPath };
+            Func<string, bool>[] validators = new Func<string, bool>[]
+            {
+                MarriageRecordStore.TryValidateFile,
+                StaffIdolStore.TryValidateFile,
+                GraduationSnapshotStore.TryValidateFile
+            };
+            for (int i = 0; i < paths.Length; i++)
+            {
+                if (!File.Exists(paths[i]))
+                {
+                    continue;
+                }
+                hasData = true;
+                if (!validators[i](paths[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        internal static bool TryGetDataPaths(
+            string directory,
+            out string marriagePath,
+            out string staffPath,
+            out string snapshotsPath)
+        {
+            marriagePath = "";
+            staffPath = "";
+            snapshotsPath = "";
+            return GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.MarriageFile,
+                    out marriagePath)
+                && GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.StaffMapFile,
+                    out staffPath)
+                && GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.SnapshotsFile,
+                    out snapshotsPath);
+        }
+
+        private static bool StageMigratedDataFile(
+            string currentDirectory,
+            string scopedSourceDirectory,
+            string relatedRootFlatDirectory,
+            string stageDirectory,
+            string fileName,
+            Func<string, bool> validator,
+            string emptyJson)
+        {
+            string destinationPath;
+            if (!GraduationDetailsPaths.TryGetSafeLeafPath(
+                stageDirectory,
+                fileName,
+                out destinationPath))
+            {
+                return false;
+            }
+
+            string[] candidates = new string[]
+            {
+                currentDirectory,
+                scopedSourceDirectory,
+                relatedRootFlatDirectory
+            };
+            bool corruptCurrentFile = false;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                string candidateDirectory = candidates[i];
+                string candidatePath;
+                if (string.IsNullOrEmpty(candidateDirectory)
+                    || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                        candidateDirectory,
+                        fileName,
+                        false,
+                        out candidatePath)
+                    || !File.Exists(candidatePath))
+                {
+                    continue;
+                }
+                if (!validator(candidatePath))
+                {
+                    if (i == 0)
+                    {
+                        corruptCurrentFile = true;
+                    }
+                    continue;
+                }
+                GraduationDetailsPersistenceIO.CopyFileDurable(
+                    candidatePath,
+                    destinationPath);
+                return true;
+            }
+            if (corruptCurrentFile)
+            {
+                return false;
+            }
+            GraduationDetailsPersistenceIO.WriteUtf8Durable(destinationPath, emptyJson);
+            return true;
+        }
+
+        private static void CopyValidatedPortraitLeaves(
+            string sourceDataDirectory,
+            string stageDirectory)
+        {
+            if (string.IsNullOrEmpty(sourceDataDirectory))
+            {
+                return;
+            }
+            string sourcePortraitDirectory;
+            string destinationPortraitDirectory;
+            if (!GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    sourceDataDirectory,
+                    GraduationDetailsPaths.PortraitsFolder,
+                    false,
+                    out sourcePortraitDirectory)
+                || !Directory.Exists(sourcePortraitDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    stageDirectory,
+                    GraduationDetailsPaths.PortraitsFolder,
+                    true,
+                    out destinationPortraitDirectory))
+            {
+                return;
+            }
+            foreach (string sourceFile in Directory.GetFiles(sourcePortraitDirectory))
+            {
+                string fileName = Path.GetFileName(sourceFile);
+                string validatedSource;
+                string destination;
+                if (!GraduationDetailsPaths.IsSafePortraitFileName(fileName)
+                    || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                        sourcePortraitDirectory,
+                        fileName,
+                        false,
+                        out validatedSource)
+                    || !string.Equals(
+                        validatedSource,
+                        Path.GetFullPath(sourceFile),
+                        StringComparison.OrdinalIgnoreCase)
+                    || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                        destinationPortraitDirectory,
+                        fileName,
+                        true,
+                        out destination)
+                    || File.Exists(destination))
+                {
+                    continue;
+                }
+                GraduationDetailsPersistenceIO.CopyFileDurable(validatedSource, destination);
+            }
+        }
+
+        private static bool TryResolvePointer(
+            string pointerPath,
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath,
+            out string token,
+            out string generationDirectory)
+        {
+            token = "";
+            generationDirectory = "";
+            try
+            {
+                if (string.IsNullOrEmpty(pointerPath) || !File.Exists(pointerPath))
+                {
+                    return false;
+                }
+                token = File.ReadAllText(pointerPath).Trim();
+                if (!IsSafeTransactionId(token))
+                {
+                    return false;
+                }
+                string transactionsRoot;
+                string committedRoot;
+                string ignoredStage;
+                if (!TryGetTransactionPaths(
+                    saveDirectory,
+                    token,
+                    out transactionsRoot,
+                    out committedRoot,
+                    out ignoredStage,
+                    out generationDirectory)
+                    || !Directory.Exists(generationDirectory))
+                {
+                    return false;
+                }
+                GraduationDetailsPersistenceIO.FileFingerprint current;
+                GraduationDetailsSnapshotManifest manifest;
+                return GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                        normalizedVanillaSaveFilePath,
+                        out current)
+                    && TryReadAndValidateManifest(
+                        generationDirectory,
+                        token,
+                        normalizedVanillaSaveFilePath,
+                        current,
+                        out manifest)
+                    && ValidateCompleteDataDirectory(generationDirectory);
+            }
+            catch
+            {
+                token = "";
+                generationDirectory = "";
+                return false;
+            }
+        }
+
+        private static bool TryReadAndValidateManifest(
+            string directory,
+            string expectedTransactionId,
+            string normalizedVanillaSaveFilePath,
+            GraduationDetailsPersistenceIO.FileFingerprint currentVanillaFingerprint,
+            out GraduationDetailsSnapshotManifest manifest)
+        {
+            manifest = null;
+            try
+            {
+                string manifestPath;
+                if (!GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.SnapshotManifestFile,
+                    out manifestPath)
+                    || !File.Exists(manifestPath))
+                {
+                    return false;
+                }
+                string json = File.ReadAllText(manifestPath);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return false;
+                }
+                manifest = JsonUtility.FromJson<GraduationDetailsSnapshotManifest>(json);
+                string expectedRelativePath = GraduationDetailsPaths.GetVanillaRelativePath(
+                    normalizedVanillaSaveFilePath);
+                return manifest != null
+                    && manifest.SchemaVersion == ManifestSchemaVersion
+                    && IsSafeTransactionId(manifest.TransactionId)
+                    && IsKnownSourceKind(manifest.SourceKind)
+                    && manifest.CreatedUtcTicks > 0L
+                    && manifest.CreatedUtcTicks <= DateTime.UtcNow.AddMinutes(5).Ticks
+                    && string.Equals(
+                        manifest.TransactionId,
+                        expectedTransactionId,
+                        StringComparison.Ordinal)
+                    && IsSafeRelativeToken(manifest.TargetVanillaRelativePath)
+                    && !string.IsNullOrEmpty(expectedRelativePath)
+                    && string.Equals(
+                        NormalizeRelativePath(manifest.TargetVanillaRelativePath),
+                        NormalizeRelativePath(expectedRelativePath),
+                        StringComparison.OrdinalIgnoreCase)
+                    && FingerprintMatchesExpected(
+                        currentVanillaFingerprint,
+                        manifest.ExpectedVanillaSha256,
+                        manifest.ExpectedVanillaLength)
+                    && ManifestHasObservedWrite(manifest, currentVanillaFingerprint);
+            }
+            catch
+            {
+                manifest = null;
+                return false;
+            }
+        }
+
+        private static bool FingerprintMatchesExpected(
+            GraduationDetailsPersistenceIO.FileFingerprint fingerprint,
+            string expectedSha256,
+            long expectedLength)
+        {
+            return fingerprint != null
+                && fingerprint.Exists
+                && expectedLength >= 0L
+                && fingerprint.Length == expectedLength
+                && !string.IsNullOrEmpty(expectedSha256)
+                && string.Equals(
+                    fingerprint.Sha256,
+                    expectedSha256,
+                    StringComparison.Ordinal);
+        }
+
+        private static string NormalizeRelativePath(string path)
+        {
+            return (path ?? "").Replace(
+                Path.AltDirectorySeparatorChar,
+                Path.DirectorySeparatorChar).TrimStart(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+        }
+
+        private static bool IsSafeRelativeToken(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path))
+            {
+                return false;
+            }
+            string[] parts = path.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.None);
+            foreach (string part in parts)
+            {
+                if (string.IsNullOrWhiteSpace(part)
+                    || string.Equals(part, ".", StringComparison.Ordinal)
+                    || string.Equals(part, "..", StringComparison.Ordinal)
+                    || !GraduationDetailsPaths.IsSafeLeafFileName(part))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool ManifestHasObservedWrite(
+            GraduationDetailsSnapshotManifest manifest,
+            GraduationDetailsPersistenceIO.FileFingerprint current)
+        {
+            if (manifest == null || current == null)
+            {
+                return false;
+            }
+            if (!string.Equals(manifest.SourceKind, "live_save", StringComparison.Ordinal))
+            {
+                return true;
+            }
+            if (!manifest.PreWriteExisted)
+            {
+                return current.Exists;
+            }
+            if (manifest.PreWriteLength != manifest.ExpectedVanillaLength
+                || !string.Equals(
+                    manifest.PreWriteSha256,
+                    manifest.ExpectedVanillaSha256,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+            return current.LastWriteUtcTicks != manifest.PreWriteLastWriteUtcTicks;
+        }
+
+        private static bool IsKnownSourceKind(string sourceKind)
+        {
+            return string.Equals(sourceKind, "live_save", StringComparison.Ordinal)
+                || IsKnownMigrationSourceKind(sourceKind);
+        }
+
+        private static bool IsKnownMigrationSourceKind(string sourceKind)
+        {
+            return string.Equals(sourceKind, "legacy_migration", StringComparison.Ordinal)
+                || string.Equals(sourceKind, "canonical_legacy", StringComparison.Ordinal)
+                || string.Equals(sourceKind, "scoped_legacy", StringComparison.Ordinal)
+                || string.Equals(sourceKind, "marked_root_flat", StringComparison.Ordinal);
+        }
+
+        private static bool IsSafeTransactionId(string transactionId)
+        {
+            if (string.IsNullOrEmpty(transactionId) || transactionId.Length != 32)
+            {
+                return false;
+            }
+            for (int i = 0; i < transactionId.Length; i++)
+            {
+                char c = transactionId[i];
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryGetTransactionPaths(
+            string saveDirectory,
+            string transactionId,
+            out string transactionsRoot,
+            out string committedRoot,
+            out string stageDirectory,
+            out string finalDirectory)
+        {
+            transactionsRoot = "";
+            committedRoot = "";
+            stageDirectory = "";
+            finalDirectory = "";
+            string validatedSaveDirectory;
+            return IsSafeTransactionId(transactionId)
+                && GraduationDetailsPaths.IsPathContainedBy(
+                    GraduationDetailsPaths.RootDir,
+                    saveDirectory)
+                && GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                    Application.persistentDataPath,
+                    saveDirectory,
+                    false,
+                    out validatedSaveDirectory)
+                && GraduationDetailsPaths.TryGetContainedPath(
+                    validatedSaveDirectory,
+                    GraduationDetailsPaths.TransactionsFolder,
+                    out transactionsRoot)
+                && GraduationDetailsPaths.TryGetContainedPath(
+                    validatedSaveDirectory,
+                    GraduationDetailsPaths.CommittedSnapshotsFolder,
+                    out committedRoot)
+                && GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    transactionsRoot,
+                    transactionId,
+                    true,
+                    out stageDirectory)
+                && GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    committedRoot,
+                    transactionId,
+                    true,
+                    out finalDirectory);
+        }
+
+        private static bool TryGetPointerPaths(
+            string saveDirectory,
+            out string pointerPath,
+            out string backupPath)
+        {
+            pointerPath = "";
+            backupPath = "";
+            string validatedSaveDirectory;
+            return GraduationDetailsPaths.IsPathContainedBy(
+                    GraduationDetailsPaths.RootDir,
+                    saveDirectory)
+                && GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                    Application.persistentDataPath,
+                    saveDirectory,
+                    false,
+                    out validatedSaveDirectory)
+                && GraduationDetailsPaths.TryGetSafeLeafPath(
+                    validatedSaveDirectory,
+                    GraduationDetailsPaths.ActiveSnapshotFile,
+                    out pointerPath)
+                && GraduationDetailsPaths.TryGetSafeLeafPath(
+                    validatedSaveDirectory,
+                    GraduationDetailsPaths.ActiveSnapshotBackupFile,
+                    out backupPath);
+        }
+
+        private static bool PointerArtifactExists(string saveDirectory)
+        {
+            try
+            {
+                string validated;
+                if (!GraduationDetailsPaths.TryValidateOwnedDataDirectory(
+                    saveDirectory,
+                    out validated))
+                {
+                    return true;
+                }
+                if (!Directory.Exists(validated))
+                {
+                    return false;
+                }
+                return Directory.GetFileSystemEntries(
+                        validated,
+                        GraduationDetailsPaths.ActiveSnapshotFile,
+                        SearchOption.TopDirectoryOnly).Length > 0
+                    || Directory.GetFileSystemEntries(
+                        validated,
+                        GraduationDetailsPaths.ActiveSnapshotBackupFile,
+                        SearchOption.TopDirectoryOnly).Length > 0;
+            }
+            catch
+            {
+                // If the directory cannot be safely inspected, treat it as an invalid pointer
+                // scope rather than authoring replacement sidecars into it.
+                return true;
+            }
+        }
+
+        private static void WriteActivePointer(string saveDirectory, string transactionId)
+        {
+            if (!IsSafeTransactionId(transactionId))
+            {
+                throw new InvalidDataException("Unsafe active snapshot transaction ID.");
+            }
+            string pointerPath;
+            string backupPath;
+            if (!TryGetPointerPaths(saveDirectory, out pointerPath, out backupPath))
+            {
+                throw new InvalidDataException("Unsafe active snapshot pointer path.");
+            }
+            GraduationDetailsPersistenceIO.WritePointerAtomically(
+                pointerPath,
+                backupPath,
+                transactionId);
+        }
+
+        private static void CollectRecoveryCandidates(
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath,
+            GraduationDetailsPersistenceIO.FileFingerprint current,
+            string folderName,
+            bool isStaging,
+            List<RecoveryCandidate> candidates)
+        {
+            string root;
+            if (!GraduationDetailsPaths.TryGetContainedPath(saveDirectory, folderName, out root)
+                || !Directory.Exists(root))
+            {
+                return;
+            }
+            foreach (string directory in Directory.GetDirectories(root))
+            {
+                string token = Path.GetFileName(directory);
+                string normalizedDirectory;
+                GraduationDetailsSnapshotManifest manifest;
+                if (!IsSafeTransactionId(token)
+                    || !GraduationDetailsPersistenceIO.TryGetContainedPath(
+                        root,
+                        token,
+                        true,
+                        out normalizedDirectory)
+                    || !string.Equals(directory, normalizedDirectory, StringComparison.OrdinalIgnoreCase)
+                    || !TryReadAndValidateManifest(
+                        directory,
+                        token,
+                        normalizedVanillaSaveFilePath,
+                        current,
+                        out manifest)
+                    || !ValidateCompleteDataDirectory(directory))
+                {
+                    continue;
+                }
+                candidates.Add(new RecoveryCandidate
+                {
+                    TransactionId = token,
+                    Directory = directory,
+                    CreatedUtcTicks = manifest.CreatedUtcTicks,
+                    IsStaging = isStaging
+                });
+            }
+        }
+
+        private static void RollBackStagingDirectories(
+            string saveDirectory,
+            string normalizedVanillaSaveFilePath,
+            GraduationDetailsPersistenceIO.FileFingerprint current,
+            string keepTransactionId,
+            bool committedSnapshotExists)
+        {
+            string transactionsRoot;
+            if (!GraduationDetailsPaths.TryGetContainedPath(
+                saveDirectory,
+                GraduationDetailsPaths.TransactionsFolder,
+                out transactionsRoot)
+                || !Directory.Exists(transactionsRoot))
+            {
+                return;
+            }
+            foreach (string directory in Directory.GetDirectories(transactionsRoot))
+            {
+                string token = Path.GetFileName(directory);
+                if (string.Equals(token, keepTransactionId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                GraduationDetailsSnapshotManifest matchingManifest;
+                bool matchesCurrent = IsSafeTransactionId(token)
+                    && TryReadAndValidateManifest(
+                        directory,
+                        token,
+                        normalizedVanillaSaveFilePath,
+                        current,
+                        out matchingManifest)
+                    && ValidateCompleteDataDirectory(directory);
+                if (matchesCurrent && !committedSnapshotExists)
+                {
+                    continue;
+                }
+                GraduationDetailsSnapshotManifest rawManifest;
+                bool rawValid = TryReadRawManifest(directory, token, out rawManifest);
+                long createdTicks = rawValid
+                    ? rawManifest.CreatedUtcTicks
+                    : Directory.GetCreationTimeUtc(directory).Ticks;
+                bool oldEnough = createdTicks > 0L
+                    && DateTime.UtcNow.Ticks - createdTicks
+                        >= AbandonedTransactionRetentionTicks;
+                if ((matchesCurrent && committedSnapshotExists) || oldEnough)
+                {
+                    TryDeleteOwnedTransactionDirectory(saveDirectory, directory);
+                }
+            }
+        }
+
+        private static bool TryReadRawManifest(
+            string directory,
+            string expectedTransactionId,
+            out GraduationDetailsSnapshotManifest manifest)
+        {
+            manifest = null;
+            try
+            {
+                string manifestPath;
+                if (!IsSafeTransactionId(expectedTransactionId)
+                    || !GraduationDetailsPaths.TryGetSafeLeafPath(
+                        directory,
+                        GraduationDetailsPaths.SnapshotManifestFile,
+                        out manifestPath)
+                    || !File.Exists(manifestPath))
+                {
+                    return false;
+                }
+                string json = File.ReadAllText(manifestPath);
+                manifest = JsonUtility.FromJson<GraduationDetailsSnapshotManifest>(json);
+                return manifest != null
+                    && manifest.SchemaVersion == ManifestSchemaVersion
+                    && string.Equals(
+                        manifest.TransactionId,
+                        expectedTransactionId,
+                        StringComparison.Ordinal)
+                    && IsSafeRelativeToken(manifest.TargetVanillaRelativePath)
+                    && manifest.CreatedUtcTicks > 0L
+                    && manifest.CreatedUtcTicks <= DateTime.UtcNow.AddMinutes(5).Ticks;
+            }
+            catch
+            {
+                manifest = null;
+                return false;
+            }
+        }
+
+        private static void TryDeleteOwnedTransactionDirectory(
+            string saveDirectory,
+            string directory)
+        {
+            try
+            {
+                string transactionsRoot;
+                string committedRoot;
+                string expectedStage;
+                string ignoredFinal;
+                string token = Path.GetFileName(directory);
+                if (string.IsNullOrEmpty(directory)
+                    || !IsSafeTransactionId(token)
+                    || !TryGetTransactionPaths(
+                        saveDirectory,
+                        token,
+                        out transactionsRoot,
+                        out committedRoot,
+                        out expectedStage,
+                        out ignoredFinal)
+                    || !string.Equals(
+                        expectedStage,
+                        directory,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !Directory.Exists(directory)
+                    || ContainsReparsePoint(directory))
+                {
+                    return;
+                }
+                Directory.Delete(directory, true);
+            }
+            catch
+            {
+                // A failed cleanup is harmless; recovery will inspect the durable manifest later.
+            }
+        }
+
+        private static void PruneCommittedGenerations(string saveDirectory)
+        {
+            try
+            {
+                string pointerPath;
+                string backupPath;
+                if (!TryGetPointerPaths(saveDirectory, out pointerPath, out backupPath))
+                {
+                    return;
+                }
+                HashSet<string> protectedTokens = new HashSet<string>(StringComparer.Ordinal);
+                if (!AddPointerToken(pointerPath, protectedTokens)
+                    || !AddPointerToken(backupPath, protectedTokens))
+                {
+                    return;
+                }
+
+                string transactionsRoot;
+                string committedRoot;
+                string ignoredStage;
+                string ignoredFinal;
+                if (!TryGetTransactionPaths(
+                        saveDirectory,
+                        new string('0', 32),
+                        out transactionsRoot,
+                        out committedRoot,
+                        out ignoredStage,
+                        out ignoredFinal)
+                    || !Directory.Exists(committedRoot))
+                {
+                    return;
+                }
+                foreach (string directory in Directory.GetDirectories(
+                    committedRoot,
+                    "*",
+                    SearchOption.TopDirectoryOnly))
+                {
+                    string token = Path.GetFileName(directory);
+                    if (!IsSafeTransactionId(token) || protectedTokens.Contains(token))
+                    {
+                        continue;
+                    }
+                    TryDeleteOwnedCommittedDirectory(saveDirectory, directory);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[Graduation Details] Snapshot pruning was deferred: " +
+                    exception.Message);
+            }
+        }
+
+        private static bool AddPointerToken(string pointerPath, HashSet<string> tokens)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(pointerPath) || !File.Exists(pointerPath))
+                {
+                    return true;
+                }
+                string token = File.ReadAllText(pointerPath).Trim();
+                if (!IsSafeTransactionId(token))
+                {
+                    return false;
+                }
+                tokens.Add(token);
+                return true;
+            }
+            catch
+            {
+                // If either pointer cannot be read, fail closed and preserve every generation.
+                return false;
+            }
+        }
+
+        private static void TryDeleteOwnedCommittedDirectory(
+            string saveDirectory,
+            string directory)
+        {
+            try
+            {
+                string transactionsRoot;
+                string committedRoot;
+                string ignoredStage;
+                string expectedFinal;
+                string token = Path.GetFileName(directory);
+                if (string.IsNullOrEmpty(directory)
+                    || !IsSafeTransactionId(token)
+                    || !TryGetTransactionPaths(
+                        saveDirectory,
+                        token,
+                        out transactionsRoot,
+                        out committedRoot,
+                        out ignoredStage,
+                        out expectedFinal)
+                    || !string.Equals(
+                        expectedFinal,
+                        directory,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !Directory.Exists(directory)
+                    || ContainsReparsePoint(directory))
+                {
+                    return;
+                }
+                GraduationSnapshotStore.RemovePendingPortraitTargetsUnderDirectory(directory);
+                Directory.Delete(directory, true);
+            }
+            catch
+            {
+                // Pruning is best effort; an active/backup generation is never a cleanup target.
+            }
+        }
+
+        private static bool ContainsReparsePoint(string directory)
+        {
+            try
+            {
+                Stack<string> pending = new Stack<string>();
+                pending.Push(directory);
+                while (pending.Count > 0)
+                {
+                    string current = pending.Pop();
+                    if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        return true;
+                    }
+                    // Enumerate only one level. Checking a child before adding it prevents a
+                    // junction from being followed outside the owned transaction tree.
+                    foreach (string child in Directory.GetFileSystemEntries(current, "*",
+                        SearchOption.TopDirectoryOnly))
+                    {
+                        FileAttributes attributes = File.GetAttributes(child);
+                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            return true;
+                        }
+                        if ((attributes & FileAttributes.Directory) != 0)
+                        {
+                            pending.Push(child);
+                        }
+                    }
+                }
+                return false;
+            }
+            catch
+            {
+                // Cleanup must fail closed. A stranded transaction is harmless and can be
+                // inspected again on a later load.
+                return true;
+            }
+        }
+
+        private sealed class RecoveryCandidate
+        {
+            internal string TransactionId = "";
+            internal string Directory = "";
+            internal long CreatedUtcTicks;
+            internal bool IsStaging;
+        }
+    }
+
     internal static class GraduationDetailsLegacyMigration
     {
         private const string RootFlatMigrationMarker = ".root_flat_data_migrated";
+        private const string ScopedMigrationOwnerMarker = ".scope_owner";
         private const string AssemblyFileName = "com.cosmo.graduationdetails.dll";
         private const string SteamAppsFolderName = "steamapps";
         private const string SteamCommonFolderName = "common";
@@ -539,34 +2166,113 @@ namespace GraduationDetails
 
             try
             {
-                List<string> legacyKeys = GetLegacyKeys(vanillaSaveFilePath);
                 List<string> sourceRoots = GetLegacySourceRoots();
-                bool foundScopedData = false;
-
-                // Search every historical root for the most specific agency key before trying
-                // owner-folder fallbacks. This prevents a broad chapter/slot key in one root from
-                // winning over the exact agency data in another root.
-                foreach (string legacyKey in legacyKeys)
+                string readableDirectory;
+                GraduationDetailsSnapshotResolution currentResolution =
+                    GraduationDetailsSnapshotStorage.ResolveReadableSnapshot(
+                        targetDirectory,
+                        vanillaSaveFilePath,
+                        out readableDirectory);
+                if (currentResolution == GraduationDetailsSnapshotResolution.Valid
+                    && !PathsReferToSameDirectory(readableDirectory, targetDirectory))
                 {
-                    foreach (string sourceRoot in sourceRoots)
+                    return;
+                }
+                if (currentResolution == GraduationDetailsSnapshotResolution.Invalid
+                    && HasSnapshotPointer(targetDirectory))
+                {
+                    Debug.LogWarning(
+                        "[Graduation Details] A snapshot pointer is corrupt; legacy migration " +
+                        "was not allowed to replace it automatically.");
+                    return;
+                }
+
+                // Historical folder/fallback buckets are scoped to a playthrough/chapter, not to
+                // an individual vanilla filename. Treat them as the strongest available legacy
+                // provenance, while still selecting one whole freshest bucket instead of merging
+                // all matching roots.
+                List<string> scopedKeys = GetStrongLegacyKeys();
+                LegacyCandidate selected = FindFreshestValidatedCandidate(
+                    sourceRoots,
+                    scopedKeys,
+                    targetDirectory);
+                if (selected != null
+                    && !HasExplicitScopedAssignment(
+                        selected.Directory,
+                        targetDirectory))
+                {
+                    Debug.LogWarning(
+                        "[Graduation Details] Preserved playthrough-scoped legacy data at " +
+                        selected.Directory + " because it has no explicit owner marker; no exact " +
+                        "vanilla save can be proven from the historical key.");
+                    selected = null;
+                }
+
+                bool targetHasData;
+                bool targetValid = GraduationDetailsSnapshotStorage.ValidateLegacyDirectory(
+                    targetDirectory,
+                    out targetHasData);
+                if (selected == null && targetValid && targetHasData)
+                {
+                    selected = new LegacyCandidate
                     {
-                        string savesSource = Path.Combine(
-                            sourceRoot,
-                            GraduationDetailsPaths.SavesFolder,
-                            legacyKey);
-                        string directSource = Path.Combine(sourceRoot, legacyKey);
-                        foundScopedData |= HasAnyDataFile(savesSource);
-                        foundScopedData |= HasAnyDataFile(directSource);
-                        TryCopyMissingData(savesSource, targetDirectory);
-                        TryCopyMissingData(directSource, targetDirectory);
+                        Directory = targetDirectory,
+                        DataFileCount = GetDataFileCount(targetDirectory),
+                        FreshnessUtcTicks = GetDataFreshness(targetDirectory),
+                        SourceKind = "canonical_legacy"
+                    };
+                }
+
+                // Root-flat JSON was inherently unscoped. It is safe to recover only when its
+                // historical marker explicitly names this canonical save directory. Sharing an
+                // install root with a scoped bucket is not ownership evidence.
+                string relatedRootFlat = "";
+                string explicitlyAssignedRootFlat = FindExplicitlyAssignedRootFlat(
+                    sourceRoots,
+                    targetDirectory);
+                if (selected != null)
+                {
+                    if (!string.IsNullOrEmpty(explicitlyAssignedRootFlat)
+                        && !PathsReferToSameDirectory(
+                            explicitlyAssignedRootFlat,
+                            selected.Directory))
+                    {
+                        relatedRootFlat = explicitlyAssignedRootFlat;
+                    }
+                }
+                else
+                {
+                    relatedRootFlat = explicitlyAssignedRootFlat;
+                    if (!string.IsNullOrEmpty(relatedRootFlat))
+                    {
+                        selected = new LegacyCandidate
+                        {
+                            Directory = relatedRootFlat,
+                            DataFileCount = GetDataFileCount(relatedRootFlat),
+                            FreshnessUtcTicks = GetDataFreshness(relatedRootFlat),
+                            SourceKind = "marked_root_flat"
+                        };
                     }
                 }
 
-                // Some historical installs split portraits into a keyed folder while leaving the
-                // JSON at the root. Portraits alone must not suppress this guarded flat fallback.
-                if (!foundScopedData && !HasAnyDataFile(targetDirectory))
+                if (selected == null)
                 {
-                    TryMigrateRootFlatDataOnce(sourceRoots, targetDirectory);
+                    WarnAboutAmbiguousLegacyData(
+                        sourceRoots,
+                        vanillaSaveFilePath,
+                        targetDirectory);
+                    return;
+                }
+
+                if (GraduationDetailsSnapshotStorage.TryInstallMigratedSnapshot(
+                    targetDirectory,
+                    vanillaSaveFilePath,
+                    selected.Directory,
+                    relatedRootFlat,
+                    selected.SourceKind))
+                {
+                    Debug.Log("[Graduation Details] Installed validated legacy sidecars from " +
+                        selected.Directory);
                 }
             }
             catch (Exception exception)
@@ -575,17 +2281,13 @@ namespace GraduationDetails
             }
         }
 
-        private static List<string> GetLegacyKeys(string vanillaSaveFilePath)
+        private static List<string> GetStrongLegacyKeys()
         {
             List<string> keys = new List<string>();
             // Both forms shipped: story normally used SaveFolderName, while freeplay and some
             // transitional saves used the identity fallback even when a folder name existed.
             AddUnique(keys, GraduationDetailsPaths.GetLegacyFolderKey());
             AddUnique(keys, GraduationDetailsPaths.GetLegacyFallbackKey());
-
-            string ownerKey = GraduationDetailsPaths.GetLegacyOwnerKey(vanillaSaveFilePath);
-            AddUnique(keys, ownerKey);
-            AddUnique(keys, GraduationDetailsPaths.SanitizeLegacyFileToken(ownerKey));
             return keys;
         }
 
@@ -674,113 +2376,377 @@ namespace GraduationDetails
             return roots;
         }
 
-        private static void TryMigrateRootFlatDataOnce(
+        private static LegacyCandidate FindFreshestValidatedCandidate(
             List<string> sourceRoots,
+            List<string> scopedKeys,
             string targetDirectory)
         {
-            string markerPath = Path.Combine(
-                GraduationDetailsPaths.RootDir,
-                RootFlatMigrationMarker);
-            if (File.Exists(markerPath))
+            List<LegacyCandidate> candidates = new List<LegacyCandidate>();
+            foreach (string sourceRoot in sourceRoots)
+            {
+                foreach (string key in scopedKeys)
+                {
+                    ConsiderCandidate(
+                        Path.Combine(sourceRoot, GraduationDetailsPaths.SavesFolder, key),
+                        targetDirectory,
+                        candidates);
+                    ConsiderCandidate(
+                        Path.Combine(sourceRoot, key),
+                        targetDirectory,
+                        candidates);
+                }
+            }
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+            List<LegacyCandidate> explicitlyOwned = candidates
+                .Where(candidate => candidate.ExplicitOwner)
+                .ToList();
+            return SelectBestCandidate(
+                explicitlyOwned.Count > 0 ? explicitlyOwned : candidates,
+                "Equally ranked legacy buckets disagree; all were preserved and none was " +
+                    "assigned automatically.");
+        }
+
+        private static void ConsiderCandidate(
+            string directory,
+            string targetDirectory,
+            List<LegacyCandidate> candidates)
+        {
+            if (PathsReferToSameDirectory(directory, targetDirectory))
             {
                 return;
             }
+            bool hasData;
+            if (!GraduationDetailsSnapshotStorage.ValidateLegacyDirectory(directory, out hasData)
+                || !hasData)
+            {
+                return;
+            }
+            long freshness = GetDataFreshness(directory);
+            string identity = GetContentIdentity(directory);
+            if (string.IsNullOrEmpty(identity))
+            {
+                return;
+            }
+            candidates.Add(new LegacyCandidate
+            {
+                Directory = directory,
+                ExplicitOwner = HasExplicitScopedAssignment(directory, targetDirectory),
+                DataFileCount = GetDataFileCount(directory),
+                FreshnessUtcTicks = freshness,
+                ContentIdentity = identity,
+                SourceKind = "scoped_legacy"
+            });
+        }
 
-            bool importedRootData = false;
+        private static string FindExplicitlyAssignedRootFlat(
+            List<string> sourceRoots,
+            string targetDirectory)
+        {
+            List<LegacyCandidate> candidates = new List<LegacyCandidate>();
             foreach (string sourceRoot in sourceRoots)
             {
-                bool sourceHasData = HasAnyDataFile(sourceRoot);
-                TryCopyMissingData(sourceRoot, targetDirectory);
-                importedRootData |= sourceHasData && HasAnyDataFile(targetDirectory);
+                string markerPath;
+                if (!GraduationDetailsPaths.TryGetSafeLeafPath(
+                        sourceRoot,
+                        RootFlatMigrationMarker,
+                        out markerPath)
+                    || !File.Exists(markerPath))
+                {
+                    continue;
+                }
+                string assigned;
+                try
+                {
+                    assigned = File.ReadAllText(markerPath).Trim();
+                }
+                catch
+                {
+                    continue;
+                }
+                if (!PathsReferToSameDirectory(assigned, targetDirectory))
+                {
+                    continue;
+                }
+                bool hasData;
+                if (!GraduationDetailsSnapshotStorage.ValidateLegacyDirectory(sourceRoot, out hasData)
+                    || !hasData)
+                {
+                    continue;
+                }
+                long freshness = GetDataFreshness(sourceRoot);
+                string identity = GetContentIdentity(sourceRoot);
+                if (string.IsNullOrEmpty(identity))
+                {
+                    continue;
+                }
+                candidates.Add(new LegacyCandidate
+                {
+                    Directory = sourceRoot,
+                    DataFileCount = GetDataFileCount(sourceRoot),
+                    FreshnessUtcTicks = freshness,
+                    ContentIdentity = identity
+                });
             }
-
-            // Portrait-only roots are useful to merge, but are not evidence that the ambiguous
-            // flat JSON fallback was consumed. Mark only after importing at least one data file.
-            if (importedRootData)
+            if (candidates.Count == 0)
             {
-                Directory.CreateDirectory(GraduationDetailsPaths.RootDir);
-                File.WriteAllText(markerPath, targetDirectory);
-                Debug.Log("[Graduation Details] Imported root-level legacy data into " + targetDirectory);
+                return "";
             }
+            LegacyCandidate selected = SelectBestCandidate(
+                candidates,
+                "Equally ranked marked root-flat sources disagree; neither was assigned " +
+                    "automatically.");
+            return selected != null ? selected.Directory : "";
         }
 
-        private static bool TryCopyMissingData(string sourceDirectory, string targetDirectory)
+        private static LegacyCandidate SelectBestCandidate(
+            List<LegacyCandidate> candidates,
+            string ambiguityMessage)
         {
-            if (string.IsNullOrEmpty(sourceDirectory)
-                || string.IsNullOrEmpty(targetDirectory)
-                || !Directory.Exists(sourceDirectory)
-                || PathsReferToSameDirectory(sourceDirectory, targetDirectory))
+            if (candidates == null || candidates.Count == 0)
+            {
+                return null;
+            }
+            // Missing stores are semantically empty, but a partial bundle must never outrank an
+            // older complete bundle merely because one file was touched recently.
+            int bestCompleteness = candidates.Max(candidate => candidate.DataFileCount);
+            List<LegacyCandidate> completeCandidates = candidates
+                .Where(candidate => candidate.DataFileCount == bestCompleteness)
+                .ToList();
+            long freshest = completeCandidates.Max(candidate => candidate.FreshnessUtcTicks);
+            List<LegacyCandidate> finalists = completeCandidates
+                .Where(candidate => candidate.FreshnessUtcTicks == freshest)
+                .ToList();
+            if (finalists
+                .Select(candidate => candidate.ContentIdentity)
+                .Distinct(StringComparer.Ordinal)
+                .Count() > 1)
+            {
+                Debug.LogWarning("[Graduation Details] " + ambiguityMessage);
+                return null;
+            }
+            return finalists
+                .OrderBy(candidate => candidate.Directory, StringComparer.OrdinalIgnoreCase)
+                .First();
+        }
+
+        private static int GetDataFileCount(string directory)
+        {
+            string marriagePath;
+            string staffPath;
+            string snapshotsPath;
+            if (!GraduationDetailsSnapshotStorage.TryGetDataPaths(
+                directory,
+                out marriagePath,
+                out staffPath,
+                out snapshotsPath))
+            {
+                return 0;
+            }
+            int count = 0;
+            if (File.Exists(marriagePath))
+            {
+                count++;
+            }
+            if (File.Exists(staffPath))
+            {
+                count++;
+            }
+            if (File.Exists(snapshotsPath))
+            {
+                count++;
+            }
+            return count;
+        }
+
+        private static bool HasExplicitScopedAssignment(
+            string scopedDirectory,
+            string targetDirectory)
+        {
+            try
+            {
+                string markerPath;
+                if (!GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                        scopedDirectory,
+                        ScopedMigrationOwnerMarker,
+                        false,
+                        out markerPath)
+                    || !File.Exists(markerPath))
+                {
+                    return false;
+                }
+                return PathsReferToSameDirectory(
+                    File.ReadAllText(markerPath).Trim(),
+                    targetDirectory);
+            }
+            catch
             {
                 return false;
             }
-
-            bool copied = false;
-            copied |= CopyFileIfMissing(
-                Path.Combine(sourceDirectory, GraduationDetailsPaths.MarriageFile),
-                Path.Combine(targetDirectory, GraduationDetailsPaths.MarriageFile));
-            copied |= CopyFileIfMissing(
-                Path.Combine(sourceDirectory, GraduationDetailsPaths.StaffMapFile),
-                Path.Combine(targetDirectory, GraduationDetailsPaths.StaffMapFile));
-            copied |= CopyFileIfMissing(
-                Path.Combine(sourceDirectory, GraduationDetailsPaths.SnapshotsFile),
-                Path.Combine(targetDirectory, GraduationDetailsPaths.SnapshotsFile));
-
-            string sourcePortraits = Path.Combine(
-                sourceDirectory,
-                GraduationDetailsPaths.PortraitsFolder);
-            string targetPortraits = Path.Combine(
-                targetDirectory,
-                GraduationDetailsPaths.PortraitsFolder);
-            copied |= CopyDirectoryFilesIfMissing(sourcePortraits, targetPortraits);
-
-            if (copied)
-            {
-                Debug.Log("[Graduation Details] Copied legacy save data from " + sourceDirectory);
-            }
-            return copied;
         }
 
-        private static bool CopyFileIfMissing(string sourceFile, string targetFile)
+        private static void WarnAboutAmbiguousLegacyData(
+            List<string> sourceRoots,
+            string vanillaSaveFilePath,
+            string targetDirectory)
         {
-            if (!File.Exists(sourceFile) || File.Exists(targetFile))
+            List<string> ambiguousKeys = new List<string>();
+            string ownerKey = GraduationDetailsPaths.GetLegacyOwnerKey(vanillaSaveFilePath);
+            AddUnique(ambiguousKeys, ownerKey);
+            AddUnique(ambiguousKeys, GraduationDetailsPaths.SanitizeLegacyFileToken(ownerKey));
+            // This historical folder is deliberately recognized, but it cannot identify which
+            // current save owns its contents and is therefore never imported automatically.
+            AddUnique(ambiguousKeys, "default");
+            foreach (string sourceRoot in sourceRoots)
             {
-                return false;
+                bool rootHasData;
+                if (!PathsReferToSameDirectory(sourceRoot, targetDirectory)
+                    && GraduationDetailsSnapshotStorage.ValidateLegacyDirectory(
+                        sourceRoot,
+                        out rootHasData)
+                    && rootHasData)
+                {
+                    Debug.LogWarning(
+                        "[Graduation Details] Preserved ambiguous root-flat legacy data at " +
+                        sourceRoot + "; it was not assigned to this save.");
+                }
+                foreach (string key in ambiguousKeys)
+                {
+                    WarnIfValidAmbiguous(Path.Combine(
+                        sourceRoot,
+                        GraduationDetailsPaths.SavesFolder,
+                        key));
+                    WarnIfValidAmbiguous(Path.Combine(sourceRoot, key));
+                }
             }
-
-            string targetParent = Path.GetDirectoryName(targetFile);
-            if (!string.IsNullOrEmpty(targetParent) && !Directory.Exists(targetParent))
-            {
-                Directory.CreateDirectory(targetParent);
-            }
-            File.Copy(sourceFile, targetFile, false);
-            return true;
         }
 
-        private static bool CopyDirectoryFilesIfMissing(string sourceDirectory, string targetDirectory)
+        private static void WarnIfValidAmbiguous(string directory)
         {
-            if (!Directory.Exists(sourceDirectory))
+            bool hasData;
+            if (GraduationDetailsSnapshotStorage.ValidateLegacyDirectory(directory, out hasData)
+                && hasData)
             {
-                return false;
+                Debug.LogWarning(
+                    "[Graduation Details] Preserved ambiguous legacy data at " + directory +
+                    "; it was not silently bound to the current save.");
             }
-
-            bool copied = false;
-            foreach (string sourceFile in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-            {
-                string relativePath = sourceFile.Substring(
-                    sourceDirectory.TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar).Length)
-                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                copied |= CopyFileIfMissing(sourceFile, Path.Combine(targetDirectory, relativePath));
-            }
-            return copied;
         }
 
-        private static bool HasAnyDataFile(string directory)
+        private static long GetDataFreshness(string directory)
         {
-            return File.Exists(Path.Combine(directory, GraduationDetailsPaths.MarriageFile))
-                || File.Exists(Path.Combine(directory, GraduationDetailsPaths.StaffMapFile))
-                || File.Exists(Path.Combine(directory, GraduationDetailsPaths.SnapshotsFile));
+            string marriagePath;
+            string staffPath;
+            string snapshotsPath;
+            if (!GraduationDetailsSnapshotStorage.TryGetDataPaths(
+                directory,
+                out marriagePath,
+                out staffPath,
+                out snapshotsPath))
+            {
+                return 0L;
+            }
+            long latest = 0L;
+            foreach (string path in new[] { marriagePath, staffPath, snapshotsPath })
+            {
+                if (File.Exists(path))
+                {
+                    latest = Math.Max(latest, File.GetLastWriteTimeUtc(path).Ticks);
+                }
+            }
+            return latest;
+        }
+
+        private static string GetContentIdentity(string directory)
+        {
+            try
+            {
+                List<string> identity = new List<string>();
+                string marriagePath;
+                string staffPath;
+                string snapshotsPath;
+                if (!GraduationDetailsSnapshotStorage.TryGetDataPaths(
+                    directory,
+                    out marriagePath,
+                    out staffPath,
+                    out snapshotsPath))
+                {
+                    return "";
+                }
+                foreach (string path in new[] { marriagePath, staffPath, snapshotsPath })
+                {
+                    GraduationDetailsPersistenceIO.FileFingerprint fingerprint;
+                    if (!File.Exists(path))
+                    {
+                        identity.Add(Path.GetFileName(path) + ":missing");
+                    }
+                    else if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                        path,
+                        out fingerprint))
+                    {
+                        return "";
+                    }
+                    else
+                    {
+                        identity.Add(Path.GetFileName(path) + ":" + fingerprint.Sha256);
+                    }
+                }
+                string portraits;
+                if (GraduationDetailsPersistenceIO.TryGetContainedPath(
+                        directory,
+                        GraduationDetailsPaths.PortraitsFolder,
+                        false,
+                        out portraits)
+                    && Directory.Exists(portraits))
+                {
+                    foreach (string portrait in Directory.GetFiles(
+                        portraits,
+                        "*",
+                        SearchOption.TopDirectoryOnly)
+                        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                    {
+                        string fileName = Path.GetFileName(portrait);
+                        string safePath;
+                        GraduationDetailsPersistenceIO.FileFingerprint fingerprint;
+                        if (!GraduationDetailsPaths.IsSafePortraitFileName(fileName)
+                            || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                                portraits,
+                                fileName,
+                                false,
+                                out safePath)
+                            || !GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                                safePath,
+                                out fingerprint))
+                        {
+                            return "";
+                        }
+                        identity.Add(fileName + ":" + fingerprint.Sha256);
+                    }
+                }
+                return GraduationDetailsPersistenceIO.ComputeSha256(
+                    Encoding.UTF8.GetBytes(string.Join("|", identity.ToArray())));
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static bool HasSnapshotPointer(string directory)
+        {
+            string pointer;
+            string backup;
+            return GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.ActiveSnapshotFile,
+                    out pointer)
+                && GraduationDetailsPaths.TryGetSafeLeafPath(
+                    directory,
+                    GraduationDetailsPaths.ActiveSnapshotBackupFile,
+                    out backup)
+                && (File.Exists(pointer) || File.Exists(backup));
         }
 
         private static bool PathsReferToSameDirectory(string firstPath, string secondPath)
@@ -816,15 +2782,39 @@ namespace GraduationDetails
             }
             values.Add(value);
         }
+
+        private sealed class LegacyCandidate
+        {
+            internal string Directory = "";
+            internal bool ExplicitOwner;
+            internal int DataFileCount;
+            internal long FreshnessUtcTicks;
+            internal string ContentIdentity = "";
+            internal string SourceKind = "legacy_migration";
+        }
     }
 
     internal static class GraduationDetailsPersistence
     {
+        private const float SaveCompletionTimeoutSeconds = 30f;
+        private const float SaveCompletionStableSeconds = 0.5f;
+        private const float SavePollIntervalSeconds = 0.1f;
+
         private static bool loadInProgress;
         private static bool loadPathCaptured;
         private static bool awaitingLatestAutosavePath;
         private static string stagedVanillaSaveFilePath = "";
         private static string stagedSaveDirectory = "";
+        private static float loadPauseStarted = -1f;
+        private static int runtimeEpoch;
+        private static long saveSequence;
+        private static int latestReboundEpoch = -1;
+        private static long latestReboundSequence = -1L;
+        private static readonly Dictionary<string, GraduationDetailsPreparedSave> PendingByToken =
+            new Dictionary<string, GraduationDetailsPreparedSave>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, List<GraduationDetailsPreparedSave>> PendingByTarget =
+            new Dictionary<string, List<GraduationDetailsPreparedSave>>(
+                StringComparer.OrdinalIgnoreCase);
 
         internal static bool LoadInProgress
         {
@@ -836,6 +2826,10 @@ namespace GraduationDetails
 
         internal static void BeginLoad(bool expectLatestAutosavePath = false)
         {
+            if (!loadInProgress)
+            {
+                loadPauseStarted = Time.realtimeSinceStartup;
+            }
             loadInProgress = true;
             loadPathCaptured = false;
             awaitingLatestAutosavePath = expectLatestAutosavePath;
@@ -881,6 +2875,7 @@ namespace GraduationDetails
             bool capturedPath = loadPathCaptured;
             string vanillaSaveFilePath = stagedVanillaSaveFilePath;
             string saveDirectory = stagedSaveDirectory;
+            ResumePendingObservers();
             loadInProgress = false;
             loadPathCaptured = false;
             awaitingLatestAutosavePath = false;
@@ -894,9 +2889,16 @@ namespace GraduationDetails
                 return;
             }
 
+            // Pending saves from the prior scope may still finish and publish to their own
+            // destinations, but must never rebind over the successfully loaded game.
+            runtimeEpoch++;
+
             GraduationDetailsPaths.BeginFreshWorkingPortraitScope();
             if (!string.IsNullOrEmpty(saveDirectory))
             {
+                GraduationDetailsSnapshotStorage.TryRecoverForVanillaSave(
+                    saveDirectory,
+                    vanillaSaveFilePath);
                 GraduationDetailsLegacyMigration.TryMigrateForScope(
                     saveDirectory,
                     vanillaSaveFilePath);
@@ -921,6 +2923,7 @@ namespace GraduationDetails
 
         internal static void CancelLoad()
         {
+            ResumePendingObservers();
             loadInProgress = false;
             loadPathCaptured = false;
             awaitingLatestAutosavePath = false;
@@ -931,6 +2934,9 @@ namespace GraduationDetails
         internal static void ResetForNewGame()
         {
             CancelLoad();
+            // Let verified old-game saves finish publishing, but make their epochs ineligible to
+            // rebind over the new game.
+            runtimeEpoch++;
             GraduationDetailsPaths.ClearBinding();
             GraduationDetailsPaths.BeginFreshWorkingPortraitScope();
             MarriageRecordStore.ResetForScopeChange();
@@ -938,11 +2944,15 @@ namespace GraduationDetails
             GraduationSnapshotStore.ResetForScopeChange();
         }
 
-        internal static void OnVanillaSaveScheduled(string dataFileName, bool fullPath)
+        internal static string PrepareVanillaSave(
+            SaveManager.SavedData data,
+            string dataFileName,
+            bool isJson,
+            bool fullPath)
         {
             if (loadInProgress)
             {
-                return;
+                return "";
             }
 
             string outputPath = GraduationDetailsPaths.ResolveDataSaverOutputPath(
@@ -956,30 +2966,294 @@ namespace GraduationDetails
                 out saveDirectory))
             {
                 Debug.LogWarning("[Graduation Details] Ignored non-canonical save path: " + outputPath);
-                return;
+                return "";
             }
 
             try
             {
-                // Save As must serialize the live dictionaries even when they are empty. This
-                // deliberately overwrites stale JSON left behind when vanilla reuses a deleted slot.
                 MarriageRecordStore.EnsureReady();
                 StaffIdolStore.EnsureReady();
                 GraduationSnapshotStore.EnsureReady();
-                MarriageRecordStore.SaveToDirectory(saveDirectory);
-                StaffIdolStore.SaveToDirectory(saveDirectory);
-                GraduationSnapshotStore.SaveToDirectory(saveDirectory);
+                string serialized = isJson
+                    ? JsonUtility.ToJson(data, true)
+                    : (data != null ? data.ToString() : "");
+                byte[] expectedPayload = Encoding.UTF8.GetBytes(serialized ?? "");
+                GraduationDetailsPersistenceIO.FileFingerprint preWriteFingerprint;
+                if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                    normalizedPath,
+                    out preWriteFingerprint))
+                {
+                    return "";
+                }
 
-                // Rebinding after the snapshot preserves the live cached state instead of clearing
-                // it and loading an older destination when the player uses Save As.
-                GraduationDetailsPaths.Bind(normalizedPath, saveDirectory);
-                MarriageRecordStore.RebindLoadedScope();
-                StaffIdolStore.RebindLoadedScope();
-                GraduationSnapshotStore.RebindLoadedScope();
+                long sequence = ++saveSequence;
+                GraduationDetailsPreparedSave prepared;
+                if (!GraduationDetailsSnapshotStorage.TryStageLiveSnapshot(
+                    normalizedPath,
+                    saveDirectory,
+                    expectedPayload,
+                    preWriteFingerprint,
+                    runtimeEpoch,
+                    sequence,
+                    out prepared))
+                {
+                    return "";
+                }
+                PendingByToken[prepared.TransactionId] = prepared;
+                List<GraduationDetailsPreparedSave> targetPending;
+                if (!PendingByTarget.TryGetValue(normalizedPath, out targetPending))
+                {
+                    targetPending = new List<GraduationDetailsPreparedSave>();
+                    PendingByTarget[normalizedPath] = targetPending;
+                }
+                targetPending.Add(prepared);
+                return prepared.TransactionId;
             }
             catch (Exception exception)
             {
-                Debug.LogWarning("[Graduation Details] Failed to snapshot save data: " + exception.Message);
+                Debug.LogWarning("[Graduation Details] Failed to prepare sidecar snapshot: " +
+                    exception.Message);
+                return "";
+            }
+        }
+
+        internal static void OnVanillaSaveScheduled(string transactionId)
+        {
+            GraduationDetailsPreparedSave prepared;
+            if (string.IsNullOrEmpty(transactionId)
+                || !PendingByToken.TryGetValue(transactionId, out prepared))
+            {
+                return;
+            }
+            prepared.Deadline = Time.realtimeSinceStartup + SaveCompletionTimeoutSeconds;
+            if (!GraduationDetailsPersistenceRunner.TryObserve(transactionId))
+            {
+                // The manifest was flushed before DataSaver was scheduled. With no guaranteed
+                // main-thread pump, leave it durable for exact-payload recovery on the next load.
+                DetachPrepared(prepared);
+            }
+        }
+
+        internal static bool TickPendingSave(string transactionId)
+        {
+            GraduationDetailsPreparedSave requested;
+            if (!PendingByToken.TryGetValue(transactionId, out requested))
+            {
+                return false;
+            }
+            if (loadInProgress)
+            {
+                return true;
+            }
+            float now = Time.realtimeSinceStartup;
+            if (now < requested.NextPoll)
+            {
+                return true;
+            }
+            requested.NextPoll = now + SavePollIntervalSeconds;
+
+            List<GraduationDetailsPreparedSave> targetPending;
+            if (!PendingByTarget.TryGetValue(
+                requested.NormalizedVanillaSaveFilePath,
+                out targetPending))
+            {
+                return false;
+            }
+            GraduationDetailsPersistenceIO.FileFingerprint current;
+            if (!GraduationDetailsPersistenceIO.TryCaptureFingerprint(
+                requested.NormalizedVanillaSaveFilePath,
+                out current))
+            {
+                return true;
+            }
+            foreach (GraduationDetailsPreparedSave candidate in targetPending)
+            {
+                if (FingerprintMatches(candidate, current)
+                    && !candidate.PreWriteFingerprint.SameFileState(current))
+                {
+                    candidate.WriteObserved = true;
+                }
+                if (!candidate.WriteObserved && now >= candidate.Deadline)
+                {
+                    candidate.Expired = true;
+                }
+                if (!FingerprintMatches(candidate, current))
+                {
+                    candidate.MatchingSince = -1f;
+                }
+            }
+            if (targetPending.Any(candidate => !candidate.WriteObserved && !candidate.Expired))
+            {
+                return true;
+            }
+
+            // DataSaver writes on independent threads. Intermediate writes can complete between
+            // polls or finish out of scheduling order. Publish only the newest transition-observed,
+            // fully validated generation whose payload equals the stable final file. An expired
+            // identical-payload schedule is not evidence that its writer ever ran.
+            GraduationDetailsPreparedSave latest = targetPending
+                .Where(candidate => candidate.WriteObserved
+                    && FingerprintMatches(candidate, current)
+                    && GraduationDetailsSnapshotStorage
+                        .IsPreparedSnapshotValidForCurrentPayload(candidate, current))
+                .OrderByDescending(candidate => candidate.Sequence)
+                .FirstOrDefault();
+            if (latest == null)
+            {
+                DiscardTarget(targetPending);
+                return false;
+            }
+            if (latest.MatchingSince < 0f)
+            {
+                latest.MatchingSince = now;
+                return true;
+            }
+            if (now - latest.MatchingSince < SaveCompletionStableSeconds)
+            {
+                return true;
+            }
+
+            string committedDirectory;
+            bool published = GraduationDetailsSnapshotStorage.TryPublishPreparedSnapshot(
+                latest,
+                out committedDirectory);
+            foreach (GraduationDetailsPreparedSave candidate in targetPending.ToArray())
+            {
+                PendingByToken.Remove(candidate.TransactionId);
+                if (!ReferenceEquals(candidate, latest))
+                {
+                    GraduationDetailsSnapshotStorage.DiscardPreparedSnapshot(candidate);
+                }
+            }
+            PendingByTarget.Remove(latest.NormalizedVanillaSaveFilePath);
+            if (!published)
+            {
+                // Keep the newest durable stage/final generation for load-time recovery.
+                return false;
+            }
+
+            if (!loadInProgress
+                && latest.RuntimeEpoch == runtimeEpoch
+                && (latestReboundEpoch != runtimeEpoch
+                    || latest.Sequence > latestReboundSequence))
+            {
+                GraduationDetailsPaths.Bind(
+                    latest.NormalizedVanillaSaveFilePath,
+                    latest.SaveDirectory);
+                MarriageRecordStore.RebindLoadedScope();
+                StaffIdolStore.RebindLoadedScope();
+                GraduationSnapshotStore.RebindLoadedScope();
+                latestReboundEpoch = runtimeEpoch;
+                latestReboundSequence = latest.Sequence;
+            }
+            return false;
+        }
+
+        private static bool FingerprintMatches(
+            GraduationDetailsPreparedSave prepared,
+            GraduationDetailsPersistenceIO.FileFingerprint fingerprint)
+        {
+            return prepared != null
+                && fingerprint != null
+                && fingerprint.Exists
+                && fingerprint.Length == prepared.ExpectedVanillaLength
+                && string.Equals(
+                    fingerprint.Sha256,
+                    prepared.ExpectedVanillaSha256,
+                    StringComparison.Ordinal);
+        }
+
+        private static void DiscardTarget(List<GraduationDetailsPreparedSave> targetPending)
+        {
+            if (targetPending == null || targetPending.Count == 0)
+            {
+                return;
+            }
+            string target = targetPending[0].NormalizedVanillaSaveFilePath;
+            foreach (GraduationDetailsPreparedSave candidate in targetPending.ToArray())
+            {
+                PendingByToken.Remove(candidate.TransactionId);
+                GraduationDetailsSnapshotStorage.DiscardPreparedSnapshot(candidate);
+            }
+            PendingByTarget.Remove(target);
+        }
+
+        private static void DetachPrepared(GraduationDetailsPreparedSave prepared)
+        {
+            PendingByToken.Remove(prepared.TransactionId);
+            List<GraduationDetailsPreparedSave> targetPending;
+            if (PendingByTarget.TryGetValue(
+                prepared.NormalizedVanillaSaveFilePath,
+                out targetPending))
+            {
+                targetPending.Remove(prepared);
+                if (targetPending.Count == 0)
+                {
+                    PendingByTarget.Remove(prepared.NormalizedVanillaSaveFilePath);
+                }
+            }
+        }
+
+        private static void ResumePendingObservers()
+        {
+            if (loadPauseStarted < 0f)
+            {
+                return;
+            }
+            float pauseDuration = Math.Max(
+                0f,
+                Time.realtimeSinceStartup - loadPauseStarted);
+            foreach (GraduationDetailsPreparedSave prepared in PendingByToken.Values)
+            {
+                if (prepared.Deadline > 0f)
+                {
+                    prepared.Deadline += pauseDuration;
+                }
+            }
+            loadPauseStarted = -1f;
+        }
+    }
+
+    internal sealed class GraduationDetailsPersistenceRunner : MonoBehaviour
+    {
+        private static GraduationDetailsPersistenceRunner instance;
+
+        internal static void Ensure(GameObject host)
+        {
+            if (instance != null || host == null)
+            {
+                return;
+            }
+            instance = host.GetComponent<GraduationDetailsPersistenceRunner>();
+            if (instance == null)
+            {
+                instance = host.AddComponent<GraduationDetailsPersistenceRunner>();
+            }
+        }
+
+        internal static bool TryObserve(string transactionId)
+        {
+            if (instance == null || string.IsNullOrEmpty(transactionId))
+            {
+                return false;
+            }
+            instance.StartCoroutine(instance.Observe(transactionId));
+            return true;
+        }
+
+        private IEnumerator Observe(string transactionId)
+        {
+            while (GraduationDetailsPersistence.TickPendingSave(transactionId))
+            {
+                yield return null;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (ReferenceEquals(instance, this))
+            {
+                instance = null;
             }
         }
     }
@@ -988,7 +3262,19 @@ namespace GraduationDetails
     {
         private static readonly Dictionary<int, MarriageRecord> Records = new Dictionary<int, MarriageRecord>();
         private static bool loaded;
+        private static bool loadHealthy = true;
         private static string loadedScope = "";
+
+        internal static bool CanSnapshot
+        {
+            get
+            {
+                EnsureLoaded();
+                return loadHealthy
+                    && (!GraduationDetailsPaths.HasActiveSaveScope
+                        || GraduationDetailsPaths.CanWriteActiveScope);
+            }
+        }
 
         private static string DataPath
         {
@@ -1029,6 +3315,7 @@ namespace GraduationDetails
         internal static void ResetForScopeChange()
         {
             loaded = false;
+            loadHealthy = true;
             loadedScope = "";
             Records.Clear();
         }
@@ -1036,23 +3323,80 @@ namespace GraduationDetails
         internal static void RebindLoadedScope()
         {
             loaded = true;
+            loadHealthy = true;
             loadedScope = GraduationDetailsPaths.GetScopeId();
         }
 
         internal static void SaveToDirectory(string directory)
         {
-            if (string.IsNullOrEmpty(directory))
+            string path;
+            string validatedDirectory;
+            if (string.IsNullOrEmpty(directory)
+                || !GraduationDetailsPaths.TryValidateOwnedDataDirectory(
+                    directory,
+                    out validatedDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                    validatedDirectory,
+                    GraduationDetailsPaths.MarriageFile,
+                    true,
+                    out path))
             {
-                return;
+                throw new InvalidDataException("Unsafe marriage snapshot path.");
             }
 
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(validatedDirectory);
             MarriageRecordList list = new MarriageRecordList();
             list.Records = Records.Values.ToList();
             string json = JsonUtility.ToJson(list, true);
-            File.WriteAllText(
-                Path.Combine(directory, GraduationDetailsPaths.MarriageFile),
-                json);
+            GraduationDetailsPersistenceIO.WriteUtf8Durable(path, json);
+        }
+
+        internal static string GetEmptyJson()
+        {
+            return JsonUtility.ToJson(new MarriageRecordList(), true);
+        }
+
+        internal static bool TryValidateFile(string path)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return false;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    return false;
+                }
+                MarriageRecordList list = JsonUtility.FromJson<MarriageRecordList>(json);
+                if (list == null || list.Records == null)
+                {
+                    return false;
+                }
+                HashSet<int> ids = new HashSet<int>();
+                foreach (MarriageRecord record in list.Records)
+                {
+                    if (record == null
+                        || record.GirlId < 0
+                        || !ids.Add(record.GirlId)
+                        || !Enum.IsDefined(typeof(CustodyOwner), record.Custody))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static void EnsureLoaded()
@@ -1064,37 +3408,69 @@ namespace GraduationDetails
             }
             loadedScope = scope;
             loaded = true;
-            Records.Clear();
+            loadHealthy = true;
             try
             {
-                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope)
                 {
+                    Records.Clear();
+                    return;
+                }
+                if (!GraduationDetailsPaths.CanWriteActiveScope
+                    || string.IsNullOrEmpty(DataPath))
+                {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!File.Exists(DataPath))
+                {
+                    Records.Clear();
                     return;
                 }
                 string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
-                if (string.IsNullOrEmpty(json))
+                if (string.IsNullOrWhiteSpace(json))
                 {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    loadHealthy = false;
                     return;
                 }
                 MarriageRecordList list = JsonUtility.FromJson<MarriageRecordList>(json);
                 if (list == null || list.Records == null)
                 {
+                    loadHealthy = false;
                     return;
                 }
-                Records.Clear();
+                Dictionary<int, MarriageRecord> parsed = new Dictionary<int, MarriageRecord>();
                 foreach (MarriageRecord record in list.Records)
                 {
-                    if (record == null || record.GirlId < 0)
+                    if (record == null
+                        || record.GirlId < 0
+                        || parsed.ContainsKey(record.GirlId)
+                        || !Enum.IsDefined(typeof(CustodyOwner), record.Custody))
                     {
-                        continue;
+                        loadHealthy = false;
+                        return;
                     }
-                    Records[record.GirlId] = record;
+                    parsed[record.GirlId] = record;
+                }
+                Records.Clear();
+                foreach (KeyValuePair<int, MarriageRecord> entry in parsed)
+                {
+                    Records[entry.Key] = entry.Value;
                 }
             }
-            catch
+            catch (Exception exception)
             {
-                Records.Clear();
+                loadHealthy = false;
+                Debug.LogWarning("[Graduation Details] Marriage sidecar is unreadable and was " +
+                    "left untouched: " + exception.Message);
             }
         }
 
@@ -1321,7 +3697,19 @@ namespace GraduationDetails
     {
         private static readonly Dictionary<int, StaffIdolRecord> StaffToGirl = new Dictionary<int, StaffIdolRecord>();
         private static bool loaded;
+        private static bool loadHealthy = true;
         private static string loadedScope = "";
+
+        internal static bool CanSnapshot
+        {
+            get
+            {
+                EnsureLoaded();
+                return loadHealthy
+                    && (!GraduationDetailsPaths.HasActiveSaveScope
+                        || GraduationDetailsPaths.CanWriteActiveScope);
+            }
+        }
 
         private static string DataPath
         {
@@ -1485,6 +3873,7 @@ namespace GraduationDetails
         internal static void ResetForScopeChange()
         {
             loaded = false;
+            loadHealthy = true;
             loadedScope = "";
             StaffToGirl.Clear();
         }
@@ -1492,17 +3881,28 @@ namespace GraduationDetails
         internal static void RebindLoadedScope()
         {
             loaded = true;
+            loadHealthy = true;
             loadedScope = GraduationDetailsPaths.GetScopeId();
         }
 
         internal static void SaveToDirectory(string directory)
         {
-            if (string.IsNullOrEmpty(directory))
+            string path;
+            string validatedDirectory;
+            if (string.IsNullOrEmpty(directory)
+                || !GraduationDetailsPaths.TryValidateOwnedDataDirectory(
+                    directory,
+                    out validatedDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                    validatedDirectory,
+                    GraduationDetailsPaths.StaffMapFile,
+                    true,
+                    out path))
             {
-                return;
+                throw new InvalidDataException("Unsafe staff snapshot path.");
             }
 
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(validatedDirectory);
             StaffIdolRecordList list = new StaffIdolRecordList();
             foreach (KeyValuePair<int, StaffIdolRecord> entry in StaffToGirl)
             {
@@ -1512,9 +3912,55 @@ namespace GraduationDetails
                 }
             }
             string json = JsonUtility.ToJson(list, true);
-            File.WriteAllText(
-                Path.Combine(directory, GraduationDetailsPaths.StaffMapFile),
-                json);
+            GraduationDetailsPersistenceIO.WriteUtf8Durable(path, json);
+        }
+
+        internal static string GetEmptyJson()
+        {
+            return JsonUtility.ToJson(new StaffIdolRecordList(), true);
+        }
+
+        internal static bool TryValidateFile(string path)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return false;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    return false;
+                }
+                StaffIdolRecordList list = JsonUtility.FromJson<StaffIdolRecordList>(json);
+                if (list == null || list.Records == null)
+                {
+                    return false;
+                }
+                HashSet<int> ids = new HashSet<int>();
+                foreach (StaffIdolRecord record in list.Records)
+                {
+                    if (record == null
+                        || record.StaffId < 0
+                        || record.GirlId < 0
+                        || !ids.Add(record.StaffId))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static int TryResolveGirlId(staff._staff staffer)
@@ -1694,37 +4140,69 @@ namespace GraduationDetails
             }
             loadedScope = scope;
             loaded = true;
-            StaffToGirl.Clear();
+            loadHealthy = true;
             try
             {
-                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope)
                 {
+                    StaffToGirl.Clear();
+                    return;
+                }
+                if (!GraduationDetailsPaths.CanWriteActiveScope
+                    || string.IsNullOrEmpty(DataPath))
+                {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!File.Exists(DataPath))
+                {
+                    StaffToGirl.Clear();
                     return;
                 }
                 string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
-                if (string.IsNullOrEmpty(json))
+                if (string.IsNullOrWhiteSpace(json))
                 {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    loadHealthy = false;
                     return;
                 }
                 StaffIdolRecordList list = JsonUtility.FromJson<StaffIdolRecordList>(json);
                 if (list == null || list.Records == null)
                 {
+                    loadHealthy = false;
                     return;
                 }
-                StaffToGirl.Clear();
+                Dictionary<int, StaffIdolRecord> parsed = new Dictionary<int, StaffIdolRecord>();
                 foreach (StaffIdolRecord record in list.Records)
                 {
-                    if (record == null || record.StaffId < 0 || record.GirlId < 0)
+                    if (record == null
+                        || record.StaffId < 0
+                        || record.GirlId < 0
+                        || parsed.ContainsKey(record.StaffId))
                     {
-                        continue;
+                        loadHealthy = false;
+                        return;
                     }
-                    StaffToGirl[record.StaffId] = record;
+                    parsed[record.StaffId] = record;
+                }
+                StaffToGirl.Clear();
+                foreach (KeyValuePair<int, StaffIdolRecord> entry in parsed)
+                {
+                    StaffToGirl[entry.Key] = entry.Value;
                 }
             }
-            catch
+            catch (Exception exception)
             {
-                StaffToGirl.Clear();
+                loadHealthy = false;
+                Debug.LogWarning("[Graduation Details] Staff sidecar is unreadable and was left " +
+                    "untouched: " + exception.Message);
             }
         }
 
@@ -1829,7 +4307,19 @@ namespace GraduationDetails
         private static readonly Dictionary<string, HashSet<string>> PendingPortraitTargets =
             new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         private static bool loaded;
+        private static bool loadHealthy = true;
         private static string loadedScope = "";
+
+        internal static bool CanSnapshot
+        {
+            get
+            {
+                EnsureLoaded();
+                return loadHealthy
+                    && (!GraduationDetailsPaths.HasActiveSaveScope
+                        || GraduationDetailsPaths.CanWriteActiveScope);
+            }
+        }
 
         private static string DataPath
         {
@@ -1959,11 +4449,16 @@ namespace GraduationDetails
 
         internal static string GetPortraitPath(GraduationSnapshot snapshot)
         {
-            if (snapshot == null || string.IsNullOrEmpty(snapshot.PortraitFile))
+            string workingPath;
+            if (snapshot == null
+                || !GraduationDetailsPaths.TryGetSafePortraitPath(
+                    WorkingPortraitDir,
+                    snapshot.PortraitFile,
+                    false,
+                    out workingPath))
             {
                 return "";
             }
-            string workingPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
             if (File.Exists(workingPath))
             {
                 return workingPath;
@@ -1971,8 +4466,13 @@ namespace GraduationDetails
 
             if (!string.IsNullOrEmpty(PortraitDir))
             {
-                string scopedPath = Path.Combine(PortraitDir, snapshot.PortraitFile);
-                if (File.Exists(scopedPath))
+                string scopedPath;
+                if (GraduationDetailsPaths.TryGetSafePortraitPath(
+                        PortraitDir,
+                        snapshot.PortraitFile,
+                        false,
+                        out scopedPath)
+                    && File.Exists(scopedPath))
                 {
                     return scopedPath;
                 }
@@ -2459,6 +4959,7 @@ namespace GraduationDetails
         internal static void ResetForScopeChange()
         {
             loaded = false;
+            loadHealthy = true;
             loadedScope = "";
             Records.Clear();
         }
@@ -2466,48 +4967,202 @@ namespace GraduationDetails
         internal static void RebindLoadedScope()
         {
             loaded = true;
+            loadHealthy = true;
             loadedScope = GraduationDetailsPaths.GetScopeId();
         }
 
         internal static void SaveToDirectory(string directory)
         {
-            if (string.IsNullOrEmpty(directory))
+            string dataPath;
+            string targetPortraitDirectory;
+            string validatedDirectory;
+            if (string.IsNullOrEmpty(directory)
+                || !GraduationDetailsPaths.TryValidateOwnedDataDirectory(
+                    directory,
+                    out validatedDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                    validatedDirectory,
+                    GraduationDetailsPaths.SnapshotsFile,
+                    true,
+                    out dataPath)
+                || !GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    validatedDirectory,
+                    GraduationDetailsPaths.PortraitsFolder,
+                    true,
+                    out targetPortraitDirectory))
             {
-                return;
+                throw new InvalidDataException("Unsafe graduation snapshot path.");
             }
 
-            Directory.CreateDirectory(directory);
+            Directory.CreateDirectory(validatedDirectory);
             GraduationSnapshotList list = new GraduationSnapshotList();
             list.Records = Records.Values.ToList();
             string json = JsonUtility.ToJson(list, true);
-            File.WriteAllText(
-                Path.Combine(directory, GraduationDetailsPaths.SnapshotsFile),
-                json);
-
-            string targetPortraitDirectory = Path.Combine(
-                directory,
-                GraduationDetailsPaths.PortraitsFolder);
+            GraduationDetailsPersistenceIO.WriteUtf8Durable(dataPath, json);
             foreach (GraduationSnapshot snapshot in Records.Values)
             {
-                if (snapshot == null || string.IsNullOrEmpty(snapshot.PortraitFile))
+                string targetPath;
+                if (snapshot == null)
+                {
+                    throw new InvalidDataException("Null record in live graduation snapshot.");
+                }
+                if (string.IsNullOrEmpty(snapshot.PortraitFile))
                 {
                     continue;
                 }
+                if (!GraduationDetailsPaths.TryGetSafePortraitPath(
+                        targetPortraitDirectory,
+                        snapshot.PortraitFile,
+                        true,
+                        out targetPath))
+                {
+                    throw new InvalidDataException("Unsafe portrait filename in live snapshot.");
+                }
 
                 string sourcePath = GetPortraitPath(snapshot);
-                string targetPath = Path.Combine(targetPortraitDirectory, snapshot.PortraitFile);
                 if (!File.Exists(sourcePath))
                 {
-                    // Portrait generation is asynchronous. Bind this already-written snapshot to
-                    // its exact save target so the late result cannot follow a later active scope.
-                    RegisterPendingPortraitTarget(sourcePath, targetPath);
                     continue;
                 }
                 if (PathsReferToSameFile(sourcePath, targetPath))
                 {
                     continue;
                 }
-                CopyPortrait(sourcePath, targetPath);
+                if (!CopyPortrait(sourcePath, targetPath))
+                {
+                    throw new IOException("Failed to durably stage graduation portrait.");
+                }
+            }
+        }
+
+        internal static string GetEmptyJson()
+        {
+            return JsonUtility.ToJson(new GraduationSnapshotList(), true);
+        }
+
+        internal static bool TryValidateFile(string path)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    return false;
+                }
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return false;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    return false;
+                }
+                GraduationSnapshotList list = JsonUtility.FromJson<GraduationSnapshotList>(json);
+                if (list == null || list.Records == null)
+                {
+                    return false;
+                }
+                HashSet<int> ids = new HashSet<int>();
+                foreach (GraduationSnapshot snapshot in list.Records)
+                {
+                    if (!IsValidSnapshot(snapshot) || !ids.Add(snapshot.GirlId))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static void RegisterPendingPortraitTargetsForDirectory(string dataDirectory)
+        {
+            string targetPortraitDirectory;
+            string snapshotDataPath;
+            if (string.IsNullOrEmpty(dataDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetContainedPath(
+                    dataDirectory,
+                    GraduationDetailsPaths.PortraitsFolder,
+                    true,
+                    out targetPortraitDirectory)
+                || !GraduationDetailsPersistenceIO.TryGetSafeLeafPath(
+                    dataDirectory,
+                    GraduationDetailsPaths.SnapshotsFile,
+                    false,
+                    out snapshotDataPath)
+                || !TryValidateFile(snapshotDataPath))
+            {
+                return;
+            }
+            GraduationSnapshotList persisted;
+            try
+            {
+                persisted = JsonUtility.FromJson<GraduationSnapshotList>(
+                    File.ReadAllText(snapshotDataPath));
+            }
+            catch
+            {
+                return;
+            }
+            if (persisted == null || persisted.Records == null)
+            {
+                return;
+            }
+            foreach (GraduationSnapshot snapshot in persisted.Records)
+            {
+                string workingPath;
+                string targetPath;
+                if (snapshot == null
+                    || !GraduationDetailsPaths.TryGetSafePortraitPath(
+                        WorkingPortraitDir,
+                        snapshot.PortraitFile,
+                        false,
+                        out workingPath)
+                    || !GraduationDetailsPaths.TryGetSafePortraitPath(
+                        targetPortraitDirectory,
+                        snapshot.PortraitFile,
+                        true,
+                        out targetPath)
+                    || File.Exists(targetPath))
+                {
+                    continue;
+                }
+                if (File.Exists(workingPath))
+                {
+                    CopyPortrait(workingPath, targetPath);
+                }
+                else
+                {
+                    RegisterPendingPortraitTarget(workingPath, targetPath);
+                }
+            }
+        }
+
+        internal static void RemovePendingPortraitTargetsUnderDirectory(string directory)
+        {
+            if (string.IsNullOrEmpty(directory))
+            {
+                return;
+            }
+            foreach (string source in PendingPortraitTargets.Keys.ToArray())
+            {
+                if (GraduationDetailsPaths.IsPathContainedBy(directory, source))
+                {
+                    PendingPortraitTargets.Remove(source);
+                    continue;
+                }
+                HashSet<string> targets = PendingPortraitTargets[source];
+                targets.RemoveWhere(target =>
+                    GraduationDetailsPaths.IsPathContainedBy(directory, target));
+                if (targets.Count == 0)
+                {
+                    PendingPortraitTargets.Remove(source);
+                }
             }
         }
 
@@ -2520,43 +5175,108 @@ namespace GraduationDetails
             }
             loadedScope = scope;
             loaded = true;
-            Records.Clear();
+            loadHealthy = true;
             try
             {
-                if (!GraduationDetailsPaths.HasActiveSaveScope || !File.Exists(DataPath))
+                if (!GraduationDetailsPaths.HasActiveSaveScope)
                 {
+                    Records.Clear();
+                    return;
+                }
+                if (!GraduationDetailsPaths.CanWriteActiveScope
+                    || string.IsNullOrEmpty(DataPath))
+                {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!File.Exists(DataPath))
+                {
+                    Records.Clear();
                     return;
                 }
                 string loadPath = DataPath;
                 string json = File.ReadAllText(loadPath);
-                if (string.IsNullOrEmpty(json))
+                if (string.IsNullOrWhiteSpace(json))
                 {
+                    loadHealthy = false;
+                    return;
+                }
+                if (!GraduationDetailsPersistenceIO.HasExplicitRootArrayProperty(
+                    json,
+                    "Records"))
+                {
+                    loadHealthy = false;
                     return;
                 }
                 GraduationSnapshotList list = JsonUtility.FromJson<GraduationSnapshotList>(json);
                 if (list == null || list.Records == null)
                 {
+                    loadHealthy = false;
                     return;
                 }
-                Records.Clear();
+                Dictionary<int, GraduationSnapshot> parsed =
+                    new Dictionary<int, GraduationSnapshot>();
                 foreach (GraduationSnapshot snapshot in list.Records)
                 {
-                    if (snapshot == null || snapshot.GirlId < 0)
+                    if (!IsValidSnapshot(snapshot) || parsed.ContainsKey(snapshot.GirlId))
                     {
-                        continue;
+                        loadHealthy = false;
+                        return;
                     }
-                    Records[snapshot.GirlId] = snapshot;
+                    parsed[snapshot.GirlId] = snapshot;
+                }
+                Records.Clear();
+                foreach (KeyValuePair<int, GraduationSnapshot> entry in parsed)
+                {
+                    Records[entry.Key] = entry.Value;
                 }
             }
-            catch
+            catch (Exception exception)
             {
-                Records.Clear();
+                loadHealthy = false;
+                Debug.LogWarning("[Graduation Details] Graduation sidecar is unreadable and was " +
+                    "left untouched: " + exception.Message);
             }
         }
 
         private static void Save()
         {
             // Mutations stay in memory until the matching vanilla save is scheduled.
+        }
+
+        private static bool IsValidSnapshot(GraduationSnapshot snapshot)
+        {
+            if (snapshot == null
+                || snapshot.GirlId < 0
+                || (!string.IsNullOrEmpty(snapshot.PortraitFile)
+                    && !GraduationDetailsPaths.IsSafePortraitFileName(snapshot.PortraitFile))
+                || snapshot.Fans == null
+                || snapshot.Bonds == null)
+            {
+                return false;
+            }
+            foreach (FanSnapshot fan in snapshot.Fans)
+            {
+                if (fan == null)
+                {
+                    return false;
+                }
+            }
+            foreach (BondSectionSnapshot section in snapshot.Bonds)
+            {
+                if (section == null || section.Entries == null)
+                {
+                    return false;
+                }
+                foreach (BondEntry entry in section.Entries)
+                {
+                    if (entry == null || entry.GirlId < 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
 
         private static void TryCapturePortrait(data_girls.girls girl, GraduationSnapshot snapshot)
@@ -2570,7 +5290,15 @@ namespace GraduationDetails
             {
                 return;
             }
-            string destPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
+            string destPath;
+            if (!GraduationDetailsPaths.TryGetSafePortraitPath(
+                WorkingPortraitDir,
+                snapshot.PortraitFile,
+                true,
+                out destPath))
+            {
+                return;
+            }
             string sourcePath = GetSourcePortraitPath(girl);
             if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
             {
@@ -2618,20 +5346,24 @@ namespace GraduationDetails
 
         private static void RegisterPendingPortraitTarget(string sourcePath, string targetPath)
         {
+            string validatedSource;
+            string validatedTarget;
             if (string.IsNullOrEmpty(sourcePath)
                 || string.IsNullOrEmpty(targetPath)
+                || !TryValidateWorkingPortraitPath(sourcePath, false, out validatedSource)
+                || !TryValidateOwnedPortraitDestination(targetPath, out validatedTarget)
                 || PathsReferToSameFile(sourcePath, targetPath))
             {
                 return;
             }
 
             HashSet<string> targets;
-            if (!PendingPortraitTargets.TryGetValue(sourcePath, out targets))
+            if (!PendingPortraitTargets.TryGetValue(validatedSource, out targets))
             {
                 targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                PendingPortraitTargets[sourcePath] = targets;
+                PendingPortraitTargets[validatedSource] = targets;
             }
-            targets.Add(targetPath);
+            targets.Add(validatedTarget);
         }
 
         private static void RegisterScopedPortraitRepair(GraduationSnapshot snapshot)
@@ -2643,8 +5375,21 @@ namespace GraduationDetails
                 return;
             }
 
-            string workingPath = Path.Combine(WorkingPortraitDir, snapshot.PortraitFile);
-            string scopedPath = Path.Combine(PortraitDir, snapshot.PortraitFile);
+            string workingPath;
+            string scopedPath;
+            if (!GraduationDetailsPaths.TryGetSafePortraitPath(
+                    WorkingPortraitDir,
+                    snapshot.PortraitFile,
+                    false,
+                    out workingPath)
+                || !GraduationDetailsPaths.TryGetSafePortraitPath(
+                    PortraitDir,
+                    snapshot.PortraitFile,
+                    true,
+                    out scopedPath))
+            {
+                return;
+            }
             if (File.Exists(scopedPath))
             {
                 return;
@@ -2675,6 +5420,17 @@ namespace GraduationDetails
             HashSet<string> failedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string targetPath in targets)
             {
+                string portraitDirectory = Path.GetDirectoryName(targetPath);
+                string targetDataDirectory = !string.IsNullOrEmpty(portraitDirectory)
+                    ? Path.GetDirectoryName(portraitDirectory)
+                    : "";
+                if (string.IsNullOrEmpty(targetDataDirectory)
+                    || !Directory.Exists(targetDataDirectory))
+                {
+                    // The transaction/generation was discarded or pruned. Never recreate it for
+                    // an asynchronous portrait result.
+                    continue;
+                }
                 if (!CopyPortrait(workingPath, targetPath))
                 {
                     failedTargets.Add(targetPath);
@@ -2692,17 +5448,103 @@ namespace GraduationDetails
         {
             try
             {
-                string dir = Path.GetDirectoryName(destPath);
-                if (!Directory.Exists(dir))
+                string normalizedSource;
+                string normalizedDestination;
+                if (!GraduationDetailsPersistenceIO.TryNormalizeFilePath(
+                        sourcePath,
+                        out normalizedSource)
+                    || !File.Exists(normalizedSource)
+                    || (File.GetAttributes(normalizedSource) & FileAttributes.ReparsePoint) != 0
+                    || !TryValidateOwnedPortraitDestination(
+                        destPath,
+                        out normalizedDestination))
                 {
-                    Directory.CreateDirectory(dir);
+                    return false;
                 }
-                File.Copy(sourcePath, destPath, true);
+                GraduationDetailsPersistenceIO.CopyFileDurable(
+                    normalizedSource,
+                    normalizedDestination);
                 return true;
             }
             catch
             {
                 // Ignore file copy errors to avoid breaking the game loop.
+                return false;
+            }
+        }
+
+        private static bool TryValidateWorkingPortraitPath(
+            string path,
+            bool forWrite,
+            out string normalized)
+        {
+            normalized = "";
+            string fileName;
+            try
+            {
+                fileName = Path.GetFileName(path);
+            }
+            catch
+            {
+                return false;
+            }
+            return GraduationDetailsPaths.TryGetSafePortraitPath(
+                    WorkingPortraitDir,
+                    fileName,
+                    forWrite,
+                    out normalized)
+                && PathsReferToSameFile(path, normalized);
+        }
+
+        private static bool TryValidateOwnedPortraitDestination(
+            string path,
+            out string normalized)
+        {
+            normalized = "";
+            try
+            {
+                string parent = Path.GetDirectoryName(path);
+                string fileName = Path.GetFileName(path);
+                if (string.IsNullOrEmpty(parent)
+                    || !string.Equals(
+                        Path.GetFileName(parent),
+                        GraduationDetailsPaths.PortraitsFolder,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !GraduationDetailsPaths.TryGetSafePortraitPath(
+                        parent,
+                        fileName,
+                        true,
+                        out normalized)
+                    || !PathsReferToSameFile(path, normalized))
+                {
+                    return false;
+                }
+                string validated;
+                if (GraduationDetailsPaths.IsPathContainedBy(
+                    GraduationDetailsPaths.RootDir,
+                    normalized))
+                {
+                    return GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                        Application.persistentDataPath,
+                        normalized,
+                        true,
+                        out validated);
+                }
+                if (GraduationDetailsPaths.IsPathContainedBy(
+                    WorkingPortraitDir,
+                    normalized))
+                {
+                    return GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                        Path.GetTempPath(),
+                        normalized,
+                        true,
+                        out validated);
+                }
+                return false;
+            }
+            catch
+            {
+                normalized = "";
                 return false;
             }
         }
@@ -4083,6 +6925,32 @@ namespace GraduationDetails
         }
     }
 
+    [HarmonyPatch(typeof(SaveManager), "Awake")]
+    internal static class SaveManager_Awake_GraduationDetailsPersistenceRunner_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(SaveManager __instance)
+        {
+            if (__instance != null)
+            {
+                GraduationDetailsPersistenceRunner.Ensure(__instance.gameObject);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(PopupManager), "Start")]
+    internal static class PopupManager_Start_GraduationDetailsPersistenceRunner_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(PopupManager __instance)
+        {
+            if (__instance != null)
+            {
+                GraduationDetailsPersistenceRunner.Ensure(__instance.gameObject);
+            }
+        }
+    }
+
     /// <summary>
     /// Injects save-scope capture into vanilla's non-generic SavedData writer call sites.
     /// Patching a constructed DataSaver generic is unsafe on Mono because reference-type
@@ -4128,10 +6996,21 @@ namespace GraduationDetails
             LocalBuilder dataFileNameLocal = generator.DeclareLocal(typeof(string));
             LocalBuilder isJsonLocal = generator.DeclareLocal(typeof(bool));
             LocalBuilder fullPathLocal = generator.DeclareLocal(typeof(bool));
-            MethodInfo captureMethod = AccessTools.Method(
+            LocalBuilder transactionIdLocal = generator.DeclareLocal(typeof(string));
+            MethodInfo prepareMethod = AccessTools.Method(
+                typeof(GraduationDetailsPersistence),
+                nameof(GraduationDetailsPersistence.PrepareVanillaSave),
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string),
+                    typeof(bool),
+                    typeof(bool)
+                });
+            MethodInfo scheduledMethod = AccessTools.Method(
                 typeof(GraduationDetailsPersistence),
                 nameof(GraduationDetailsPersistence.OnVanillaSaveScheduled),
-                new Type[] { typeof(string), typeof(bool) });
+                new Type[] { typeof(string) });
             int injectedWriteCount = 0;
 
             foreach (CodeInstruction instruction in codes)
@@ -4142,8 +7021,8 @@ namespace GraduationDetails
                     continue;
                 }
 
-                // Preserve the exact four vanilla arguments, schedule the game save unchanged,
-                // and snapshot/rebind this mod only after DataSaver returns successfully.
+                // Stage sidecars and the expected vanilla payload before vanilla starts its
+                // background writer. The original four arguments and call remain unchanged.
                 CodeInstruction firstInjectedInstruction =
                     new CodeInstruction(OpCodes.Stloc, fullPathLocal);
                 firstInjectedInstruction.labels.AddRange(instruction.labels);
@@ -4159,10 +7038,15 @@ namespace GraduationDetails
                 yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
-                yield return instruction;
+                yield return new CodeInstruction(OpCodes.Call, prepareMethod);
+                yield return new CodeInstruction(OpCodes.Stloc, transactionIdLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
-                yield return new CodeInstruction(OpCodes.Call, captureMethod);
+                yield return instruction;
+                yield return new CodeInstruction(OpCodes.Ldloc, transactionIdLocal);
+                yield return new CodeInstruction(OpCodes.Call, scheduledMethod);
                 injectedWriteCount++;
             }
 

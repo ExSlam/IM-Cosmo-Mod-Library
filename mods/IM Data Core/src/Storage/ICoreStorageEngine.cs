@@ -23,6 +23,11 @@ namespace IMDataCore
         bool Initialize(string databasePath, out string errorMessage);
 
         /// <summary>
+        /// Revalidates the durable storage artifact before a staged candidate is published.
+        /// </summary>
+        bool TryValidateIntegrity(out string errorMessage);
+
+        /// <summary>
         /// Persists one queued batch atomically.
         /// </summary>
         bool PersistBatch(
@@ -47,6 +52,18 @@ namespace IMDataCore
         bool TryRemoveCustomData(string saveKey, string namespaceIdentifier, string dataKey, out string errorMessage);
 
         /// <summary>
+        /// Validates one prospective custom-data mutation against the currently
+        /// persisted namespace quotas without changing memory or durable storage.
+        /// </summary>
+        bool TryValidateCustomDataMutation(
+            string saveKey,
+            string namespaceIdentifier,
+            string dataKey,
+            string jsonValue,
+            bool remove,
+            out string errorMessage);
+
+        /// <summary>
         /// Returns a bounded list of recent events for one idol.
         /// </summary>
         bool TryReadRecentEventsForIdol(string saveKey, int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage);
@@ -67,6 +84,27 @@ namespace IMDataCore
         /// Returns the first game date at which exact money-ledger capture began.
         /// </summary>
         bool TryGetMoneyLedgerCoverageStart(string saveKey, out DateTime coverageStart, out string errorMessage);
+
+        /// <summary>
+        /// Records an exact storage checkpoint for confirmed bytes of one vanilla
+        /// save file. Engines retain a bounded recent history; re-recording the same
+        /// fingerprint replaces its older checkpoint with the latest storage state.
+        /// </summary>
+        bool TryRecordSaveGeneration(
+            string saveKey,
+            string vanillaSaveFingerprint,
+            out string errorMessage);
+
+        /// <summary>
+        /// Restores an exact retained storage checkpoint associated with one vanilla
+        /// save fingerprint. A fingerprint older than the bounded history is reported
+        /// through generationFound so callers can fall back to legacy game-date rollback.
+        /// </summary>
+        bool TryRollbackToSaveGeneration(
+            string saveKey,
+            string vanillaSaveFingerprint,
+            out bool generationFound,
+            out string errorMessage);
 
         /// <summary>
         /// Removes persisted rows that are newer than one loaded save snapshot date.

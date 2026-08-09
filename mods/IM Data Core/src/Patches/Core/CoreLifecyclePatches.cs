@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Text;
 using HarmonyLib;
 using UnityEngine;
 
@@ -20,6 +21,20 @@ namespace IMDataCore
         private static void Postfix()
         {
             IMDataCoreController.Instance.BootstrapIfNeeded();
+        }
+    }
+
+    /// <summary>
+    /// Finalizes filesystem-only save observations on the main thread. This keeps all
+    /// storage rebinding and Unity-facing logging out of observer worker threads.
+    /// </summary>
+    [HarmonyPatch(typeof(PopupManager), "Update")]
+    internal static class PopupManager_Update_IMDataCoreTransactionPump_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix()
+        {
+            IMDataCoreController.Instance.ProcessMainThreadTransactions();
         }
     }
 
@@ -52,8 +67,8 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Commits save-scope persistence immediately after vanilla successfully schedules
-    /// a SavedData write. Patching DataSaver's constructed generic is unsafe on Mono,
+    /// Stages save-scope persistence before vanilla schedules a SavedData write.
+    /// Patching DataSaver's constructed generic is unsafe on Mono,
     /// where reference-type generic instantiations can share native code.
     /// </summary>
     [HarmonyPatch]
@@ -96,10 +111,16 @@ namespace IMDataCore
                 typeof(string));
             LocalBuilder isJsonLocal = generator.DeclareLocal(typeof(bool));
             LocalBuilder fullPathLocal = generator.DeclareLocal(typeof(bool));
-            MethodInfo commitSaveWriteMethod = AccessTools.Method(
+            MethodInfo prepareSaveWriteMethod = AccessTools.Method(
                 typeof(CoreSaveLifecycleBinding),
-                nameof(CoreSaveLifecycleBinding.CommitSaveWrite),
-                new Type[] { typeof(string), typeof(bool) });
+                nameof(CoreSaveLifecycleBinding.PrepareSaveWrite),
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string),
+                    typeof(bool),
+                    typeof(bool)
+                });
             int injectedWriteCount = CoreConstants.ZeroBasedListStartIndex;
 
             foreach (CodeInstruction instruction in instructions)
@@ -111,8 +132,9 @@ namespace IMDataCore
                 }
 
                 // The four DataSaver arguments are already on the evaluation stack.
-                // Preserve them, call vanilla unchanged, and commit only after that call
-                // returns successfully. Exceptions leave the prior scope untouched.
+                // Preserve them, synchronously stage the matching sidecar and expected
+                // byte identity, then call vanilla unchanged. The background observer
+                // never writes or replaces the vanilla file.
                 CodeInstruction firstInjectedInstruction =
                     new CodeInstruction(OpCodes.Stloc, fullPathLocal);
                 firstInjectedInstruction.labels.AddRange(instruction.labels);
@@ -127,19 +149,19 @@ namespace IMDataCore
                     dataFileNameLocal);
                 yield return new CodeInstruction(OpCodes.Stloc, dataToSaveLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
+                yield return new CodeInstruction(
+                    OpCodes.Call,
+                    prepareSaveWriteMethod);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
                 yield return new CodeInstruction(
                     OpCodes.Ldloc,
                     dataFileNameLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
                 yield return instruction;
-                yield return new CodeInstruction(
-                    OpCodes.Ldloc,
-                    dataFileNameLocal);
-                yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
-                yield return new CodeInstruction(
-                    OpCodes.Call,
-                    commitSaveWriteMethod);
                 injectedWriteCount++;
             }
 
@@ -202,25 +224,43 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Shared commit entry point for exact, non-generic vanilla save call sites.
+    /// Shared preparation entry point for exact, non-generic vanilla save call sites.
     /// </summary>
     internal static class CoreSaveLifecycleBinding
     {
-        internal static void CommitSaveWrite(
+        internal static void PrepareSaveWrite(
+            SaveManager.SavedData savedData,
             string dataFileName,
+            bool isJson,
             bool fullPath)
         {
             string savePath =
                 CoreSaveFilePathResolver.ResolveDataSaverWritePath(
                     dataFileName,
                     fullPath);
-            if (!CorePaths.IsSupportedGameSavePath(savePath))
+            if (savedData == null ||
+                !CorePaths.IsSupportedGameSavePath(savePath))
             {
                 return;
             }
 
-            IMDataCoreController.Instance.OnSaveWriteStarting(savePath);
-            IMDataCoreController.Instance.ForceFlushBeforeSave();
+            try
+            {
+                string serializedData = isJson
+                    ? JsonUtility.ToJson(savedData, true)
+                    : savedData.ToString();
+                byte[] expectedBytes = new UTF8Encoding(false).GetBytes(
+                    serializedData ?? string.Empty);
+                IMDataCoreController.Instance.PrepareVanillaSaveWrite(
+                    savePath,
+                    expectedBytes);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    CoreConstants.MessageSaveWritePreparationFailurePrefix +
+                    exception.Message);
+            }
         }
     }
 
@@ -293,18 +333,32 @@ namespace IMDataCore
                 typeof(CoreSaveLoadDataCaptureTranspiler),
                 nameof(CaptureLoadedSaveData));
 
+            List<CodeInstruction> patchedInstructions =
+                new List<CodeInstruction>();
+            int injectedCaptureCount = 0;
             foreach (CodeInstruction instruction in instructions)
             {
-                yield return instruction;
+                patchedInstructions.Add(instruction);
                 if (instruction.opcode == OpCodes.Stfld &&
                     Equals(instruction.operand, saveDataField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(
+                    patchedInstructions.Add(
+                        new CodeInstruction(OpCodes.Ldarg_0));
+                    patchedInstructions.Add(new CodeInstruction(
                         OpCodes.Call,
-                        captureMethod);
+                        captureMethod));
+                    injectedCaptureCount++;
                 }
             }
+
+            if (injectedCaptureCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "IM Data Core requires exactly one pre-LoadEvent SaveManager.Data capture; found " +
+                    injectedCaptureCount.ToString() + ".");
+            }
+
+            return patchedInstructions;
         }
 
         private static void CaptureLoadedSaveData(SaveManager saveManager)

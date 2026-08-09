@@ -39,6 +39,71 @@ namespace IMDataCore
         private const string SqlParameterTargetSaveKey = "@target_save_key";
         private const string SqlParameterStartDateKey = "@start_date_key";
         private const string SqlParameterEndDateKey = "@end_date_key";
+        private const string SqlParameterVanillaSaveFingerprint = "@vanilla_save_fingerprint";
+        private const string SqlParameterEventWatermark = "@event_watermark";
+        private const string SqlParameterCheckpointCreatedUtc = "@checkpoint_created_utc";
+        private const string SqlParameterCheckpointTableName = "@checkpoint_table_name";
+        private const string SqlParameterCheckpointSnapshotTableName = "@checkpoint_snapshot_table_name";
+        private const string SqlParameterCheckpointMutableTableCount = "@checkpoint_mutable_table_count";
+        private const string SqlParameterCheckpointGenerationId =
+            "@checkpoint_generation_id";
+        private const string LegacyCheckpointMetadataTableName =
+            "storage_save_checkpoint";
+        private const string LegacyCheckpointManifestTableName =
+            "storage_save_checkpoint_table";
+        private const string LegacyCheckpointSnapshotTableNamePrefix =
+            "storage_save_checkpoint_data_";
+        private const string CheckpointGenerationMetadataTableName =
+            "storage_save_generation";
+        private const string CheckpointGenerationManifestTableName =
+            "storage_save_generation_table";
+        private const string CheckpointTableNamePrefix = "storage_save_";
+        private const string CheckpointSnapshotTableNamePrefix =
+            "storage_save_generation_data_";
+        private const int MaximumRetainedSaveGenerations = 8;
+        private const string SqlCreateCheckpointMetadataTable =
+            "CREATE TABLE IF NOT EXISTS storage_save_checkpoint (" +
+            "save_key TEXT PRIMARY KEY, " +
+            "vanilla_save_fingerprint TEXT NOT NULL, " +
+            "event_watermark INTEGER NOT NULL, " +
+            "mutable_table_count INTEGER NOT NULL, " +
+            "checkpoint_created_utc TEXT NOT NULL);";
+        private const string SqlCreateCheckpointManifestTable =
+            "CREATE TABLE IF NOT EXISTS storage_save_checkpoint_table (" +
+            "save_key TEXT NOT NULL, " +
+            "table_name TEXT NOT NULL, " +
+            "snapshot_table_name TEXT NOT NULL, " +
+            "PRIMARY KEY(save_key, table_name));";
+        private const string SqlCreateCheckpointGenerationMetadataTable =
+            "CREATE TABLE IF NOT EXISTS storage_save_generation (" +
+            "generation_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "save_key TEXT NOT NULL, " +
+            "vanilla_save_fingerprint TEXT NOT NULL, " +
+            "event_watermark INTEGER NOT NULL, " +
+            "mutable_table_count INTEGER NOT NULL, " +
+            "checkpoint_created_utc TEXT NOT NULL);";
+        private const string SqlCreateCheckpointGenerationManifestTable =
+            "CREATE TABLE IF NOT EXISTS storage_save_generation_table (" +
+            "generation_id INTEGER NOT NULL, " +
+            "table_name TEXT NOT NULL, " +
+            "snapshot_table_name TEXT NOT NULL, " +
+            "PRIMARY KEY(generation_id, table_name));";
+        private const string SqlCreateCheckpointGenerationLookupIndex =
+            "CREATE INDEX IF NOT EXISTS idx_storage_save_generation_lookup " +
+            "ON storage_save_generation(save_key, vanilla_save_fingerprint, generation_id DESC);";
+        private const string SqlInsertCheckpointGenerationMetadata =
+            "INSERT INTO storage_save_generation(save_key, vanilla_save_fingerprint, event_watermark, mutable_table_count, checkpoint_created_utc) " +
+            "VALUES(@save_key, @vanilla_save_fingerprint, @event_watermark, @checkpoint_mutable_table_count, @checkpoint_created_utc);";
+        private const string SqlInsertCheckpointGenerationManifest =
+            "INSERT INTO storage_save_generation_table(generation_id, table_name, snapshot_table_name) " +
+            "VALUES(@checkpoint_generation_id, @checkpoint_table_name, @checkpoint_snapshot_table_name);";
+        private const string SqlSelectCheckpointGeneration =
+            "SELECT generation_id, event_watermark, mutable_table_count " +
+            "FROM storage_save_generation WHERE save_key = @save_key " +
+            "AND vanilla_save_fingerprint = @vanilla_save_fingerprint " +
+            "ORDER BY generation_id DESC LIMIT 1;";
+        private const string SqlSelectMaximumEventIdForSave =
+            "SELECT COALESCE(MAX(event_id), 0) FROM event_stream WHERE save_key = @save_key;";
         private const string SqlReadMoneyTransactions =
             "SELECT event_id, game_date_key, game_datetime, idol_id, entity_kind, entity_id, event_type, source_patch, payload_json, namespace_id " +
             "FROM event_stream WHERE save_key = @save_key AND event_type = @event_type " +
@@ -56,13 +121,21 @@ namespace IMDataCore
         private const string SqlDeleteSingleParticipationRowsAfterCutoff =
             "DELETE FROM single_participation WHERE save_key = @save_key AND release_date > @cutoff_datetime;";
         private const string SqlDeleteStatusWindowRowsAfterCutoff =
-            "DELETE FROM status_window WHERE save_key = @save_key AND (start_date > @cutoff_datetime OR end_date > @cutoff_datetime);";
+            "DELETE FROM status_window WHERE save_key = @save_key AND start_date > @cutoff_datetime;";
+        private const string SqlReopenStatusWindowRowsAfterCutoff =
+            "UPDATE status_window SET end_date = NULL WHERE save_key = @save_key AND end_date > @cutoff_datetime;";
         private const string SqlDeleteShowCastWindowRowsAfterCutoff =
-            "DELETE FROM show_cast_window WHERE save_key = @save_key AND (start_date > @cutoff_datetime OR end_date > @cutoff_datetime);";
+            "DELETE FROM show_cast_window WHERE save_key = @save_key AND start_date > @cutoff_datetime;";
+        private const string SqlReopenShowCastWindowRowsAfterCutoff =
+            "UPDATE show_cast_window SET end_date = NULL, end_reason = '' WHERE save_key = @save_key AND end_date > @cutoff_datetime;";
         private const string SqlDeleteContractWindowRowsAfterCutoff =
-            "DELETE FROM contract_window WHERE save_key = @save_key AND (start_date > @cutoff_datetime OR end_date > @cutoff_datetime);";
+            "DELETE FROM contract_window WHERE save_key = @save_key AND start_date > @cutoff_datetime;";
+        private const string SqlReopenContractWindowRowsAfterCutoff =
+            "UPDATE contract_window SET end_date = NULL, end_reason = '' WHERE save_key = @save_key AND end_date > @cutoff_datetime;";
         private const string SqlDeleteRelationshipWindowRowsAfterCutoff =
-            "DELETE FROM relationship_window WHERE save_key = @save_key AND (start_date > @cutoff_datetime OR end_date > @cutoff_datetime);";
+            "DELETE FROM relationship_window WHERE save_key = @save_key AND start_date > @cutoff_datetime;";
+        private const string SqlReopenRelationshipWindowRowsAfterCutoff =
+            "UPDATE relationship_window SET end_date = NULL, end_reason = '' WHERE save_key = @save_key AND end_date > @cutoff_datetime;";
         private const string SqlDeleteTourParticipationRowsAfterCutoff =
             "DELETE FROM tour_participation WHERE save_key = @save_key AND event_date > @cutoff_datetime;";
         private const string SqlDeleteAwardResultRowsAfterCutoff =
@@ -70,7 +143,9 @@ namespace IMDataCore
         private const string SqlDeleteElectionResultRowsAfterCutoff =
             "DELETE FROM election_result_projection WHERE save_key = @save_key AND event_date > @cutoff_datetime;";
         private const string SqlDeletePushWindowRowsAfterCutoff =
-            "DELETE FROM push_window WHERE save_key = @save_key AND (start_date > @cutoff_datetime OR end_date > @cutoff_datetime);";
+            "DELETE FROM push_window WHERE save_key = @save_key AND start_date > @cutoff_datetime;";
+        private const string SqlReopenPushWindowRowsAfterCutoff =
+            "UPDATE push_window SET end_date = NULL, end_reason = '' WHERE save_key = @save_key AND end_date > @cutoff_datetime;";
         private const string SerializerMethodNameObjectPayload = nameof(CoreJsonUtility.SerializeObjectPayload);
         private const string SchemaSampleStringValue = "schema_sample";
         private const bool SchemaSampleBooleanValue = true;
@@ -137,6 +212,28 @@ namespace IMDataCore
             internal string FieldKey = string.Empty;
             internal string ValueKind = CoreConstants.PayloadValueKindRaw;
             internal string ValueText = string.Empty;
+        }
+
+        private sealed class CheckpointTableRow
+        {
+            internal string TableName = string.Empty;
+            internal string SnapshotTableName = string.Empty;
+        }
+
+        private sealed class CheckpointGenerationRow
+        {
+            internal long GenerationId;
+            internal long EventWatermark;
+            internal int MutableTableCount;
+        }
+
+        private sealed class LegacyCheckpointGenerationRow
+        {
+            internal string SaveKey = string.Empty;
+            internal string Fingerprint = string.Empty;
+            internal long EventWatermark;
+            internal int MutableTableCount;
+            internal string CreatedUtc = string.Empty;
         }
 
         private sealed class BuiltInEventSchemaSource
@@ -441,6 +538,128 @@ namespace IMDataCore
             }
         }
 
+        public bool TryValidateIntegrity(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                try
+                {
+                    object quickCheckScalar = ExecuteScalar("PRAGMA quick_check;");
+                    string quickCheckResult = quickCheckScalar == null || quickCheckScalar == DBNull.Value
+                        ? string.Empty
+                        : Convert.ToString(quickCheckScalar, CultureInfo.InvariantCulture);
+                    if (!string.Equals(quickCheckResult, "ok", StringComparison.OrdinalIgnoreCase))
+                    {
+                        errorMessage = "SQLite quick_check failed: " + quickCheckResult;
+                        return false;
+                    }
+
+                    ValidateCheckpointGenerationHistory();
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = "SQLite integrity validation failed: " + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        private void ValidateCheckpointGenerationHistory()
+        {
+            const string invalidMetadataSql =
+                "SELECT COUNT(*) FROM storage_save_generation " +
+                "WHERE save_key = '' OR vanilla_save_fingerprint = '' " +
+                "OR event_watermark < 0 OR mutable_table_count <= 0 " +
+                "OR checkpoint_created_utc = '';";
+            object invalidMetadataScalar = ExecuteScalar(
+                invalidMetadataSql);
+            long invalidMetadataCount =
+                invalidMetadataScalar == null ||
+                invalidMetadataScalar == DBNull.Value
+                    ? 0L
+                    : Convert.ToInt64(
+                        invalidMetadataScalar,
+                        CultureInfo.InvariantCulture);
+            if (invalidMetadataCount > 0L)
+            {
+                throw new InvalidDataException(
+                    "The SQLite save-generation metadata is invalid.");
+            }
+
+            List<long> generationIds = ReadCheckpointGenerationIds(
+                "SELECT generation_id FROM storage_save_generation " +
+                "ORDER BY generation_id ASC;");
+            if (generationIds.Count > MaximumRetainedSaveGenerations)
+            {
+                throw new InvalidDataException(
+                    "The SQLite save-generation history exceeds its retention bound.");
+            }
+
+            List<string> allTableNames = ReadUserTableNames();
+            HashSet<string> existingTableNames = new HashSet<string>(
+                allTableNames,
+                StringComparer.Ordinal);
+            HashSet<string> referencedSnapshotTables = new HashSet<string>(
+                StringComparer.Ordinal);
+            for (int generationIndex =
+                    CoreConstants.ZeroBasedListStartIndex;
+                generationIndex < generationIds.Count;
+                generationIndex++)
+            {
+                long generationId = generationIds[generationIndex];
+                CheckpointGenerationRow generation =
+                    ReadCheckpointGenerationById(generationId);
+                if (generation == null)
+                {
+                    throw new InvalidDataException(
+                        "A SQLite save-generation metadata row disappeared during validation.");
+                }
+
+                List<CheckpointTableRow> checkpointRows =
+                    ReadCheckpointTableRows(generationId);
+                ValidateCheckpointManifest(
+                    generationId,
+                    checkpointRows,
+                    generation.MutableTableCount,
+                    existingTableNames);
+                for (int checkpointIndex =
+                        CoreConstants.ZeroBasedListStartIndex;
+                    checkpointIndex < checkpointRows.Count;
+                    checkpointIndex++)
+                {
+                    if (!referencedSnapshotTables.Add(
+                        checkpointRows[checkpointIndex]
+                            .SnapshotTableName))
+                    {
+                        throw new InvalidDataException(
+                            "A SQLite save-generation snapshot is referenced more than once.");
+                    }
+                }
+            }
+
+            for (int tableIndex = CoreConstants.ZeroBasedListStartIndex;
+                tableIndex < allTableNames.Count;
+                tableIndex++)
+            {
+                string tableName = allTableNames[tableIndex];
+                if (IsCheckpointSnapshotTable(tableName) &&
+                    !referencedSnapshotTables.Contains(tableName))
+                {
+                    throw new InvalidDataException(
+                        "The SQLite save-generation history contains an orphan snapshot table.");
+                }
+            }
+        }
+
         /// <summary>
         /// Tries a one-time recovery only for artifacts created by this failed first
         /// initialization. Callers never pass an existing database to this reset path.
@@ -542,6 +761,18 @@ namespace IMDataCore
             ExecuteNonQuery(CoreConstants.SqlCreateTableElectionResultProjection);
             ExecuteNonQuery(CoreConstants.SqlCreateTablePushWindow);
             ExecuteNonQuery(CoreConstants.SqlCreateTableCustomData);
+            ExecuteNonQuery(SqlCreateCheckpointMetadataTable);
+            ExecuteNonQuery(SqlCreateCheckpointManifestTable);
+            if (!ReadTableColumns(
+                LegacyCheckpointMetadataTableName).Contains(
+                    "mutable_table_count"))
+            {
+                ExecuteNonQuery(
+                    "ALTER TABLE storage_save_checkpoint ADD COLUMN mutable_table_count INTEGER NOT NULL DEFAULT 0;");
+            }
+            ExecuteNonQuery(SqlCreateCheckpointGenerationMetadataTable);
+            ExecuteNonQuery(SqlCreateCheckpointGenerationManifestTable);
+            ExecuteNonQuery(SqlCreateCheckpointGenerationLookupIndex);
             EnsureEventNamespaceColumnExists();
 
             TryExecuteNonQueryBestEffort(CoreConstants.SqlCreateIndexEventIdolDate);
@@ -560,9 +791,297 @@ namespace IMDataCore
             // Pre-create one typed table per built-in event kind.
             EnsureAllBuiltInEventTypeTablesExist();
 
+            MigrateLegacySingleCheckpointIfNeeded();
+
             // Avoid parameter-binding edge cases during bootstrap metadata writes.
             ExecuteNonQuery(SqlInsertMetaSchemaVersionLiteral);
             ExecuteNonQuery(SqlInsertMetaProviderLiteral);
+        }
+
+        /// <summary>
+        /// Imports the former single checkpoint into the bounded generation history.
+        /// The copy, manifest replacement, and legacy cleanup are one SQLite
+        /// transaction, so a failed upgrade leaves the original checkpoint intact.
+        /// </summary>
+        private void MigrateLegacySingleCheckpointIfNeeded()
+        {
+            List<LegacyCheckpointGenerationRow> legacyRows =
+                ReadLegacyCheckpointGenerationRows();
+            if (legacyRows.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                return;
+            }
+
+            ExecuteWithinTransaction(delegate
+            {
+                List<string> allTableNames = ReadUserTableNames();
+                HashSet<string> existingTableNames = new HashSet<string>(
+                    allTableNames,
+                    StringComparer.Ordinal);
+                for (int legacyIndex =
+                        CoreConstants.ZeroBasedListStartIndex;
+                    legacyIndex < legacyRows.Count;
+                    legacyIndex++)
+                {
+                    LegacyCheckpointGenerationRow legacy =
+                        legacyRows[legacyIndex];
+                    List<CheckpointTableRow> legacyManifest =
+                        ReadLegacyCheckpointTableRows(legacy.SaveKey);
+                    int expectedCount = legacy.MutableTableCount >
+                        CoreConstants.ZeroBasedListStartIndex
+                            ? legacy.MutableTableCount
+                            : legacyManifest.Count;
+                    ValidateLegacyCheckpointManifest(
+                        legacyManifest,
+                        expectedCount,
+                        existingTableNames);
+
+                    CheckpointGenerationRow existingGeneration =
+                        ReadCheckpointGeneration(
+                            legacy.SaveKey,
+                            legacy.Fingerprint);
+                    if (existingGeneration == null)
+                    {
+                        ExecuteNonQuery(
+                            SqlInsertCheckpointGenerationMetadata,
+                            CreateParameter(
+                                CoreConstants.SqlParameterSaveKey,
+                                legacy.SaveKey),
+                            CreateParameter(
+                                SqlParameterVanillaSaveFingerprint,
+                                legacy.Fingerprint),
+                            CreateParameter(
+                                SqlParameterEventWatermark,
+                                legacy.EventWatermark),
+                            CreateParameter(
+                                SqlParameterCheckpointMutableTableCount,
+                                expectedCount),
+                            CreateParameter(
+                                SqlParameterCheckpointCreatedUtc,
+                                legacy.CreatedUtc));
+                        object generationScalar = ExecuteScalar(
+                            "SELECT last_insert_rowid();");
+                        if (generationScalar == null ||
+                            generationScalar == DBNull.Value)
+                        {
+                            throw new InvalidDataException(
+                                "The migrated save-generation identifier was not created.");
+                        }
+
+                        long generationId = Convert.ToInt64(
+                            generationScalar,
+                            CultureInfo.InvariantCulture);
+                        for (int manifestIndex =
+                                CoreConstants.ZeroBasedListStartIndex;
+                            manifestIndex < legacyManifest.Count;
+                            manifestIndex++)
+                        {
+                            CheckpointTableRow legacyTable =
+                                legacyManifest[manifestIndex];
+                            string snapshotTableName =
+                                BuildCheckpointSnapshotTableName(
+                                    generationId,
+                                    legacyTable.TableName);
+                            ExecuteNonQuery(
+                                "CREATE TABLE " +
+                                QuoteSqlIdentifier(snapshotTableName) +
+                                " AS SELECT * FROM " +
+                                QuoteSqlIdentifier(
+                                    legacyTable.SnapshotTableName) +
+                                SqlStatementTerminator);
+                            ExecuteNonQuery(
+                                SqlInsertCheckpointGenerationManifest,
+                                CreateParameter(
+                                    SqlParameterCheckpointGenerationId,
+                                    generationId),
+                                CreateParameter(
+                                    SqlParameterCheckpointTableName,
+                                    legacyTable.TableName),
+                                CreateParameter(
+                                    SqlParameterCheckpointSnapshotTableName,
+                                    snapshotTableName));
+                        }
+                    }
+
+                    for (int manifestIndex =
+                            CoreConstants.ZeroBasedListStartIndex;
+                        manifestIndex < legacyManifest.Count;
+                        manifestIndex++)
+                    {
+                        ExecuteNonQuery(
+                            "DROP TABLE IF EXISTS " +
+                            QuoteSqlIdentifier(
+                                legacyManifest[manifestIndex]
+                                    .SnapshotTableName) +
+                            SqlStatementTerminator);
+                    }
+                }
+
+                ExecuteNonQuery(
+                    "DELETE FROM " +
+                    QuoteSqlIdentifier(
+                        LegacyCheckpointManifestTableName) +
+                    SqlStatementTerminator);
+                ExecuteNonQuery(
+                    "DELETE FROM " +
+                    QuoteSqlIdentifier(
+                        LegacyCheckpointMetadataTableName) +
+                    SqlStatementTerminator);
+                PruneOldestCheckpointGenerations();
+            });
+        }
+
+        private List<LegacyCheckpointGenerationRow>
+            ReadLegacyCheckpointGenerationRows()
+        {
+            const string commandText =
+                "SELECT save_key, vanilla_save_fingerprint, event_watermark, " +
+                "mutable_table_count, checkpoint_created_utc " +
+                "FROM storage_save_checkpoint ORDER BY save_key ASC;";
+            List<LegacyCheckpointGenerationRow> rows =
+                new List<LegacyCheckpointGenerationRow>();
+            IntPtr statementHandle = PrepareStatement(commandText);
+            try
+            {
+                while (true)
+                {
+                    int stepResult = NativeMethods.sqlite3_step(
+                        statementHandle);
+                    if (stepResult == SqliteDone)
+                    {
+                        break;
+                    }
+
+                    if (stepResult != SqliteRow)
+                    {
+                        throw CreateSqliteException(
+                            stepResult,
+                            commandText);
+                    }
+
+                    rows.Add(
+                        new LegacyCheckpointGenerationRow
+                        {
+                            SaveKey = GetColumnText(
+                                statementHandle,
+                                CoreConstants.ZeroBasedListStartIndex),
+                            Fingerprint = GetColumnText(
+                                statementHandle,
+                                CoreConstants.LastElementOffsetFromCount),
+                            EventWatermark =
+                                NativeMethods.sqlite3_column_int64(
+                                    statementHandle,
+                                    2),
+                            MutableTableCount = Convert.ToInt32(
+                                NativeMethods.sqlite3_column_int64(
+                                    statementHandle,
+                                    3),
+                                CultureInfo.InvariantCulture),
+                            CreatedUtc = GetColumnText(
+                                statementHandle,
+                                4)
+                        });
+                }
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+
+            return rows;
+        }
+
+        private List<CheckpointTableRow> ReadLegacyCheckpointTableRows(
+            string saveKey)
+        {
+            const string commandText =
+                "SELECT table_name, snapshot_table_name " +
+                "FROM storage_save_checkpoint_table " +
+                "WHERE save_key = @save_key ORDER BY table_name ASC;";
+            List<CheckpointTableRow> rows =
+                new List<CheckpointTableRow>();
+            IntPtr statementHandle = PrepareStatement(commandText);
+            try
+            {
+                BindParameters(
+                    statementHandle,
+                    CreateParameter(
+                        CoreConstants.SqlParameterSaveKey,
+                        saveKey));
+                while (true)
+                {
+                    int stepResult = NativeMethods.sqlite3_step(
+                        statementHandle);
+                    if (stepResult == SqliteDone)
+                    {
+                        break;
+                    }
+
+                    if (stepResult != SqliteRow)
+                    {
+                        throw CreateSqliteException(
+                            stepResult,
+                            commandText);
+                    }
+
+                    rows.Add(
+                        new CheckpointTableRow
+                        {
+                            TableName = GetColumnText(
+                                statementHandle,
+                                CoreConstants.ZeroBasedListStartIndex),
+                            SnapshotTableName = GetColumnText(
+                                statementHandle,
+                                CoreConstants.LastElementOffsetFromCount)
+                        });
+                }
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+
+            return rows;
+        }
+
+        private void ValidateLegacyCheckpointManifest(
+            IReadOnlyList<CheckpointTableRow> rows,
+            int expectedCount,
+            HashSet<string> existingTableNames)
+        {
+            if (rows == null ||
+                expectedCount <= CoreConstants.ZeroBasedListStartIndex ||
+                rows.Count != expectedCount)
+            {
+                throw new InvalidDataException(
+                    "The legacy save-generation manifest is incomplete.");
+            }
+
+            HashSet<string> seenTables = new HashSet<string>(
+                StringComparer.Ordinal);
+            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex;
+                rowIndex < rows.Count;
+                rowIndex++)
+            {
+                CheckpointTableRow row = rows[rowIndex];
+                if (row == null ||
+                    existingTableNames == null ||
+                    !existingTableNames.Contains(row.TableName) ||
+                    !existingTableNames.Contains(row.SnapshotTableName) ||
+                    !IsSaveScopedMutableTable(row.TableName) ||
+                    !string.Equals(
+                        row.SnapshotTableName,
+                        BuildLegacyCheckpointSnapshotTableName(
+                            row.TableName),
+                        StringComparison.Ordinal) ||
+                    !seenTables.Add(row.TableName) ||
+                    !ReadTableColumns(row.SnapshotTableName).Contains(
+                        SqlColumnSaveKey))
+                {
+                    throw new InvalidDataException(
+                        "The legacy save-generation manifest contains an invalid entry.");
+                }
+            }
         }
 
         /// <summary>
@@ -933,7 +1452,12 @@ namespace IMDataCore
 
         private HashSet<string> ReadTableColumns(string tableName)
         {
-            HashSet<string> columns = new HashSet<string>(StringComparer.Ordinal);
+            return new HashSet<string>(ReadTableColumnNames(tableName), StringComparer.Ordinal);
+        }
+
+        private List<string> ReadTableColumnNames(string tableName)
+        {
+            List<string> columns = new List<string>();
             string pragmaSql = SqlPragmaTableInfoPrefix + QuoteSqlIdentifier(tableName) + SqlPragmaTableInfoSuffix;
             IntPtr statementHandle = PrepareStatement(pragmaSql);
             try
@@ -1025,6 +1549,485 @@ namespace IMDataCore
                 + " WHERE "
                 + whereClause
                 + SqlStatementTerminator;
+        }
+
+        private bool IsSaveScopedMutableTable(string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName)
+                || string.Equals(tableName, "event_stream", StringComparison.Ordinal)
+                || tableName.StartsWith(BuiltInEventTableNamePrefix, StringComparison.Ordinal)
+                || tableName.StartsWith(CheckpointTableNamePrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return ReadTableColumns(tableName).Contains(SqlColumnSaveKey);
+        }
+
+        private static bool IsCheckpointSnapshotTable(string tableName)
+        {
+            return !string.IsNullOrEmpty(tableName)
+                && tableName.StartsWith(CheckpointSnapshotTableNamePrefix, StringComparison.Ordinal);
+        }
+
+        private static string BuildCheckpointSnapshotTableName(
+            long generationId,
+            string tableName)
+        {
+            byte[] tableNameBytes = Encoding.UTF8.GetBytes(tableName ?? string.Empty);
+            StringBuilder builder = new StringBuilder(
+                CheckpointSnapshotTableNamePrefix.Length +
+                24 +
+                (tableNameBytes.Length * 2));
+            builder.Append(CheckpointSnapshotTableNamePrefix);
+            builder.Append(generationId.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append('_');
+            for (int i = CoreConstants.ZeroBasedListStartIndex; i < tableNameBytes.Length; i++)
+            {
+                builder.Append(tableNameBytes[i].ToString("x2", CultureInfo.InvariantCulture));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string BuildLegacyCheckpointSnapshotTableName(
+            string tableName)
+        {
+            byte[] tableNameBytes = Encoding.UTF8.GetBytes(
+                tableName ?? string.Empty);
+            StringBuilder builder = new StringBuilder(
+                LegacyCheckpointSnapshotTableNamePrefix.Length +
+                (tableNameBytes.Length * 2));
+            builder.Append(LegacyCheckpointSnapshotTableNamePrefix);
+            for (int i = CoreConstants.ZeroBasedListStartIndex;
+                i < tableNameBytes.Length;
+                i++)
+            {
+                builder.Append(tableNameBytes[i].ToString(
+                    "x2",
+                    CultureInfo.InvariantCulture));
+            }
+
+            return builder.ToString();
+        }
+
+        private void DeleteTypedEventRowsAfterWatermark(
+            IReadOnlyList<string> tableNames,
+            string saveKey,
+            long eventWatermark)
+        {
+            if (tableNames == null)
+            {
+                return;
+            }
+
+            for (int i = CoreConstants.ZeroBasedListStartIndex; i < tableNames.Count; i++)
+            {
+                string tableName = tableNames[i];
+                if (string.IsNullOrEmpty(tableName)
+                    || !tableName.StartsWith(BuiltInEventTableNamePrefix, StringComparison.Ordinal)
+                    || !ReadTableColumns(tableName).Contains(SqlColumnEventId))
+                {
+                    continue;
+                }
+
+                ExecuteNonQuery(
+                    "DELETE FROM " + QuoteSqlIdentifier(tableName)
+                    + " WHERE " + QuoteSqlIdentifier(SqlColumnEventId)
+                    + " IN (SELECT " + QuoteSqlIdentifier(SqlColumnEventId)
+                    + " FROM event_stream WHERE " + QuoteSqlIdentifier(SqlColumnSaveKey)
+                    + " = " + CoreConstants.SqlParameterSaveKey
+                    + " AND " + QuoteSqlIdentifier(SqlColumnEventId)
+                    + " > " + SqlParameterEventWatermark + ")" + SqlStatementTerminator,
+                    CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                    CreateParameter(SqlParameterEventWatermark, eventWatermark));
+            }
+        }
+
+        private CheckpointGenerationRow ReadCheckpointGeneration(
+            string saveKey,
+            string fingerprint)
+        {
+            IntPtr statementHandle = PrepareStatement(
+                SqlSelectCheckpointGeneration);
+            try
+            {
+                BindParameters(
+                    statementHandle,
+                    CreateParameter(
+                        CoreConstants.SqlParameterSaveKey,
+                        saveKey),
+                    CreateParameter(
+                        SqlParameterVanillaSaveFingerprint,
+                        fingerprint));
+                int stepResult = NativeMethods.sqlite3_step(
+                    statementHandle);
+                if (stepResult == SqliteDone)
+                {
+                    return null;
+                }
+
+                if (stepResult != SqliteRow)
+                {
+                    throw CreateSqliteException(
+                        stepResult,
+                        SqlSelectCheckpointGeneration);
+                }
+
+                return new CheckpointGenerationRow
+                {
+                    GenerationId = NativeMethods.sqlite3_column_int64(
+                        statementHandle,
+                        CoreConstants.ZeroBasedListStartIndex),
+                    EventWatermark = NativeMethods.sqlite3_column_int64(
+                        statementHandle,
+                        CoreConstants.LastElementOffsetFromCount),
+                    MutableTableCount = Convert.ToInt32(
+                        NativeMethods.sqlite3_column_int64(
+                            statementHandle,
+                            2),
+                        CultureInfo.InvariantCulture)
+                };
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+        }
+
+        private CheckpointGenerationRow ReadCheckpointGenerationById(
+            long generationId)
+        {
+            const string commandText =
+                "SELECT generation_id, event_watermark, mutable_table_count " +
+                "FROM storage_save_generation " +
+                "WHERE generation_id = @checkpoint_generation_id LIMIT 1;";
+            IntPtr statementHandle = PrepareStatement(commandText);
+            try
+            {
+                BindParameters(
+                    statementHandle,
+                    CreateParameter(
+                        SqlParameterCheckpointGenerationId,
+                        generationId));
+                int stepResult = NativeMethods.sqlite3_step(
+                    statementHandle);
+                if (stepResult == SqliteDone)
+                {
+                    return null;
+                }
+
+                if (stepResult != SqliteRow)
+                {
+                    throw CreateSqliteException(
+                        stepResult,
+                        commandText);
+                }
+
+                return new CheckpointGenerationRow
+                {
+                    GenerationId = NativeMethods.sqlite3_column_int64(
+                        statementHandle,
+                        CoreConstants.ZeroBasedListStartIndex),
+                    EventWatermark = NativeMethods.sqlite3_column_int64(
+                        statementHandle,
+                        CoreConstants.LastElementOffsetFromCount),
+                    MutableTableCount = Convert.ToInt32(
+                        NativeMethods.sqlite3_column_int64(
+                            statementHandle,
+                            2),
+                        CultureInfo.InvariantCulture)
+                };
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+        }
+
+        private List<long> ReadCheckpointGenerationIds(string commandText,
+            params SqliteParameter[] parameters)
+        {
+            List<long> generationIds = new List<long>();
+            IntPtr statementHandle = PrepareStatement(commandText);
+            try
+            {
+                BindParameters(statementHandle, parameters);
+                while (true)
+                {
+                    int stepResult = NativeMethods.sqlite3_step(
+                        statementHandle);
+                    if (stepResult == SqliteDone)
+                    {
+                        break;
+                    }
+
+                    if (stepResult != SqliteRow)
+                    {
+                        throw CreateSqliteException(
+                            stepResult,
+                            commandText);
+                    }
+
+                    generationIds.Add(
+                        NativeMethods.sqlite3_column_int64(
+                            statementHandle,
+                            CoreConstants.ZeroBasedListStartIndex));
+                }
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+
+            return generationIds;
+        }
+
+        private void DeleteCheckpointGenerationsMatchingFingerprint(
+            string saveKey,
+            string fingerprint)
+        {
+            const string commandText =
+                "SELECT generation_id FROM storage_save_generation " +
+                "WHERE save_key = @save_key " +
+                "AND vanilla_save_fingerprint = @vanilla_save_fingerprint " +
+                "ORDER BY generation_id ASC;";
+            List<long> generationIds = ReadCheckpointGenerationIds(
+                commandText,
+                CreateParameter(
+                    CoreConstants.SqlParameterSaveKey,
+                    saveKey),
+                CreateParameter(
+                    SqlParameterVanillaSaveFingerprint,
+                    fingerprint));
+            for (int generationIndex =
+                    CoreConstants.ZeroBasedListStartIndex;
+                generationIndex < generationIds.Count;
+                generationIndex++)
+            {
+                DeleteCheckpointGeneration(
+                    generationIds[generationIndex]);
+            }
+        }
+
+        private void PruneOldestCheckpointGenerations()
+        {
+            string commandText =
+                "SELECT generation_id FROM storage_save_generation " +
+                "ORDER BY generation_id DESC LIMIT -1 OFFSET " +
+                MaximumRetainedSaveGenerations.ToString(
+                    CultureInfo.InvariantCulture) +
+                SqlStatementTerminator;
+            List<long> generationIds = ReadCheckpointGenerationIds(
+                commandText);
+            for (int generationIndex =
+                    CoreConstants.ZeroBasedListStartIndex;
+                generationIndex < generationIds.Count;
+                generationIndex++)
+            {
+                DeleteCheckpointGeneration(
+                    generationIds[generationIndex]);
+            }
+        }
+
+        private void DeleteCheckpointGeneration(long generationId)
+        {
+            CheckpointGenerationRow generation =
+                ReadCheckpointGenerationById(generationId);
+            if (generation == null)
+            {
+                return;
+            }
+
+            List<CheckpointTableRow> checkpointRows =
+                ReadCheckpointTableRows(generationId);
+            List<string> allTableNames = ReadUserTableNames();
+            ValidateCheckpointManifest(
+                generationId,
+                checkpointRows,
+                generation.MutableTableCount,
+                new HashSet<string>(
+                    allTableNames,
+                    StringComparer.Ordinal));
+            for (int checkpointIndex =
+                    CoreConstants.ZeroBasedListStartIndex;
+                checkpointIndex < checkpointRows.Count;
+                checkpointIndex++)
+            {
+                CheckpointTableRow checkpointRow =
+                    checkpointRows[checkpointIndex];
+                if (checkpointRow == null ||
+                    !string.Equals(
+                        checkpointRow.SnapshotTableName,
+                        BuildCheckpointSnapshotTableName(
+                            generationId,
+                            checkpointRow.TableName),
+                        StringComparison.Ordinal) ||
+                    !IsCheckpointSnapshotTable(
+                        checkpointRow.SnapshotTableName))
+                {
+                    throw new InvalidDataException(
+                        "Refused to remove an invalid save-generation snapshot reference.");
+                }
+
+                ExecuteNonQuery(
+                    "DROP TABLE IF EXISTS " +
+                    QuoteSqlIdentifier(
+                        checkpointRow.SnapshotTableName) +
+                    SqlStatementTerminator);
+            }
+
+            ExecuteNonQuery(
+                "DELETE FROM storage_save_generation_table " +
+                "WHERE generation_id = @checkpoint_generation_id;",
+                CreateParameter(
+                    SqlParameterCheckpointGenerationId,
+                    generationId));
+            ExecuteNonQuery(
+                "DELETE FROM storage_save_generation " +
+                "WHERE generation_id = @checkpoint_generation_id;",
+                CreateParameter(
+                    SqlParameterCheckpointGenerationId,
+                    generationId));
+        }
+
+        private List<CheckpointTableRow> ReadCheckpointTableRows(
+            long generationId)
+        {
+            const string commandText =
+                "SELECT table_name, snapshot_table_name FROM storage_save_generation_table " +
+                "WHERE generation_id = @checkpoint_generation_id ORDER BY table_name ASC;";
+            List<CheckpointTableRow> rows = new List<CheckpointTableRow>();
+            IntPtr statementHandle = PrepareStatement(commandText);
+            try
+            {
+                BindParameters(
+                    statementHandle,
+                    CreateParameter(
+                        SqlParameterCheckpointGenerationId,
+                        generationId));
+                while (true)
+                {
+                    int stepResult = NativeMethods.sqlite3_step(statementHandle);
+                    if (stepResult == SqliteDone)
+                    {
+                        break;
+                    }
+
+                    if (stepResult != SqliteRow)
+                    {
+                        throw CreateSqliteException(stepResult, commandText);
+                    }
+
+                    rows.Add(
+                        new CheckpointTableRow
+                        {
+                            TableName = GetColumnText(statementHandle, CoreConstants.ZeroBasedListStartIndex),
+                            SnapshotTableName = GetColumnText(statementHandle, CoreConstants.LastElementOffsetFromCount)
+                        });
+                }
+            }
+            finally
+            {
+                FinalizeStatement(statementHandle);
+            }
+
+            return rows;
+        }
+
+        private void ValidateCheckpointManifest(
+            long generationId,
+            IReadOnlyList<CheckpointTableRow> checkpointRows,
+            int expectedMutableTableCount,
+            HashSet<string> existingTableNames)
+        {
+            if (checkpointRows == null
+                || expectedMutableTableCount <= CoreConstants.ZeroBasedListStartIndex
+                || checkpointRows.Count != expectedMutableTableCount)
+            {
+                throw new InvalidDataException("The save-generation checkpoint manifest is incomplete.");
+            }
+
+            HashSet<string> seenSnapshotTableNames = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = CoreConstants.ZeroBasedListStartIndex; i < checkpointRows.Count; i++)
+            {
+                CheckpointTableRow checkpointRow = checkpointRows[i];
+                if (checkpointRow == null
+                    || existingTableNames == null
+                    || !existingTableNames.Contains(checkpointRow.TableName)
+                    || !existingTableNames.Contains(checkpointRow.SnapshotTableName)
+                    || !IsSaveScopedMutableTable(checkpointRow.TableName)
+                    || !IsCheckpointSnapshotTable(checkpointRow.SnapshotTableName)
+                    || !string.Equals(
+                        checkpointRow.SnapshotTableName,
+                        BuildCheckpointSnapshotTableName(
+                            generationId,
+                            checkpointRow.TableName),
+                        StringComparison.Ordinal)
+                    || !seenSnapshotTableNames.Add(checkpointRow.SnapshotTableName)
+                    || !ReadTableColumns(checkpointRow.SnapshotTableName).Contains(SqlColumnSaveKey))
+                {
+                    throw new InvalidDataException("A save-generation checkpoint manifest entry is invalid or missing.");
+                }
+            }
+        }
+
+        private void RestoreCheckpointTableRows(CheckpointTableRow checkpointRow, string saveKey)
+        {
+            if (checkpointRow == null
+                || !IsSaveScopedMutableTable(checkpointRow.TableName)
+                || !IsCheckpointSnapshotTable(checkpointRow.SnapshotTableName))
+            {
+                throw new InvalidDataException("A save-generation checkpoint manifest entry is invalid.");
+            }
+
+            List<string> liveColumns = ReadTableColumnNames(checkpointRow.TableName);
+            HashSet<string> snapshotColumns = ReadTableColumns(checkpointRow.SnapshotTableName);
+            List<string> commonColumns = new List<string>();
+            for (int i = CoreConstants.ZeroBasedListStartIndex; i < liveColumns.Count; i++)
+            {
+                string columnName = liveColumns[i];
+                if (snapshotColumns.Contains(columnName))
+                {
+                    commonColumns.Add(columnName);
+                }
+            }
+
+            if (!commonColumns.Contains(SqlColumnSaveKey))
+            {
+                throw new InvalidDataException("A save-generation checkpoint snapshot has no save_key column.");
+            }
+
+            string quotedColumns = BuildQuotedColumnList(commonColumns);
+            ExecuteNonQuery(
+                "INSERT INTO " + QuoteSqlIdentifier(checkpointRow.TableName)
+                + " (" + quotedColumns + ") SELECT " + quotedColumns
+                + " FROM " + QuoteSqlIdentifier(checkpointRow.SnapshotTableName)
+                + " WHERE " + QuoteSqlIdentifier(SqlColumnSaveKey)
+                + " = " + CoreConstants.SqlParameterSaveKey + SqlStatementTerminator,
+                CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey));
+        }
+
+        private static string BuildQuotedColumnList(IReadOnlyList<string> columnNames)
+        {
+            if (columnNames == null || columnNames.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                throw new InvalidDataException("A save-generation checkpoint has no restorable columns.");
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = CoreConstants.ZeroBasedListStartIndex; i < columnNames.Count; i++)
+            {
+                if (i > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    builder.Append(SqlColumnSeparator);
+                }
+
+                builder.Append(QuoteSqlIdentifier(columnNames[i]));
+            }
+
+            return builder.ToString();
         }
 
         private static string BuildCreateBuiltInEventTableSql(string tableName, IReadOnlyList<EventPayloadFieldRow> schemaRows)
@@ -1654,6 +2657,75 @@ namespace IMDataCore
             }
         }
 
+        public bool TryValidateCustomDataMutation(
+            string saveKey,
+            string namespaceIdentifier,
+            string dataKey,
+            string jsonValue,
+            bool remove,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!remove && jsonValue == null)
+            {
+                errorMessage = CoreConstants.MessageJsonValueNull;
+                return false;
+            }
+
+            if (!remove && jsonValue.Length > CoreConstants.MaximumCustomValueCharacterCount)
+            {
+                errorMessage = CoreConstants.MessageJsonValueTooLong;
+                return false;
+            }
+
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                if (remove)
+                {
+                    return true;
+                }
+
+                try
+                {
+                    bool customDataAlreadyExists;
+                    int existingLength = GetExistingCustomValueLength(
+                        saveKey,
+                        namespaceIdentifier,
+                        dataKey,
+                        out customDataAlreadyExists);
+                    if (!customDataAlreadyExists
+                        && GetCustomNamespaceKeyCount(saveKey, namespaceIdentifier) >= CoreConstants.MaximumCustomKeysPerNamespace)
+                    {
+                        errorMessage = CoreConstants.MessageNamespaceKeyQuotaExceeded;
+                        return false;
+                    }
+
+                    int projectedTotalLength = GetCustomNamespaceTotalLength(saveKey, namespaceIdentifier)
+                        - existingLength
+                        + jsonValue.Length;
+                    if (projectedTotalLength > CoreConstants.MaximumNamespaceCharacterBudget)
+                    {
+                        errorMessage = CoreConstants.MessageNamespaceDataBudgetExceeded;
+                        return false;
+                    }
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = "TryValidateCustomDataMutation failed: " + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
         public bool TrySetCustomData(string saveKey, string namespaceIdentifier, string dataKey, string jsonValue, out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -2052,6 +3124,224 @@ namespace IMDataCore
             };
         }
 
+        public bool TryRecordSaveGeneration(
+            string saveKey,
+            string vanillaSaveFingerprint,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (string.IsNullOrEmpty(vanillaSaveFingerprint))
+            {
+                errorMessage = "Vanilla save fingerprint is empty.";
+                return false;
+            }
+
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                try
+                {
+                    ExecuteWithinTransaction(delegate
+                    {
+                        List<string> allTableNames = ReadUserTableNames();
+                        List<string> mutableTableNames = new List<string>();
+                        for (int i = CoreConstants.ZeroBasedListStartIndex; i < allTableNames.Count; i++)
+                        {
+                            string tableName = allTableNames[i];
+                            if (IsSaveScopedMutableTable(tableName))
+                            {
+                                mutableTableNames.Add(tableName);
+                            }
+                        }
+
+                        DeleteCheckpointGenerationsMatchingFingerprint(
+                            saveKey,
+                            vanillaSaveFingerprint);
+                        object watermarkScalar = ExecuteScalar(
+                            SqlSelectMaximumEventIdForSave,
+                            CreateParameter(
+                                CoreConstants.SqlParameterSaveKey,
+                                saveKey));
+                        long eventWatermark =
+                            watermarkScalar == null ||
+                            watermarkScalar == DBNull.Value
+                                ? 0L
+                                : Convert.ToInt64(
+                                    watermarkScalar,
+                                    CultureInfo.InvariantCulture);
+                        ExecuteNonQuery(
+                            SqlInsertCheckpointGenerationMetadata,
+                            CreateParameter(
+                                CoreConstants.SqlParameterSaveKey,
+                                saveKey),
+                            CreateParameter(
+                                SqlParameterVanillaSaveFingerprint,
+                                vanillaSaveFingerprint),
+                            CreateParameter(
+                                SqlParameterEventWatermark,
+                                eventWatermark),
+                            CreateParameter(
+                                SqlParameterCheckpointMutableTableCount,
+                                mutableTableNames.Count),
+                            CreateParameter(
+                                SqlParameterCheckpointCreatedUtc,
+                                CoreDateTimeUtility.ToUtcRoundTripString(
+                                    DateTime.UtcNow)));
+                        object generationScalar = ExecuteScalar(
+                            "SELECT last_insert_rowid();");
+                        if (generationScalar == null ||
+                            generationScalar == DBNull.Value)
+                        {
+                            throw new InvalidDataException(
+                                "The save-generation identifier was not created.");
+                        }
+
+                        long generationId = Convert.ToInt64(
+                            generationScalar,
+                            CultureInfo.InvariantCulture);
+
+                        for (int i = CoreConstants.ZeroBasedListStartIndex; i < mutableTableNames.Count; i++)
+                        {
+                            string tableName = mutableTableNames[i];
+                            string snapshotTableName =
+                                BuildCheckpointSnapshotTableName(
+                                    generationId,
+                                    tableName);
+                            string quotedTableName = QuoteSqlIdentifier(tableName);
+                            string quotedSnapshotTableName = QuoteSqlIdentifier(snapshotTableName);
+                            string quotedSaveKey = QuoteSqlIdentifier(SqlColumnSaveKey);
+
+                            ExecuteNonQuery(
+                                "CREATE TABLE " + quotedSnapshotTableName
+                                + " AS SELECT * FROM " + quotedTableName
+                                + " WHERE 0" + SqlStatementTerminator);
+                            ExecuteNonQuery(
+                                "INSERT INTO " + quotedSnapshotTableName
+                                + " SELECT * FROM " + quotedTableName
+                                + " WHERE " + quotedSaveKey + " = " + CoreConstants.SqlParameterSaveKey
+                                + SqlStatementTerminator,
+                                CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey));
+                            ExecuteNonQuery(
+                                SqlInsertCheckpointGenerationManifest,
+                                CreateParameter(
+                                    SqlParameterCheckpointGenerationId,
+                                    generationId),
+                                CreateParameter(SqlParameterCheckpointTableName, tableName),
+                                CreateParameter(SqlParameterCheckpointSnapshotTableName, snapshotTableName));
+                        }
+
+                        PruneOldestCheckpointGenerations();
+                    });
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = "TryRecordSaveGeneration failed: " + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
+        public bool TryRollbackToSaveGeneration(
+            string saveKey,
+            string vanillaSaveFingerprint,
+            out bool generationFound,
+            out string errorMessage)
+        {
+            generationFound = false;
+            errorMessage = string.Empty;
+            bool matchedGeneration = false;
+
+            lock (databaseLock)
+            {
+                if (disposed)
+                {
+                    errorMessage = CoreConstants.MessageStorageEngineDisposed;
+                    return false;
+                }
+
+                try
+                {
+                    ExecuteWithinTransaction(delegate
+                    {
+                        if (string.IsNullOrEmpty(vanillaSaveFingerprint))
+                        {
+                            return;
+                        }
+
+                        CheckpointGenerationRow generation =
+                            ReadCheckpointGeneration(
+                                saveKey,
+                                vanillaSaveFingerprint);
+                        if (generation == null)
+                        {
+                            return;
+                        }
+
+                        matchedGeneration = true;
+                        List<string> allTableNames = ReadUserTableNames();
+                        HashSet<string> existingTableNames = new HashSet<string>(allTableNames, StringComparer.Ordinal);
+                        List<CheckpointTableRow> checkpointRows =
+                            ReadCheckpointTableRows(
+                                generation.GenerationId);
+                        ValidateCheckpointManifest(
+                            generation.GenerationId,
+                            checkpointRows,
+                            generation.MutableTableCount,
+                            existingTableNames);
+
+                        DeleteTypedEventRowsAfterWatermark(
+                            allTableNames,
+                            saveKey,
+                            generation.EventWatermark);
+                        ExecuteNonQuery(
+                            "DELETE FROM event_stream WHERE save_key = @save_key AND event_id > @event_watermark;",
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(
+                                SqlParameterEventWatermark,
+                                generation.EventWatermark));
+
+                        for (int i = CoreConstants.ZeroBasedListStartIndex; i < allTableNames.Count; i++)
+                        {
+                            string tableName = allTableNames[i];
+                            if (!IsSaveScopedMutableTable(tableName))
+                            {
+                                continue;
+                            }
+
+                            ExecuteNonQuery(
+                                "DELETE FROM " + QuoteSqlIdentifier(tableName)
+                                + " WHERE " + QuoteSqlIdentifier(SqlColumnSaveKey)
+                                + " = " + CoreConstants.SqlParameterSaveKey + SqlStatementTerminator,
+                                CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey));
+                        }
+
+                        for (int i = CoreConstants.ZeroBasedListStartIndex; i < checkpointRows.Count; i++)
+                        {
+                            RestoreCheckpointTableRows(checkpointRows[i], saveKey);
+                        }
+                    });
+
+                    generationFound = matchedGeneration;
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    generationFound = false;
+                    errorMessage = "TryRollbackToSaveGeneration failed: " + exception.Message;
+                    CoreLog.Error(errorMessage);
+                    return false;
+                }
+            }
+        }
+
         public bool TryRollbackToGameDateTime(string saveKey, DateTime cutoffGameDateTime, out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -2085,7 +3375,15 @@ namespace IMDataCore
                             CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                         ExecuteNonQuery(
+                            SqlReopenStatusWindowRowsAfterCutoff,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
+                        ExecuteNonQuery(
                             SqlDeleteShowCastWindowRowsAfterCutoff,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
+                        ExecuteNonQuery(
+                            SqlReopenShowCastWindowRowsAfterCutoff,
                             CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                         ExecuteNonQuery(
@@ -2093,7 +3391,15 @@ namespace IMDataCore
                             CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                         ExecuteNonQuery(
+                            SqlReopenContractWindowRowsAfterCutoff,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
+                        ExecuteNonQuery(
                             SqlDeleteRelationshipWindowRowsAfterCutoff,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
+                        ExecuteNonQuery(
+                            SqlReopenRelationshipWindowRowsAfterCutoff,
                             CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                         ExecuteNonQuery(
@@ -2110,6 +3416,10 @@ namespace IMDataCore
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                         ExecuteNonQuery(
                             SqlDeletePushWindowRowsAfterCutoff,
+                            CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
+                            CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
+                        ExecuteNonQuery(
+                            SqlReopenPushWindowRowsAfterCutoff,
                             CreateParameter(CoreConstants.SqlParameterSaveKey, saveKey),
                             CreateParameter(SqlParameterCutoffDateTime, cutoffDateTime));
                     });

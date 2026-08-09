@@ -32,6 +32,11 @@ namespace IMDataCore
 
             lock (runtimeLock)
             {
+                if (saveLoadPreparationActive)
+                {
+                    return;
+                }
+
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
@@ -89,6 +94,11 @@ namespace IMDataCore
 
             lock (runtimeLock)
             {
+                if (saveLoadPreparationActive)
+                {
+                    return;
+                }
+
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
@@ -199,6 +209,7 @@ namespace IMDataCore
                     string payloadJson = CoreJsonUtility.SerializeSingleParticipationPayload(payload);
                     PendingEvent pendingEvent = new PendingEvent
                     {
+                        CaptureSequence = NextCaptureSequenceLocked(),
                         SaveKey = activeSaveKey,
                         GameDateKey = gameDateKey,
                         GameDateTime = gameDateTime,
@@ -211,6 +222,7 @@ namespace IMDataCore
                     };
                     PendingEvent participationRecordedEvent = new PendingEvent
                     {
+                        CaptureSequence = NextCaptureSequenceLocked(),
                         SaveKey = activeSaveKey,
                         GameDateKey = gameDateKey,
                         GameDateTime = gameDateTime,
@@ -224,6 +236,7 @@ namespace IMDataCore
 
                     SingleParticipationProjection projection = new SingleParticipationProjection
                     {
+                        CaptureSequence = NextCaptureSequenceLocked(),
                         SaveKey = activeSaveKey,
                         SingleId = releasedSingle.id,
                         IdolId = idol.id,
@@ -276,11 +289,6 @@ namespace IMDataCore
                 }
 
                 resolvedSingleChartPositionBySingleId[releasedSingle.id] = chartPosition;
-                if (releasedSingle.ReleaseData != null)
-                {
-                    releasedSingle.ReleaseData.Chart_Position = chartPosition;
-                }
-
                 shouldCapture = true;
             }
 
@@ -1213,6 +1221,11 @@ namespace IMDataCore
 
             lock (runtimeLock)
             {
+                if (saveLoadPreparationActive)
+                {
+                    return;
+                }
+
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
@@ -1241,6 +1254,7 @@ namespace IMDataCore
 
                 PendingEvent pendingEvent = new PendingEvent
                 {
+                    CaptureSequence = NextCaptureSequenceLocked(),
                     SaveKey = activeSaveKey,
                     GameDateKey = CoreDateTimeUtility.BuildGameDateKey(gameDate),
                     GameDateTime = transitionDate,
@@ -1254,6 +1268,7 @@ namespace IMDataCore
 
                 StatusTransitionProjection transition = new StatusTransitionProjection
                 {
+                    CaptureSequence = NextCaptureSequenceLocked(),
                     SaveKey = activeSaveKey,
                     IdolId = idol.id,
                     PreviousStatusCode = previousStatusCode,

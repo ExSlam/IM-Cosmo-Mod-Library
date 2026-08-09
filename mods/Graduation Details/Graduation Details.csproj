@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <Compile Include="src\GraduationDetails.cs" />
+    <Compile Include="src\GraduationDetailsPersistenceIO.cs" />
   </ItemGroup>
 </Project>
