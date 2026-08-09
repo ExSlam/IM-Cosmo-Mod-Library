@@ -533,7 +533,9 @@ namespace AssitantManagerMod
             // Prevent the base global fields from leaking one manager's cooldown to another.
             Auditions.Regional_Date = state.RegionalDate;
             Auditions.Nationwide_Date = state.NationwideDate;
-            ForgetOwner(state.Audition);
+
+            // GenerateAudition() only starts the game's delayed generation coroutine.
+            // Keep ownership alive until Popup_Audition.Set() has consumed the audition data.
         }
 
         internal static List<CooldownEntry> ExportCooldownEntries()
@@ -581,6 +583,16 @@ namespace AssitantManagerMod
             {
                 AssistantManagerStatePersistence.MarkDirty();
             }
+        }
+
+        internal static void FinishAuditionPopup(Auditions.data audition)
+        {
+            if (audition == null)
+            {
+                return;
+            }
+
+            ForgetOwner(audition);
         }
 
         internal static List<OwnerEntry> ExportOwnerEntries()
@@ -3895,6 +3907,24 @@ namespace AssitantManagerMod
         private static void Postfix(AssistantManagerAuditionTracking.GenerateState __state)
         {
             AssistantManagerAuditionTracking.EndGenerate(__state);
+        }
+    }
+
+    [HarmonyPatch(typeof(Popup_Audition), "Set", new Type[] { typeof(Auditions.data), typeof(bool) })]
+    internal static class PopupAuditionSetOwnerCleanupPatch
+    {
+        private static Exception Finalizer(object[] __args, Exception __exception)
+        {
+            Auditions.data audition = null;
+            if (__args != null && __args.Length > 0)
+            {
+                audition = __args[0] as Auditions.data;
+            }
+
+            AssistantManagerAuditionTracking.FinishAuditionPopup(audition);
+
+            // Preserve exceptions from vanilla or other mods instead of swallowing them.
+            return __exception;
         }
     }
 
