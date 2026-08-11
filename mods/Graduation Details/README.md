@@ -12,39 +12,38 @@
 
 ## Save data
 
-Graduation Details mirrors each vanilla save below the game's persistent data folder:
+Graduation Details mirrors each supported vanilla save below a sibling directory in the game's
+persistent data folder:
 
-`C:\Users\<user>\AppData\LocalLow\Glitch Pitch\Idol Manager\GraduationDetails\saves`
+`C:\Users\<user>\AppData\LocalLow\Glitch Pitch\Idol Manager\GraduationDetails`
 
-The vanilla path below `data` is preserved. A terminal `save.json` is represented by its parent
-directory; meaningful filenames such as `auto_save.json` and `manual_save.json` retain their stem.
-For example:
+The complete vanilla path below `data` is preserved. There is no `Mods` or `saves` layer:
 
-| Vanilla save | Graduation Details directory |
+| Vanilla save | Graduation Details sidecar |
 | --- | --- |
-| `data\manual_saves\12\save.json` | `GraduationDetails\saves\manual_saves\12` |
-| `data\story_mode\Agency Name\auto_save.json` | `GraduationDetails\saves\story_mode\Agency Name\auto_save` |
-| `data\story_mode\Agency Name\manual_saves\AB12CD34\save.json` | `GraduationDetails\saves\story_mode\Agency Name\manual_saves\AB12CD34` |
-| `data\story_mode\Agency Name\chapter_1\save.json` | `GraduationDetails\saves\story_mode\Agency Name\chapter_1` |
+| `data\auto_save.json` | `GraduationDetails\auto_save.json` |
+| `data\manual_saves\12\save.json` | `GraduationDetails\manual_saves\12\save.json` |
+| `data\story_mode\Agency Name\auto_save.json` | `GraduationDetails\story_mode\Agency Name\auto_save.json` |
+| `data\story_mode\Agency Name\manual_saves\AB12CD34\save.json` | `GraduationDetails\story_mode\Agency Name\manual_saves\AB12CD34\save.json` |
+| `data\story_mode\Agency Name\chapter_1\save.json` | `GraduationDetails\story_mode\Agency Name\chapter_1\save.json` |
 
-Each directory can contain `marriage_data.json`, `staff_idol_map.json`,
-`graduation_snapshots.json`, and a `Portraits` directory. Save As writes a complete snapshot of
-the current in-memory records into the new vanilla slot and then binds future changes to it.
+Each sidecar uses the named `GraduationDetails.LightweightSidecar` format. It contains only
+sequenced Graduation Details mutations, exact vanilla-save checkpoints, and the supplemental
+records that vanilla does not preserve. It never serializes a copy of Idol Manager's canonical
+save state. Identity-named portrait files are stored beside the sidecar in a matching
+`<save-name>.portraits` directory.
+
+Changes remain in memory until one of Idol Manager's real save operations writes its vanilla
+save. At that boundary Graduation Details records the vanilla relative path, real-world save
+time, playtime, and in-game date. Loading requires that complete tuple to select the matching
+supplemental checkpoint; sequence numbers order history but never decide which save is loaded.
+Save As carries the active branch into the new exact vanilla slot.
 
 ## Legacy migration
 
-When a vanilla save is successfully loaded, the mod looks for its historical agency/fallback and
-save-owner keys in these legacy locations:
-
-- `...\Idol Manager\GraduationDetails\saves\<legacy-key>` and the older direct keyed form.
-- `...\Idol Manager\Mods\GraduationDetails\...` and
-  `...\Idol Manager\Mods\Graduation Details\...`.
-- The installed mod/assembly directory and matching installed Workshop mod directories, including
-  `steamapps\workshop\content\821880\3646637689\...`.
-
-Migration is copy-only and idempotent: it merges missing JSON and portrait files into the new
-directory, never moves or deletes legacy data, and never overwrites a file already present at the
-destination. Ambiguous root-level legacy files are imported through a guarded one-time fallback.
+The lightweight format does not automatically import the older agency-keyed, fingerprinted, or
+transactional layouts. Those files are left untouched. A missing, invalid, or non-matching
+sidecar loads as safe empty supplemental state and never blocks the vanilla save from loading.
 
 ## Build
 
