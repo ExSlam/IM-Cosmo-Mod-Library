@@ -103,6 +103,20 @@ namespace IMDataCore
             LightweightCoreStorageEngine loadedEngine = null;
             CoreSaveScope targetScope = null;
             bool engineInstalled = false;
+            lock (runtimeLock)
+            {
+                if (saveLoadPreparationActive)
+                {
+                    CoreLog.Warn(
+                        "IM Data Core ignored a duplicate SaveManager.Data restoration " +
+                        "during the same vanilla load.");
+                    return;
+                }
+
+                // This flag is now an idempotency guard for one vanilla LoadData
+                // invocation. The successful postfix clears it.
+                saveLoadPreparationActive = true;
+            }
             try
             {
                 string resolvedVanillaPath;
@@ -379,7 +393,29 @@ namespace IMDataCore
             lock (runtimeLock)
             {
                 saveLoadPreparationActive = false;
-                SeedResolvedSingleChartPositionsFromVanillaLocked();
+                try
+                {
+                    SeedResolvedSingleChartPositionsFromVanillaLocked();
+                }
+                catch (Exception exception)
+                {
+                    // A supplemental post-load backfill must never escape from a
+                    // Harmony postfix and interrupt vanilla scene/game progression.
+                    CoreLog.Warn(
+                        "IM Data Core post-load chart-position seeding failed " +
+                        "without blocking vanilla: " +
+                        exception.Message);
+                }
+            }
+        }
+
+        internal void CancelVanillaLoadPreparation()
+        {
+            lock (runtimeLock)
+            {
+                // Used only by Harmony failure/finalizer paths. Do not seed
+                // supplemental state when vanilla itself did not complete loading.
+                saveLoadPreparationActive = false;
             }
         }
 
