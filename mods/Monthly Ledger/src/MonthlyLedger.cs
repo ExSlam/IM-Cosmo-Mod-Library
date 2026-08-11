@@ -163,8 +163,8 @@ namespace MonthlyLedger
         internal const string FallbackDependencyError = "Monthly Ledger requires an active, compatible installation of {0}.";
         internal const string FallbackCoverageFailed = "Exact monthly ledger coverage has not started for this save.";
         internal const string FallbackOther = "Other";
-        internal const string DataCoreDependencyDisplayName = "IM Data Core 1.3.0+";
-        internal const string MinimumDataCoreAssemblyVersionText = "1.3.0.0";
+        internal const string DataCoreDependencyDisplayName = "IM Data Core 2.0.0+";
+        internal const string MinimumDataCoreAssemblyVersionText = "2.0.0.0";
 
         internal const int PopupTypeValue = 997;
         internal const int FirstDayOfMonth = 1;
