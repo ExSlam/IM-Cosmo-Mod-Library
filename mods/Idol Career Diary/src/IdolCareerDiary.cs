@@ -22,8 +22,8 @@ namespace IdolCareerDiary
     {
         internal const string HarmonyId = "com.cosmo.idolcareerdiary";
         internal const string HarmonyIdImDataCore = "com.cosmo.imdatacore";
-        internal const string MinimumImDataCoreDisplayVersion = "1.3.0";
-        internal const string MinimumImDataCoreAssemblyVersionText = "1.3.0.0";
+        internal const string MinimumImDataCoreDisplayVersion = "2.0.0";
+        internal const string MinimumImDataCoreAssemblyVersionText = "2.0.0.0";
         internal static readonly Version MinimumImDataCoreAssemblyVersion = new Version(MinimumImDataCoreAssemblyVersionText);
         internal const string HarmonyIdImUiFramework = "com.cosmo.imuiframework";
         internal const string HarmonyIdGraduationRebalances = "com.cosmo.graduationrebalances";

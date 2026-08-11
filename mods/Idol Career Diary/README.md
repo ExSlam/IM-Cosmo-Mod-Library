@@ -4,10 +4,20 @@
 
 ## Dependencies
 
-- `IM Data Core` (`com.cosmo.imdatacore`) version `1.0.0` or higher
+- `IM Data Core` (`com.cosmo.imdatacore`) version `2.0.0` or higher
 - `IM UI Framework` (`com.cosmo.imuiframework`) version `1.0.0` or higher
 
 This mod does not ship a separate persistence backend. It reads timeline events from IM Data Core and renders UI with IM UI Framework.
+
+Idol Career Diary uses IM Data Core's public API only. With IM Data Core 2.0,
+entity identifiers are read from the event's `EntityId`, and new timeline data
+uses the canonical `single_released`, `show_episode_released`,
+`contract_cancelled`, and `idol_status_changed` event names. Readers for their
+old aliases remain so imported or third-party events can still be displayed.
+
+The last-selected diary entry is supplemental state stored through IM Data
+Core. It is immediately visible in the active session and becomes durable at
+the next vanilla save boundary, following IM Data Core 2.0's persistence model.
 
 ## Player-facing behavior
 
@@ -78,7 +88,7 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 
 ## Installation
 
-1. Install `IM Data Core` first.
+1. Install `IM Data Core` 2.0 or newer first.
 2. Install `IM UI Framework` second.
 3. Install `Idol Career Diary`.
 4. Launch game and open an idol profile to verify diary UI appears.
@@ -87,7 +97,7 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 
 - Runtime behavior and user-facing diary feature set are considered stable in `1.x`.
 - Dependency requirement remains hard: missing IM Data Core or IM UI Framework is an install error.
-- Save compatibility is inherited from IM Data Core event schema and namespace usage.
+- Timeline and supplemental-state rollback follow the vanilla save selected by IM Data Core 2.0.
 
 ## Troubleshooting
 
