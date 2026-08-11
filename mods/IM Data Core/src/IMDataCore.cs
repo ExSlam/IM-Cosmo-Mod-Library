@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using HarmonyLib;
@@ -19,15 +18,7 @@ namespace IMDataCore
     {
         internal const string LogPrefix = "[IMDataCore] ";
 
-        internal const string ModFolderName = "IMDataCore";
-        internal const string ModsFolderName = "Mods";
-        internal const string SaveFolderName = "saves";
         internal const string DefaultSaveKey = "default";
-        internal const string DatabaseFileName = "im_data_core.db";
-        internal const string FlatFileDatabaseFileName = "im_data_core.fallback.json";
-
-        internal const string SaveModeStory = "story";
-        internal const string SaveModeFreePlay = "freeplay";
         internal const string SaveKeyJoinSeparator = "_";
 
         internal const int SaveKeyMaximumLength = 64;
@@ -52,39 +43,13 @@ namespace IMDataCore
         internal const int DateKeyMonthMultiplier = 100;
         internal const string RoundTripDateFormat = "o";
 
-        internal const float FlushIntervalSeconds = 3f;
-        internal const int ImmediateFlushQueueThreshold = 128;
-        internal const int MaximumBufferedEventsAfterPersistenceFailure = 8192;
         internal const bool PrettyPrintJsonPayload = false;
-
-        internal const string ProviderNamePrimary = "Mono.Data.Sqlite";
-        internal const string ProviderNameFallback = "Mono.Data.SqliteClient";
-        internal const string ProviderFactoryTypePrimary = "Mono.Data.Sqlite.SqliteFactory, Mono.Data.Sqlite";
-        internal const string ProviderFactoryTypeFallback = "Mono.Data.SqliteClient.SqliteFactory, Mono.Data.SqliteClient";
-        internal static readonly string[] ProviderCandidates = new[] { ProviderNamePrimary, ProviderNameFallback };
-        internal const string SystemDataFactoryTypeName = "System.Data.Common.DbProviderFactory, System.Data";
-        internal const string SystemDataDbTypeName = "System.Data.DbType, System.Data";
-        internal const string SqliteProviderAssemblyFileName = "Mono.Data.Sqlite.dll";
-        internal const string SystemDataAssemblyFileName = "System.Data.dll";
-        internal const string SqliteProviderPathEnvironmentVariableName = "IMDATACORE_SQLITE_PROVIDER_PATH";
-        internal const string SystemDataPathEnvironmentVariableName = "IMDATACORE_SYSTEM_DATA_PATH";
-        internal const string EnableExternalSqliteLoadEnvironmentVariableName = "IMDATACORE_ENABLE_EXTERNAL_SQLITE";
-        internal const string ConnectionStringFormat = "Data Source={0};Version=3;Pooling=True;";
-
-        internal const string SqlPragmaJournalMode = "PRAGMA journal_mode=WAL;";
-        internal const string SqlPragmaSynchronous = "PRAGMA synchronous=NORMAL;";
-        internal const string SqlPragmaForeignKeys = "PRAGMA foreign_keys=ON;";
-
-        internal const string MetaSchemaVersionKey = "schema_version";
-        internal const string MetaProviderKey = "db_provider";
-        internal const string SchemaVersionValue = "2";
 
         internal const string UnknownAssemblyIdentity = "unknown_assembly_identity";
         internal const string SessionTokenFormat = "N";
 
         internal const string EventTypeSingleCreated = "single_created";
         internal const string EventTypeSingleReleased = "single_released";
-        internal const string EventTypeSingleParticipationRecorded = "single_participation_recorded";
         internal const string EventTypeSingleCancelled = "single_cancelled";
         internal const string EventTypeSingleStatusChanged = "single_status_changed";
         internal const string EventTypeSingleCastChanged = "single_cast_changed";
@@ -95,7 +60,6 @@ namespace IMDataCore
         internal const string EventTypeGroupParamPointsChanged = "group_param_points_changed";
         internal const string EventTypeGroupAppealPointsSpent = "group_appeal_points_spent";
         internal const string EventTypeStatusChanged = "idol_status_changed";
-        internal const string EventTypeStatusChangedLegacy = "status_changed";
         internal const string EventTypeStatusStarted = "status_started";
         internal const string EventTypeStatusEnded = "status_ended";
         internal const string EventTypeDatingPartnerStatusChanged = "dating_partner_status_changed";
@@ -104,7 +68,6 @@ namespace IMDataCore
         internal const string EventTypeContractWindowOpened = "contract_window_opened";
         internal const string EventTypeContractAccepted = "contract_accepted";
         internal const string EventTypeContractCancelled = "contract_cancelled";
-        internal const string EventTypeContractCanceled = "contract_canceled";
         internal const string EventTypeContractFinished = "contract_finished";
         internal const string EventTypeContractWeeklyEarningsApplied = "contract_weekly_earnings_applied";
         internal const string EventTypeContractWeeklyBenefitsApplied = "contract_weekly_benefits_applied";
@@ -114,7 +77,6 @@ namespace IMDataCore
         internal const string EventTypeShowCancelled = "show_cancelled";
         internal const string EventTypeShowStatusChanged = "show_status_changed";
         internal const string EventTypeShowEpisodeReleased = "show_episode_released";
-        internal const string EventTypeShowEpisode = "show_episode";
         internal const string EventTypeShowCastChanged = "show_cast_changed";
         internal const string EventTypeShowConfigurationChanged = "show_configuration_changed";
         internal const string EventTypeShowRelaunchStarted = "show_relaunch_started";
@@ -572,286 +534,6 @@ namespace IMDataCore
             StatusCodeHiatus
         };
 
-        internal const string SqlCreateTableMeta = "CREATE TABLE IF NOT EXISTS meta (meta_key TEXT PRIMARY KEY, meta_value TEXT NOT NULL);";
-
-        internal const string SqlCreateTableEventStream =
-            "CREATE TABLE IF NOT EXISTS event_stream (" +
-            "event_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "game_date_key INTEGER NOT NULL, " +
-            "game_datetime TEXT NOT NULL, " +
-            "idol_id INTEGER, " +
-            "entity_kind TEXT NOT NULL, " +
-            "entity_id TEXT, " +
-            "event_type TEXT NOT NULL, " +
-            "source_patch TEXT NOT NULL, " +
-            "namespace_id TEXT NOT NULL DEFAULT '', " +
-            "payload_json TEXT NOT NULL" +
-            ");";
-
-        internal const string SqlCreateTableSingleParticipation =
-            "CREATE TABLE IF NOT EXISTS single_participation (" +
-            "save_key TEXT NOT NULL, " +
-            "single_id INTEGER NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "row_index INTEGER NOT NULL, " +
-            "position_index INTEGER NOT NULL, " +
-            "is_center INTEGER NOT NULL, " +
-            "release_date TEXT NOT NULL, " +
-            "PRIMARY KEY(save_key, single_id, idol_id)" +
-            ");";
-
-        internal const string SqlCreateTableStatusWindow =
-            "CREATE TABLE IF NOT EXISTS status_window (" +
-            "window_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "status_type TEXT NOT NULL, " +
-            "start_date TEXT NOT NULL, " +
-            "end_date TEXT" +
-            ");";
-
-        internal const string SqlCreateTableShowCastWindow =
-            "CREATE TABLE IF NOT EXISTS show_cast_window (" +
-            "window_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "show_id TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "start_date TEXT NOT NULL, " +
-            "end_date TEXT, " +
-            "end_reason TEXT NOT NULL DEFAULT ''" +
-            ");";
-
-        internal const string SqlCreateTableContractWindow =
-            "CREATE TABLE IF NOT EXISTS contract_window (" +
-            "window_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "contract_key TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "start_date TEXT NOT NULL, " +
-            "end_date TEXT, " +
-            "end_reason TEXT NOT NULL DEFAULT ''" +
-            ");";
-
-        internal const string SqlCreateTableRelationshipWindow =
-            "CREATE TABLE IF NOT EXISTS relationship_window (" +
-            "window_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "relationship_key TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "relationship_type TEXT NOT NULL, " +
-            "start_date TEXT NOT NULL, " +
-            "end_date TEXT, " +
-            "end_reason TEXT NOT NULL DEFAULT ''" +
-            ");";
-
-        internal const string SqlCreateTableTourParticipation =
-            "CREATE TABLE IF NOT EXISTS tour_participation (" +
-            "row_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "tour_id TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "lifecycle_action TEXT NOT NULL, " +
-            "event_date TEXT NOT NULL, " +
-            "UNIQUE(save_key, tour_id, idol_id, lifecycle_action)" +
-            ");";
-
-        internal const string SqlCreateTableAwardResultProjection =
-            "CREATE TABLE IF NOT EXISTS award_result_projection (" +
-            "row_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "award_key TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "event_date TEXT NOT NULL, " +
-            "UNIQUE(save_key, award_key, idol_id)" +
-            ");";
-
-        internal const string SqlCreateTableElectionResultProjection =
-            "CREATE TABLE IF NOT EXISTS election_result_projection (" +
-            "row_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "election_id TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "event_date TEXT NOT NULL, " +
-            "UNIQUE(save_key, election_id, idol_id)" +
-            ");";
-
-        internal const string SqlCreateTablePushWindow =
-            "CREATE TABLE IF NOT EXISTS push_window (" +
-            "window_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-            "save_key TEXT NOT NULL, " +
-            "slot_key TEXT NOT NULL, " +
-            "idol_id INTEGER NOT NULL, " +
-            "start_date TEXT NOT NULL, " +
-            "end_date TEXT, " +
-            "last_days_in_slot INTEGER NOT NULL DEFAULT -1, " +
-            "end_reason TEXT NOT NULL DEFAULT ''" +
-            ");";
-
-        internal const string SqlCreateTableCustomData =
-            "CREATE TABLE IF NOT EXISTS custom_data (" +
-            "save_key TEXT NOT NULL, " +
-            "namespace_id TEXT NOT NULL, " +
-            "data_key TEXT NOT NULL, " +
-            "value_json TEXT NOT NULL, " +
-            "updated_utc TEXT NOT NULL, " +
-            "PRIMARY KEY(save_key, namespace_id, data_key)" +
-            ");";
-
-        internal const string SqlCreateIndexEventIdolDate =
-            "CREATE INDEX IF NOT EXISTS idx_event_stream_save_idol_date ON event_stream(save_key, idol_id, game_date_key DESC, event_id DESC);";
-        internal const string SqlCreateIndexEventTypeDate =
-            "CREATE INDEX IF NOT EXISTS idx_event_stream_save_type_date ON event_stream(save_key, event_type, game_date_key DESC, event_id DESC);";
-        internal const string SqlCreateIndexSingleParticipation =
-            "CREATE INDEX IF NOT EXISTS idx_single_participation_save_idol ON single_participation(save_key, idol_id, release_date DESC);";
-        internal const string SqlCreateIndexStatusWindow =
-            "CREATE INDEX IF NOT EXISTS idx_status_window_save_idol_status ON status_window(save_key, idol_id, status_type, start_date DESC);";
-        internal const string SqlCreateIndexShowCastWindow =
-            "CREATE INDEX IF NOT EXISTS idx_show_cast_window_save_idol ON show_cast_window(save_key, idol_id, show_id, start_date DESC);";
-        internal const string SqlCreateIndexContractWindow =
-            "CREATE INDEX IF NOT EXISTS idx_contract_window_save_idol ON contract_window(save_key, idol_id, start_date DESC);";
-        internal const string SqlCreateIndexRelationshipWindow =
-            "CREATE INDEX IF NOT EXISTS idx_relationship_window_save_idol ON relationship_window(save_key, idol_id, relationship_type, start_date DESC);";
-        internal const string SqlCreateIndexTourParticipation =
-            "CREATE INDEX IF NOT EXISTS idx_tour_participation_save_idol ON tour_participation(save_key, idol_id, event_date DESC);";
-        internal const string SqlCreateIndexAwardResultProjection =
-            "CREATE INDEX IF NOT EXISTS idx_award_result_projection_save_idol ON award_result_projection(save_key, idol_id, event_date DESC);";
-        internal const string SqlCreateIndexElectionResultProjection =
-            "CREATE INDEX IF NOT EXISTS idx_election_result_projection_save_idol ON election_result_projection(save_key, idol_id, event_date DESC);";
-        internal const string SqlCreateIndexPushWindow =
-            "CREATE INDEX IF NOT EXISTS idx_push_window_save_idol ON push_window(save_key, idol_id, start_date DESC);";
-        internal const string SqlCreateIndexCustomData =
-            "CREATE INDEX IF NOT EXISTS idx_custom_data_save_namespace ON custom_data(save_key, namespace_id);";
-        internal const string SqlInsertMeta = "INSERT OR REPLACE INTO meta(meta_key, meta_value) VALUES(@meta_key, @meta_value);";
-
-        internal const string SqlInsertEvent =
-            "INSERT INTO event_stream(" +
-            "save_key, game_date_key, game_datetime, idol_id, entity_kind, entity_id, event_type, source_patch, namespace_id, payload_json" +
-            ") VALUES (" +
-            "@save_key, @game_date_key, @game_datetime, @idol_id, @entity_kind, @entity_id, @event_type, @source_patch, @event_namespace_id, @payload_json" +
-            ");";
-
-        internal const string SqlUpsertSingleParticipation =
-            "INSERT OR REPLACE INTO single_participation(" +
-            "save_key, single_id, idol_id, row_index, position_index, is_center, release_date" +
-            ") VALUES (" +
-            "@save_key, @single_id, @idol_id, @row_index, @position_index, @is_center, @release_date" +
-            ");";
-
-        internal const string SqlCloseStatusWindow =
-            "UPDATE status_window SET end_date = @end_date " +
-            "WHERE save_key = @save_key AND idol_id = @idol_id AND status_type = @status_type AND end_date IS NULL;";
-
-        internal const string SqlOpenStatusWindowIfMissing =
-            "INSERT INTO status_window(save_key, idol_id, status_type, start_date, end_date) " +
-            "SELECT @save_key, @idol_id, @status_type, @start_date, NULL " +
-            "WHERE NOT EXISTS(" +
-            "SELECT 1 FROM status_window " +
-            "WHERE save_key = @save_key AND idol_id = @idol_id AND status_type = @status_type AND end_date IS NULL" +
-            ");";
-
-        internal const string SqlOpenShowCastWindowIfMissing =
-            "INSERT INTO show_cast_window(save_key, show_id, idol_id, start_date, end_date, end_reason) " +
-            "SELECT @save_key, @show_id, @idol_id, @start_date, NULL, '' " +
-            "WHERE NOT EXISTS(" +
-            "SELECT 1 FROM show_cast_window " +
-            "WHERE save_key = @save_key AND show_id = @show_id AND idol_id = @idol_id AND end_date IS NULL" +
-            ");";
-
-        internal const string SqlCloseShowCastWindow =
-            "UPDATE show_cast_window SET end_date = @end_date, end_reason = @end_reason " +
-            "WHERE save_key = @save_key AND show_id = @show_id AND idol_id = @idol_id AND end_date IS NULL;";
-
-        internal const string SqlOpenContractWindowIfMissing =
-            "INSERT INTO contract_window(save_key, contract_key, idol_id, start_date, end_date, end_reason) " +
-            "SELECT @save_key, @contract_key, @idol_id, @start_date, NULL, '' " +
-            "WHERE NOT EXISTS(" +
-            "SELECT 1 FROM contract_window " +
-            "WHERE save_key = @save_key AND contract_key = @contract_key AND idol_id = @idol_id AND end_date IS NULL" +
-            ");";
-
-        internal const string SqlCloseContractWindow =
-            "UPDATE contract_window SET end_date = @end_date, end_reason = @end_reason " +
-            "WHERE save_key = @save_key AND contract_key = @contract_key AND idol_id = @idol_id AND end_date IS NULL;";
-
-        internal const string SqlOpenRelationshipWindowIfMissing =
-            "INSERT INTO relationship_window(save_key, relationship_key, idol_id, relationship_type, start_date, end_date, end_reason) " +
-            "SELECT @save_key, @relationship_key, @idol_id, @relationship_type, @start_date, NULL, '' " +
-            "WHERE NOT EXISTS(" +
-            "SELECT 1 FROM relationship_window " +
-            "WHERE save_key = @save_key AND relationship_key = @relationship_key AND idol_id = @idol_id AND relationship_type = @relationship_type AND end_date IS NULL" +
-            ");";
-
-        internal const string SqlCloseRelationshipWindow =
-            "UPDATE relationship_window SET end_date = @end_date, end_reason = @end_reason " +
-            "WHERE save_key = @save_key AND relationship_key = @relationship_key AND idol_id = @idol_id AND relationship_type = @relationship_type AND end_date IS NULL;";
-
-        internal const string SqlUpsertTourParticipationProjection =
-            "INSERT OR REPLACE INTO tour_participation(save_key, tour_id, idol_id, lifecycle_action, event_date) " +
-            "VALUES(@save_key, @tour_id, @idol_id, @lifecycle_action, @event_date);";
-
-        internal const string SqlUpsertAwardResultProjection =
-            "INSERT OR REPLACE INTO award_result_projection(save_key, award_key, idol_id, event_date) " +
-            "VALUES(@save_key, @award_key, @idol_id, @event_date);";
-
-        internal const string SqlUpsertElectionResultProjection =
-            "INSERT OR REPLACE INTO election_result_projection(save_key, election_id, idol_id, event_date) " +
-            "VALUES(@save_key, @election_id, @idol_id, @event_date);";
-
-        internal const string SqlOpenPushWindowIfMissing =
-            "INSERT INTO push_window(save_key, slot_key, idol_id, start_date, end_date, last_days_in_slot, end_reason) " +
-            "SELECT @save_key, @slot_key, @idol_id, @start_date, NULL, @push_days_in_slot, '' " +
-            "WHERE NOT EXISTS(" +
-            "SELECT 1 FROM push_window " +
-            "WHERE save_key = @save_key AND slot_key = @slot_key AND idol_id = @idol_id AND end_date IS NULL" +
-            ");";
-
-        internal const string SqlClosePushWindow =
-            "UPDATE push_window SET end_date = @end_date, last_days_in_slot = @push_days_in_slot, end_reason = @end_reason " +
-            "WHERE save_key = @save_key AND slot_key = @slot_key AND idol_id = @idol_id AND end_date IS NULL;";
-
-        internal const string SqlTouchPushWindow =
-            "UPDATE push_window SET last_days_in_slot = @push_days_in_slot " +
-            "WHERE save_key = @save_key AND slot_key = @slot_key AND idol_id = @idol_id AND end_date IS NULL;";
-
-        internal const string SqlUpsertCustomData =
-            "INSERT OR REPLACE INTO custom_data(" +
-            "save_key, namespace_id, data_key, value_json, updated_utc" +
-            ") VALUES (" +
-            "@save_key, @namespace_id, @data_key, @value_json, @updated_utc" +
-            ");";
-
-        internal const string SqlSelectCustomData =
-            "SELECT value_json FROM custom_data WHERE save_key = @save_key AND namespace_id = @namespace_id AND data_key = @data_key;";
-
-        internal const string SqlDeleteCustomData =
-            "DELETE FROM custom_data WHERE save_key = @save_key AND namespace_id = @namespace_id AND data_key = @data_key;";
-
-        internal const string SqlCountCustomKeysForNamespace =
-            "SELECT COUNT(*) FROM custom_data WHERE save_key = @save_key AND namespace_id = @namespace_id;";
-
-        internal const string SqlSumCustomValueLengthsForNamespace =
-            "SELECT COALESCE(SUM(LENGTH(value_json)), 0) FROM custom_data WHERE save_key = @save_key AND namespace_id = @namespace_id;";
-
-        internal const string SqlLengthForCustomValue =
-            "SELECT LENGTH(value_json) FROM custom_data WHERE save_key = @save_key AND namespace_id = @namespace_id AND data_key = @data_key;";
-
-        internal const string SqlSelectLastInsertRowId = "SELECT last_insert_rowid();";
-
-        internal const string SqlReadRecentEventsForIdol =
-            "SELECT event_id, game_date_key, game_datetime, idol_id, entity_kind, entity_id, event_type, source_patch, payload_json, namespace_id " +
-            "FROM event_stream " +
-            "WHERE save_key = @save_key AND (idol_id = @idol_id OR idol_id < 0 OR idol_id IS NULL) " +
-            "AND event_type NOT IN ('" + MoneyLedgerConstants.EventTypeTransaction + "', '" + MoneyLedgerConstants.EventTypeCoverageStarted + "') " +
-            "ORDER BY CASE WHEN idol_id = @idol_id THEN 0 ELSE 1 END, game_date_key DESC, event_id DESC " +
-            "LIMIT @limit_count;";
-
-        internal const string SqlSelectEventNamespaceColumnExists =
-            "SELECT COUNT(*) FROM pragma_table_info('event_stream') WHERE name = 'namespace_id';";
-
-        internal const string SqlAlterTableEventStreamAddNamespaceIdentifier =
-            "ALTER TABLE event_stream ADD COLUMN namespace_id TEXT NOT NULL DEFAULT '';";
-
         internal const int SenbatsuCenterPositionIndex = 0;
         internal const int ZeroBasedListStartIndex = 0;
         internal const int MinimumValidIdolIdentifier = 0;
@@ -868,18 +550,6 @@ namespace IMDataCore
         internal const int UninitializedDateKey = int.MinValue;
         internal const float ScandalPointsDeltaEpsilon = 0.0001f;
         internal static readonly float ScandalPointsRawStateUnavailableValue = float.NaN;
-        internal const int EventStreamColumnIndexEventId = 0;
-        internal const int EventStreamColumnIndexGameDateKey = 1;
-        internal const int EventStreamColumnIndexGameDateTime = 2;
-        internal const int EventStreamColumnIndexIdolId = 3;
-        internal const int EventStreamColumnIndexEntityKind = 4;
-        internal const int EventStreamColumnIndexEntityId = 5;
-        internal const int EventStreamColumnIndexEventType = 6;
-        internal const int EventStreamColumnIndexSourcePatch = 7;
-        internal const int EventStreamColumnIndexPayloadJson = 8;
-        internal const int EventStreamColumnIndexNamespaceIdentifier = 9;
-
-        internal const int MinimumQueueSizeForFlush = 1;
         internal const int MinimumTokenLength = 1;
         internal const int EventKindMaximumLength = 64;
         internal const int EventIdMaximumLength = 128;
@@ -887,54 +557,12 @@ namespace IMDataCore
         internal const int EventSourceMaximumLength = 128;
 
         internal const string EmptyJsonObject = "{}";
-        internal const string DefaultEntityIdentifier = "";
         internal const string MessageStorageInitializationFailure = "Storage initialization failed: ";
-        internal const string MessageStorageSaveSwitchFailure = "Storage save switch failed: ";
-        internal const string MessageSaveLoadInitializationFailurePrefix = "Save-load initialization failed: ";
-        internal const string MessageSaveLoadRollbackFailurePrefix = "Save-load rollback failed: ";
-        internal const string MessageSaveWritePreparationFailurePrefix = "Save-write preparation failed: ";
-        internal const string MessageSaveDataMigrationFailedPrefix = "Save-data migration failed: ";
-        internal const string MessageLegacySaveDataMigrationFailedPrefix = "Legacy save-data migration failed: ";
-        internal const string MessageCoreInitializedForSaveKeyPrefix = "IM Data Core initialized for save key '";
-        internal const string MessageCoreInitializedForSaveKeySuffix = "'.";
-        internal const string MessageSaveKeyDerivationFailurePrefix = "Failed to derive save key from player data. ";
-        internal const string MessageSqliteEngineInitializedProviderPrefix = "SQLite engine initialized with provider '";
-        internal const string MessageSqliteEngineInitializedProviderSuffix = "'.";
-        internal const string MessageSqliteUnavailableFallbackPrefix = "SQLite storage unavailable; falling back to flat-file storage: ";
-        internal const string MessageSystemDataUnavailableFallback = "System.Data is unavailable; using flat-file storage.";
-        internal const string MessageRuntimeDependencyProbeFailedPrefix = "SQLite runtime dependency probe failed: ";
-        internal const string MessageLoadedSystemDataAssemblyPrefix = "Loaded System.Data assembly from: ";
-        internal const string MessageLoadedSqliteProviderAssemblyPrefix = "Loaded SQLite provider assembly from: ";
-        internal const string MessageFlatFileEngineInitialized = "Flat-file storage engine initialized.";
-        internal const string MessageFlatFileReadFailedPrefix = "Flat-file read failed: ";
-        internal const string MessageFlatFileWriteFailedPrefix = "Flat-file write failed: ";
-        internal const string MessageDatabasePathEmpty = "Database path cannot be empty.";
-        internal const string MessageConnectionInstanceCreationFailed = "Failed to create database connection instance.";
-        internal const string MessageStorageEngineDisposed = "Storage engine is disposed.";
-        internal const string MessagePersistBatchFailedPrefix = "PersistBatch failed: ";
         internal const string MessageJsonValueNull = "JSON value cannot be null.";
         internal const string MessageJsonValueTooLong = "JSON value exceeds maximum allowed length.";
         internal const string MessageNamespaceKeyQuotaExceeded = "Namespace key quota exceeded.";
         internal const string MessageNamespaceDataBudgetExceeded = "Namespace data budget exceeded.";
-        internal const string MessageTrySetCustomDataFailedPrefix = "TrySetCustomData failed: ";
-        internal const string MessageTryGetCustomDataFailedPrefix = "TryGetCustomData failed: ";
-        internal const string MessageTryRemoveCustomDataFailedPrefix = "TryRemoveCustomData failed: ";
         internal const string MessageTryReadRecentEventsFailedPrefix = "TryReadRecentEventsForIdol failed: ";
-        internal const string MessageTryRollbackToGameDateTimeFailedPrefix = "TryRollbackToGameDateTime failed: ";
-        internal const string MessageTryRemapSaveKeyFailedPrefix = "TryRemapSaveKey failed: ";
-        internal const string MessageDatabaseDisposeErrorPrefix = "Error while disposing database connection: ";
-        internal const string MessageNoCompatibleSqliteProvider = "No compatible SQLite provider was found in the current runtime.";
-        internal const string MessageRecoveryAttemptFailedPrefix = " Recovery attempt failed: ";
-        internal const string MessageRecoveredSqliteInitializationPrefix = "Recovered SQLite initialization by recreating DB files after failure: ";
-        internal const string MessageFailedEnableWalFallbackDeletePrefix = "Failed to enable WAL journal mode; retrying DELETE mode: ";
-        internal const string MessageSqliteOptionalStatementFailedPrefix = "SQLite optional statement failed. SQL: ";
-        internal const string MessageSqliteOptionalStatementFailedDetailsSeparator = " Details: ";
-        internal const string MessageSqliteParameterNotFoundPrefix = "SQLite parameter not found: ";
-        internal const string MessageSqliteResultCodePrefix = "SQLite result code ";
-        internal const string MessageSqliteResultMessageOpeningToken = " (";
-        internal const string MessageSqliteDatabaseMessagePrefix = ". DB message: ";
-        internal const string MessageSqliteSqlPreviewPrefix = " SQL: ";
-        internal const string LogSeparatorColonSpace = ": ";
         internal const string MessageNamespaceInvalid = "Namespace must contain only safe token characters and meet minimum length.";
         internal const string MessageNamespaceAlreadyClaimed = "Namespace is already registered by another assembly.";
         internal const string MessageSessionNull = "Session cannot be null.";
@@ -946,7 +574,6 @@ namespace IMDataCore
         internal const string MessageEntityKindInvalid = "Entity kind must contain only safe token characters and meet minimum length.";
         internal const string MessageEventTypeInvalid = "Event type must contain only safe token characters and meet minimum length.";
         internal const string MessagePayloadNull = "Payload JSON cannot be null.";
-        internal const string MessageControllerNotInitialized = "IM Data Core is not initialized.";
         internal const string MessageStorageUnavailable = "Storage engine is not available.";
         internal const string MessageIdolInvalid = "Idol id must be non-negative.";
         internal const string MessageFlushFailed = "Flush failed: ";
@@ -995,56 +622,6 @@ namespace IMDataCore
         internal const string JsonEscapedUnicodePrefix = "\\u";
         internal const string FourDigitLowerHexFormat = "x4";
 
-        internal const string SqliteWriteAheadLogFileSuffix = "-wal";
-        internal const string SqliteSharedMemoryFileSuffix = "-shm";
-
-        internal const string SqlParameterSaveKey = "@save_key";
-        internal const string SqlParameterNamespaceIdentifier = "@namespace_id";
-        internal const string SqlParameterDataKey = "@data_key";
-        internal const string SqlParameterValueJson = "@value_json";
-        internal const string SqlParameterUpdatedUtc = "@updated_utc";
-        internal const string SqlParameterIdolId = "@idol_id";
-        internal const string SqlParameterLimitCount = "@limit_count";
-        internal const string SqlParameterGameDateKey = "@game_date_key";
-        internal const string SqlParameterGameDateTime = "@game_datetime";
-        internal const string SqlParameterEntityKind = "@entity_kind";
-        internal const string SqlParameterEntityId = "@entity_id";
-        internal const string SqlParameterEventNamespaceIdentifier = "@event_namespace_id";
-        internal const string SqlParameterEventType = "@event_type";
-        internal const string SqlParameterSourcePatch = "@source_patch";
-        internal const string SqlParameterPayloadJson = "@payload_json";
-        internal const string SqlParameterEventId = "@event_id";
-        internal const string SqlParameterSingleId = "@single_id";
-        internal const string SqlParameterRowIndex = "@row_index";
-        internal const string SqlParameterPositionIndex = "@position_index";
-        internal const string SqlParameterIsCenter = "@is_center";
-        internal const string SqlParameterReleaseDate = "@release_date";
-        internal const string SqlParameterEndDate = "@end_date";
-        internal const string SqlParameterStatusType = "@status_type";
-        internal const string SqlParameterStartDate = "@start_date";
-        internal const string SqlParameterMetaKey = "@meta_key";
-        internal const string SqlParameterMetaValue = "@meta_value";
-        internal const string SqlParameterShowId = "@show_id";
-        internal const string SqlParameterContractKey = "@contract_key";
-        internal const string SqlParameterRelationshipKey = "@relationship_key";
-        internal const string SqlParameterRelationshipType = "@relationship_type";
-        internal const string SqlParameterTourId = "@tour_id";
-        internal const string SqlParameterLifecycleAction = "@lifecycle_action";
-        internal const string SqlParameterEventDate = "@event_date";
-        internal const string SqlParameterAwardKey = "@award_key";
-        internal const string SqlParameterElectionId = "@election_id";
-        internal const string SqlParameterSlotKey = "@slot_key";
-        internal const string SqlParameterEndReason = "@end_reason";
-        internal const string SqlParameterPushDaysInSlot = "@push_days_in_slot";
-
-        internal const string ProjectionRelationshipTypeIdolDating = "idol_dating";
-        internal const string ProjectionRelationshipTypeBullying = "bullying";
-        internal const string ProjectionRelationshipTypeClique = "clique";
-        internal const string ProjectionLifecycleActionStarted = "started";
-        internal const string ProjectionLifecycleActionFinished = "finished";
-        internal const string ProjectionLifecycleActionCancelled = "cancelled";
-        internal const int ProjectionUnknownDayCount = -1;
-
         internal const int JsonBuilderDefaultCapacity = 512;
         internal const char JsonObjectStartCharacter = '{';
         internal const char JsonObjectEndCharacter = '}';
@@ -1076,10 +653,7 @@ namespace IMDataCore
         internal const string PayloadValueKindArray = "array";
         internal const string PayloadValueKindRaw = "raw";
 
-        internal const string JsonFieldSingleId = "single_id";
         internal const string JsonFieldSingleTitle = "single_title";
-        internal const string JsonFieldSingleLifecycleAction = "single_lifecycle_action";
-        internal const string JsonFieldSingleStatus = "single_status";
         internal const string JsonFieldSinglePreviousStatus = "single_previous_status";
         internal const string JsonFieldSingleNewStatus = "single_new_status";
         internal const string JsonFieldSingleCastCount = "single_cast_count";
@@ -1103,7 +677,6 @@ namespace IMDataCore
         internal const string JsonFieldGroupId = "group_id";
         internal const string JsonFieldGroupTitle = "group_title";
         internal const string JsonFieldGroupStatus = "group_status";
-        internal const string JsonFieldGroupLifecycleAction = "group_lifecycle_action";
         internal const string JsonFieldGroupDateCreated = "group_date_created";
         internal const string JsonFieldGroupEventDate = "group_event_date";
         internal const string JsonFieldGroupMemberCount = "group_member_count";
@@ -1127,7 +700,6 @@ namespace IMDataCore
         internal const string JsonFieldGroupTargetPointsBefore = "group_target_points_before";
         internal const string JsonFieldGroupTargetPointsAfter = "group_target_points_after";
         internal const string JsonFieldIdolId = "idol_id";
-        internal const string JsonFieldIdolLifecycleAction = "idol_lifecycle_action";
         internal const string JsonFieldIdolStatus = "idol_status";
         internal const string JsonFieldIdolType = "idol_type";
         internal const string JsonFieldIdolAge = "idol_age";
@@ -1232,12 +804,9 @@ namespace IMDataCore
         internal const string JsonFieldContractBreakContext = "contract_break_context";
         internal const string JsonFieldContractWeeklyAction = "contract_weekly_action";
         internal const string JsonFieldContractWeeklyTrainingPoints = "contract_weekly_training_points";
-        internal const string JsonFieldShowId = "show_id";
         internal const string JsonFieldShowTitle = "show_title";
         internal const string JsonFieldShowTitleBefore = "show_title_before";
         internal const string JsonFieldShowTitleAfter = "show_title_after";
-        internal const string JsonFieldShowLifecycleAction = "show_lifecycle_action";
-        internal const string JsonFieldShowStatus = "show_status";
         internal const string JsonFieldShowMediumCode = "show_medium_code";
         internal const string JsonFieldShowMediumTitle = "show_medium_title";
         internal const string JsonFieldShowGenreCode = "show_genre_code";
@@ -1295,7 +864,6 @@ namespace IMDataCore
         internal const string JsonFieldShowLatestProfit = "show_latest_profit";
         internal const string JsonFieldShowEpisodeBudget = "show_episode_budget";
         internal const string JsonFieldShowStaminaCost = "show_stamina_cost";
-        internal const string JsonFieldConcertId = "concert_id";
         internal const string JsonFieldConcertTitle = "concert_title";
         internal const string JsonFieldConcertTitleBefore = "concert_title_before";
         internal const string JsonFieldConcertTitleAfter = "concert_title_after";
@@ -1348,7 +916,6 @@ namespace IMDataCore
         internal const string JsonFieldRelationshipStatus = "relationship_status";
         internal const string JsonFieldRelationshipDynamic = "relationship_dynamic";
         internal const string JsonFieldRelationshipKnownToPlayer = "relationship_known_to_player";
-        internal const string JsonFieldRelationshipPairKey = "relationship_pair_key";
         internal const string JsonFieldRelationshipBreakReason = "relationship_break_reason";
         internal const string JsonFieldRelationshipIsDating = "relationship_is_dating";
         internal const string JsonFieldRelationshipPreviousStatus = "relationship_previous_status";
@@ -1408,7 +975,6 @@ namespace IMDataCore
         internal const string JsonFieldMarriageCustodyString = "marriage_custody_string";
         internal const string JsonFieldMarriageGraduationTrivia = "marriage_graduation_trivia";
         internal const string JsonFieldMarriageIdolStatus = "marriage_idol_status";
-        internal const string JsonFieldTourId = "tour_id";
         internal const string JsonFieldTourLifecycleAction = "tour_lifecycle_action";
         internal const string JsonFieldTourStatus = "tour_status";
         internal const string JsonFieldTourParticipantCount = "tour_participant_count";
@@ -1434,7 +1000,6 @@ namespace IMDataCore
         internal const string JsonFieldTourCountryNewFans = "tour_country_new_fans";
         internal const string JsonFieldTourCountryRevenue = "tour_country_revenue";
         internal const string JsonFieldTourCountryDiscount = "tour_country_discount";
-        internal const string JsonFieldElectionId = "election_id";
         internal const string JsonFieldElectionLifecycleAction = "election_lifecycle_action";
         internal const string JsonFieldElectionStatus = "election_status";
         internal const string JsonFieldElectionPreviousStatus = "election_previous_status";
@@ -1802,8 +1367,6 @@ namespace IMDataCore
 
         private readonly object runtimeLock = new object();
         private readonly List<PendingEvent> bufferedEvents = new List<PendingEvent>();
-        private readonly List<SingleParticipationProjection> bufferedSingleParticipationRows = new List<SingleParticipationProjection>();
-        private readonly List<StatusTransitionProjection> bufferedStatusTransitions = new List<StatusTransitionProjection>();
         private readonly Dictionary<int, TourRuntimeCaptureState> tourRuntimeStateByTourId = new Dictionary<int, TourRuntimeCaptureState>();
         private readonly Dictionary<int, ConcertCastChangeSnapshot> concertEditBaselineByConcertId = new Dictionary<int, ConcertCastChangeSnapshot>();
         private readonly Dictionary<int, int> resolvedSingleChartPositionBySingleId = new Dictionary<int, int>();
@@ -1812,34 +1375,13 @@ namespace IMDataCore
         private readonly Dictionary<string, NamespaceSessionRegistration> namespaceRegistrations =
             new Dictionary<string, NamespaceSessionRegistration>(StringComparer.Ordinal);
 
-        private ICoreStorageEngine storageEngine;
+        private LightweightCoreStorageEngine storageEngine;
         private bool initialized;
         private string activeSaveKey = CoreConstants.DefaultSaveKey;
-        private string activeSaveDirectory = string.Empty;
-        private bool activeSaveScopeIsTransient;
         private CoreSaveScope activeSaveScope;
+        // This is capture suppression only. It is not a filesystem transaction.
         private bool saveLoadPreparationActive;
-        private SaveManager.SavedData pendingLoadedSaveData;
-        private staticVars._playerData pendingLoadedPlayerData;
-        private CoreSaveScope loadPriorSaveScope;
-        private string loadPriorSaveDirectory = string.Empty;
-        private bool loadPriorScopeWasTransient;
-        private CoreSaveScope loadTargetSaveScope;
-        private CoreSaveScope loadStagingSaveScope;
-        private string loadStagingSaveDirectory = string.Empty;
-        private bool loadStagingPrepared;
-        private bool loadStagingPreparationFailed;
-        private bool loadRollbackPrepared;
-        private bool loadCommitPending;
-        private string loadVanillaFingerprint = string.Empty;
-        private string loadRequestedVanillaFingerprint = string.Empty;
-        private CoreFileFingerprint loadRequestedVanillaFileFingerprint;
-        private string loadTransactionToken = string.Empty;
         private long captureSequence;
-        private long loadCaptureSequenceBaseline;
-        private long runtimeEpoch = 1L;
-        private bool transactionRecoveryAttempted;
-        private DateTime nextFlushUtc;
         private int idempotencyDateKey = CoreConstants.UninitializedDateKey;
 
         /// <summary>
@@ -1847,7 +1389,6 @@ namespace IMDataCore
         /// </summary>
         private IMDataCoreController()
         {
-            nextFlushUtc = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -1874,47 +1415,10 @@ namespace IMDataCore
         /// </summary>
         internal void BootstrapIfNeeded()
         {
-            lock (runtimeLock)
-            {
-                if (!transactionRecoveryAttempted)
-                {
-                    string recoveryErrorMessage;
-                    if (CorePaths.TryRecoverInterruptedPublishes(
-                            out recoveryErrorMessage) &&
-                        TryCleanupOrphanedLoadStagesLocked(
-                            out recoveryErrorMessage) &&
-                        TryRecoverPendingSaveIntentsLocked(
-                            out recoveryErrorMessage))
-                    {
-                        transactionRecoveryAttempted = true;
-                    }
-                    else
-                    {
-                        CoreLog.Warn(
-                            "IM Data Core transaction recovery failed: " +
-                            recoveryErrorMessage);
-                    }
-                }
-            }
-
             string errorMessage;
             if (!EnsureInitialized(out errorMessage))
             {
                 CoreLog.Warn(errorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Captures the scope owned by the open storage engine. Unlike the current
-        /// hint, this is stable across nested vanilla LoadData overloads.
-        /// </summary>
-        internal CoreSaveScope CaptureActiveSaveScope()
-        {
-            lock (runtimeLock)
-            {
-                return initialized && activeSaveScope != null
-                    ? activeSaveScope
-                    : CorePaths.GetSaveScope();
             }
         }
 
@@ -2036,17 +1540,23 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (HasUnresolvedSaveTransactionForActiveScopeLocked())
+                if (!storageEngine.TryValidateCustomDataMutation(
+                    registration.NamespaceIdentifier,
+                    sanitizedDataKey,
+                    jsonValue,
+                    false,
+                    out errorMessage))
                 {
-                    return TryDeferCustomDataMutationLocked(
-                        registration.NamespaceIdentifier,
-                        sanitizedDataKey,
-                        jsonValue,
-                        false,
-                        out errorMessage);
+                    return false;
                 }
 
-                return storageEngine.TrySetCustomData(activeSaveKey, registration.NamespaceIdentifier, sanitizedDataKey, jsonValue, out errorMessage);
+                return storageEngine.TrySetCustomData(
+                    NextCaptureSequenceLocked(),
+                    staticVars.dateTime,
+                    registration.NamespaceIdentifier,
+                    sanitizedDataKey,
+                    jsonValue,
+                    out errorMessage);
             }
         }
 
@@ -2083,20 +1593,11 @@ namespace IMDataCore
                     return false;
                 }
 
-                bool deferredValueFound;
-                bool deferredOverlayFound;
-                if (TryReadDeferredCustomDataLocked(
+                return storageEngine.TryGetCustomData(
                     registration.NamespaceIdentifier,
                     sanitizedDataKey,
-                    out deferredOverlayFound,
-                    out deferredValueFound,
-                    out jsonValue) &&
-                    deferredOverlayFound)
-                {
-                    return deferredValueFound;
-                }
-
-                return storageEngine.TryGetCustomData(activeSaveKey, registration.NamespaceIdentifier, sanitizedDataKey, out jsonValue, out errorMessage);
+                    out jsonValue,
+                    out errorMessage);
             }
         }
 
@@ -2132,17 +1633,12 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (HasUnresolvedSaveTransactionForActiveScopeLocked())
-                {
-                    return TryDeferCustomDataMutationLocked(
-                        registration.NamespaceIdentifier,
-                        sanitizedDataKey,
-                        string.Empty,
-                        true,
-                        out errorMessage);
-                }
-
-                return storageEngine.TryRemoveCustomData(activeSaveKey, registration.NamespaceIdentifier, sanitizedDataKey, out errorMessage);
+                return storageEngine.TryRemoveCustomData(
+                    NextCaptureSequenceLocked(),
+                    staticVars.dateTime,
+                    registration.NamespaceIdentifier,
+                    sanitizedDataKey,
+                    out errorMessage);
             }
         }
 
@@ -2216,7 +1712,6 @@ namespace IMDataCore
                 PendingEvent pendingEvent = new PendingEvent
                 {
                     CaptureSequence = NextCaptureSequenceLocked(),
-                    SaveKey = activeSaveKey,
                     GameDateKey = CoreDateTimeUtility.BuildGameDateKey(gameDate),
                     GameDateTime = CoreDateTimeUtility.ToRoundTripString(gameDate),
                     IdolId = idolId >= CoreConstants.MinimumValidIdolIdentifier ? idolId : CoreConstants.InvalidIdValue,
@@ -2234,7 +1729,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Reads recent persisted events for one idol.
+        /// Reads recent active-branch events for one idol.
         /// </summary>
         internal bool TryReadRecentEventsForIdol(int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage)
         {
@@ -2264,12 +1759,16 @@ namespace IMDataCore
                     CoreConstants.MinimumRecentEventRequestCount,
                     CoreConstants.MaximumRecentEventRequestCount);
 
-                return storageEngine.TryReadRecentEventsForIdol(activeSaveKey, idolId, clampedMaxCount, out events, out errorMessage);
+                return storageEngine.TryReadRecentEventsForIdol(
+                    idolId,
+                    clampedMaxCount,
+                    out events,
+                    out errorMessage);
             }
         }
 
         /// <summary>
-        /// Forces an immediate flush of all queued writes.
+        /// Persists the currently active IMDC branch immediately.
         /// </summary>
         internal bool TryFlushNow(out string errorMessage)
         {
@@ -2282,7 +1781,12 @@ namespace IMDataCore
                     return false;
                 }
 
-                return FlushLocked(true, out errorMessage);
+                if (!FlushLocked(true, out errorMessage))
+                {
+                    return false;
+                }
+
+                return storageEngine.TryPersistCurrent(out errorMessage);
             }
         }
 
@@ -2303,1989 +1807,6 @@ namespace IMDataCore
 
                 saveKey = activeSaveKey;
                 return true;
-            }
-        }
-
-        /// <summary>
-        /// Forces persistence before game save operations.
-        /// </summary>
-        internal void ForceFlushBeforeSave()
-        {
-            CaptureResolvedSingleChartPositionsBeforeSave();
-
-            string errorMessage;
-            if (!TryFlushNow(out errorMessage))
-            {
-                CoreLog.Warn(CoreConstants.EventSourceSaveFlushPatch + CoreConstants.LogSeparatorColonSpace + errorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Captures one save-file path hint before load starts so storage rebinding resolves per file.
-        /// </summary>
-        internal string OnSaveLoadStarting(string saveFilePath)
-        {
-            CoreSaveScope targetSaveScope;
-            if (!CorePaths.TryResolveSaveScope(
-                saveFilePath,
-                out targetSaveScope))
-            {
-                return string.Empty;
-            }
-
-            lock (runtimeLock)
-            {
-                if (saveLoadPreparationActive)
-                {
-                    return loadTargetSaveScope != null &&
-                        string.Equals(
-                            loadTargetSaveScope.SaveFilePath,
-                            targetSaveScope.SaveFilePath,
-                            StringComparison.OrdinalIgnoreCase)
-                                ? loadTransactionToken
-                                : string.Empty;
-                }
-
-                CoreFileFingerprint requestedFingerprint;
-                string fingerprintErrorMessage;
-                CoreFileFingerprintUtility.TryReadStable(
-                    targetSaveScope.SaveFilePath,
-                    out requestedFingerprint,
-                    out fingerprintErrorMessage);
-                PausePendingSaveTransactionsForLoadLocked(
-                    targetSaveScope);
-                runtimeEpoch++;
-
-                CoreSaveScope priorSaveScope =
-                    initialized && activeSaveScope != null
-                        ? activeSaveScope
-                        : CorePaths.GetSaveScope();
-
-                loadPriorSaveScope = priorSaveScope;
-                loadPriorSaveDirectory =
-                    initialized &&
-                    !string.IsNullOrEmpty(activeSaveDirectory)
-                        ? activeSaveDirectory
-                        : CorePaths.GetSaveDirectory(priorSaveScope);
-                loadPriorScopeWasTransient =
-                    priorSaveScope != null &&
-                    priorSaveScope.IsTransient;
-                loadTargetSaveScope = targetSaveScope;
-                loadStagingSaveScope = CorePaths.CreateStagingSaveScope(
-                    targetSaveScope,
-                    true);
-                loadStagingSaveDirectory = CorePaths.GetSaveDirectory(
-                    loadStagingSaveScope);
-                loadStagingPrepared = false;
-                loadStagingPreparationFailed = false;
-                loadRollbackPrepared = false;
-                loadCommitPending = false;
-                loadVanillaFingerprint = string.Empty;
-                loadRequestedVanillaFingerprint = string.Empty;
-                loadRequestedVanillaFileFingerprint = null;
-                if (requestedFingerprint != null)
-                {
-                    loadRequestedVanillaFingerprint =
-                        requestedFingerprint.ContentIdentity;
-                    loadRequestedVanillaFileFingerprint =
-                        requestedFingerprint;
-                }
-                string loadStagingDirectoryName = Path.GetFileName(
-                    loadStagingSaveDirectory.TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar));
-                loadTransactionToken =
-                    loadStagingDirectoryName.StartsWith(
-                        "load_",
-                        StringComparison.Ordinal)
-                            ? loadStagingDirectoryName.Substring(
-                                "load_".Length)
-                            : string.Empty;
-                if (loadTransactionToken.Length != 32)
-                {
-                    ClearSaveLoadPreparationStateLocked();
-                    return string.Empty;
-                }
-                loadCaptureSequenceBaseline = captureSequence;
-                pendingLoadedPlayerData = null;
-                saveLoadPreparationActive = true;
-                return loadTransactionToken;
-            }
-        }
-
-        /// <summary>
-        /// Captures the PlayerData deserialized by vanilla before LoadEvent subscribers
-        /// can initialize storage using stale PlayerData from the prior game.
-        /// </summary>
-        internal void OnVanillaSaveDataRead(
-            SaveManager.SavedData loadedSaveData)
-        {
-            if (loadedSaveData == null)
-            {
-                return;
-            }
-
-            lock (runtimeLock)
-            {
-                if (!saveLoadPreparationActive)
-                {
-                    return;
-                }
-
-                pendingLoadedPlayerData =
-                    loadedSaveData.staticVars__PlayerData;
-                pendingLoadedSaveData = loadedSaveData;
-
-                // The transpiler invokes this before vanilla LoadEvent. A second
-                // postfix invocation after LoadEvent must not roll staging back again,
-                // because legitimate custom writes made by LoadEvent subscribers are
-                // part of the newly loaded runtime.
-                if (loadRollbackPrepared)
-                {
-                    return;
-                }
-
-                CoreFileFingerprint loadedFileFingerprint;
-                string loadedFingerprint =
-                    ResolveLoadedVanillaFingerprintLocked(
-                        loadedSaveData,
-                        out loadedFileFingerprint);
-                string pendingSaveErrorMessage;
-                if (!PreparePendingSaveTransactionsForLoadLocked(
-                    loadTargetSaveScope,
-                    loadedFingerprint,
-                    loadedFileFingerprint,
-                    out pendingSaveErrorMessage))
-                {
-                    loadStagingPreparationFailed = true;
-                    CoreLog.Warn(
-                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                        pendingSaveErrorMessage);
-                    return;
-                }
-
-                string preparationErrorMessage;
-                if (!PrepareLoadStagingLocked(
-                    out preparationErrorMessage))
-                {
-                    loadStagingPreparationFailed = true;
-                    CoreLog.Warn(
-                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                        preparationErrorMessage);
-                    return;
-                }
-
-                bool generationFound = false;
-                if (!string.IsNullOrEmpty(loadedFingerprint))
-                {
-                    string generationRollbackErrorMessage;
-                    if (!storageEngine.TryRollbackToSaveGeneration(
-                        activeSaveKey,
-                        loadedFingerprint,
-                        out generationFound,
-                        out generationRollbackErrorMessage))
-                    {
-                        loadStagingPreparationFailed = true;
-                        CoreLog.Warn(
-                            CoreConstants.MessageSaveLoadRollbackFailurePrefix +
-                            generationRollbackErrorMessage);
-                        return;
-                    }
-                }
-
-                if (!generationFound)
-                {
-                    DateTime loadedSnapshotDateTime;
-                    try
-                    {
-                        loadedSnapshotDateTime = ExtensionMethods.ToDateTime(
-                            loadedSaveData.staticVars__dateTime);
-                    }
-                    catch (Exception exception)
-                    {
-                        loadStagingPreparationFailed = true;
-                        CoreLog.Warn(
-                            CoreConstants.MessageSaveLoadRollbackFailurePrefix +
-                            exception.Message);
-                        return;
-                    }
-
-                    string legacyRollbackErrorMessage;
-                    if (!storageEngine.TryRollbackToGameDateTime(
-                        activeSaveKey,
-                        loadedSnapshotDateTime,
-                        out legacyRollbackErrorMessage))
-                    {
-                        loadStagingPreparationFailed = true;
-                        CoreLog.Warn(
-                            CoreConstants.MessageSaveLoadRollbackFailurePrefix +
-                            legacyRollbackErrorMessage);
-                        return;
-                    }
-
-                    if (!string.IsNullOrEmpty(loadedFingerprint))
-                    {
-                        string checkpointErrorMessage;
-                        if (!storageEngine.TryRecordSaveGeneration(
-                            activeSaveKey,
-                            loadedFingerprint,
-                            out checkpointErrorMessage))
-                        {
-                            loadStagingPreparationFailed = true;
-                            CoreLog.Warn(
-                                CoreConstants.MessageSaveLoadRollbackFailurePrefix +
-                                checkpointErrorMessage);
-                            return;
-                        }
-                    }
-                }
-
-                loadVanillaFingerprint = loadedFingerprint;
-                loadRollbackPrepared = true;
-            }
-        }
-
-        /// <summary>
-        /// Runs filesystem transaction finalization on Unity's main thread. Background
-        /// observers only update plain transaction state and never access Unity objects.
-        /// </summary>
-        internal void ProcessMainThreadTransactions()
-        {
-            lock (runtimeLock)
-            {
-                if (loadCommitPending &&
-                    !loadStagingPreparationFailed)
-                {
-                    string commitErrorMessage;
-                    if (!TryCommitLoadedStagingLocked(
-                        loadTargetSaveScope == null
-                            ? string.Empty
-                            : loadTargetSaveScope.SaveFilePath,
-                        out commitErrorMessage))
-                    {
-                        // Retrying is intentional. Logging every frame would obscure
-                        // the original failure already emitted by OnSaveLoaded.
-                    }
-                }
-
-                ProcessCompletedSaveTransactionsLocked();
-            }
-        }
-
-        /// <summary>
-        /// Builds the fingerprint of the SavedData instance vanilla just deserialized.
-        /// The pre-read file fingerprint is preferred when its content hash matches the
-        /// deterministic SavedData serialization; this remains stable if another writer
-        /// changes the path immediately after vanilla's read.
-        /// </summary>
-        private string ResolveLoadedVanillaFingerprintLocked(
-            SaveManager.SavedData loadedSaveData,
-            out CoreFileFingerprint matchedFileFingerprint)
-        {
-            matchedFileFingerprint = null;
-            try
-            {
-                byte[] loadedBytes = new UTF8Encoding(false).GetBytes(
-                    JsonUtility.ToJson(loadedSaveData, true));
-                string loadedHash =
-                    CoreFileFingerprintUtility.ComputeSha256(loadedBytes);
-                CoreFileFingerprint currentFingerprint;
-                string ignoredErrorMessage;
-                if (loadTargetSaveScope != null &&
-                    CoreFileFingerprintUtility.TryReadStable(
-                        loadTargetSaveScope.SaveFilePath,
-                        out currentFingerprint,
-                        out ignoredErrorMessage) &&
-                    currentFingerprint.Length == loadedBytes.LongLength &&
-                    string.Equals(
-                        currentFingerprint.Sha256,
-                        loadedHash,
-                        StringComparison.Ordinal))
-                {
-                    matchedFileFingerprint = currentFingerprint;
-                    return currentFingerprint.ContentIdentity;
-                }
-
-                if (loadRequestedVanillaFileFingerprint != null &&
-                    loadRequestedVanillaFileFingerprint.Length ==
-                        loadedBytes.LongLength &&
-                    string.Equals(
-                        loadRequestedVanillaFileFingerprint.Sha256,
-                        loadedHash,
-                        StringComparison.Ordinal))
-                {
-                    matchedFileFingerprint =
-                        loadRequestedVanillaFileFingerprint;
-                    return loadRequestedVanillaFileFingerprint.ContentIdentity;
-                }
-
-                return CoreFileFingerprintUtility.BuildContentIdentity(
-                    loadedBytes.LongLength,
-                    loadedHash);
-            }
-            catch
-            {
-                // Legacy game-date rollback remains available when exact fingerprint
-                // reconstruction is impossible.
-            }
-
-            return string.Empty;
-        }
-
-        /// <summary>
-        /// Flushes and closes the prior scope, clones the canonical target into a
-        /// private directory, and opens only that private copy during LoadEvent.
-        /// The canonical target remains byte-for-byte untouched until success commit.
-        /// </summary>
-        private bool PrepareLoadStagingLocked(out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (!saveLoadPreparationActive ||
-                loadTargetSaveScope == null ||
-                loadStagingSaveScope == null ||
-                string.IsNullOrEmpty(loadTransactionToken))
-            {
-                errorMessage = "No active save-load transaction is available.";
-                return false;
-            }
-
-            if (loadStagingPrepared)
-            {
-                return true;
-            }
-
-            if (initialized && storageEngine != null)
-            {
-                string flushErrorMessage;
-                if (!FlushLocked(true, out flushErrorMessage))
-                {
-                    errorMessage = CoreConstants.MessageFlushFailed +
-                        flushErrorMessage;
-                    return false;
-                }
-            }
-
-            // A successful flush leaves a precise baseline. Everything appended after
-            // this point was produced while applying the candidate load and is dropped
-            // if vanilla later throws, including same-save reloads with the same key.
-            loadCaptureSequenceBaseline = captureSequence;
-
-            string canonicalTargetDirectory = CorePaths.GetSaveDirectory(
-                loadTargetSaveScope);
-            bool canonicalStorageExists = StorageDirectoryHasData(
-                canonicalTargetDirectory);
-
-            DisposeStorageLocked();
-            ResetStorageBindingLocked();
-            TryCleanupStagingSaveDirectory(loadStagingSaveDirectory);
-
-            if (canonicalStorageExists &&
-                !TryCloneAuthoritativeStorageIntoStageLocked(
-                    canonicalTargetDirectory,
-                    loadStagingSaveScope,
-                    out errorMessage))
-            {
-                errorMessage =
-                    "The target sidecar could not be cloned into load staging: " +
-                    errorMessage;
-                RestorePriorStorageAfterStagingFailureLocked();
-                return false;
-            }
-
-            CorePaths.UseSaveScope(loadStagingSaveScope);
-            string initializationErrorMessage;
-            if (!InitializePreparedStorageLocked(
-                loadStagingSaveScope,
-                out initializationErrorMessage))
-            {
-                errorMessage = initializationErrorMessage;
-                RestorePriorStorageAfterStagingFailureLocked();
-                return false;
-            }
-
-
-            string integrityErrorMessage;
-            if (!storageEngine.TryValidateIntegrity(
-                out integrityErrorMessage))
-            {
-                errorMessage =
-                    "The staged load sidecar failed integrity validation: " +
-                    integrityErrorMessage;
-                RestorePriorStorageAfterStagingFailureLocked();
-                return false;
-            }
-
-            loadStagingPrepared = true;
-            loadStagingPreparationFailed = false;
-            return true;
-        }
-
-        /// <summary>
-        /// Reopens the exact scope that owned storage before a staging attempt failed.
-        /// This helper never publishes or mutates the canonical load target.
-        /// </summary>
-        private void RestorePriorStorageAfterStagingFailureLocked()
-        {
-            DisposeStorageLocked();
-            ResetStorageBindingLocked();
-            CorePaths.RestoreSaveScope(loadPriorSaveScope);
-            TryCleanupStagingSaveDirectory(loadStagingSaveDirectory);
-
-            if (loadPriorSaveScope == null)
-            {
-                return;
-            }
-
-            string restoreErrorMessage;
-            if (!InitializePreparedStorageLocked(
-                loadPriorSaveScope,
-                out restoreErrorMessage))
-            {
-                CoreLog.Warn(
-                    CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                    restoreErrorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Detaches the previous game and creates a fresh transient scope until the
-        /// first exact vanilla save target is supplied by DataSaver.
-        /// </summary>
-        internal void OnNewGameStarting()
-        {
-            lock (runtimeLock)
-            {
-                runtimeEpoch++;
-                string priorSaveDirectory = activeSaveDirectory;
-                bool priorScopeWasTransient =
-                    activeSaveScopeIsTransient;
-
-                if (storageEngine != null)
-                {
-                    string flushErrorMessage;
-                    if (!FlushLocked(true, out flushErrorMessage))
-                    {
-                        CoreLog.Warn(
-                            CoreConstants.MessageStorageSaveSwitchFailure +
-                            CoreConstants.MessageFlushFailed +
-                            flushErrorMessage);
-                        // The old-key buffers remain in memory. Detach them from the
-                        // new transient game instead of discarding or mis-keying them.
-                    }
-                }
-
-                DisposeStorageLocked();
-                ResetStorageBindingLocked();
-                ClearSaveLoadPreparationStateLocked();
-                if (priorScopeWasTransient)
-                {
-                    TryCleanupTransientSaveDirectory(
-                        priorSaveDirectory);
-                }
-
-                CorePaths.ResetToTransientSaveScope();
-                ResetRuntimeCaptureStateLocked();
-            }
-        }
-
-        /// <summary>
-        /// Restores the scope that was active before vanilla attempted a failed load.
-        /// </summary>
-        internal void OnSaveLoadFailed(CoreSaveScope previousSaveScope)
-        {
-            lock (runtimeLock)
-            {
-                CoreSaveScope failedTargetSaveScope = loadTargetSaveScope;
-                CoreSaveScope restoreSaveScope =
-                    loadPriorSaveScope ?? previousSaveScope;
-                RemoveBufferedDataAfterSequenceLocked(
-                    loadCaptureSequenceBaseline);
-
-                bool storageAlreadyMatchesRestoreScope =
-                    restoreSaveScope != null &&
-                    ActiveStorageMatchesScopeLocked(
-                        restoreSaveScope,
-                        !string.IsNullOrEmpty(loadPriorSaveDirectory)
-                            ? loadPriorSaveDirectory
-                            : CorePaths.GetSaveDirectory(restoreSaveScope));
-                if (!storageAlreadyMatchesRestoreScope)
-                {
-                    DisposeStorageLocked();
-                    ResetStorageBindingLocked();
-                }
-
-                TryCleanupStagingSaveDirectory(
-                    loadStagingSaveDirectory);
-                CorePaths.RestoreSaveScope(restoreSaveScope);
-                ClearSaveLoadPreparationStateLocked();
-
-                if (restoreSaveScope != null &&
-                    !storageAlreadyMatchesRestoreScope)
-                {
-                    string initializationErrorMessage;
-                    if (!InitializePreparedStorageLocked(
-                        restoreSaveScope,
-                        out initializationErrorMessage))
-                    {
-                        CoreLog.Warn(
-                            CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                            initializationErrorMessage);
-                    }
-                }
-
-                ResumePendingSaveTransactionsAfterLoadFailureLocked(
-                    failedTargetSaveScope);
-            }
-        }
-
-        /// <summary>
-        /// Rebinds storage to the loaded save file and removes rows newer than the loaded save snapshot.
-        /// </summary>
-        internal void OnSaveLoaded(string saveFilePath)
-        {
-            if (!CorePaths.IsSupportedGameSavePath(saveFilePath))
-            {
-                return;
-            }
-
-            lock (runtimeLock)
-            {
-                if (saveLoadPreparationActive &&
-                    loadStagingPreparationFailed &&
-                    pendingLoadedSaveData != null)
-                {
-                    // Vanilla accepted the target. Retry fail-closed preparation now;
-                    // no rejected LoadEvent capture was allowed into the prior engine.
-                    loadStagingPreparationFailed = false;
-                    OnVanillaSaveDataRead(pendingLoadedSaveData);
-                }
-
-                if (!saveLoadPreparationActive ||
-                    loadTargetSaveScope == null ||
-                    !loadStagingPrepared ||
-                    !loadRollbackPrepared ||
-                    loadStagingPreparationFailed)
-                {
-                    CoreLog.Warn(
-                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                        "The sidecar load transaction was not prepared before LoadEvent.");
-                    return;
-                }
-
-                loadCommitPending = true;
-                string commitErrorMessage;
-                if (!TryCommitLoadedStagingLocked(
-                    saveFilePath,
-                    out commitErrorMessage))
-                {
-                    // Keep the already-restored staging engine bound. A main-thread
-                    // lifecycle pump retries without exposing canonical storage or
-                    // misattributing subsequent writes to the prior game.
-                    CoreLog.Warn(
-                        CoreConstants.MessageSaveLoadInitializationFailurePrefix +
-                        commitErrorMessage);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Flushes LoadEvent custom writes and atomically publishes the already-restored
-        /// stage. It deliberately performs no second rollback.
-        /// </summary>
-        private bool TryCommitLoadedStagingLocked(
-            string saveFilePath,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (!loadCommitPending ||
-                loadTargetSaveScope == null ||
-                !loadStagingPrepared ||
-                storageEngine == null)
-            {
-                errorMessage = "No completed load stage is available to publish.";
-                return false;
-            }
-
-            if (!FlushLocked(true, out errorMessage))
-            {
-                return false;
-            }
-
-            CoreSaveScope targetSaveScope = loadTargetSaveScope;
-            string stagingDirectory = loadStagingSaveDirectory;
-            string canonicalDirectory = CorePaths.GetSaveDirectory(
-                targetSaveScope);
-            string transactionToken = loadTransactionToken;
-            bool priorScopeWasTransient = loadPriorScopeWasTransient;
-            string priorDirectory = loadPriorSaveDirectory;
-            string vanillaRelativeSavePath;
-            if (!CorePaths.TryGetVanillaSaveRelativePath(
-                    targetSaveScope.SaveFilePath,
-                    out vanillaRelativeSavePath) ||
-                !TryWriteLoadIntentMarker(
-                    stagingDirectory,
-                    transactionToken,
-                    vanillaRelativeSavePath,
-                    loadVanillaFingerprint,
-                    out errorMessage))
-            {
-                return false;
-            }
-
-            DisposeStorageLocked();
-            ResetStorageBindingLocked();
-            if (!CorePaths.TryPublishStagingDirectory(
-                stagingDirectory,
-                targetSaveScope,
-                transactionToken,
-                loadVanillaFingerprint,
-                out errorMessage))
-            {
-                // Publish recovery is journaled. Re-open staging when it still exists;
-                // otherwise recover the journal and open the canonical result.
-                string recoveryErrorMessage;
-                bool recoverySucceeded =
-                    CorePaths.TryRecoverInterruptedPublishes(
-                        out recoveryErrorMessage);
-                string markerValidationError;
-                bool recoveredExpectedStage = recoverySucceeded &&
-                    !Directory.Exists(stagingDirectory) &&
-                    Directory.Exists(canonicalDirectory) &&
-                    TryValidateLoadIntentMarker(
-                        canonicalDirectory,
-                        transactionToken,
-                        vanillaRelativeSavePath,
-                        loadVanillaFingerprint,
-                        out markerValidationError);
-                if (recoveredExpectedStage)
-                {
-                    return FinalizeLoadedCanonicalBindingLocked(
-                        saveFilePath,
-                        targetSaveScope,
-                        canonicalDirectory,
-                        priorScopeWasTransient,
-                        priorDirectory,
-                        out errorMessage);
-                }
-
-                if (Directory.Exists(stagingDirectory))
-                {
-                    CorePaths.UseSaveScope(loadStagingSaveScope);
-                    string reopenErrorMessage;
-                    InitializePreparedStorageLocked(
-                        loadStagingSaveScope,
-                        out reopenErrorMessage);
-                }
-
-                return false;
-            }
-
-            return FinalizeLoadedCanonicalBindingLocked(
-                saveFilePath,
-                targetSaveScope,
-                canonicalDirectory,
-                priorScopeWasTransient,
-                priorDirectory,
-                out errorMessage);
-        }
-
-        private bool FinalizeLoadedCanonicalBindingLocked(
-            string saveFilePath,
-            CoreSaveScope targetSaveScope,
-            string canonicalDirectory,
-            bool priorScopeWasTransient,
-            string priorDirectory,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            CorePaths.SetActiveSaveFilePathHint(saveFilePath);
-            if (!InitializePreparedStorageLocked(
-                targetSaveScope,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            string markerCleanupError;
-            if (!CorePaths.TryDeleteContainedFile(
-                Path.Combine(canonicalDirectory, "load.intent"),
-                out markerCleanupError))
-            {
-                CoreLog.Warn(
-                    "The completed load intent marker was retained: " +
-                    markerCleanupError);
-            }
-
-            ResetRuntimeCaptureStateLocked();
-            if (priorScopeWasTransient &&
-                !PathsReferToSameDirectory(
-                    priorDirectory,
-                    canonicalDirectory))
-            {
-                TryCleanupTransientSaveDirectory(priorDirectory);
-            }
-
-            loadCommitPending = false;
-            ClearSaveLoadPreparationStateLocked();
-            return true;
-        }
-
-        /// <summary>
-        /// Captures chart-position backfill events for released singles before save flush.
-        /// </summary>
-        private void CaptureResolvedSingleChartPositionsBeforeSave()
-        {
-            List<KeyValuePair<singles._single, int>> pendingChartUpdates = new List<KeyValuePair<singles._single, int>>();
-
-            lock (runtimeLock)
-            {
-                string errorMessage;
-                if (!EnsureInitializedLocked(out errorMessage))
-                {
-                    CoreLog.Warn(errorMessage);
-                    return;
-                }
-
-                if (singles.Singles == null || singles.Singles.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    return;
-                }
-
-                for (int singleIndex = CoreConstants.ZeroBasedListStartIndex; singleIndex < singles.Singles.Count; singleIndex++)
-                {
-                    singles._single releasedSingle = singles.Singles[singleIndex];
-                    if (releasedSingle == null
-                        || releasedSingle.id < CoreConstants.MinimumValidIdolIdentifier
-                        || releasedSingle.status != singles._single._status.released)
-                    {
-                        continue;
-                    }
-
-                    int chartPosition = ResolveChartPosition(releasedSingle);
-                    if (chartPosition <= CoreConstants.ZeroBasedListStartIndex)
-                    {
-                        continue;
-                    }
-
-                    int knownChartPosition;
-                    if (resolvedSingleChartPositionBySingleId.TryGetValue(releasedSingle.id, out knownChartPosition)
-                        && knownChartPosition == chartPosition)
-                    {
-                        continue;
-                    }
-
-                    pendingChartUpdates.Add(new KeyValuePair<singles._single, int>(releasedSingle, chartPosition));
-                }
-            }
-
-            for (int updateIndex = CoreConstants.ZeroBasedListStartIndex; updateIndex < pendingChartUpdates.Count; updateIndex++)
-            {
-                KeyValuePair<singles._single, int> update = pendingChartUpdates[updateIndex];
-                CaptureSingleChartPositionResolved(update.Key, update.Value, CoreConstants.EventSourceSingleChartBackfillPatch);
-            }
-        }
-
-        /// <summary>
-        /// Ensures runtime initialization and save binding exist.
-        /// </summary>
-        private bool EnsureInitialized(out string errorMessage)
-        {
-            lock (runtimeLock)
-            {
-                return EnsureInitializedLocked(out errorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Ensures runtime initialization and save binding exist while caller already holds runtime lock.
-        /// </summary>
-        private bool EnsureInitializedLocked(out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (saveLoadPreparationActive &&
-                (!loadStagingPrepared ||
-                 loadStagingPreparationFailed))
-            {
-                errorMessage =
-                    "The active save-load sidecar transaction is not safely prepared.";
-                return false;
-            }
-
-            CoreSaveScope currentSaveScope = CorePaths.GetSaveScope();
-
-            if (!initialized || storageEngine == null)
-            {
-                return InitializeStorageLocked(
-                    currentSaveScope,
-                    out errorMessage);
-            }
-
-            string currentSaveKey = NormalizeSaveKey(
-                currentSaveScope.InternalSaveKey);
-            string currentSaveDirectory = CorePaths.GetSaveDirectory(
-                currentSaveScope);
-            if (string.Equals(
-                    currentSaveKey,
-                    activeSaveKey,
-                    StringComparison.Ordinal) &&
-                PathsReferToSameDirectory(
-                    currentSaveDirectory,
-                    activeSaveDirectory))
-            {
-                return true;
-            }
-
-            string flushErrorMessage;
-            if (!FlushLocked(true, out flushErrorMessage))
-            {
-                errorMessage = CoreConstants.MessageStorageSaveSwitchFailure +
-                    CoreConstants.MessageFlushFailed +
-                    flushErrorMessage;
-                return false;
-            }
-
-            string previousSaveDirectory = activeSaveDirectory;
-            bool previousScopeWasTransient =
-                activeSaveScopeIsTransient;
-            CoreSaveScope previousSaveScope = activeSaveScope;
-
-            DisposeStorageLocked();
-            if (!InitializeStorageLocked(
-                currentSaveScope,
-                out errorMessage))
-            {
-                errorMessage = CoreConstants.MessageStorageSaveSwitchFailure + errorMessage;
-                return false;
-            }
-
-            if (previousScopeWasTransient)
-            {
-                if (saveLoadPreparationActive)
-                {
-                    // A failed target load must be able to reopen this exact transient
-                    // scope. Cleanup is committed only by OnSaveLoaded.
-                    if (loadPriorSaveScope == null)
-                    {
-                        loadPriorSaveScope = previousSaveScope;
-                        loadPriorSaveDirectory =
-                            previousSaveDirectory;
-                        loadPriorScopeWasTransient = true;
-                    }
-                }
-                else
-                {
-                    TryCleanupTransientSaveDirectory(
-                        previousSaveDirectory);
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Creates and initializes a storage engine for one save key.
-        /// </summary>
-        private bool InitializeStorageLocked(
-            CoreSaveScope saveScope,
-            out string errorMessage)
-        {
-            return InitializeStorageLocked(
-                saveScope,
-                string.Empty,
-                string.Empty,
-                false,
-                false,
-                out errorMessage);
-        }
-
-        /// <summary>
-        /// Opens storage that was already validated and key-normalized in a private
-        /// transaction directory. This avoids repeating legacy scans and full-table
-        /// remaps after the directory is published at its canonical path.
-        /// </summary>
-        private bool InitializePreparedStorageLocked(
-            CoreSaveScope saveScope,
-            out string errorMessage)
-        {
-            return InitializeStorageLocked(
-                saveScope,
-                string.Empty,
-                string.Empty,
-                false,
-                true,
-                out errorMessage);
-        }
-
-        /// <summary>
-        /// Creates and initializes one storage engine with optional source-save copy semantics.
-        /// </summary>
-        private bool InitializeStorageLocked(
-            CoreSaveScope saveScope,
-            string sourceSaveDirectoryForCopy,
-            string sourceSaveKeyForMigration,
-            bool overwriteTargetWithSourceStorage,
-            bool storageFilesAlreadyPrepared,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            if (saveScope == null)
-            {
-                errorMessage = CoreConstants.MessageStorageInitializationFailure +
-                    CoreConstants.MessageDatabasePathEmpty;
-                return false;
-            }
-
-            string normalizedSaveKey = NormalizeSaveKey(
-                saveScope.InternalSaveKey);
-            string saveDirectory = CorePaths.GetSaveDirectory(saveScope);
-            string sqliteDatabasePath = CorePaths.GetDatabasePath(saveScope);
-            string flatFileDatabasePath = CorePaths.GetFlatFileDatabasePath(
-                saveScope);
-            string selectedMigrationSourceSaveKey = string.Empty;
-            if (!storageFilesAlreadyPrepared)
-            {
-                TryMigrateLegacyStorageIfNeeded(
-                    saveScope,
-                    sourceSaveDirectoryForCopy,
-                    sourceSaveKeyForMigration,
-                    overwriteTargetWithSourceStorage,
-                    out selectedMigrationSourceSaveKey,
-                    out errorMessage);
-            }
-
-            if (!string.IsNullOrEmpty(errorMessage))
-            {
-                storageEngine = null;
-                initialized = false;
-                errorMessage = CoreConstants.MessageStorageInitializationFailure +
-                    errorMessage;
-                return false;
-            }
-
-            ICoreStorageEngine newStorageEngine;
-            if (!TryCreateAndInitializeStorageEngine(sqliteDatabasePath, flatFileDatabasePath, out newStorageEngine, out errorMessage))
-            {
-                storageEngine = null;
-                initialized = false;
-                errorMessage = CoreConstants.MessageStorageInitializationFailure + errorMessage;
-                return false;
-            }
-
-            if (!storageFilesAlreadyPrepared)
-            {
-                string normalizedMigrationSourceSaveKey =
-                    CoreTokenUtility.SanitizeToken(
-                        selectedMigrationSourceSaveKey,
-                        CoreConstants.SaveKeyMaximumLength);
-                if (!string.IsNullOrEmpty(
-                        normalizedMigrationSourceSaveKey) &&
-                    !string.Equals(
-                        normalizedMigrationSourceSaveKey,
-                        normalizedSaveKey,
-                        StringComparison.Ordinal))
-                {
-                    string remapErrorMessage;
-                    if (!newStorageEngine.TryRemapSaveKey(
-                        normalizedMigrationSourceSaveKey,
-                        normalizedSaveKey,
-                        out remapErrorMessage))
-                    {
-                        newStorageEngine.Dispose();
-                        storageEngine = null;
-                        initialized = false;
-                        errorMessage = CoreConstants.MessageStorageInitializationFailure + remapErrorMessage;
-                        return false;
-                    }
-                }
-            }
-
-            storageEngine = newStorageEngine;
-            activeSaveKey = normalizedSaveKey;
-            activeSaveDirectory = saveDirectory;
-            activeSaveScopeIsTransient = saveScope.IsTransient;
-            activeSaveScope = saveScope;
-            initialized = true;
-            nextFlushUtc = DateTime.UtcNow.AddSeconds(CoreConstants.FlushIntervalSeconds);
-            ResetRuntimeCaptureStateLocked();
-            CoreLog.Info(CoreConstants.MessageCoreInitializedForSaveKeyPrefix + activeSaveKey + CoreConstants.MessageCoreInitializedForSaveKeySuffix);
-            return true;
-        }
-
-        /// <summary>
-        /// Copies storage from older keyed layouts into the mirrored save directory.
-        /// Save As uses the explicit active source directory and never searches a stale
-        /// legacy directory by key.
-        /// </summary>
-        private void TryMigrateLegacyStorageIfNeeded(
-            CoreSaveScope saveScope,
-            string sourceSaveDirectoryForCopy,
-            string sourceSaveKeyForMigration,
-            bool overwriteTargetWithSourceStorage,
-            out string selectedMigrationSourceSaveKey,
-            out string errorMessage)
-        {
-            selectedMigrationSourceSaveKey = string.Empty;
-            errorMessage = string.Empty;
-            if (saveScope == null || saveScope.IsTransient)
-            {
-                return;
-            }
-
-            string targetDirectory = CorePaths.GetSaveDirectory(saveScope);
-            bool targetStorageExists = StorageDirectoryHasData(
-                targetDirectory);
-            bool invalidCandidateObserved = false;
-            string lastCandidateError = string.Empty;
-
-            if (overwriteTargetWithSourceStorage)
-            {
-                bool sourceHadCandidate;
-                bool candidateValidated;
-                if (TryStageAndPublishStorageCandidateLocked(
-                    sourceSaveDirectoryForCopy,
-                    saveScope,
-                    out sourceHadCandidate,
-                    out candidateValidated,
-                    out errorMessage))
-                {
-                    selectedMigrationSourceSaveKey =
-                        sourceSaveKeyForMigration;
-                    return;
-                }
-
-                if (!sourceHadCandidate && string.IsNullOrEmpty(errorMessage))
-                {
-                    errorMessage =
-                        "The active source sidecar has no recoverable storage family.";
-                }
-
-                return;
-            }
-
-            if (targetStorageExists)
-            {
-                bool ignoredTargetCandidate;
-                bool targetCandidateValidated;
-                if (TryStageAndPublishStorageCandidateLocked(
-                    targetDirectory,
-                    saveScope,
-                    out ignoredTargetCandidate,
-                    out targetCandidateValidated,
-                    out lastCandidateError))
-                {
-                    return;
-                }
-
-                if (targetCandidateValidated)
-                {
-                    errorMessage = lastCandidateError;
-                    return;
-                }
-
-                invalidCandidateObserved = true;
-            }
-
-            List<string> migrationCandidateSaveKeys =
-                CorePaths.GetPlausibleLegacySaveKeys(
-                    saveScope,
-                    pendingLoadedPlayerData);
-
-            for (
-                int candidateIndex = CoreConstants.ZeroBasedListStartIndex;
-                candidateIndex < migrationCandidateSaveKeys.Count;
-                candidateIndex++)
-            {
-                string candidateSaveKey =
-                    migrationCandidateSaveKeys[candidateIndex];
-
-                if (string.IsNullOrEmpty(candidateSaveKey))
-                {
-                    continue;
-                }
-
-                string normalizedCandidateSaveKey =
-                    CoreTokenUtility.SanitizeToken(
-                        candidateSaveKey,
-                        CoreConstants.SaveKeyMaximumLength);
-                if (string.IsNullOrEmpty(normalizedCandidateSaveKey))
-                {
-                    continue;
-                }
-
-                List<string> sourceDirectories =
-                    CorePaths.GetStorageSourceDirectories(
-                        normalizedCandidateSaveKey);
-                for (int directoryIndex = 0;
-                    directoryIndex < sourceDirectories.Count;
-                    directoryIndex++)
-                {
-                    string sourceDirectory =
-                        sourceDirectories[directoryIndex];
-                    if (PathsReferToSameDirectory(
-                        sourceDirectory,
-                        targetDirectory))
-                    {
-                        continue;
-                    }
-
-                    bool sourceHadCandidate;
-                    bool candidateValidated;
-                    string candidateError;
-                    if (TryStageAndPublishStorageCandidateLocked(
-                        sourceDirectory,
-                        saveScope,
-                        out sourceHadCandidate,
-                        out candidateValidated,
-                        out candidateError))
-                    {
-                        selectedMigrationSourceSaveKey =
-                            normalizedCandidateSaveKey;
-                        return;
-                    }
-
-                    if (candidateValidated)
-                    {
-                        errorMessage = candidateError;
-                        return;
-                    }
-
-                    if (sourceHadCandidate)
-                    {
-                        invalidCandidateObserved = true;
-                        lastCandidateError = candidateError;
-                    }
-                }
-            }
-
-            if (invalidCandidateObserved)
-            {
-                errorMessage =
-                    "No candidate sidecar storage family passed staged integrity validation." +
-                    (string.IsNullOrEmpty(lastCandidateError)
-                        ? string.Empty
-                        : " " + lastCandidateError);
-            }
-        }
-
-        /// <summary>
-        /// Clones one source into a private transaction, lets the selected engine
-        /// recover and integrity-check there, then atomically publishes it only while
-        /// the vanilla target still has the pre-clone content identity.
-        /// </summary>
-        private bool TryStageAndPublishStorageCandidateLocked(
-            string sourceDirectory,
-            CoreSaveScope targetSaveScope,
-            out bool sourceHadCandidate,
-            out bool candidateValidated,
-            out string errorMessage)
-        {
-            sourceHadCandidate = StorageDirectoryHasData(sourceDirectory);
-            candidateValidated = false;
-            errorMessage = string.Empty;
-            if (!sourceHadCandidate)
-            {
-                return false;
-            }
-
-            CoreFileFingerprint vanillaFingerprint;
-            if (!CoreFileFingerprintUtility.TryReadStable(
-                targetSaveScope.SaveFilePath,
-                out vanillaFingerprint,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            CoreSaveScope stagingSaveScope =
-                CorePaths.CreateStagingSaveScope(
-                    targetSaveScope,
-                    false);
-            if (stagingSaveScope == null)
-            {
-                errorMessage =
-                    "A private migration staging scope could not be created.";
-                return false;
-            }
-
-            string stagingDirectory = CorePaths.GetSaveDirectory(
-                stagingSaveScope);
-            if (!TryCloneAuthoritativeStorageIntoStageLocked(
-                sourceDirectory,
-                stagingSaveScope,
-                out errorMessage))
-            {
-                TryCleanupStagingSaveDirectory(stagingDirectory);
-                return false;
-            }
-
-            candidateValidated = true;
-
-            string stagingDirectoryName = Path.GetFileName(
-                stagingDirectory.TrimEnd(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar));
-            string transactionToken =
-                stagingDirectoryName.StartsWith(
-                    "save_",
-                    StringComparison.Ordinal)
-                        ? stagingDirectoryName.Substring("save_".Length)
-                        : string.Empty;
-            if (transactionToken.Length != 32)
-            {
-                errorMessage = "The migration transaction token is invalid.";
-                TryCleanupStagingSaveDirectory(stagingDirectory);
-                return false;
-            }
-
-            if (!CorePaths.TryPublishStagingDirectory(
-                stagingDirectory,
-                targetSaveScope,
-                transactionToken,
-                vanillaFingerprint.ContentIdentity,
-                out errorMessage))
-            {
-                string recoveryErrorMessage;
-                if (!CorePaths.TryRecoverInterruptedPublishes(
-                    out recoveryErrorMessage) &&
-                    !string.IsNullOrEmpty(recoveryErrorMessage))
-                {
-                    errorMessage += " Recovery failed: " +
-                        recoveryErrorMessage;
-                }
-
-                return false;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Returns true when the open engine owns one exact save scope and directory.
-        /// </summary>
-        private bool ActiveStorageMatchesScopeLocked(
-            CoreSaveScope saveScope,
-            string saveDirectory)
-        {
-            return initialized &&
-                storageEngine != null &&
-                SaveScopesReferToSameStorage(
-                    activeSaveScope,
-                    activeSaveDirectory,
-                    saveScope,
-                    saveDirectory);
-        }
-
-        /// <summary>
-        /// Compares both the persisted key and exact storage directory of two scopes.
-        /// </summary>
-        private static bool SaveScopesReferToSameStorage(
-            CoreSaveScope firstSaveScope,
-            string firstSaveDirectory,
-            CoreSaveScope secondSaveScope,
-            string secondSaveDirectory)
-        {
-            if (firstSaveScope == null || secondSaveScope == null)
-            {
-                return false;
-            }
-
-            return string.Equals(
-                    firstSaveScope.InternalSaveKey,
-                    secondSaveScope.InternalSaveKey,
-                    StringComparison.Ordinal) &&
-                PathsReferToSameDirectory(
-                    firstSaveDirectory,
-                    secondSaveDirectory);
-        }
-
-        /// <summary>
-        /// Clears state retained only for one in-flight vanilla load transaction.
-        /// </summary>
-        private void ClearSaveLoadPreparationStateLocked()
-        {
-            saveLoadPreparationActive = false;
-            pendingLoadedSaveData = null;
-            pendingLoadedPlayerData = null;
-            loadPriorSaveScope = null;
-            loadPriorSaveDirectory = string.Empty;
-            loadPriorScopeWasTransient = false;
-            loadTargetSaveScope = null;
-            loadStagingSaveScope = null;
-            loadStagingSaveDirectory = string.Empty;
-            loadStagingPrepared = false;
-            loadStagingPreparationFailed = false;
-            loadRollbackPrepared = false;
-            loadCommitPending = false;
-            loadVanillaFingerprint = string.Empty;
-            loadRequestedVanillaFingerprint = string.Empty;
-            loadRequestedVanillaFileFingerprint = null;
-            loadTransactionToken = string.Empty;
-            loadCaptureSequenceBaseline = captureSequence;
-        }
-
-        /// <summary>
-        /// Clears only the live binding fields after its engine is closed.
-        /// </summary>
-        private void ResetStorageBindingLocked()
-        {
-            storageEngine = null;
-            initialized = false;
-            activeSaveKey = CoreConstants.DefaultSaveKey;
-            activeSaveDirectory = string.Empty;
-            activeSaveScopeIsTransient = false;
-            activeSaveScope = null;
-        }
-
-        private static bool StorageDirectoryHasData(
-            string saveDirectory)
-        {
-            if (string.IsNullOrEmpty(saveDirectory))
-            {
-                return false;
-            }
-
-            try
-            {
-                string sqlitePath = Path.Combine(
-                    saveDirectory,
-                    CoreConstants.DatabaseFileName);
-                string flatFilePath = Path.Combine(
-                    saveDirectory,
-                    CoreConstants.FlatFileDatabaseFileName);
-                return HasNonEmptyStorageCandidate(sqlitePath) ||
-                    HasNonEmptyStorageCandidate(flatFilePath) ||
-                    HasNonEmptyStorageCandidate(flatFilePath + ".tmp") ||
-                    HasNonEmptyStorageCandidate(flatFilePath + ".bak");
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static bool HasNonEmptyStorageCandidate(string filePath)
-        {
-            return File.Exists(filePath) &&
-                new FileInfo(filePath).Length > 0L;
-        }
-
-        private static void TryCleanupStagingSaveDirectory(
-            string stagingSaveDirectory)
-        {
-            string cleanupErrorMessage;
-            if (!CorePaths.TryDeleteStagingSaveDirectory(
-                stagingSaveDirectory,
-                out cleanupErrorMessage))
-            {
-                CoreLog.Warn(
-                    CoreConstants.MessageSaveDataMigrationFailedPrefix +
-                    cleanupErrorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Compares two directory paths after canonicalization.
-        /// </summary>
-        private static bool PathsReferToSameDirectory(
-            string firstDirectory,
-            string secondDirectory)
-        {
-            if (string.IsNullOrEmpty(firstDirectory) ||
-                string.IsNullOrEmpty(secondDirectory))
-            {
-                return false;
-            }
-
-            try
-            {
-                string normalizedFirstDirectory =
-                    Path.GetFullPath(firstDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-
-                string normalizedSecondDirectory =
-                    Path.GetFullPath(secondDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-
-                return string.Equals(
-                    normalizedFirstDirectory,
-                    normalizedSecondDirectory,
-                    StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                return string.Equals(
-                    firstDirectory.TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar),
-                    secondDirectory.TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar),
-                    StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        /// <summary>
-        /// Clears transient capture state that must not leak between save loads.
-        /// </summary>
-        private void ResetRuntimeCaptureStateLocked()
-        {
-            tourRuntimeStateByTourId.Clear();
-            concertEditBaselineByConcertId.Clear();
-            resolvedSingleChartPositionBySingleId.Clear();
-            pendingSubstoryCompletionCountByDialogueId.Clear();
-            idempotencyKeysForCurrentDate.Clear();
-            idempotencyDateKey = CoreConstants.UninitializedDateKey;
-        }
-
-        /// <summary>
-        /// Selects a runtime-compatible storage engine and initializes it.
-        /// </summary>
-        private bool TryCreateAndInitializeStorageEngine(
-            string sqliteDatabasePath,
-            string flatFileDatabasePath,
-            out ICoreStorageEngine createdStorageEngine,
-            out string errorMessage)
-        {
-            createdStorageEngine = null;
-            errorMessage = string.Empty;
-
-            bool sqliteStorageExists = File.Exists(sqliteDatabasePath);
-            bool flatFileStorageExists = File.Exists(flatFileDatabasePath);
-
-            // Preserve the backend format of migrated or existing saves. Creating a
-            // new empty SQLite database beside an existing fallback file would hide
-            // the fallback data on every subsequent launch.
-            if (flatFileStorageExists && !sqliteStorageExists)
-            {
-                return TryInitializeFlatFileStorageEngine(
-                    flatFileDatabasePath,
-                    out createdStorageEngine,
-                    out errorMessage);
-            }
-
-            string runtimeDependencyErrorMessage;
-            if (CoreRuntimeCapabilities.TryEnsureSqliteRuntimeSupport(out runtimeDependencyErrorMessage))
-            {
-                string sqliteInitializationError;
-                if (TryInitializeSqliteStorageEngine(sqliteDatabasePath, out createdStorageEngine, out sqliteInitializationError))
-                {
-                    return true;
-                }
-
-                CoreLog.Warn(CoreConstants.MessageSqliteUnavailableFallbackPrefix + sqliteInitializationError);
-
-                if (flatFileStorageExists)
-                {
-                    return TryInitializeFlatFileStorageEngine(
-                        flatFileDatabasePath,
-                        out createdStorageEngine,
-                        out errorMessage);
-                }
-
-                if (sqliteStorageExists)
-                {
-                    errorMessage = sqliteInitializationError;
-                    return false;
-                }
-            }
-            else
-            {
-                CoreLog.Warn(CoreConstants.MessageRuntimeDependencyProbeFailedPrefix + runtimeDependencyErrorMessage);
-
-                if (sqliteStorageExists && !flatFileStorageExists)
-                {
-                    errorMessage = runtimeDependencyErrorMessage;
-                    return false;
-                }
-            }
-
-            return TryInitializeFlatFileStorageEngine(
-                flatFileDatabasePath,
-                out createdStorageEngine,
-                out errorMessage);
-        }
-
-        /// <summary>
-        /// Cleans up temporary pre-save storage without ever touching legacy sources.
-        /// </summary>
-        private static void TryCleanupTransientSaveDirectory(
-            string saveDirectory)
-        {
-            string cleanupErrorMessage;
-            if (!CorePaths.TryDeleteTransientSaveDirectory(
-                saveDirectory,
-                out cleanupErrorMessage))
-            {
-                CoreLog.Warn(
-                    CoreConstants.MessageSaveDataMigrationFailedPrefix +
-                    cleanupErrorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Initializes the flat-file backend without creating a competing storage format.
-        /// </summary>
-        private static bool TryInitializeFlatFileStorageEngine(
-            string flatFileDatabasePath,
-            out ICoreStorageEngine createdStorageEngine,
-            out string errorMessage)
-        {
-            createdStorageEngine = null;
-            ICoreStorageEngine flatFileStorageEngine = new FlatFileCoreStorageEngine();
-            if (!flatFileStorageEngine.Initialize(flatFileDatabasePath, out errorMessage))
-            {
-                flatFileStorageEngine.Dispose();
-                return false;
-            }
-
-            createdStorageEngine = flatFileStorageEngine;
-            return true;
-        }
-
-        /// <summary>
-        /// Tries to initialize the SQLite storage engine and captures compatibility failures.
-        /// </summary>
-        private static bool TryInitializeSqliteStorageEngine(string databasePath, out ICoreStorageEngine createdStorageEngine, out string errorMessage)
-        {
-            createdStorageEngine = null;
-            errorMessage = string.Empty;
-
-            ICoreStorageEngine sqliteStorageEngine = null;
-            try
-            {
-                sqliteStorageEngine = new SqliteCoreStorageEngine();
-                if (!sqliteStorageEngine.Initialize(databasePath, out errorMessage))
-                {
-                    sqliteStorageEngine.Dispose();
-                    return false;
-                }
-
-                createdStorageEngine = sqliteStorageEngine;
-                return true;
-            }
-            catch (Exception exception)
-            {
-                if (sqliteStorageEngine != null)
-                {
-                    try
-                    {
-                        sqliteStorageEngine.Dispose();
-                    }
-                    catch
-                    {
-                    }
-                }
-
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Disposes the current storage engine.
-        /// </summary>
-        private void DisposeStorageLocked()
-        {
-            if (storageEngine != null)
-            {
-                storageEngine.Dispose();
-                storageEngine = null;
-            }
-        }
-
-        /// <summary>
-        /// Flushes buffers based on policy or on-demand forcing.
-        /// </summary>
-        private bool FlushLocked(bool forceFlush, out string errorMessage)
-        {
-            errorMessage = string.Empty;
-
-            if (storageEngine == null)
-            {
-                errorMessage = CoreConstants.MessageStorageUnavailable;
-                return false;
-            }
-
-            if (HasUnresolvedSaveTransactionForActiveScopeLocked())
-            {
-                // Post-prepare records are the journal needed to advance whichever
-                // asynchronous save payload becomes authoritative. Do not flush them
-                // into the source engine while any such transaction is unresolved.
-                return true;
-            }
-
-            bool hasBufferedData = HasBufferedDataForSaveKeyLocked(activeSaveKey);
-
-            if (!hasBufferedData)
-            {
-                return true;
-            }
-
-            int bufferedEventCount = CountBufferedEventsForSaveKeyLocked(activeSaveKey);
-            bool thresholdReached = bufferedEventCount >= CoreConstants.ImmediateFlushQueueThreshold;
-            bool intervalElapsed = DateTime.UtcNow >= nextFlushUtc;
-            if (!forceFlush && !thresholdReached && !intervalElapsed)
-            {
-                return true;
-            }
-
-            List<PendingEvent> eventsSnapshot = CreateEventSnapshotForSaveKeyLocked(activeSaveKey);
-            List<SingleParticipationProjection> singleProjectionSnapshot = CreateSingleParticipationSnapshotForSaveKeyLocked(activeSaveKey);
-            List<StatusTransitionProjection> transitionSnapshot = CreateStatusTransitionSnapshotForSaveKeyLocked(activeSaveKey);
-            bool hasSnapshotData =
-                eventsSnapshot.Count >= CoreConstants.MinimumQueueSizeForFlush
-                || singleProjectionSnapshot.Count >= CoreConstants.MinimumQueueSizeForFlush
-                || transitionSnapshot.Count >= CoreConstants.MinimumQueueSizeForFlush;
-            if (!hasSnapshotData)
-            {
-                return true;
-            }
-
-            if (!storageEngine.PersistBatch(eventsSnapshot, singleProjectionSnapshot, transitionSnapshot, out errorMessage))
-            {
-                TrimBuffersAfterPersistenceFailureLocked(activeSaveKey);
-                nextFlushUtc = DateTime.UtcNow.AddSeconds(CoreConstants.FlushIntervalSeconds);
-                return false;
-            }
-
-            RemoveBufferedDataForSaveKeyLocked(activeSaveKey);
-            nextFlushUtc = DateTime.UtcNow.AddSeconds(CoreConstants.FlushIntervalSeconds);
-            return true;
-        }
-
-        /// <summary>
-        /// Returns true when at least one buffered record exists for the requested save key.
-        /// </summary>
-        private bool HasBufferedDataForSaveKeyLocked(string saveKey)
-        {
-            return CountBufferedEventsForSaveKeyLocked(saveKey) >= CoreConstants.MinimumQueueSizeForFlush
-                || CountBufferedSingleParticipationRowsForSaveKeyLocked(saveKey) >= CoreConstants.MinimumQueueSizeForFlush
-                || CountBufferedStatusTransitionsForSaveKeyLocked(saveKey) >= CoreConstants.MinimumQueueSizeForFlush;
-        }
-
-        /// <summary>
-        /// Counts buffered event rows for the requested save key.
-        /// </summary>
-        private int CountBufferedEventsForSaveKeyLocked(string saveKey)
-        {
-            int matchingEventCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < bufferedEvents.Count; eventIndex++)
-            {
-                PendingEvent pendingEvent = bufferedEvents[eventIndex];
-                if (pendingEvent != null && string.Equals(pendingEvent.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingEventCount++;
-                }
-            }
-
-            return matchingEventCount;
-        }
-
-        /// <summary>
-        /// Counts buffered single-participation projection rows for the requested save key.
-        /// </summary>
-        private int CountBufferedSingleParticipationRowsForSaveKeyLocked(string saveKey)
-        {
-            int matchingProjectionCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex; rowIndex < bufferedSingleParticipationRows.Count; rowIndex++)
-            {
-                SingleParticipationProjection projection = bufferedSingleParticipationRows[rowIndex];
-                if (projection != null && string.Equals(projection.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingProjectionCount++;
-                }
-            }
-
-            return matchingProjectionCount;
-        }
-
-        /// <summary>
-        /// Counts buffered status-transition projection rows for the requested save key.
-        /// </summary>
-        private int CountBufferedStatusTransitionsForSaveKeyLocked(string saveKey)
-        {
-            int matchingTransitionCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int transitionIndex = CoreConstants.ZeroBasedListStartIndex; transitionIndex < bufferedStatusTransitions.Count; transitionIndex++)
-            {
-                StatusTransitionProjection transition = bufferedStatusTransitions[transitionIndex];
-                if (transition != null && string.Equals(transition.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingTransitionCount++;
-                }
-            }
-
-            return matchingTransitionCount;
-        }
-
-        /// <summary>
-        /// Creates one event snapshot containing only rows for the active save key.
-        /// </summary>
-        private List<PendingEvent> CreateEventSnapshotForSaveKeyLocked(string saveKey)
-        {
-            List<PendingEvent> saveScopedSnapshot = new List<PendingEvent>();
-            for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < bufferedEvents.Count; eventIndex++)
-            {
-                PendingEvent pendingEvent = bufferedEvents[eventIndex];
-                if (pendingEvent != null && string.Equals(pendingEvent.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    saveScopedSnapshot.Add(pendingEvent);
-                }
-            }
-
-            return saveScopedSnapshot;
-        }
-
-        /// <summary>
-        /// Creates one single-participation snapshot containing only rows for the active save key.
-        /// </summary>
-        private List<SingleParticipationProjection> CreateSingleParticipationSnapshotForSaveKeyLocked(string saveKey)
-        {
-            List<SingleParticipationProjection> saveScopedSnapshot = new List<SingleParticipationProjection>();
-            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex; rowIndex < bufferedSingleParticipationRows.Count; rowIndex++)
-            {
-                SingleParticipationProjection projection = bufferedSingleParticipationRows[rowIndex];
-                if (projection != null && string.Equals(projection.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    saveScopedSnapshot.Add(projection);
-                }
-            }
-
-            return saveScopedSnapshot;
-        }
-
-        /// <summary>
-        /// Creates one status-transition snapshot containing only rows for the active save key.
-        /// </summary>
-        private List<StatusTransitionProjection> CreateStatusTransitionSnapshotForSaveKeyLocked(string saveKey)
-        {
-            List<StatusTransitionProjection> saveScopedSnapshot = new List<StatusTransitionProjection>();
-            for (int transitionIndex = CoreConstants.ZeroBasedListStartIndex; transitionIndex < bufferedStatusTransitions.Count; transitionIndex++)
-            {
-                StatusTransitionProjection transition = bufferedStatusTransitions[transitionIndex];
-                if (transition != null && string.Equals(transition.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    saveScopedSnapshot.Add(transition);
-                }
-            }
-
-            return saveScopedSnapshot;
-        }
-
-        /// <summary>
-        /// Removes all buffered rows for one save key after successful persistence.
-        /// </summary>
-        private void RemoveBufferedDataForSaveKeyLocked(string saveKey)
-        {
-            for (int eventIndex = bufferedEvents.Count - CoreConstants.LastElementOffsetFromCount; eventIndex >= CoreConstants.ZeroBasedListStartIndex; eventIndex--)
-            {
-                PendingEvent pendingEvent = bufferedEvents[eventIndex];
-                if (pendingEvent != null && string.Equals(pendingEvent.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    bufferedEvents.RemoveAt(eventIndex);
-                }
-            }
-
-            for (int rowIndex = bufferedSingleParticipationRows.Count - CoreConstants.LastElementOffsetFromCount; rowIndex >= CoreConstants.ZeroBasedListStartIndex; rowIndex--)
-            {
-                SingleParticipationProjection projection = bufferedSingleParticipationRows[rowIndex];
-                if (projection != null && string.Equals(projection.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    bufferedSingleParticipationRows.RemoveAt(rowIndex);
-                }
-            }
-
-            for (int transitionIndex = bufferedStatusTransitions.Count - CoreConstants.LastElementOffsetFromCount; transitionIndex >= CoreConstants.ZeroBasedListStartIndex; transitionIndex--)
-            {
-                StatusTransitionProjection transition = bufferedStatusTransitions[transitionIndex];
-                if (transition != null && string.Equals(transition.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    bufferedStatusTransitions.RemoveAt(transitionIndex);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Drops only records captured after one transaction baseline. This is safe
-        /// when list indexes shifted because of a failed retry or retention trim.
-        /// </summary>
-        private void RemoveBufferedDataAfterSequenceLocked(
-            long baselineSequence)
-        {
-            for (int eventIndex = bufferedEvents.Count - 1;
-                eventIndex >= 0;
-                eventIndex--)
-            {
-                PendingEvent pendingEvent = bufferedEvents[eventIndex];
-                if (pendingEvent != null &&
-                    pendingEvent.CaptureSequence > baselineSequence)
-                {
-                    bufferedEvents.RemoveAt(eventIndex);
-                }
-            }
-
-            for (int rowIndex = bufferedSingleParticipationRows.Count - 1;
-                rowIndex >= 0;
-                rowIndex--)
-            {
-                SingleParticipationProjection projection =
-                    bufferedSingleParticipationRows[rowIndex];
-                if (projection != null &&
-                    projection.CaptureSequence > baselineSequence)
-                {
-                    bufferedSingleParticipationRows.RemoveAt(rowIndex);
-                }
-            }
-
-            for (int transitionIndex = bufferedStatusTransitions.Count - 1;
-                transitionIndex >= 0;
-                transitionIndex--)
-            {
-                StatusTransitionProjection transition =
-                    bufferedStatusTransitions[transitionIndex];
-                if (transition != null &&
-                    transition.CaptureSequence > baselineSequence)
-                {
-                    bufferedStatusTransitions.RemoveAt(transitionIndex);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Applies bounded retention when persistence fails to prevent unbounded memory growth.
-        /// </summary>
-        private void TrimBuffersAfterPersistenceFailureLocked(string saveKey)
-        {
-            TrimPendingEventsToMaximumCountForSaveKey(bufferedEvents, saveKey, CoreConstants.MaximumBufferedEventsAfterPersistenceFailure);
-            TrimSingleParticipationRowsToMaximumCountForSaveKey(bufferedSingleParticipationRows, saveKey, CoreConstants.MaximumBufferedEventsAfterPersistenceFailure);
-            TrimStatusTransitionsToMaximumCountForSaveKey(bufferedStatusTransitions, saveKey, CoreConstants.MaximumBufferedEventsAfterPersistenceFailure);
-        }
-
-        /// <summary>
-        /// Keeps only the newest pending events up to the configured maximum count for one save key.
-        /// </summary>
-        private static void TrimPendingEventsToMaximumCountForSaveKey(List<PendingEvent> pendingEvents, string saveKey, int maximumCount)
-        {
-            if (pendingEvents == null)
-            {
-                return;
-            }
-
-            int matchingEventCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < pendingEvents.Count; eventIndex++)
-            {
-                PendingEvent pendingEvent = pendingEvents[eventIndex];
-                if (pendingEvent != null && string.Equals(pendingEvent.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingEventCount++;
-                }
-            }
-
-            int matchingEventsToRemove = matchingEventCount - maximumCount;
-            if (matchingEventsToRemove <= CoreConstants.ZeroBasedListStartIndex)
-            {
-                return;
-            }
-
-            for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < pendingEvents.Count && matchingEventsToRemove > CoreConstants.ZeroBasedListStartIndex;)
-            {
-                PendingEvent pendingEvent = pendingEvents[eventIndex];
-                if (pendingEvent != null && string.Equals(pendingEvent.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    pendingEvents.RemoveAt(eventIndex);
-                    matchingEventsToRemove--;
-                    continue;
-                }
-
-                eventIndex++;
-            }
-        }
-
-        /// <summary>
-        /// Keeps only the newest single-participation rows up to the configured maximum count for one save key.
-        /// </summary>
-        private static void TrimSingleParticipationRowsToMaximumCountForSaveKey(
-            List<SingleParticipationProjection> singleParticipationRows,
-            string saveKey,
-            int maximumCount)
-        {
-            if (singleParticipationRows == null)
-            {
-                return;
-            }
-
-            int matchingRowCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex; rowIndex < singleParticipationRows.Count; rowIndex++)
-            {
-                SingleParticipationProjection projection = singleParticipationRows[rowIndex];
-                if (projection != null && string.Equals(projection.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingRowCount++;
-                }
-            }
-
-            int matchingRowsToRemove = matchingRowCount - maximumCount;
-            if (matchingRowsToRemove <= CoreConstants.ZeroBasedListStartIndex)
-            {
-                return;
-            }
-
-            for (int rowIndex = CoreConstants.ZeroBasedListStartIndex; rowIndex < singleParticipationRows.Count && matchingRowsToRemove > CoreConstants.ZeroBasedListStartIndex;)
-            {
-                SingleParticipationProjection projection = singleParticipationRows[rowIndex];
-                if (projection != null && string.Equals(projection.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    singleParticipationRows.RemoveAt(rowIndex);
-                    matchingRowsToRemove--;
-                    continue;
-                }
-
-                rowIndex++;
-            }
-        }
-
-        /// <summary>
-        /// Keeps only the newest status-transition rows up to the configured maximum count for one save key.
-        /// </summary>
-        private static void TrimStatusTransitionsToMaximumCountForSaveKey(
-            List<StatusTransitionProjection> statusTransitions,
-            string saveKey,
-            int maximumCount)
-        {
-            if (statusTransitions == null)
-            {
-                return;
-            }
-
-            int matchingTransitionCount = CoreConstants.ZeroBasedListStartIndex;
-            for (int transitionIndex = CoreConstants.ZeroBasedListStartIndex; transitionIndex < statusTransitions.Count; transitionIndex++)
-            {
-                StatusTransitionProjection transition = statusTransitions[transitionIndex];
-                if (transition != null && string.Equals(transition.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    matchingTransitionCount++;
-                }
-            }
-
-            int matchingTransitionsToRemove = matchingTransitionCount - maximumCount;
-            if (matchingTransitionsToRemove <= CoreConstants.ZeroBasedListStartIndex)
-            {
-                return;
-            }
-
-            for (int transitionIndex = CoreConstants.ZeroBasedListStartIndex; transitionIndex < statusTransitions.Count && matchingTransitionsToRemove > CoreConstants.ZeroBasedListStartIndex;)
-            {
-                StatusTransitionProjection transition = statusTransitions[transitionIndex];
-                if (transition != null && string.Equals(transition.SaveKey, saveKey, StringComparison.Ordinal))
-                {
-                    statusTransitions.RemoveAt(transitionIndex);
-                    matchingTransitionsToRemove--;
-                    continue;
-                }
-
-                transitionIndex++;
             }
         }
 
@@ -5142,7 +2663,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Flushes queued capture records and logs a warning if persistence fails.
+        /// Runs lightweight post-capture handling and logs failures.
         /// </summary>
         private void FlushAfterCaptureLocked()
         {
@@ -5168,7 +2689,7 @@ namespace IMDataCore
             // Vanilla LoadEvent reconstructs existing game state by replaying many of
             // the same methods patched for live capture. Those calls are not new game
             // events and must never enter the persistent stream. Public custom-data
-            // APIs remain available during the load transaction and write to staging.
+            // APIs remain available and operate on the restored in-memory branch.
             if (saveLoadPreparationActive)
             {
                 return;
@@ -5177,7 +2698,6 @@ namespace IMDataCore
             PendingEvent pendingEvent = new PendingEvent
             {
                 CaptureSequence = NextCaptureSequenceLocked(),
-                SaveKey = activeSaveKey,
                 GameDateKey = CoreDateTimeUtility.BuildGameDateKey(gameDate),
                 GameDateTime = CoreDateTimeUtility.ToRoundTripString(gameDate),
                 IdolId = idolId >= CoreConstants.MinimumValidIdolIdentifier ? idolId : CoreConstants.InvalidIdValue,
@@ -5193,16 +2713,14 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Assigns a process-monotonic capture sequence. Transaction baselines use
-        /// this value instead of list indexes, which can shift after retries or
-        /// bounded failure retention.
+        /// Assigns a branch-safe, monotonically increasing mutation sequence.
         /// </summary>
         private long NextCaptureSequenceLocked()
         {
             if (captureSequence == long.MaxValue)
             {
                 // A practical process can never reach this point. Preserve strict
-                // ordering rather than silently wrapping into an old transaction.
+                // ordering rather than silently wrapping into earlier history.
                 throw new InvalidOperationException(
                     "The IM Data Core capture sequence is exhausted.");
             }
@@ -7793,10 +5311,7 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldSingleId, payload.SingleId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldSingleLifecycleAction, payload.SingleLifecycleAction ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldSingleStatus, payload.SingleStatus ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldSingleCastCount, payload.SingleCastCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdList, payload.SingleCastIdList ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldSingleIsDigital, payload.SingleIsDigital, ref isFirstProperty);
@@ -7820,7 +5335,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldSingleId, payload.SingleId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSinglePreviousStatus, payload.PreviousSingleStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleNewStatus, payload.NewSingleStatus ?? string.Empty, ref isFirstProperty);
@@ -7847,7 +5361,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldSingleId, payload.SingleId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSinglePreviousStatus, payload.PreviousSingleStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleNewStatus, payload.NewSingleStatus ?? string.Empty, ref isFirstProperty);
@@ -7877,7 +5390,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldSingleId, payload.SingleId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSinglePreviousStatus, payload.PreviousSingleStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleNewStatus, payload.NewSingleStatus ?? string.Empty, ref isFirstProperty);
@@ -7939,7 +5451,6 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldGroupId, payload.GroupId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldGroupTitle, payload.GroupTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldGroupStatus, payload.GroupStatus ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldGroupLifecycleAction, payload.GroupLifecycleAction ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldGroupDateCreated, payload.GroupDateCreated ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldGroupEventDate, payload.GroupEventDate ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldGroupMemberCount, payload.GroupMemberCount, ref isFirstProperty);
@@ -8032,7 +5543,6 @@ namespace IMDataCore
             bool isFirstProperty = true;
 
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldIdolLifecycleAction, payload.IdolLifecycleAction ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolStatus, payload.IdolStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolType, payload.IdolType ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolAge, payload.IdolAge, ref isFirstProperty);
@@ -8087,9 +5597,7 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldSingleId, payload.SingleId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldSingleStatus, payload.SingleStatus ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldRowIndex, payload.RowIndex, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldPositionIndex, payload.PositionIndex, ref isFirstProperty);
@@ -8290,10 +5798,7 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitle, payload.ShowTitle ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldShowLifecycleAction, payload.ShowLifecycleAction ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldShowStatus, payload.ShowStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastType, payload.ShowCastType ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowMediumCode, payload.ShowMediumCode ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowMediumTitle, payload.ShowMediumTitle ?? string.Empty, ref isFirstProperty);
@@ -8328,7 +5833,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitle, payload.ShowTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowPreviousStatus, payload.PreviousShowStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowNewStatus, payload.NewShowStatus ?? string.Empty, ref isFirstProperty);
@@ -8358,7 +5862,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitle, payload.ShowTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastType, payload.ShowCastType ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowEpisodeCount, payload.ShowEpisodeCount, ref isFirstProperty);
@@ -8410,7 +5913,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitle, payload.ShowTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowPreviousStatus, payload.PreviousShowStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowNewStatus, payload.NewShowStatus ?? string.Empty, ref isFirstProperty);
@@ -8442,7 +5944,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitleBefore, payload.ShowTitleBefore ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowTitleAfter, payload.ShowTitleAfter ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowPreviousStatus, payload.PreviousShowStatus ?? string.Empty, ref isFirstProperty);
@@ -8481,7 +5982,6 @@ namespace IMDataCore
             bool isFirstProperty = true;
 
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldConcertId, payload.ConcertId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertTitle, payload.ConcertTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertVenue, payload.ConcertVenue ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertStatus, payload.ConcertStatus ?? string.Empty, ref isFirstProperty);
@@ -8517,7 +6017,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldConcertId, payload.ConcertId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertTitle, payload.ConcertTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertPreviousStatus, payload.PreviousConcertStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertNewStatus, payload.NewConcertStatus ?? string.Empty, ref isFirstProperty);
@@ -8547,7 +6046,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldConcertId, payload.ConcertId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertTitle, payload.ConcertTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertPreviousStatus, payload.PreviousConcertStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertNewStatus, payload.NewConcertStatus ?? string.Empty, ref isFirstProperty);
@@ -8581,7 +6079,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldConcertId, payload.ConcertId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertTitleBefore, payload.ConcertTitleBefore ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertTitleAfter, payload.ConcertTitleAfter ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldConcertRawTitleBefore, payload.ConcertRawTitleBefore ?? string.Empty, ref isFirstProperty);
@@ -8672,7 +6169,6 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipStatus, payload.RelationshipStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipDynamic, payload.RelationshipDynamic ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldRelationshipKnownToPlayer, payload.RelationshipKnownToPlayer, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipPairKey, payload.RelationshipPairKey ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipBreakReason, payload.RelationshipBreakReason ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldRelationshipIsDating, payload.RelationshipIsDating, ref isFirstProperty);
 
@@ -8700,7 +6196,6 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipNewStatus, payload.RelationshipNewStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipDynamic, payload.RelationshipDynamic ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldRelationshipKnownToPlayer, payload.RelationshipKnownToPlayer, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldRelationshipPairKey, payload.RelationshipPairKey ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldRelationshipIsDating, payload.RelationshipIsDating, ref isFirstProperty);
             AppendFloatProperty(builder, CoreConstants.JsonFieldRelationshipRequestedDelta, payload.RelationshipRequestedDelta, ref isFirstProperty);
             AppendFloatProperty(builder, CoreConstants.JsonFieldRelationshipRatio, payload.RelationshipRatio, ref isFirstProperty);
@@ -8919,7 +6414,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourId, payload.TourId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourLifecycleAction, payload.TourLifecycleAction ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourStatus, payload.TourStatus ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourSelectedCountryCount, payload.SelectedCountryCount, ref isFirstProperty);
@@ -8955,7 +6449,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourId, payload.TourId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourStatus, payload.TourStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourFinishDate, payload.TourFinishDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourCountryCode, payload.TourCountryCode ?? string.Empty, ref isFirstProperty);
@@ -8984,7 +6477,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourId, payload.TourId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourParticipantCount, payload.TourParticipantCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourParticipantIdList, payload.TourParticipantIdList ?? string.Empty, ref isFirstProperty);
@@ -9008,7 +6500,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourId, payload.TourId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourPreviousStatus, payload.PreviousTourStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourNewStatus, payload.NewTourStatus ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourSelectedCountryCount, payload.SelectedCountryCount, ref isFirstProperty);
@@ -9038,7 +6529,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionId, payload.ElectionId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionLifecycleAction, payload.ElectionLifecycleAction ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionStatus, payload.ElectionStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
@@ -9073,7 +6563,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionId, payload.ElectionId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionExpectedPlace, payload.ElectionExpectedPlace, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionGeneratedPlace, payload.ElectionGeneratedPlace, ref isFirstProperty);
@@ -9106,7 +6595,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionId, payload.ElectionId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionPlaceBefore, payload.ElectionPlaceBefore, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionPlaceAfter, payload.ElectionPlaceAfter, ref isFirstProperty);
@@ -9131,7 +6619,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionId, payload.ElectionId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionPreviousStatus, payload.PreviousElectionStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionNewStatus, payload.NewElectionStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
@@ -9160,7 +6647,6 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionId, payload.ElectionId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionPlace, payload.ElectionPlace, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldElectionVotes, payload.ElectionVotes, ref isFirstProperty);
@@ -11631,158 +9117,12 @@ namespace IMDataCore
         public string event_date = string.Empty;
     }
 
-    internal sealed class CoreFileFingerprint
-    {
-        internal long Length;
-        internal long LastWriteUtcTicks;
-        internal string Sha256 = string.Empty;
-        internal string ContentIdentity = string.Empty;
-        internal string OpaqueValue = string.Empty;
-    }
-
-    /// <summary>
-    /// Thread-safe vanilla-file fingerprinting. It contains no Unity access and can
-    /// therefore be used by save observers after all paths are captured on main thread.
-    /// </summary>
-    internal static class CoreFileFingerprintUtility
-    {
-        internal static string ComputeSha256(byte[] bytes)
-        {
-            if (bytes == null)
-            {
-                return string.Empty;
-            }
-
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                return ToLowerHex(sha256.ComputeHash(bytes));
-            }
-        }
-
-        internal static bool TryReadStable(
-            string filePath,
-            out CoreFileFingerprint fingerprint,
-            out string errorMessage)
-        {
-            fingerprint = null;
-            errorMessage = string.Empty;
-            if (string.IsNullOrWhiteSpace(filePath))
-            {
-                errorMessage = "The vanilla save path is empty.";
-                return false;
-            }
-
-            try
-            {
-                string normalizedPath = Path.GetFullPath(filePath);
-                FileInfo before = new FileInfo(normalizedPath);
-                if (!before.Exists)
-                {
-                    errorMessage = "The vanilla save file does not exist.";
-                    return false;
-                }
-
-                long beforeLength = before.Length;
-                long beforeWriteTicks = before.LastWriteTimeUtc.Ticks;
-                byte[] hashBytes;
-                using (FileStream stream = new FileStream(
-                    normalizedPath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete))
-                using (SHA256 sha256 = SHA256.Create())
-                {
-                    hashBytes = sha256.ComputeHash(stream);
-                }
-
-                FileInfo after = new FileInfo(normalizedPath);
-                after.Refresh();
-                if (!after.Exists ||
-                    after.Length != beforeLength ||
-                    after.LastWriteTimeUtc.Ticks != beforeWriteTicks)
-                {
-                    errorMessage =
-                        "The vanilla save changed while it was fingerprinted.";
-                    return false;
-                }
-
-                string hash = ToLowerHex(hashBytes);
-                fingerprint = new CoreFileFingerprint
-                {
-                    Length = beforeLength,
-                    LastWriteUtcTicks = beforeWriteTicks,
-                    Sha256 = hash,
-                    ContentIdentity = BuildContentIdentity(
-                        beforeLength,
-                        hash),
-                    OpaqueValue = BuildOpaqueValue(
-                        beforeLength,
-                        hash)
-                };
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        internal static string BuildOpaqueValue(
-            long length,
-            string sha256)
-        {
-            return BuildContentIdentity(length, sha256);
-        }
-
-        internal static string BuildContentIdentity(
-            long length,
-            string sha256)
-        {
-            if (length < 0L ||
-                string.IsNullOrEmpty(sha256))
-            {
-                return string.Empty;
-            }
-
-            return string.Join(
-                ":",
-                new string[]
-                {
-                    "v1",
-                    length.ToString(CultureInfo.InvariantCulture),
-                    sha256
-                });
-        }
-
-        private static string ToLowerHex(byte[] bytes)
-        {
-            if (bytes == null || bytes.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            for (int byteIndex = 0;
-                byteIndex < bytes.Length;
-                byteIndex++)
-            {
-                builder.Append(bytes[byteIndex].ToString(
-                    "x2",
-                    CultureInfo.InvariantCulture));
-            }
-
-            return builder.ToString();
-        }
-    }
-
     /// <summary>
     /// Internal queued event representation before storage commit.
     /// </summary>
     internal sealed class PendingEvent
     {
         internal long CaptureSequence;
-        internal string SaveKey = string.Empty;
         internal int GameDateKey;
         internal string GameDateTime = string.Empty;
         internal int IdolId;
@@ -11792,450 +9132,6 @@ namespace IMDataCore
         internal string SourcePatch = string.Empty;
         internal string NamespaceIdentifier = string.Empty;
         internal string PayloadJson = string.Empty;
-    }
-
-    /// <summary>
-    /// Projection row for single participation read-model updates.
-    /// </summary>
-    internal sealed class SingleParticipationProjection
-    {
-        internal long CaptureSequence;
-        internal string SaveKey = string.Empty;
-        internal int SingleId;
-        internal int IdolId;
-        internal int RowIndex;
-        internal int PositionIndex;
-        internal int IsCenterFlag;
-        internal string ReleaseDate = string.Empty;
-    }
-
-    /// <summary>
-    /// Projection command for opening/closing status windows.
-    /// </summary>
-    internal sealed class StatusTransitionProjection
-    {
-        internal long CaptureSequence;
-        internal string SaveKey = string.Empty;
-        internal int IdolId;
-        internal string PreviousStatusCode = string.Empty;
-        internal string NewStatusCode = string.Empty;
-        internal string TransitionDate = string.Empty;
-    }
-
-    /// <summary>
-    /// Mutation command for show-cast window projection updates.
-    /// </summary>
-    internal sealed class ShowCastWindowProjectionMutation
-    {
-        internal string SaveKey = string.Empty;
-        internal string ShowId = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string StartDate = string.Empty;
-        internal string EndDate = string.Empty;
-        internal string EndReason = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-        internal bool OpenWindow;
-    }
-
-    /// <summary>
-    /// Mutation command for contract-window projection updates.
-    /// </summary>
-    internal sealed class ContractWindowProjectionMutation
-    {
-        internal string SaveKey = string.Empty;
-        internal string ContractKey = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string StartDate = string.Empty;
-        internal string EndDate = string.Empty;
-        internal string EndReason = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-        internal bool OpenWindow;
-    }
-
-    /// <summary>
-    /// Mutation command for relationship-window projection updates.
-    /// </summary>
-    internal sealed class RelationshipWindowProjectionMutation
-    {
-        internal string SaveKey = string.Empty;
-        internal string RelationshipKey = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string RelationshipType = string.Empty;
-        internal string StartDate = string.Empty;
-        internal string EndDate = string.Empty;
-        internal string EndReason = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-        internal bool OpenWindow;
-    }
-
-    /// <summary>
-    /// Upsert row for tour participation projection.
-    /// </summary>
-    internal sealed class TourParticipationProjectionRow
-    {
-        internal string SaveKey = string.Empty;
-        internal string TourId = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string LifecycleAction = string.Empty;
-        internal string EventDate = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-    }
-
-    /// <summary>
-    /// Upsert row for award-result projection.
-    /// </summary>
-    internal sealed class AwardResultProjectionRow
-    {
-        internal string SaveKey = string.Empty;
-        internal string AwardKey = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string EventDate = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-    }
-
-    /// <summary>
-    /// Upsert row for election-result projection.
-    /// </summary>
-    internal sealed class ElectionResultProjectionRow
-    {
-        internal string SaveKey = string.Empty;
-        internal string ElectionId = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string EventDate = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-    }
-
-    /// <summary>
-    /// Mutation command for push-window projection updates.
-    /// </summary>
-    internal sealed class PushWindowProjectionMutation
-    {
-        internal string SaveKey = string.Empty;
-        internal string SlotKey = string.Empty;
-        internal int IdolId = CoreConstants.InvalidIdValue;
-        internal string StartDate = string.Empty;
-        internal string EndDate = string.Empty;
-        internal string EndReason = string.Empty;
-        internal string PayloadJson = CoreConstants.EmptyJsonObject;
-        internal int PushDaysInSlot = CoreConstants.ProjectionUnknownDayCount;
-        internal bool OpenWindow;
-        internal bool CloseWindow;
-    }
-
-    /// <summary>
-    /// Converts canonical event rows into projection-mutation batches.
-    /// </summary>
-    internal static class CoreProjectionDerivation
-    {
-        internal static void DeriveFromEvents(
-            IReadOnlyList<PendingEvent> pendingEvents,
-            out List<ShowCastWindowProjectionMutation> showCastMutations,
-            out List<ContractWindowProjectionMutation> contractMutations,
-            out List<RelationshipWindowProjectionMutation> relationshipMutations,
-            out List<TourParticipationProjectionRow> tourParticipationRows,
-            out List<AwardResultProjectionRow> awardResultRows,
-            out List<ElectionResultProjectionRow> electionResultRows,
-            out List<PushWindowProjectionMutation> pushMutations)
-        {
-            showCastMutations = new List<ShowCastWindowProjectionMutation>();
-            contractMutations = new List<ContractWindowProjectionMutation>();
-            relationshipMutations = new List<RelationshipWindowProjectionMutation>();
-            tourParticipationRows = new List<TourParticipationProjectionRow>();
-            awardResultRows = new List<AwardResultProjectionRow>();
-            electionResultRows = new List<ElectionResultProjectionRow>();
-            pushMutations = new List<PushWindowProjectionMutation>();
-
-            if (pendingEvents == null || pendingEvents.Count < CoreConstants.MinimumQueueSizeForFlush)
-            {
-                return;
-            }
-
-            for (int eventIndex = CoreConstants.ZeroBasedListStartIndex; eventIndex < pendingEvents.Count; eventIndex++)
-            {
-                PendingEvent pendingEvent = pendingEvents[eventIndex];
-                if (pendingEvent == null || string.IsNullOrEmpty(pendingEvent.EventType))
-                {
-                    continue;
-                }
-
-                if (pendingEvent.IdolId < CoreConstants.MinimumValidIdolIdentifier && !string.Equals(pendingEvent.EventType, CoreConstants.EventTypeAwardResult, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                string eventType = pendingEvent.EventType;
-                string saveKey = pendingEvent.SaveKey ?? string.Empty;
-                string entityId = pendingEvent.EntityId ?? string.Empty;
-                string gameDateTime = pendingEvent.GameDateTime ?? string.Empty;
-                string payloadJson = pendingEvent.PayloadJson ?? CoreConstants.EmptyJsonObject;
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && string.Equals(pendingEvent.EntityKind, CoreConstants.EventEntityKindShow, StringComparison.Ordinal)
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    if (string.Equals(eventType, CoreConstants.EventTypeShowReleased, StringComparison.Ordinal))
-                    {
-                        showCastMutations.Add(
-                            new ShowCastWindowProjectionMutation
-                            {
-                                SaveKey = saveKey,
-                                ShowId = entityId,
-                                IdolId = pendingEvent.IdolId,
-                                StartDate = gameDateTime,
-                                PayloadJson = payloadJson,
-                                OpenWindow = true
-                            });
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeShowCancelled, StringComparison.Ordinal))
-                    {
-                        showCastMutations.Add(
-                            new ShowCastWindowProjectionMutation
-                            {
-                                SaveKey = saveKey,
-                                ShowId = entityId,
-                                IdolId = pendingEvent.IdolId,
-                                EndDate = gameDateTime,
-                                EndReason = eventType,
-                                PayloadJson = payloadJson,
-                                OpenWindow = false
-                            });
-                    }
-                }
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && string.Equals(pendingEvent.EntityKind, CoreConstants.EventEntityKindContract, StringComparison.Ordinal)
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    bool isContractOpen =
-                        string.Equals(eventType, CoreConstants.EventTypeContractAccepted, StringComparison.Ordinal)
-                        || string.Equals(eventType, CoreConstants.EventTypeContractWindowOpened, StringComparison.Ordinal)
-                        || string.Equals(eventType, CoreConstants.EventTypeContractActivated, StringComparison.Ordinal);
-                    bool isContractClose =
-                        string.Equals(eventType, CoreConstants.EventTypeContractFinished, StringComparison.Ordinal)
-                        || string.Equals(eventType, CoreConstants.EventTypeContractCancelled, StringComparison.Ordinal)
-                        || string.Equals(eventType, CoreConstants.EventTypeContractCanceled, StringComparison.Ordinal)
-                        || string.Equals(eventType, CoreConstants.EventTypeContractBroken, StringComparison.Ordinal);
-
-                    if (isContractOpen || isContractClose)
-                    {
-                        contractMutations.Add(
-                            new ContractWindowProjectionMutation
-                            {
-                                SaveKey = saveKey,
-                                ContractKey = entityId,
-                                IdolId = pendingEvent.IdolId,
-                                StartDate = gameDateTime,
-                                EndDate = gameDateTime,
-                                EndReason = isContractClose ? eventType : string.Empty,
-                                PayloadJson = payloadJson,
-                                OpenWindow = isContractOpen
-                            });
-                    }
-                }
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    string relationshipType = string.Empty;
-                    bool openRelationshipWindow = false;
-                    bool closeRelationshipWindow = false;
-
-                    if (string.Equals(eventType, CoreConstants.EventTypeIdolDatingStarted, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeIdolDating;
-                        openRelationshipWindow = true;
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeIdolDatingEnded, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeIdolDating;
-                        closeRelationshipWindow = true;
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeBullyingStarted, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeBullying;
-                        openRelationshipWindow = true;
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeBullyingEnded, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeBullying;
-                        closeRelationshipWindow = true;
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeCliqueJoined, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeClique;
-                        openRelationshipWindow = true;
-                    }
-                    else if (string.Equals(eventType, CoreConstants.EventTypeCliqueLeft, StringComparison.Ordinal))
-                    {
-                        relationshipType = CoreConstants.ProjectionRelationshipTypeClique;
-                        closeRelationshipWindow = true;
-                    }
-
-                    if (!string.IsNullOrEmpty(relationshipType) && (openRelationshipWindow || closeRelationshipWindow))
-                    {
-                        relationshipMutations.Add(
-                            new RelationshipWindowProjectionMutation
-                            {
-                                SaveKey = saveKey,
-                                RelationshipKey = entityId,
-                                IdolId = pendingEvent.IdolId,
-                                RelationshipType = relationshipType,
-                                StartDate = gameDateTime,
-                                EndDate = gameDateTime,
-                                EndReason = closeRelationshipWindow ? eventType : string.Empty,
-                                PayloadJson = payloadJson,
-                                OpenWindow = openRelationshipWindow
-                            });
-                    }
-                }
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && string.Equals(eventType, CoreConstants.EventTypeTourParticipation, StringComparison.Ordinal)
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    tourParticipationRows.Add(
-                        new TourParticipationProjectionRow
-                        {
-                            SaveKey = saveKey,
-                            TourId = entityId,
-                            IdolId = pendingEvent.IdolId,
-                            LifecycleAction = ResolveTourLifecycleAction(pendingEvent.SourcePatch),
-                            EventDate = gameDateTime,
-                            PayloadJson = payloadJson
-                        });
-                }
-
-                if (string.Equals(eventType, CoreConstants.EventTypeAwardResult, StringComparison.Ordinal)
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    awardResultRows.Add(
-                        new AwardResultProjectionRow
-                        {
-                            SaveKey = saveKey,
-                            AwardKey = entityId,
-                            IdolId = pendingEvent.IdolId,
-                            EventDate = gameDateTime,
-                            PayloadJson = payloadJson
-                        });
-                }
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && string.Equals(eventType, CoreConstants.EventTypeElectionResultRecorded, StringComparison.Ordinal)
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    electionResultRows.Add(
-                        new ElectionResultProjectionRow
-                        {
-                            SaveKey = saveKey,
-                            ElectionId = entityId,
-                            IdolId = pendingEvent.IdolId,
-                            EventDate = gameDateTime,
-                            PayloadJson = payloadJson
-                        });
-                }
-
-                if (pendingEvent.IdolId >= CoreConstants.MinimumValidIdolIdentifier
-                    && !string.IsNullOrEmpty(entityId))
-                {
-                    bool isPushOpen = string.Equals(eventType, CoreConstants.EventTypePushWindowStarted, StringComparison.Ordinal);
-                    bool isPushClose = string.Equals(eventType, CoreConstants.EventTypePushWindowEnded, StringComparison.Ordinal);
-                    bool isPushTouch = string.Equals(eventType, CoreConstants.EventTypePushWindowDayIncrement, StringComparison.Ordinal);
-                    if (isPushOpen || isPushClose || isPushTouch)
-                    {
-                        pushMutations.Add(
-                            new PushWindowProjectionMutation
-                            {
-                                SaveKey = saveKey,
-                                SlotKey = entityId,
-                                IdolId = pendingEvent.IdolId,
-                                StartDate = gameDateTime,
-                                EndDate = gameDateTime,
-                                EndReason = isPushClose ? eventType : string.Empty,
-                                PayloadJson = payloadJson,
-                                PushDaysInSlot = ExtractPushDayCount(payloadJson),
-                                OpenWindow = isPushOpen,
-                                CloseWindow = isPushClose
-                            });
-                    }
-                }
-            }
-        }
-
-        private static string ResolveTourLifecycleAction(string sourcePatch)
-        {
-            if (string.Equals(sourcePatch, CoreConstants.EventSourceTourStartPatch, StringComparison.Ordinal))
-            {
-                return CoreConstants.ProjectionLifecycleActionStarted;
-            }
-
-            if (string.Equals(sourcePatch, CoreConstants.EventSourceTourFinishPatch, StringComparison.Ordinal))
-            {
-                return CoreConstants.ProjectionLifecycleActionFinished;
-            }
-
-            if (string.Equals(sourcePatch, CoreConstants.EventSourceTourCancelPatch, StringComparison.Ordinal))
-            {
-                return CoreConstants.ProjectionLifecycleActionCancelled;
-            }
-
-            return CoreConstants.StatusCodeUnknown;
-        }
-
-        private static int ExtractPushDayCount(string payloadJson)
-        {
-            int dayCount;
-            if (TryExtractIntegerProperty(payloadJson, CoreConstants.JsonFieldPushDaysInSlot, out dayCount))
-            {
-                return dayCount;
-            }
-
-            return CoreConstants.ProjectionUnknownDayCount;
-        }
-
-        private static bool TryExtractIntegerProperty(string payloadJson, string propertyName, out int value)
-        {
-            value = CoreConstants.InvalidIdValue;
-            if (string.IsNullOrEmpty(payloadJson) || string.IsNullOrEmpty(propertyName))
-            {
-                return false;
-            }
-
-            string propertyToken = string.Concat(
-                CoreConstants.JsonStringQuoteCharacter,
-                propertyName,
-                CoreConstants.JsonStringQuoteCharacter,
-                CoreConstants.JsonNameValueSeparatorCharacter);
-            int propertyIndex = payloadJson.IndexOf(propertyToken, StringComparison.Ordinal);
-            if (propertyIndex < CoreConstants.ZeroBasedListStartIndex)
-            {
-                return false;
-            }
-
-            int valueIndex = propertyIndex + propertyToken.Length;
-            while (valueIndex < payloadJson.Length && char.IsWhiteSpace(payloadJson[valueIndex]))
-            {
-                valueIndex++;
-            }
-
-            int numericStartIndex = valueIndex;
-            if (valueIndex < payloadJson.Length && payloadJson[valueIndex] == '-')
-            {
-                valueIndex++;
-            }
-
-            while (valueIndex < payloadJson.Length && char.IsDigit(payloadJson[valueIndex]))
-            {
-                valueIndex++;
-            }
-
-            if (valueIndex <= numericStartIndex)
-            {
-                return false;
-            }
-
-            string numericToken = payloadJson.Substring(numericStartIndex, valueIndex - numericStartIndex);
-            return int.TryParse(numericToken, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
-        }
     }
 
     /// <summary>

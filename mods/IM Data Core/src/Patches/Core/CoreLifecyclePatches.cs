@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using HarmonyLib;
-using UnityEngine;
 
 namespace IMDataCore
 {
@@ -25,21 +22,7 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Finalizes filesystem-only save observations on the main thread. This keeps all
-    /// storage rebinding and Unity-facing logging out of observer worker threads.
-    /// </summary>
-    [HarmonyPatch(typeof(PopupManager), "Update")]
-    internal static class PopupManager_Update_IMDataCoreTransactionPump_Patch
-    {
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix()
-        {
-            IMDataCoreController.Instance.ProcessMainThreadTransactions();
-        }
-    }
-
-    /// <summary>
-    /// Detaches storage from the previous playthrough before a new game starts.
+    /// Detaches from the previous save while a new game has no physical save path.
     /// </summary>
     [HarmonyPatch(
         typeof(MainMenu_LoadGameManager),
@@ -54,22 +37,9 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Persists buffered records before vanilla dispatches its save event.
-    /// </summary>
-    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.CallSaveEvent))]
-    internal static class SaveManager_CallSaveEvent_IMDataCoreFlush_Patch
-    {
-        [HarmonyPriority(Priority.Last)]
-        private static void Prefix()
-        {
-            IMDataCoreController.Instance.ForceFlushBeforeSave();
-        }
-    }
-
-    /// <summary>
-    /// Stages save-scope persistence before vanilla schedules a SavedData write.
-    /// Patching DataSaver's constructed generic is unsafe on Mono,
-    /// where reference-type generic instantiations can share native code.
+    /// Captures each concrete vanilla SavedData write at its non-generic caller.
+    /// Patching DataSaver's constructed generic directly is unsafe on Mono, where
+    /// reference-type generic instantiations can share native code.
     /// </summary>
     [HarmonyPatch]
     internal static class VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
@@ -121,8 +91,14 @@ namespace IMDataCore
                     typeof(bool),
                     typeof(bool)
                 });
-            int injectedWriteCount = CoreConstants.ZeroBasedListStartIndex;
+            if (prepareSaveWriteMethod == null)
+            {
+                throw new MissingMethodException(
+                    typeof(CoreSaveLifecycleBinding).FullName,
+                    nameof(CoreSaveLifecycleBinding.PrepareSaveWrite));
+            }
 
+            int injectedWriteCount = 0;
             foreach (CodeInstruction instruction in instructions)
             {
                 if (!IsSavedDataWrite(instruction))
@@ -132,9 +108,8 @@ namespace IMDataCore
                 }
 
                 // The four DataSaver arguments are already on the evaluation stack.
-                // Preserve them, synchronously stage the matching sidecar and expected
-                // byte identity, then call vanilla unchanged. The background observer
-                // never writes or replaces the vanilla file.
+                // Save them in reverse order, notify IMDC on the main thread, then
+                // restore the exact original arguments for vanilla's asynchronous call.
                 CodeInstruction firstInjectedInstruction =
                     new CodeInstruction(OpCodes.Stloc, fullPathLocal);
                 firstInjectedInstruction.labels.AddRange(instruction.labels);
@@ -156,9 +131,7 @@ namespace IMDataCore
                     OpCodes.Call,
                     prepareSaveWriteMethod);
                 yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
-                yield return new CodeInstruction(
-                    OpCodes.Ldloc,
-                    dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Ldloc, dataFileNameLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, isJsonLocal);
                 yield return new CodeInstruction(OpCodes.Ldloc, fullPathLocal);
                 yield return instruction;
@@ -169,12 +142,8 @@ namespace IMDataCore
             {
                 throw new InvalidOperationException(
                     "Expected exactly one SavedData write in " +
-                    (__originalMethod == null
-                        ? "an unknown vanilla save caller."
-                        : __originalMethod.DeclaringType.FullName +
-                          "." +
-                          __originalMethod.Name +
-                          "."));
+                    DescribeMethod(__originalMethod) + "; found " +
+                    injectedWriteCount.ToString() + ".");
             }
         }
 
@@ -196,6 +165,7 @@ namespace IMDataCore
             ParameterInfo[] parameters = calledMethod.GetParameters();
             return genericArguments.Length == 1 &&
                 genericArguments[0] == typeof(SaveManager.SavedData) &&
+                calledMethod.ReturnType == typeof(void) &&
                 parameters.Length == 4 &&
                 parameters[0].ParameterType == typeof(SaveManager.SavedData) &&
                 parameters[1].ParameterType == typeof(string) &&
@@ -203,7 +173,7 @@ namespace IMDataCore
                 parameters[3].ParameterType == typeof(bool);
         }
 
-        private static MethodBase RequireMethod(
+        internal static MethodBase RequireMethod(
             Type declaringType,
             string methodName,
             Type[] parameterTypes)
@@ -221,10 +191,173 @@ namespace IMDataCore
 
             return method;
         }
+
+        internal static string DescribeMethod(MethodBase method)
+        {
+            return method == null
+                ? "an unknown vanilla caller"
+                : method.DeclaringType.FullName + "." + method.Name;
+        }
     }
 
     /// <summary>
-    /// Shared preparation entry point for exact, non-generic vanilla save call sites.
+    /// Captures the actual DataSaver load argument and restores IMDC immediately after
+    /// vanilla assigns SaveManager.Data, before any LoadEvent subscriber can mutate it.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class SaveManager_LoadData_IMDataCoreSaveScope_Patch
+    {
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
+                .RequireMethod(
+                    typeof(SaveManager),
+                    nameof(SaveManager.LoadData),
+                    new Type[] { typeof(string) });
+            yield return VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
+                .RequireMethod(
+                    typeof(SaveManager),
+                    nameof(SaveManager.LoadData),
+                    new Type[] { typeof(bool) });
+        }
+
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions,
+            ILGenerator generator,
+            MethodBase __originalMethod)
+        {
+            return CoreSaveLoadDataCaptureTranspiler.Inject(
+                instructions,
+                generator,
+                __originalMethod);
+        }
+
+        private static Exception Finalizer(Exception __exception)
+        {
+            CoreSaveLifecycleBinding.CompleteLoadedSave();
+            return __exception;
+        }
+    }
+
+    internal static class CoreSaveLoadDataCaptureTranspiler
+    {
+        private const string DataSaverLoadMethodName = "loadData";
+
+        internal static IEnumerable<CodeInstruction> Inject(
+            IEnumerable<CodeInstruction> instructions,
+            ILGenerator generator,
+            MethodBase originalMethod)
+        {
+            LocalBuilder dataFileNameLocal = generator.DeclareLocal(
+                typeof(string));
+            FieldInfo saveDataField = AccessTools.Field(
+                typeof(SaveManager),
+                nameof(SaveManager.Data));
+            MethodInfo captureMethod = AccessTools.Method(
+                typeof(CoreSaveLifecycleBinding),
+                nameof(CoreSaveLifecycleBinding.CaptureLoadedSaveData),
+                new Type[] { typeof(SaveManager), typeof(string) });
+            if (saveDataField == null)
+            {
+                throw new MissingFieldException(
+                    typeof(SaveManager).FullName,
+                    nameof(SaveManager.Data));
+            }
+            if (captureMethod == null)
+            {
+                throw new MissingMethodException(
+                    typeof(CoreSaveLifecycleBinding).FullName,
+                    nameof(CoreSaveLifecycleBinding.CaptureLoadedSaveData));
+            }
+
+            int interceptedReadCount = 0;
+            int injectedCaptureCount = 0;
+            bool savedDataReadSeen = false;
+            foreach (CodeInstruction instruction in instructions)
+            {
+                if (IsSavedDataRead(instruction))
+                {
+                    // SaveManager's receiver for the following stfld is already below
+                    // the string argument. Pop only the string, then restore it for the
+                    // original DataSaver call so the vanilla stack remains unchanged.
+                    CodeInstruction firstInjectedInstruction =
+                        new CodeInstruction(OpCodes.Stloc, dataFileNameLocal);
+                    firstInjectedInstruction.labels.AddRange(instruction.labels);
+                    firstInjectedInstruction.blocks.AddRange(instruction.blocks);
+                    instruction.labels.Clear();
+                    instruction.blocks.Clear();
+
+                    yield return firstInjectedInstruction;
+                    yield return new CodeInstruction(
+                        OpCodes.Ldloc,
+                        dataFileNameLocal);
+                    yield return instruction;
+                    interceptedReadCount++;
+                    savedDataReadSeen = true;
+                    continue;
+                }
+
+                yield return instruction;
+                if (instruction.opcode != OpCodes.Stfld ||
+                    !Equals(instruction.operand, saveDataField))
+                {
+                    continue;
+                }
+                if (!savedDataReadSeen)
+                {
+                    throw new InvalidOperationException(
+                        "SaveManager.Data was assigned before its SavedData read in " +
+                        VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
+                            .DescribeMethod(originalMethod) + ".");
+                }
+
+                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(
+                    OpCodes.Ldloc,
+                    dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Call, captureMethod);
+                injectedCaptureCount++;
+            }
+
+            if (interceptedReadCount != 1 || injectedCaptureCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "Expected exactly one SavedData read and one SaveManager.Data " +
+                    "assignment in " +
+                    VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
+                        .DescribeMethod(originalMethod) +
+                    "; found " + interceptedReadCount.ToString() + " and " +
+                    injectedCaptureCount.ToString() + ".");
+            }
+        }
+
+        private static bool IsSavedDataRead(CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction.operand as MethodInfo;
+            if (calledMethod == null ||
+                calledMethod.DeclaringType != typeof(DataSaver) ||
+                !string.Equals(
+                    calledMethod.Name,
+                    DataSaverLoadMethodName,
+                    StringComparison.Ordinal) ||
+                !calledMethod.IsGenericMethod)
+            {
+                return false;
+            }
+
+            Type[] genericArguments = calledMethod.GetGenericArguments();
+            ParameterInfo[] parameters = calledMethod.GetParameters();
+            return genericArguments.Length == 1 &&
+                genericArguments[0] == typeof(SaveManager.SavedData) &&
+                calledMethod.ReturnType == typeof(SaveManager.SavedData) &&
+                parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string);
+        }
+    }
+
+    /// <summary>
+    /// Exception boundary between injected vanilla call sites and IMDC persistence.
+    /// IMDC failures must never prevent vanilla from saving or loading.
     /// </summary>
     internal static class CoreSaveLifecycleBinding
     {
@@ -234,354 +367,73 @@ namespace IMDataCore
             bool isJson,
             bool fullPath)
         {
-            string savePath =
-                CoreSaveFilePathResolver.ResolveDataSaverWritePath(
-                    dataFileName,
-                    fullPath);
-            if (savedData == null ||
-                !CorePaths.IsSupportedGameSavePath(savePath))
+            if (savedData == null)
             {
                 return;
             }
 
             try
             {
-                string serializedData = isJson
-                    ? JsonUtility.ToJson(savedData, true)
-                    : savedData.ToString();
-                byte[] expectedBytes = new UTF8Encoding(false).GetBytes(
-                    serializedData ?? string.Empty);
                 IMDataCoreController.Instance.PrepareVanillaSaveWrite(
-                    savePath,
-                    expectedBytes);
+                    savedData,
+                    dataFileName,
+                    isJson,
+                    fullPath);
             }
             catch (Exception exception)
             {
-                CoreLog.Warn(
-                    CoreConstants.MessageSaveWritePreparationFailurePrefix +
+                WarnSafely(
+                    "IM Data Core could not capture a vanilla save boundary: " +
                     exception.Message);
             }
         }
-    }
 
-    /// <summary>
-    /// Reproduces the path construction in non-generic vanilla save/load callers.
-    /// </summary>
-    internal static class CoreSaveFilePathResolver
-    {
-        private const string StoryModeFolderName = "story_mode";
-        private const string DataFolderName = "data";
-        private const string ManualSaveFileName = "manual_save";
-        private const string SaveFileExtension = ".json";
-
-        internal static string ResolveDataSaverWritePath(
-            string dataFileName,
-            bool fullPath)
-        {
-            if (string.IsNullOrWhiteSpace(dataFileName))
-            {
-                return string.Empty;
-            }
-
-            try
-            {
-                string candidatePath = dataFileName;
-                if (!fullPath)
-                {
-                    candidatePath = Path.Combine(
-                        Application.persistentDataPath,
-                        DataFolderName,
-                        dataFileName + SaveFileExtension);
-                }
-
-                return Path.GetFullPath(candidatePath);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        internal static string ResolveManualLoadPath()
-        {
-            if (staticVars.PlayerData != null && staticVars.IsStoryMode())
-            {
-                return Path.Combine(
-                    StoryModeFolderName,
-                    staticVars.PlayerData.GetSaveFolderName(),
-                    ManualSaveFileName);
-            }
-
-            return ManualSaveFileName;
-        }
-
-    }
-
-    /// <summary>
-    /// Captures PlayerData immediately after the non-generic SaveManager caller assigns
-    /// the deserialized save, before vanilla invokes LoadEvent subscribers.
-    /// </summary>
-    internal static class CoreSaveLoadDataCaptureTranspiler
-    {
-        internal static IEnumerable<CodeInstruction> Inject(
-            IEnumerable<CodeInstruction> instructions)
-        {
-            FieldInfo saveDataField = AccessTools.Field(
-                typeof(SaveManager),
-                nameof(SaveManager.Data));
-            MethodInfo captureMethod = AccessTools.Method(
-                typeof(CoreSaveLoadDataCaptureTranspiler),
-                nameof(CaptureLoadedSaveData));
-
-            List<CodeInstruction> patchedInstructions =
-                new List<CodeInstruction>();
-            int injectedCaptureCount = 0;
-            foreach (CodeInstruction instruction in instructions)
-            {
-                patchedInstructions.Add(instruction);
-                if (instruction.opcode == OpCodes.Stfld &&
-                    Equals(instruction.operand, saveDataField))
-                {
-                    patchedInstructions.Add(
-                        new CodeInstruction(OpCodes.Ldarg_0));
-                    patchedInstructions.Add(new CodeInstruction(
-                        OpCodes.Call,
-                        captureMethod));
-                    injectedCaptureCount++;
-                }
-            }
-
-            if (injectedCaptureCount != 1)
-            {
-                throw new InvalidOperationException(
-                    "IM Data Core requires exactly one pre-LoadEvent SaveManager.Data capture; found " +
-                    injectedCaptureCount.ToString() + ".");
-            }
-
-            return patchedInstructions;
-        }
-
-        private static void CaptureLoadedSaveData(SaveManager saveManager)
+        internal static void CaptureLoadedSaveData(
+            SaveManager saveManager,
+            string dataFileName)
         {
             if (saveManager == null || saveManager.Data == null)
             {
                 return;
             }
 
-            IMDataCoreController.Instance.OnVanillaSaveDataRead(
-                saveManager.Data);
-        }
-    }
-
-    internal sealed class CoreSaveLoadPatchState
-    {
-        internal CoreSaveScope PreviousSaveScope;
-        internal string RequestedSavePath = string.Empty;
-        internal bool PreparationStarted;
-    }
-
-    /// <summary>
-    /// Binds storage to the explicit save path loaded by vanilla.
-    /// </summary>
-    [HarmonyPatch(
-        typeof(SaveManager),
-        nameof(SaveManager.LoadData),
-        new Type[] { typeof(string) })]
-    internal static class SaveManager_LoadDataPath_IMDataCoreSaveScope_Patch
-    {
-        [HarmonyPriority(Priority.First)]
-        private static void Prefix(
-            string path,
-            ref CoreSaveLoadPatchState __state)
-        {
-            __state = new CoreSaveLoadPatchState
+            try
             {
-                PreviousSaveScope =
-                    IMDataCoreController.Instance.CaptureActiveSaveScope(),
-                RequestedSavePath = path ?? string.Empty
-            };
-
-            if (!CorePaths.IsSupportedGameSavePath(path))
-            {
-                return;
+                IMDataCoreController.Instance.OnVanillaSaveDataRead(
+                    saveManager.Data,
+                    dataFileName);
             }
-
-            IMDataCoreController.Instance.OnSaveLoadStarting(path);
-            __state.PreparationStarted = true;
-        }
-
-        private static IEnumerable<CodeInstruction> Transpiler(
-            IEnumerable<CodeInstruction> instructions)
-        {
-            return CoreSaveLoadDataCaptureTranspiler.Inject(instructions);
-        }
-
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix(
-            SaveManager __instance,
-            CoreSaveLoadPatchState __state)
-        {
-            if (__state == null || !__state.PreparationStarted)
+            catch (Exception exception)
             {
-                return;
-            }
-
-            if (__instance == null || __instance.Data == null)
-            {
-                IMDataCoreController.Instance.OnSaveLoadFailed(
-                    __state.PreviousSaveScope);
-                return;
-            }
-
-            IMDataCoreController.Instance.OnVanillaSaveDataRead(
-                __instance.Data);
-            IMDataCoreController.Instance.OnSaveLoaded(
-                __state.RequestedSavePath);
-        }
-
-        [HarmonyFinalizer]
-        private static void Finalizer(
-            Exception __exception,
-            CoreSaveLoadPatchState __state)
-        {
-            if (__exception != null &&
-                __state != null &&
-                __state.PreparationStarted)
-            {
-                IMDataCoreController.Instance.OnSaveLoadFailed(
-                    __state.PreviousSaveScope);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Receives the autosave path from vanilla's one and only autosave scan.
-    /// </summary>
-    [HarmonyPatch(typeof(SaveManager), nameof(SaveManager.GetLatestAutosavePath))]
-    internal static class SaveManager_GetLatestAutosavePath_IMDataCoreSaveScope_Patch
-    {
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix(string __result)
-        {
-            SaveManager_LoadDataAutoFlag_IMDataCoreSaveScope_Patch
-                .CaptureResolvedAutosavePath(__result);
-        }
-    }
-
-    /// <summary>
-    /// Binds storage for the auto/manual LoadData overload without calling
-    /// GetLatestAutosavePath a second time from a prefix.
-    /// </summary>
-    [HarmonyPatch(
-        typeof(SaveManager),
-        nameof(SaveManager.LoadData),
-        new Type[] { typeof(bool) })]
-    internal static class SaveManager_LoadDataAutoFlag_IMDataCoreSaveScope_Patch
-    {
-        [ThreadStatic]
-        private static CoreSaveLoadPatchState pendingAutosaveLoadState;
-
-        [HarmonyPriority(Priority.First)]
-        private static void Prefix(
-            bool autoSave,
-            ref CoreSaveLoadPatchState __state)
-        {
-            __state = new CoreSaveLoadPatchState
-            {
-                PreviousSaveScope =
-                    IMDataCoreController.Instance.CaptureActiveSaveScope()
-            };
-
-            if (autoSave)
-            {
-                pendingAutosaveLoadState = __state;
-                return;
-            }
-
-            PrepareLoad(
-                __state,
-                CoreSaveFilePathResolver.ResolveManualLoadPath());
-        }
-
-        internal static void CaptureResolvedAutosavePath(string savePath)
-        {
-            CoreSaveLoadPatchState loadState = pendingAutosaveLoadState;
-            if (loadState == null || loadState.PreparationStarted)
-            {
-                return;
-            }
-
-            PrepareLoad(loadState, savePath);
-        }
-
-        private static void PrepareLoad(
-            CoreSaveLoadPatchState loadState,
-            string savePath)
-        {
-            if (loadState == null ||
-                !CorePaths.IsSupportedGameSavePath(savePath))
-            {
-                return;
-            }
-
-            loadState.RequestedSavePath = savePath;
-            IMDataCoreController.Instance.OnSaveLoadStarting(savePath);
-            loadState.PreparationStarted = true;
-        }
-
-        private static IEnumerable<CodeInstruction> Transpiler(
-            IEnumerable<CodeInstruction> instructions)
-        {
-            return CoreSaveLoadDataCaptureTranspiler.Inject(instructions);
-        }
-
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix(
-            SaveManager __instance,
-            CoreSaveLoadPatchState __state)
-        {
-            ClearPendingAutosaveLoadState(__state);
-            if (__state == null || !__state.PreparationStarted)
-            {
-                return;
-            }
-
-            if (__instance == null || __instance.Data == null)
-            {
-                IMDataCoreController.Instance.OnSaveLoadFailed(
-                    __state.PreviousSaveScope);
-                return;
-            }
-
-            IMDataCoreController.Instance.OnVanillaSaveDataRead(
-                __instance.Data);
-            IMDataCoreController.Instance.OnSaveLoaded(
-                __state.RequestedSavePath);
-        }
-
-        [HarmonyFinalizer]
-        private static void Finalizer(
-            Exception __exception,
-            CoreSaveLoadPatchState __state)
-        {
-            ClearPendingAutosaveLoadState(__state);
-            if (__exception != null &&
-                __state != null &&
-                __state.PreparationStarted)
-            {
-                IMDataCoreController.Instance.OnSaveLoadFailed(
-                    __state.PreviousSaveScope);
+                WarnSafely(
+                    "IM Data Core could not restore the loaded save sidecar: " +
+                    exception.Message);
             }
         }
 
-        private static void ClearPendingAutosaveLoadState(
-            CoreSaveLoadPatchState completedState)
+        internal static void CompleteLoadedSave()
         {
-            if (ReferenceEquals(
-                pendingAutosaveLoadState,
-                completedState))
+            try
             {
-                pendingAutosaveLoadState = null;
+                IMDataCoreController.Instance.OnVanillaLoadCompleted();
+            }
+            catch (Exception exception)
+            {
+                WarnSafely(
+                    "IM Data Core could not complete load capture suppression: " +
+                    exception.Message);
+            }
+        }
+
+        private static void WarnSafely(string message)
+        {
+            try
+            {
+                CoreLog.Warn(message);
+            }
+            catch
+            {
+                // Logging must not turn an IMDC failure into a vanilla failure.
             }
         }
     }

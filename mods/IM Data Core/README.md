@@ -1,6 +1,8 @@
 ﻿# IM Data Core
 
-IM Data Core is a backend framework mod for Idol Manager. It gives other mods a stable way to persist custom JSON data and append timeline events without each mod reinventing save handling.
+IM Data Core is a lightweight history and supplemental-data framework for Idol
+Manager. It gives other mods a stable way to persist rollback-safe custom JSON
+and timeline events without each mod reinventing save handling.
 
 This documentation is written for readers with no prior knowledge of:
 - Idol Manager internals
@@ -41,38 +43,54 @@ IM Data Core binds to the exact vanilla save file selected for load or write. Th
 visible sidecar directory mirrors that save's path below Idol Manager's `data`
 folder, while the internal `save_key` remains stable for existing API consumers.
 
-### Storage backend
-At runtime, IM Data Core prefers native SQLite (`winsqlite3`). If unavailable, it falls back to flat JSON file storage.
+### Lightweight sidecar
 
-Per-save storage root:
+Version 2.0 uses one JSON sidecar implementation. There is no normal-runtime
+SQLite provider, database schema, or fallback backend. The exact path below
+vanilla's `data` directory is mirrored below its sibling `IMDataCore` directory:
 
-- `Application.persistentDataPath\IMDataCore\saves`
+- `data\auto_save.json` -> `IMDataCore\auto_save.json`
+- `data\manual_saves\1c5ec635\save.json` ->
+  `IMDataCore\manual_saves\1c5ec635\save.json`
+- `data\story_mode\<playthrough>\auto_save.json` ->
+  `IMDataCore\story_mode\<playthrough>\auto_save.json`
+- `data\story_mode\<playthrough>\chapter_3\save.json` ->
+  `IMDataCore\story_mode\<playthrough>\chapter_3\save.json`
 
-Examples:
-
-- Vanilla `data\manual_saves\12\save.json` uses
-  `IMDataCore\saves\manual_saves\12\im_data_core.db`.
-- Vanilla `data\story_mode\<playthrough>\manual_saves\<slot>\save.json`
-  uses the matching `IMDataCore\saves\story_mode\...\<slot>` directory.
-- Vanilla `data\story_mode\<playthrough>\auto_save.json` uses
-  `IMDataCore\saves\story_mode\<playthrough>\auto_save`.
-- Vanilla `data\auto_save.json` uses
-  `IMDataCore\saves\auto_save`.
-
-The fallback filename in the same directory is
-`im_data_core.fallback.json`. See
-[`docs/STORAGE_LAYOUT.md`](docs/STORAGE_LAYOUT.md) for the complete mapping and
-legacy migration behavior.
+Opaque vanilla path segments are preserved verbatim. There is no required
+`IMDataCore\saves` layer. The sidecar identifies itself as
+`IMDataCore.LightweightSidecar`, format version `1`; it is not a copy of the
+vanilla JSON. See [`docs/STORAGE_LAYOUT.md`](docs/STORAGE_LAYOUT.md).
 
 Typical Windows `Application.persistentDataPath`:
 - `%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager`
 
-### Write buffering and flush policy
-Writes are buffered for performance, then flushed automatically by interval/threshold. IM Data Core also flushes before save operations to reduce risk of data loss during save transitions.
+### Persistence and rollback
+
+Ordinary events and custom JSON mutations update memory only. IMDC serializes
+once at a real vanilla save boundary, or when a consumer explicitly calls
+`TryFlushNow`. There is no three-second timer, event-count threshold, filesystem
+poll, or per-frame transaction pump.
+
+Each tiny checkpoint maps vanilla's exact `(relative path, LastSave, playtime,
+game date)` stamp to an IMDC mutation-sequence watermark. Loading a known save
+activates only IMDC history through its mapped sequence and rebuilds the custom
+dictionary/indexes. If no exact checkpoint exists, the loaded vanilla game date
+is a conservative fallback cutoff. Newer sidecar history remains unchanged on
+disk until the active branch is later saved or explicitly flushed.
+
+Vanilla remains canonical for ordinary game state. IMDC persists historical,
+transient, or supplemental data that vanilla does not retain; it never injects
+metadata into or rewrites a vanilla save. `data\global_data.json` is explicitly
+rejected as a save scope.
 
 ### Built-in vs custom payload persistence
-- Built-in captured events are stored in canonical event + typed schema forms.
-- Custom events retain caller-provided `payloadJson` in the shared event stream under your namespace.
+
+- Built-in captures retain historical/capture-time context and stable vanilla
+  entity IDs, rather than a second collection of current vanilla objects.
+- Custom events retain caller-provided `payloadJson` under the caller's namespace.
+- Derived runtime indexes are rebuilt from the event/mutation history instead of
+  being serialized as duplicate projections.
 
 ## Public API (contract)
 
@@ -93,13 +111,26 @@ Methods:
 - `bool TryFlushNow(out string errorMessage)`
 - `bool TryGetActiveSaveKey(out string saveKey, out string errorMessage)`
 
-## 1.0 API stability contract
+## 2.0 API compatibility contract
 
-- `IMDataCoreApi` with compatibility alias `IMDataCoreAPI` public method signatures are stable for the `1.x` line.
-- `IMDataCoreSession.NamespaceIdentifier`, `IMDataCoreEvent`, and `IMDataCoreMoneyTransaction` public properties are stable for `1.x` consumers.
+- `IMDataCoreApi` and compatibility alias `IMDataCoreAPI` retain their existing public method signatures in 2.0.
+- `IMDataCoreSession.NamespaceIdentifier`, `IMDataCoreEvent`, and `IMDataCoreMoneyTransaction` retain their externally visible models.
 - Money transactions expose `SectionCode` and optional structured `Details`. Structured details currently cover business contracts, single releases, show episodes, individual idol salaries, individual staff salaries, daily theater attendance, monthly theater streaming, daily cafe results, and concert costs/revenue. Staff salary details include the stable job-role code plus level and progress snapshots for every staff skill; concert details include the ordered song/talk setlist and accident outcomes.
 - Single releases and show episodes are represented by paired income/expense records in one transaction group, preserving gross revenue and production cost/weekly budget separately. A zero-cost expense record is retained for digital-only singles.
 - Internal controller/storage/patch implementation details are not public API and may evolve without breaking semantic versioning.
+
+The 2.0 breaking change is the private persistence format and migration policy,
+not the consumer API. New captures also stop emitting four byte-for-byte legacy
+alias rows (`single_participation_recorded`, `show_episode`,
+`contract_canceled`, and `status_changed`) when their canonical event is already
+emitted. Imported historical aliases remain readable; consumers should use the
+canonical `single_released`, `show_episode_released`, `contract_cancelled`, and
+`idol_status_changed` names for new data.
+
+New 2.0 payloads also omit identifiers already present in `EntityId`
+(`single_id`, `show_id`, `concert_id`, `tour_id`, `election_id`, and
+`relationship_pair_key`) plus lifecycle/status echoes already encoded by the
+event type. Historical imported payloads remain byte-for-byte readable.
 
 ## Token and quota rules
 
@@ -147,13 +178,13 @@ After refactor, source code is intentionally split by responsibility:
   - Core constants
   - Public API facade (`IMDataCoreApi` / compatibility alias)
   - Main controller core (`IMDataCoreController` root + shared logic)
-  - Payload/snapshot models and shared utilities that are still central
+  - Payload and transient pre/post-capture models plus shared utilities
 - `src/Core/`
-  - `CorePathsAndRuntime.cs` (save-key/path resolution + runtime capability probing)
+  - `CorePathsAndRuntime.cs` (contained vanilla-path mirroring, logical keys,
+    and read-only legacy-source discovery)
 - `src/Storage/`
-  - `ICoreStorageEngine.cs`
-  - `FlatFileCoreStorageEngine.cs`
-  - `SqliteCoreStorageEngine.cs`
+  - `LightweightCoreStorageEngine.cs` (the sole runtime sidecar)
+  - `LegacyFlatFileImporter.cs` (isolated, read-only compatibility importer)
 - `src/Controller/`
   - `IMDataCoreController` capture partials split by domain clusters
 - `src/Patches/`
@@ -188,7 +219,9 @@ Use a unique reverse-domain namespace, e.g. `com.yourname.yourmod`.
 Usually means key not found, not a hard failure.
 
 ### Writes seem delayed
-Writes are buffered. Call `TryFlushNow` when you need immediate persistence.
+Mutations are intentionally memory-first. They persist at the next vanilla save.
+Call `TryFlushNow` when you need immediate sidecar persistence; it returns a
+clean failure before the game has a physical save scope.
 
 ### Custom event rejected
 Validate `entityKind` and `eventType` token format/length and ensure payload is valid JSON text.
@@ -196,7 +229,7 @@ Validate `entityKind` and `eventType` token format/length and ensure payload is 
 ## Compatibility and safety guidance
 
 - Keep patch logic additive and exception-safe.
-- Do not write directly to IM Data Core tables from external mods.
+- Do not write directly to the IM Data Core sidecar from external mods.
 - Use API calls for forward compatibility.
 - Use stable `sourcePatch` strings so event provenance stays readable.
 

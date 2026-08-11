@@ -206,7 +206,8 @@ Ordering note:
 
 ## Recipe 7: Flush before irreversible transitions
 
-Use for transitions where you want persistence certainty:
+Use when a physical vanilla save scope already exists and you need the current
+IMDC branch on disk before the next vanilla save:
 - major scene unloads
 - external export workflows
 - manual "save now" UI in your mod
@@ -221,6 +222,9 @@ internal static void FlushWithLog()
     }
 }
 ```
+
+This writes only IMDC's sidecar. It neither invokes nor modifies vanilla save
+handling, and it fails cleanly before the first real vanilla save.
 
 ## Recipe 8: Defensive shutdown
 
@@ -287,13 +291,14 @@ When an API call fails:
 2. Validate token format/length (`namespace`, `dataKey`, `entityKind`, `eventType`)
 3. Check payload size/quota
 4. Log `errorMessage` exactly
-5. Retry after `TryFlushNow` if issue appears timing-related
+5. Do not use `TryFlushNow` as an API retry mechanism; reads already include
+   in-memory mutations. Preserve and diagnose the original error.
 
 ## Anti-patterns to avoid
 
 - Treating timeline events as mutable state source for every read path
   - Use snapshots for current state; events for history
-- Writing directly into IM Data Core internal tables
+- Writing directly into the IM Data Core sidecar
   - Use API for compatibility
 - Spamming registration calls every frame
   - Register once, reuse session

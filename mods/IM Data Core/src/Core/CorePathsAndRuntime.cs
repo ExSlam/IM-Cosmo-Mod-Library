@@ -10,192 +10,672 @@ using UnityEngine;
 namespace IMDataCore
 {
     /// <summary>
-    /// Describes one vanilla save file and its independent IM Data Core storage scope.
-    /// The visible directory mirrors the vanilla path while the internal key retains
-    /// the historical full-path hash format used inside persisted records.
+    /// One exact vanilla save target and its lightweight IM Data Core sidecar.
+    /// The logical save key remains separate from the physical sidecar path for
+    /// compatibility with the public API.
     /// </summary>
     internal sealed class CoreSaveScope
     {
         internal string SaveFilePath = string.Empty;
-        internal string StorageRelativeDirectory = string.Empty;
-        internal string InternalSaveKey = CoreConstants.DefaultSaveKey;
-        internal string LegacyOwnerSaveKey = string.Empty;
+        internal string RelativeSavePath = string.Empty;
+        internal string SidecarFilePath = string.Empty;
+        internal string InternalSaveKey = "default";
         internal bool IsTransient;
-        internal bool IsStaging;
     }
 
     /// <summary>
-    /// Save-scoped path resolution for IM Data Core.
+    /// Resolves exact vanilla save paths into sibling lightweight sidecar paths.
+    /// This class never writes, moves, renames, or deletes a vanilla file.
     /// </summary>
     internal static class CorePaths
     {
-        private static readonly object saveScopeLock = new object();
-        private static string activeSaveFilePathHint = string.Empty;
-        private static CoreSaveScope activeSaveScopeOverride;
-        private static CoreSaveScope transientSaveScope =
-            CreateTransientSaveScope();
-
         private const string GameDataRootFolderName = "data";
-        private const string SaveFileName = "save";
-        private const string AutoSaveFileName = "auto_save";
-        private const string ManualSaveFileName = "manual_save";
+        private const string DataCoreRootFolderName = "IMDataCore";
+        private const string LegacyModsFolderName = "Mods";
+        private const string LegacyDisplayModFolderName = "IM Data Core";
+        private const string LegacySavesFolderName = "saves";
+        private const string LegacyDatabaseFileName = "im_data_core.db";
+        private const string LegacyFlatFileName = "im_data_core.fallback.json";
+        private const string LegacyRecoveryBackupSuffix = ".bak";
+        private const string LegacyRecoveryTemporarySuffix = ".tmp";
+
+        private const string SaveFileName = "save.json";
+        private const string AutoSaveFileName = "auto_save.json";
+        private const string ManualSaveFileName = "manual_save.json";
+        private const string GlobalDataFileName = "global_data.json";
+        private const string JsonFileExtension = ".json";
         private const string ManualSavesFolderName = "manual_saves";
         private const string StoryModeFolderName = "story_mode";
         private const string StoryChapterFolderPrefix = "chapter_";
-        private const string TransactionFolderName = "_transactions";
-        private const string LoadTransactionPrefix = "load_";
-        private const string SaveTransactionPrefix = "save_";
-        private const string GlobalDataFileName = "global_data.json";
         private const int FirstStoryChapterIndex = 0;
         private const int LastStoryChapterIndex = 6;
+
+        private const string DefaultSaveKey = "default";
+        private const string TransientSaveKeyPrefix = "transient_";
         private const string SaveFileKeyPrefix = "file";
-        private const string SaveFileExtension = ".json";
-        private const int SavePathHashLength = 16;
+        private const string SaveKeyJoinSeparator = "_";
+        private const int SaveKeyMaximumLength = 64;
+        private const int SaveTokenMaximumLength = 64;
         private const int SavePathTokenLength = 32;
+        private const int SavePathHashLength = 16;
         private const char SavePathSeparatorReplacement = '_';
-        private const string LegacyDisplayModFolderName = "IM Data Core";
+
+        private const string SaveModeStory = "story";
+        private const string SaveModeFreePlay = "freeplay";
         private const string LegacyWorkshopItemIdentifier = "3680836490";
         private const string IdolManagerSteamApplicationIdentifier = "821880";
         private const string SteamAppsFolderName = "steamapps";
         private const string WorkshopFolderName = "workshop";
         private const string WorkshopContentFolderName = "content";
-        private const string DataCoreAssemblyFileName =
-            "com.cosmo.imdatacore.dll";
+        private const string DataCoreAssemblyFileName = "com.cosmo.imdatacore.dll";
+
+        private static readonly object SaveScopeLock = new object();
+        private static string activeSaveFilePathHint = string.Empty;
+        private static CoreSaveScope transientSaveScope = CreateTransientSaveScope();
 
         /// <summary>
-        /// Returns the stable IM Data Core root beside the game's data directory.
+        /// Returns the canonical vanilla data root for the running game.
+        /// </summary>
+        internal static string GetVanillaDataRootDirectory()
+        {
+            return GetVanillaDataRootDirectory(Application.persistentDataPath);
+        }
+
+        /// <summary>
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static string GetVanillaDataRootDirectory(string persistentDataRoot)
+        {
+            string normalizedPersistentRoot;
+            if (!TryNormalizeDirectoryPath(persistentDataRoot, out normalizedPersistentRoot))
+            {
+                return string.Empty;
+            }
+
+            return NormalizeDirectoryPathOrEmpty(
+                Path.Combine(normalizedPersistentRoot, GameDataRootFolderName));
+        }
+
+        /// <summary>
+        /// Returns the sibling IM Data Core root. There is intentionally no required
+        /// "saves" layer in the version-2 layout.
         /// </summary>
         internal static string GetRootDirectory()
         {
-            return Path.Combine(
+            return GetRootDirectory(Application.persistentDataPath);
+        }
+
+        /// <summary>
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static string GetRootDirectory(string persistentDataRoot)
+        {
+            string normalizedPersistentRoot;
+            if (!TryNormalizeDirectoryPath(persistentDataRoot, out normalizedPersistentRoot))
+            {
+                return string.Empty;
+            }
+
+            return NormalizeDirectoryPathOrEmpty(
+                Path.Combine(normalizedPersistentRoot, DataCoreRootFolderName));
+        }
+
+        /// <summary>
+        /// Reconstructs the exact path selection performed around DataSaver calls,
+        /// then accepts it only when it is a supported game-save scope.
+        /// </summary>
+        internal static bool TryResolveDataSaverPath(
+            string dataFileName,
+            bool isJson,
+            bool fullPath,
+            out string resolvedPath)
+        {
+            return TryResolveDataSaverPath(
                 Application.persistentDataPath,
-                CoreConstants.ModFolderName);
+                dataFileName,
+                isJson,
+                fullPath,
+                out resolvedPath);
         }
 
         /// <summary>
-        /// Returns the root beneath which the vanilla save directory layout is mirrored.
+        /// Pure overload used by path tests.
         /// </summary>
-        internal static string GetSavesRootDirectory()
+        internal static bool TryResolveDataSaverPath(
+            string persistentDataRoot,
+            string dataFileName,
+            bool isJson,
+            bool fullPath,
+            out string resolvedPath)
         {
-            return Path.Combine(
-                GetRootDirectory(),
-                CoreConstants.SaveFolderName);
+            resolvedPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(dataFileName))
+            {
+                return false;
+            }
+
+            // DataSaver uses isJson only to choose serialization. The path is
+            // exact when fullPath is true; otherwise it always appends .json.
+            string candidatePath = dataFileName;
+            if (!fullPath)
+            {
+                string dataRootDirectory =
+                    GetVanillaDataRootDirectory(persistentDataRoot);
+                if (string.IsNullOrEmpty(dataRootDirectory))
+                {
+                    return false;
+                }
+
+                candidatePath = Path.Combine(
+                    dataRootDirectory,
+                    dataFileName + JsonFileExtension);
+            }
+
+            CoreSaveScope saveScope;
+            if (!TryCreateSaveScope(
+                    persistentDataRoot,
+                    candidatePath,
+                    out saveScope))
+            {
+                return false;
+            }
+
+            resolvedPath = saveScope.SaveFilePath;
+            return true;
         }
 
         /// <summary>
-        /// Returns the private directory used only for recoverable sidecar
-        /// transactions. Callers must still validate every mutation path before use.
+        /// Reconstructs DataSaver.loadData's path rules. Unlike saveData, the load
+        /// routine always combines with the data root, appends .json, and then
+        /// collapses the literal double-extension token. A rooted second argument
+        /// intentionally wins under Path.Combine, matching vanilla chapter and
+        /// autosave loads on Windows.
         /// </summary>
-        internal static string GetTransactionRootDirectory()
+        internal static bool TryResolveDataSaverLoadPath(
+            string dataFileName,
+            out string resolvedPath)
         {
-            return Path.Combine(
-                GetSavesRootDirectory(),
-                TransactionFolderName);
+            return TryResolveDataSaverLoadPath(
+                Application.persistentDataPath,
+                dataFileName,
+                out resolvedPath);
         }
 
         /// <summary>
-        /// Converts one supported vanilla save path to a relative manifest value.
-        /// Absolute vanilla paths are deliberately never persisted in transaction
-        /// manifests.
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static bool TryResolveDataSaverLoadPath(
+            string persistentDataRoot,
+            string dataFileName,
+            out string resolvedPath)
+        {
+            resolvedPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(dataFileName))
+            {
+                return false;
+            }
+
+            string dataRootDirectory =
+                GetVanillaDataRootDirectory(persistentDataRoot);
+            if (string.IsNullOrEmpty(dataRootDirectory))
+            {
+                return false;
+            }
+
+            string candidatePath = Path.Combine(
+                    dataRootDirectory,
+                    dataFileName + JsonFileExtension)
+                .Replace(
+                    JsonFileExtension + JsonFileExtension,
+                    JsonFileExtension);
+
+            CoreSaveScope saveScope;
+            if (!TryCreateSaveScope(
+                    persistentDataRoot,
+                    candidatePath,
+                    out saveScope))
+            {
+                return false;
+            }
+
+            resolvedPath = saveScope.SaveFilePath;
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the exact normalized path below the vanilla data root.
         /// </summary>
         internal static bool TryGetVanillaSaveRelativePath(
             string saveFilePath,
             out string relativeSaveFilePath)
         {
-            relativeSaveFilePath = string.Empty;
-            CoreSaveScope saveScope;
-            if (!TryCreateSaveScope(saveFilePath, out saveScope) ||
-                saveScope == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                string dataRootDirectory = Path.GetFullPath(
-                    Path.Combine(
-                        Application.persistentDataPath,
-                        GameDataRootFolderName)).TrimEnd(
-                            Path.DirectorySeparatorChar,
-                            Path.AltDirectorySeparatorChar);
-                string dataRootPrefix = dataRootDirectory +
-                    Path.DirectorySeparatorChar;
-                if (!saveScope.SaveFilePath.StartsWith(
-                    dataRootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                string candidateRelativePath = saveScope.SaveFilePath.Substring(
-                    dataRootPrefix.Length);
-                if (!IsSupportedVanillaSaveRelativePath(
-                    candidateRelativePath))
-                {
-                    return false;
-                }
-
-                relativeSaveFilePath = candidateRelativePath.Replace(
-                    Path.AltDirectorySeparatorChar,
-                    Path.DirectorySeparatorChar);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return TryGetVanillaSaveRelativePath(
+                Application.persistentDataPath,
+                saveFilePath,
+                out relativeSaveFilePath);
         }
 
         /// <summary>
-        /// Resolves a validated relative manifest value beneath vanilla's data root.
-        /// This is the only supported recovery path; manifest-provided absolute paths
-        /// are rejected.
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static bool TryGetVanillaSaveRelativePath(
+            string persistentDataRoot,
+            string saveFilePath,
+            out string relativeSaveFilePath)
+        {
+            relativeSaveFilePath = string.Empty;
+            CoreSaveScope saveScope;
+            if (!TryCreateSaveScope(
+                    persistentDataRoot,
+                    saveFilePath,
+                    out saveScope))
+            {
+                return false;
+            }
+
+            relativeSaveFilePath = saveScope.RelativeSavePath;
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves a supported relative vanilla save path without touching the file.
         /// </summary>
         internal static bool TryResolveVanillaSaveRelativePath(
             string relativeSaveFilePath,
             out string saveFilePath,
             out CoreSaveScope saveScope)
         {
+            return TryResolveVanillaSaveRelativePath(
+                Application.persistentDataPath,
+                relativeSaveFilePath,
+                out saveFilePath,
+                out saveScope);
+        }
+
+        /// <summary>
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static bool TryResolveVanillaSaveRelativePath(
+            string persistentDataRoot,
+            string relativeSaveFilePath,
+            out string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
             saveFilePath = string.Empty;
             saveScope = null;
-            if (!IsSupportedVanillaSaveRelativePath(relativeSaveFilePath))
+
+            string normalizedRelativePath;
+            if (!TryNormalizeSupportedRelativeSavePath(
+                    relativeSaveFilePath,
+                    out normalizedRelativePath))
             {
                 return false;
             }
 
+            string dataRootDirectory =
+                GetVanillaDataRootDirectory(persistentDataRoot);
+            if (string.IsNullOrEmpty(dataRootDirectory))
+            {
+                return false;
+            }
+
+            string candidatePath = Path.Combine(
+                dataRootDirectory,
+                normalizedRelativePath);
+            if (!TryCreateSaveScope(
+                    persistentDataRoot,
+                    candidatePath,
+                    out saveScope))
+            {
+                return false;
+            }
+
+            saveFilePath = saveScope.SaveFilePath;
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves one physical vanilla save path without changing active state.
+        /// </summary>
+        internal static bool TryResolveSaveScope(
+            string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
+            return TryCreateSaveScope(
+                Application.persistentDataPath,
+                saveFilePath,
+                out saveScope);
+        }
+
+        /// <summary>
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static bool TryResolveSaveScope(
+            string persistentDataRoot,
+            string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
+            return TryCreateSaveScope(
+                persistentDataRoot,
+                saveFilePath,
+                out saveScope);
+        }
+
+        /// <summary>
+        /// Creates one exact physical scope. No vanilla file is read or required to
+        /// exist, which allows the same resolver to be used before a vanilla save.
+        /// </summary>
+        internal static bool TryCreateSaveScope(
+            string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
+            return TryCreateSaveScope(
+                Application.persistentDataPath,
+                saveFilePath,
+                out saveScope);
+        }
+
+        /// <summary>
+        /// Pure overload used by path tests.
+        /// </summary>
+        internal static bool TryCreateSaveScope(
+            string persistentDataRoot,
+            string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
+            saveScope = null;
+            if (string.IsNullOrWhiteSpace(saveFilePath))
+            {
+                return false;
+            }
+
+            string normalizedPersistentRoot;
+            string dataRootDirectory;
+            string dataCoreRootDirectory;
+            if (!TryResolveSeparatedRoots(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot,
+                    out dataRootDirectory,
+                    out dataCoreRootDirectory))
+            {
+                return false;
+            }
+
+            string normalizedSaveFilePath;
             try
             {
-                string dataRootDirectory = Path.GetFullPath(
-                    Path.Combine(
-                        Application.persistentDataPath,
-                        GameDataRootFolderName));
-                string candidatePath = Path.GetFullPath(
-                    Path.Combine(
-                        dataRootDirectory,
-                        relativeSaveFilePath));
-                if (!TryCreateSaveScope(candidatePath, out saveScope) ||
-                    saveScope == null)
-                {
-                    return false;
-                }
-
-                saveFilePath = saveScope.SaveFilePath;
-                return true;
+                string candidatePath = Path.IsPathRooted(saveFilePath)
+                    ? saveFilePath
+                    : Path.Combine(dataRootDirectory, saveFilePath);
+                normalizedSaveFilePath = Path.GetFullPath(candidatePath);
             }
             catch
             {
-                saveFilePath = string.Empty;
-                saveScope = null;
                 return false;
+            }
+
+            if (!IsStrictlyContainedPath(
+                    dataRootDirectory,
+                    normalizedSaveFilePath))
+            {
+                return false;
+            }
+
+            string relativeSaveFilePath = normalizedSaveFilePath.Substring(
+                BuildDirectoryPrefix(dataRootDirectory).Length);
+            string normalizedRelativePath;
+            if (!TryNormalizeSupportedRelativeSavePath(
+                    relativeSaveFilePath,
+                    out normalizedRelativePath))
+            {
+                return false;
+            }
+
+            string pathSafetyError;
+            if (!TryValidateExistingPathChain(
+                    dataRootDirectory,
+                    normalizedSaveFilePath,
+                    out pathSafetyError))
+            {
+                return false;
+            }
+
+            string sidecarFilePath;
+            try
+            {
+                sidecarFilePath = Path.GetFullPath(
+                    Path.Combine(
+                        dataCoreRootDirectory,
+                        normalizedRelativePath));
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (!IsStrictlyContainedPath(
+                    dataCoreRootDirectory,
+                    sidecarFilePath) ||
+                !TryValidateExistingPathChain(
+                    dataCoreRootDirectory,
+                    sidecarFilePath,
+                    out pathSafetyError))
+            {
+                return false;
+            }
+
+            string internalSaveKey = BuildFileScopedSaveKey(
+                normalizedPersistentRoot,
+                normalizedSaveFilePath);
+            if (string.IsNullOrEmpty(internalSaveKey))
+            {
+                return false;
+            }
+
+            saveScope = new CoreSaveScope
+            {
+                SaveFilePath = normalizedSaveFilePath,
+                RelativeSavePath = normalizedRelativePath,
+                SidecarFilePath = sidecarFilePath,
+                InternalSaveKey = internalSaveKey,
+                IsTransient = false
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Stores an exact supported save-file hint. Invalid paths, including
+        /// global_data.json, are ignored and can never replace the active scope.
+        /// </summary>
+        internal static void SetActiveSaveFilePathHint(string saveFilePath)
+        {
+            CoreSaveScope ignoredSaveScope;
+            TrySetActiveSaveFilePathHint(saveFilePath, out ignoredSaveScope);
+        }
+
+        /// <summary>
+        /// Stores an exact supported save-file hint and returns its resolved scope.
+        /// </summary>
+        internal static bool TrySetActiveSaveFilePathHint(
+            string saveFilePath,
+            out CoreSaveScope saveScope)
+        {
+            saveScope = null;
+            if (!TryCreateSaveScope(saveFilePath, out saveScope))
+            {
+                return false;
+            }
+
+            lock (SaveScopeLock)
+            {
+                activeSaveFilePathHint = saveScope.SaveFilePath;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Selects a previously resolved ordinary or transient scope. A physical
+        /// scope is resolved again instead of trusting mutable path fields.
+        /// </summary>
+        internal static bool TryUseSaveScope(CoreSaveScope saveScope)
+        {
+            if (saveScope == null)
+            {
+                return false;
+            }
+
+            if (saveScope.IsTransient)
+            {
+                CoreSaveScope retainedTransientScope = CloneScope(saveScope);
+                retainedTransientScope.SaveFilePath = string.Empty;
+                retainedTransientScope.RelativeSavePath = string.Empty;
+                retainedTransientScope.SidecarFilePath = string.Empty;
+                retainedTransientScope.IsTransient = true;
+                if (string.IsNullOrEmpty(retainedTransientScope.InternalSaveKey))
+                {
+                    retainedTransientScope.InternalSaveKey =
+                        TransientSaveKeyPrefix + Guid.NewGuid().ToString("N");
+                }
+
+                lock (SaveScopeLock)
+                {
+                    activeSaveFilePathHint = string.Empty;
+                    transientSaveScope = retainedTransientScope;
+                }
+
+                return true;
+            }
+
+            CoreSaveScope resolvedSaveScope;
+            if (!TryCreateSaveScope(
+                    saveScope.SaveFilePath,
+                    out resolvedSaveScope))
+            {
+                return false;
+            }
+
+            lock (SaveScopeLock)
+            {
+                activeSaveFilePathHint = resolvedSaveScope.SaveFilePath;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Compatibility wrapper for callers that do not need a result.
+        /// </summary>
+        internal static void UseSaveScope(CoreSaveScope saveScope)
+        {
+            TryUseSaveScope(saveScope);
+        }
+
+        /// <summary>
+        /// Restores a captured scope after an aborted load without any filesystem
+        /// operation.
+        /// </summary>
+        internal static void RestoreSaveScope(CoreSaveScope saveScope)
+        {
+            TryUseSaveScope(saveScope);
+        }
+
+        /// <summary>
+        /// Returns true only for supported vanilla game-save shapes. Global settings
+        /// and arbitrary JSON files can never own a sidecar.
+        /// </summary>
+        internal static bool IsSupportedGameSavePath(string saveFilePath)
+        {
+            CoreSaveScope ignoredSaveScope;
+            return TryCreateSaveScope(saveFilePath, out ignoredSaveScope);
+        }
+
+        /// <summary>
+        /// Starts a fresh memory-only scope for a new game.
+        /// </summary>
+        internal static void ResetToTransient()
+        {
+            lock (SaveScopeLock)
+            {
+                activeSaveFilePathHint = string.Empty;
+                transientSaveScope = CreateTransientSaveScope();
             }
         }
 
         /// <summary>
-        /// Canonicalizes one IM Data Core mutation target and rejects every existing
-        /// reparse-point ancestor. Optional tree validation is required before a
-        /// recursive delete so a link cannot redirect cleanup outside the private root.
+        /// Compatibility name retained for lifecycle callers.
+        /// </summary>
+        internal static void ResetToTransientSaveScope()
+        {
+            ResetToTransient();
+        }
+
+        /// <summary>
+        /// Returns the exact active physical scope, or the current memory-only scope
+        /// before the first valid vanilla save target is known.
+        /// </summary>
+        internal static CoreSaveScope GetSaveScope()
+        {
+            string saveFilePath;
+            lock (SaveScopeLock)
+            {
+                saveFilePath = activeSaveFilePathHint;
+            }
+
+            if (!string.IsNullOrEmpty(saveFilePath))
+            {
+                CoreSaveScope resolvedSaveScope;
+                if (TryCreateSaveScope(saveFilePath, out resolvedSaveScope))
+                {
+                    return resolvedSaveScope;
+                }
+            }
+
+            lock (SaveScopeLock)
+            {
+                return CloneScope(transientSaveScope);
+            }
+        }
+
+        /// <summary>
+        /// Returns the public logical key independently of the physical sidecar path.
+        /// </summary>
+        internal static string GetSaveKey()
+        {
+            return GetSaveScope().InternalSaveKey;
+        }
+
+        /// <summary>
+        /// Returns the exact historical file-scoped logical key.
+        /// </summary>
+        internal static string GetLegacyFileScopedSaveKey()
+        {
+            return GetSaveKey();
+        }
+
+        /// <summary>
+        /// Canonicalizes one proposed IMDC mutation path, requires strict containment
+        /// under the private root, and rejects every existing reparse-point ancestor.
         /// </summary>
         internal static bool TryValidateContainedMutationPath(
+            string candidatePath,
+            bool validateExistingTree,
+            out string normalizedPath,
+            out string errorMessage)
+        {
+            return TryValidateContainedMutationPath(
+                Application.persistentDataPath,
+                candidatePath,
+                validateExistingTree,
+                out normalizedPath,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests and migration tooling.
+        /// </summary>
+        internal static bool TryValidateContainedMutationPath(
+            string persistentDataRoot,
             string candidatePath,
             bool validateExistingTree,
             out string normalizedPath,
@@ -209,101 +689,205 @@ namespace IMDataCore
                 return false;
             }
 
+            string normalizedPersistentRoot;
+            string dataRootDirectory;
+            string dataCoreRootDirectory;
+            if (!TryResolveSeparatedRoots(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot,
+                    out dataRootDirectory,
+                    out dataCoreRootDirectory))
+            {
+                errorMessage = "The IM Data Core and vanilla data roots are invalid.";
+                return false;
+            }
+
+            string normalizedCandidate;
             try
             {
-                string normalizedRoot = Path.GetFullPath(
-                    GetRootDirectory()).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-                string normalizedCandidate = Path.GetFullPath(
-                    candidatePath).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-                string rootPrefix = normalizedRoot +
-                    Path.DirectorySeparatorChar;
-                if (!normalizedCandidate.StartsWith(
-                    rootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    errorMessage =
-                        "Refused an IM Data Core mutation outside its private root.";
-                    return false;
-                }
-
-                string existingPath = normalizedCandidate;
-                while (!string.IsNullOrEmpty(existingPath))
-                {
-                    if (File.Exists(existingPath) || Directory.Exists(existingPath))
-                    {
-                        FileAttributes attributes = File.GetAttributes(existingPath);
-                        if ((attributes & FileAttributes.ReparsePoint) != 0)
-                        {
-                            errorMessage =
-                                "Refused an IM Data Core mutation through a reparse point: " +
-                                existingPath;
-                            return false;
-                        }
-                    }
-
-                    if (string.Equals(
-                        existingPath,
-                        normalizedRoot,
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        break;
-                    }
-
-                    string parentPath = Path.GetDirectoryName(existingPath);
-                    if (string.IsNullOrEmpty(parentPath) ||
-                        string.Equals(
-                            parentPath,
-                            existingPath,
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        errorMessage =
-                            "The mutation path did not resolve beneath the IM Data Core root.";
-                        return false;
-                    }
-
-                    existingPath = parentPath.TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-                }
-
-                if (validateExistingTree &&
-                    Directory.Exists(normalizedCandidate) &&
-                    !TryValidateTreeHasNoReparsePoints(
-                        normalizedCandidate,
-                        out errorMessage))
-                {
-                    return false;
-                }
-
-                normalizedPath = normalizedCandidate;
-                return true;
+                normalizedCandidate = Path.GetFullPath(candidatePath);
             }
             catch (Exception exception)
             {
                 errorMessage = exception.Message;
                 return false;
             }
+
+            if (!IsStrictlyContainedPath(
+                    dataCoreRootDirectory,
+                    normalizedCandidate))
+            {
+                errorMessage =
+                    "Refused an IM Data Core mutation outside its private root.";
+                return false;
+            }
+
+            if (IsSameOrContainedPath(dataRootDirectory, normalizedCandidate))
+            {
+                errorMessage =
+                    "Refused an IM Data Core mutation beneath the vanilla data root.";
+                return false;
+            }
+
+            if (!TryValidateExistingPathChain(
+                    dataCoreRootDirectory,
+                    normalizedCandidate,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            if (validateExistingTree &&
+                Directory.Exists(normalizedCandidate) &&
+                !TryValidateTreeHasNoReparsePoints(
+                    normalizedCandidate,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            normalizedPath = normalizedCandidate;
+            return true;
         }
 
         /// <summary>
-        /// Creates a contained directory and verifies it again after creation to close
-        /// the ordinary missing-ancestor case.
+        /// Creates the private IMDC root after validating it as the exact sibling of
+        /// vanilla data.
+        /// </summary>
+        internal static bool TryEnsureRootDirectory(out string errorMessage)
+        {
+            string ignoredRoot;
+            return TryEnsureRootDirectory(
+                Application.persistentDataPath,
+                out ignoredRoot,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests.
+        /// </summary>
+        internal static bool TryEnsureRootDirectory(
+            string persistentDataRoot,
+            out string normalizedRootDirectory,
+            out string errorMessage)
+        {
+            normalizedRootDirectory = string.Empty;
+            errorMessage = string.Empty;
+
+            string normalizedPersistentRoot;
+            string dataRootDirectory;
+            string dataCoreRootDirectory;
+            if (!TryResolveSeparatedRoots(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot,
+                    out dataRootDirectory,
+                    out dataCoreRootDirectory))
+            {
+                errorMessage = "The IM Data Core and vanilla data roots are invalid.";
+                return false;
+            }
+
+            if (!TryValidateExistingPathChain(
+                    normalizedPersistentRoot,
+                    dataCoreRootDirectory,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(dataCoreRootDirectory);
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            if (!TryValidateExistingPathChain(
+                    normalizedPersistentRoot,
+                    dataCoreRootDirectory,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            normalizedRootDirectory = dataCoreRootDirectory;
+            return true;
+        }
+
+        /// <summary>
+        /// Creates a directory only at the private root or strictly below it, then
+        /// validates the created path again.
         /// </summary>
         internal static bool TryCreateContainedDirectory(
             string directoryPath,
             out string normalizedDirectoryPath,
             out string errorMessage)
         {
-            normalizedDirectoryPath = string.Empty;
-            if (!TryValidateContainedMutationPath(
+            return TryCreateContainedDirectory(
+                Application.persistentDataPath,
                 directoryPath,
-                false,
                 out normalizedDirectoryPath,
-                out errorMessage))
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests.
+        /// </summary>
+        internal static bool TryCreateContainedDirectory(
+            string persistentDataRoot,
+            string directoryPath,
+            out string normalizedDirectoryPath,
+            out string errorMessage)
+        {
+            normalizedDirectoryPath = string.Empty;
+            errorMessage = string.Empty;
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                errorMessage = "The IM Data Core directory path is empty.";
+                return false;
+            }
+
+            string dataCoreRootDirectory = GetRootDirectory(persistentDataRoot);
+            string normalizedCandidate;
+            try
+            {
+                normalizedCandidate = Path.GetFullPath(directoryPath);
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            if (string.Equals(
+                    normalizedCandidate,
+                    dataCoreRootDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return TryEnsureRootDirectory(
+                    persistentDataRoot,
+                    out normalizedDirectoryPath,
+                    out errorMessage);
+            }
+
+            if (!TryValidateContainedMutationPath(
+                    persistentDataRoot,
+                    normalizedCandidate,
+                    false,
+                    out normalizedDirectoryPath,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            string ignoredRoot;
+            if (!TryEnsureRootDirectory(
+                    persistentDataRoot,
+                    out ignoredRoot,
+                    out errorMessage))
             {
                 return false;
             }
@@ -319,6 +903,7 @@ namespace IMDataCore
             }
 
             return TryValidateContainedMutationPath(
+                persistentDataRoot,
                 normalizedDirectoryPath,
                 false,
                 out normalizedDirectoryPath,
@@ -326,25 +911,103 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Deletes one contained ordinary file after validating its final path and all
-        /// existing ancestors. Reparse-point files are rejected by the validator.
+        /// Creates and validates the parent directory for one physical sidecar.
+        /// </summary>
+        internal static bool TryEnsureSidecarParentDirectory(
+            CoreSaveScope saveScope,
+            out string errorMessage)
+        {
+            return TryEnsureSidecarParentDirectory(
+                Application.persistentDataPath,
+                saveScope,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests.
+        /// </summary>
+        internal static bool TryEnsureSidecarParentDirectory(
+            string persistentDataRoot,
+            CoreSaveScope saveScope,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (saveScope == null ||
+                saveScope.IsTransient ||
+                string.IsNullOrEmpty(saveScope.SidecarFilePath))
+            {
+                errorMessage = "A physical IM Data Core save scope is required.";
+                return false;
+            }
+
+            string normalizedSidecarPath;
+            if (!TryValidateContainedMutationPath(
+                    persistentDataRoot,
+                    saveScope.SidecarFilePath,
+                    false,
+                    out normalizedSidecarPath,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            string parentDirectory = Path.GetDirectoryName(
+                normalizedSidecarPath);
+            if (string.IsNullOrEmpty(parentDirectory))
+            {
+                errorMessage = "The sidecar parent directory is unavailable.";
+                return false;
+            }
+
+            string normalizedParent;
+            return TryCreateContainedDirectory(
+                persistentDataRoot,
+                parentDirectory,
+                out normalizedParent,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Deletes one ordinary file only after strict private-root containment and
+        /// reparse-point validation.
         /// </summary>
         internal static bool TryDeleteContainedFile(
             string filePath,
             out string errorMessage)
         {
+            return TryDeleteContainedFile(
+                Application.persistentDataPath,
+                filePath,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests.
+        /// </summary>
+        internal static bool TryDeleteContainedFile(
+            string persistentDataRoot,
+            string filePath,
+            out string errorMessage)
+        {
             string normalizedFilePath;
             if (!TryValidateContainedMutationPath(
-                filePath,
-                false,
-                out normalizedFilePath,
-                out errorMessage))
+                    persistentDataRoot,
+                    filePath,
+                    false,
+                    out normalizedFilePath,
+                    out errorMessage))
             {
                 return false;
             }
 
             try
             {
+                if (Directory.Exists(normalizedFilePath))
+                {
+                    errorMessage = "Refused to delete a directory through the file API.";
+                    return false;
+                }
+
                 if (File.Exists(normalizedFilePath))
                 {
                     File.Delete(normalizedFilePath);
@@ -360,1642 +1023,52 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Publishes a fully prepared transaction directory with same-volume directory
-        /// renames. A durable relative-path journal makes the two-rename sequence
-        /// recoverable after process termination.
+        /// Deletes one private subdirectory. The IMDC root itself is never accepted.
+        /// Recursive deletion first validates the complete existing tree.
         /// </summary>
-        internal static bool TryPublishStagingDirectory(
-            string stagingDirectory,
-            CoreSaveScope targetSaveScope,
-            string transactionToken,
-            string expectedVanillaContentIdentity,
+        internal static bool TryDeleteContainedDirectory(
+            string directoryPath,
+            bool recursive,
             out string errorMessage)
         {
-            errorMessage = string.Empty;
-            if (!IsValidLowerHexToken(transactionToken))
-            {
-                errorMessage = "The transaction token is invalid.";
-                return false;
-            }
-            if (!IsValidContentIdentity(expectedVanillaContentIdentity))
-            {
-                errorMessage =
-                    "The expected vanilla content identity is invalid.";
-                return false;
-            }
-
-            string vanillaRelativeSavePath;
-            if (targetSaveScope == null ||
-                !TryGetVanillaSaveRelativePath(
-                    targetSaveScope.SaveFilePath,
-                    out vanillaRelativeSavePath))
-            {
-                errorMessage = "The canonical vanilla save scope is invalid.";
-                return false;
-            }
-
-            string canonicalDirectory = GetSaveDirectory(targetSaveScope);
-            string fingerprintErrorMessage;
-            if (!TryVerifyVanillaContentIdentity(
-                    targetSaveScope.SaveFilePath,
-                    expectedVanillaContentIdentity,
-                    out fingerprintErrorMessage))
-            {
-                errorMessage =
-                    "The vanilla save no longer matches the sidecar stage: " +
-                    fingerprintErrorMessage;
-                return false;
-            }
-
-            string normalizedStagingDirectory;
-            if (!TryValidateContainedMutationPath(
-                stagingDirectory,
-                true,
-                out normalizedStagingDirectory,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            string normalizedCanonicalDirectory;
-            if (!TryValidateContainedMutationPath(
-                canonicalDirectory,
-                false,
-                out normalizedCanonicalDirectory,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            try
-            {
-                string pendingRecoveryErrorMessage;
-                if (!TryRecoverInterruptedPublishes(
-                    out pendingRecoveryErrorMessage))
-                {
-                    errorMessage =
-                        "A prior sidecar publish must be recovered first: " +
-                        pendingRecoveryErrorMessage;
-                    return false;
-                }
-
-                string normalizedTransactionRoot = Path.GetFullPath(
-                    GetTransactionRootDirectory()).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-                string transactionPrefix = normalizedTransactionRoot +
-                    Path.DirectorySeparatorChar;
-                string normalizedSavesRoot = Path.GetFullPath(
-                    GetSavesRootDirectory()).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-                string savesPrefix = normalizedSavesRoot +
-                    Path.DirectorySeparatorChar;
-                if (!normalizedStagingDirectory.StartsWith(
-                        transactionPrefix,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    !normalizedCanonicalDirectory.StartsWith(
-                        savesPrefix,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    normalizedCanonicalDirectory.StartsWith(
-                        transactionPrefix,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    errorMessage =
-                        "The sidecar publish paths are not a staging/canonical pair.";
-                    return false;
-                }
-
-                string stagingDirectoryName = Path.GetFileName(
-                    normalizedStagingDirectory);
-                string stagingParentDirectory = Path.GetDirectoryName(
-                    normalizedStagingDirectory);
-                bool supportedPublishStage =
-                    stagingDirectoryName.StartsWith(
-                        LoadTransactionPrefix,
-                        StringComparison.Ordinal) ||
-                    stagingDirectoryName.StartsWith(
-                        SaveTransactionPrefix,
-                        StringComparison.Ordinal);
-                string stageToken = supportedPublishStage
-                    ? stagingDirectoryName.Substring(
-                        stagingDirectoryName.IndexOf('_') + 1)
-                    : string.Empty;
-                if (!supportedPublishStage ||
-                    !string.Equals(
-                        stagingParentDirectory,
-                        normalizedTransactionRoot,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(
-                        stageToken,
-                        transactionToken,
-                        StringComparison.Ordinal) ||
-                    !IsValidTransactionDirectoryName(stagingDirectoryName) ||
-                    !Directory.Exists(normalizedStagingDirectory))
-                {
-                    errorMessage =
-                        "The sidecar staging directory is missing or invalid.";
-                    return false;
-                }
-
-                string canonicalParentDirectory = Path.GetDirectoryName(
-                    normalizedCanonicalDirectory);
-                string validatedCanonicalParent;
-                if (string.IsNullOrEmpty(canonicalParentDirectory) ||
-                    !TryCreateContainedDirectory(
-                        canonicalParentDirectory,
-                        out validatedCanonicalParent,
-                        out errorMessage))
-                {
-                    return false;
-                }
-
-                string journalDirectory = Path.Combine(
-                    normalizedTransactionRoot,
-                    "publish_" + transactionToken);
-                string normalizedJournalDirectory;
-                if (!TryValidateContainedMutationPath(
-                    journalDirectory,
-                    false,
-                    out normalizedJournalDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                if (Directory.Exists(normalizedJournalDirectory) ||
-                    File.Exists(normalizedJournalDirectory))
-                {
-                    errorMessage =
-                        "The sidecar publish journal already exists.";
-                    return false;
-                }
-
-                if (!IsSupportedVanillaSaveRelativePath(
-                    vanillaRelativeSavePath))
-                {
-                    errorMessage =
-                        "The canonical sidecar relative path is invalid.";
-                    return false;
-                }
-
-                if (!TryWriteStagePublishMarker(
-                    normalizedStagingDirectory,
-                    transactionToken,
-                    vanillaRelativeSavePath,
-                    stagingDirectoryName,
-                    expectedVanillaContentIdentity,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                string validatedJournalDirectory;
-                if (!TryCreateContainedDirectory(
-                    normalizedJournalDirectory,
-                    out validatedJournalDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                string backupDirectory = Path.Combine(
-                    validatedJournalDirectory,
-                    "prior");
-                string normalizedBackupDirectory;
-                if (!TryValidateContainedMutationPath(
-                    backupDirectory,
-                    false,
-                    out normalizedBackupDirectory,
-                    out errorMessage) ||
-                    !TryWritePublishJournal(
-                        validatedJournalDirectory,
-                        transactionToken,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        "prepared",
-                        out errorMessage))
-                {
-                    return false;
-                }
-
-                bool canonicalMovedToBackup = false;
-                try
-                {
-                    if (!TryVerifyVanillaContentIdentity(
-                        targetSaveScope.SaveFilePath,
-                        expectedVanillaContentIdentity,
-                        out fingerprintErrorMessage))
-                    {
-                        string recoveryErrorMessage;
-                        bool detached = TryRecoverPublishJournal(
-                            validatedJournalDirectory,
-                            out recoveryErrorMessage);
-                        errorMessage =
-                            "The vanilla save changed before sidecar publication." +
-                            (detached
-                                ? string.Empty
-                                : " Recovery failed: " + recoveryErrorMessage);
-                        return false;
-                    }
-
-                    if (Directory.Exists(normalizedCanonicalDirectory))
-                    {
-                        Directory.Move(
-                            normalizedCanonicalDirectory,
-                            normalizedBackupDirectory);
-                        canonicalMovedToBackup = true;
-                        if (!TryWritePublishJournal(
-                            validatedJournalDirectory,
-                            transactionToken,
-                            vanillaRelativeSavePath,
-                            stagingDirectoryName,
-                            expectedVanillaContentIdentity,
-                            "canonical_backed_up",
-                            out errorMessage))
-                        {
-                            throw new IOException(errorMessage);
-                        }
-                    }
-
-                    if (!TryVerifyVanillaContentIdentity(
-                        targetSaveScope.SaveFilePath,
-                        expectedVanillaContentIdentity,
-                        out fingerprintErrorMessage))
-                    {
-                        string recoveryErrorMessage;
-                        bool detached = TryRecoverPublishJournal(
-                            validatedJournalDirectory,
-                            out recoveryErrorMessage);
-                        errorMessage =
-                            "The vanilla save changed during sidecar publication." +
-                            (detached
-                                ? string.Empty
-                                : " Recovery failed: " + recoveryErrorMessage);
-                        return false;
-                    }
-
-                    Directory.Move(
-                        normalizedStagingDirectory,
-                        normalizedCanonicalDirectory);
-                    if (!TryWritePublishJournal(
-                        validatedJournalDirectory,
-                        transactionToken,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        "published",
-                        out errorMessage))
-                    {
-                        throw new IOException(errorMessage);
-                    }
-                }
-                catch
-                {
-                    // Do not perform an unjournaled compensating rename here. The
-                    // durable phase plus observed canonical/stage/prior state lets the
-                    // recovery matrix finish or restore unambiguously.
-                    throw;
-                }
-
-                if (!TryVerifyVanillaContentIdentity(
-                    targetSaveScope.SaveFilePath,
-                    expectedVanillaContentIdentity,
-                    out fingerprintErrorMessage))
-                {
-                    string recoveryErrorMessage;
-                    bool detached = TryRecoverPublishJournal(
-                        validatedJournalDirectory,
-                        out recoveryErrorMessage);
-                    errorMessage =
-                        "The vanilla save changed before sidecar publication became final." +
-                        (detached
-                            ? string.Empty
-                            : " Recovery failed: " + recoveryErrorMessage);
-                    return false;
-                }
-
-                if (canonicalMovedToBackup &&
-                    Directory.Exists(normalizedBackupDirectory))
-                {
-                    string cleanupErrorMessage;
-                    if (TryValidateContainedMutationPath(
-                        normalizedBackupDirectory,
-                        true,
-                        out normalizedBackupDirectory,
-                        out cleanupErrorMessage))
-                    {
-                        Directory.Delete(normalizedBackupDirectory, true);
-                    }
-                    else
-                    {
-                        CoreLog.Warn(
-                            "The prior sidecar backup was retained: " +
-                            cleanupErrorMessage);
-                        return true;
-                    }
-                }
-
-                string normalizedJournalForCleanup;
-                string journalCleanupError;
-                if (TryValidateContainedMutationPath(
-                    validatedJournalDirectory,
-                    true,
-                    out normalizedJournalForCleanup,
-                    out journalCleanupError))
-                {
-                    Directory.Delete(normalizedJournalForCleanup, true);
-                }
-                else
-                {
-                    CoreLog.Warn(
-                        "The completed sidecar publish journal was retained: " +
-                        journalCleanupError);
-                    return true;
-                }
-
-                // The journal is removed before the canonical marker. A crash in the
-                // remaining window leaves only a harmless marker, never an
-                // unrecoverable journal that requires a now-missing marker.
-                string markerCleanupErrorMessage;
-                if (!TryDeleteContainedFile(
-                    Path.Combine(
-                        normalizedCanonicalDirectory,
-                        "publish.stage"),
-                    out markerCleanupErrorMessage))
-                {
-                    CoreLog.Warn(
-                        "The completed sidecar stage marker was retained: " +
-                        markerCleanupErrorMessage);
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Recovers only validated publish journals directly beneath _transactions.
-        /// The journal stores a relative canonical path, never an absolute one.
-        /// </summary>
-        internal static bool TryRecoverInterruptedPublishes(
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            try
-            {
-                string transactionRoot = GetTransactionRootDirectory();
-                if (!Directory.Exists(transactionRoot))
-                {
-                    return true;
-                }
-
-                string normalizedTransactionRoot;
-                if (!TryValidateContainedMutationPath(
-                    transactionRoot,
-                    false,
-                    out normalizedTransactionRoot,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                string[] candidateDirectories = Directory.GetDirectories(
-                    normalizedTransactionRoot,
-                    "publish_*",
-                    SearchOption.TopDirectoryOnly);
-                List<string> validatedCandidateDirectories =
-                    new List<string>();
-                HashSet<string> canonicalTargets =
-                    new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                HashSet<string> stagingTargets =
-                    new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int candidateIndex = 0;
-                    candidateIndex < candidateDirectories.Length;
-                    candidateIndex++)
-                {
-                    string candidateDirectory;
-                    if (!TryValidateContainedMutationPath(
-                        candidateDirectories[candidateIndex],
-                        true,
-                        out candidateDirectory,
-                        out errorMessage))
-                    {
-                        return false;
-                    }
-
-                    string directoryName = Path.GetFileName(candidateDirectory);
-                    if (!IsValidTransactionDirectoryName(directoryName))
-                    {
-                        continue;
-                    }
-
-                    string token = directoryName.Substring(
-                        "publish_".Length);
-                    string journalPath = Path.Combine(
-                        candidateDirectory,
-                        "publish.journal");
-                    string temporaryJournalPath = journalPath + "." +
-                        token +
-                        ".tmp";
-                    if (!File.Exists(journalPath) &&
-                        !File.Exists(temporaryJournalPath))
-                    {
-                        string priorDirectory = Path.Combine(
-                            candidateDirectory,
-                            "prior");
-                        if (Directory.Exists(priorDirectory))
-                        {
-                            errorMessage =
-                                "A publish journal is missing after its canonical backup was created.";
-                            return false;
-                        }
-
-                        string validatedOrphanDirectory;
-                        if (!TryValidateContainedMutationPath(
-                            candidateDirectory,
-                            true,
-                            out validatedOrphanDirectory,
-                            out errorMessage))
-                        {
-                            return false;
-                        }
-
-                        Directory.Delete(validatedOrphanDirectory, true);
-                        continue;
-                    }
-
-                    string vanillaRelativeSavePath;
-                    string stagingDirectoryName;
-                    string expectedVanillaContentIdentity;
-                    string phase;
-                    if (!TryReadPublishJournal(
-                        candidateDirectory,
-                        token,
-                        out vanillaRelativeSavePath,
-                        out stagingDirectoryName,
-                        out expectedVanillaContentIdentity,
-                        out phase,
-                        out errorMessage))
-                    {
-                        return false;
-                    }
-
-                    if (!canonicalTargets.Add(vanillaRelativeSavePath) ||
-                        !stagingTargets.Add(stagingDirectoryName))
-                    {
-                        errorMessage =
-                            "Conflicting sidecar publish journals target the same save or staging directory.";
-                        return false;
-                    }
-
-                    validatedCandidateDirectories.Add(candidateDirectory);
-                }
-
-                for (int candidateIndex = 0;
-                    candidateIndex < validatedCandidateDirectories.Count;
-                    candidateIndex++)
-                {
-                    string recoveryErrorMessage;
-                    if (!TryRecoverPublishJournal(
-                        validatedCandidateDirectories[candidateIndex],
-                        out recoveryErrorMessage))
-                    {
-                        errorMessage = recoveryErrorMessage;
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        private static bool TryRecoverPublishJournal(
-            string journalDirectory,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            string normalizedJournalDirectory;
-            if (!TryValidateContainedMutationPath(
-                journalDirectory,
-                true,
-                out normalizedJournalDirectory,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            string directoryName = Path.GetFileName(normalizedJournalDirectory);
-            string token = directoryName.Substring("publish_".Length);
-            string vanillaRelativeSavePath;
-            string stagingDirectoryName;
-            string expectedVanillaContentIdentity;
-            string phase;
-            if (!TryReadPublishJournal(
-                normalizedJournalDirectory,
-                token,
-                out vanillaRelativeSavePath,
-                out stagingDirectoryName,
-                out expectedVanillaContentIdentity,
-                out phase,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            string vanillaSaveFilePath;
-            CoreSaveScope targetSaveScope;
-            if (!TryResolveVanillaSaveRelativePath(
-                vanillaRelativeSavePath,
-                out vanillaSaveFilePath,
-                out targetSaveScope))
-            {
-                errorMessage =
-                    "The publish journal vanilla save path is invalid.";
-                return false;
-            }
-
-            string canonicalDirectory = GetSaveDirectory(targetSaveScope);
-            string stagingDirectory = Path.Combine(
-                GetTransactionRootDirectory(),
-                stagingDirectoryName);
-            string backupDirectory = Path.Combine(
-                normalizedJournalDirectory,
-                "prior");
-            string normalizedCanonicalDirectory;
-            string normalizedStagingDirectory;
-            string normalizedBackupDirectory;
-            if (!TryValidateContainedMutationPath(
-                    canonicalDirectory,
-                    false,
-                    out normalizedCanonicalDirectory,
-                    out errorMessage) ||
-                !TryValidateContainedMutationPath(
-                    stagingDirectory,
-                    false,
-                    out normalizedStagingDirectory,
-                    out errorMessage) ||
-                !TryValidateContainedMutationPath(
-                    backupDirectory,
-                    false,
-                    out normalizedBackupDirectory,
-                    out errorMessage))
-            {
-                return false;
-            }
-
-            bool canonicalExists = Directory.Exists(
-                normalizedCanonicalDirectory);
-            bool stagingExists = Directory.Exists(
-                normalizedStagingDirectory);
-            bool backupExists = Directory.Exists(
-                normalizedBackupDirectory);
-
-            CoreFileFingerprint currentVanillaFingerprint;
-            string vanillaFingerprintError;
-            bool vanillaContentMatches =
-                CoreFileFingerprintUtility.TryReadStable(
-                    vanillaSaveFilePath,
-                    out currentVanillaFingerprint,
-                    out vanillaFingerprintError) &&
-                string.Equals(
-                    currentVanillaFingerprint.ContentIdentity,
-                    expectedVanillaContentIdentity,
-                    StringComparison.Ordinal);
-
-            if (!vanillaContentMatches)
-            {
-                return TryDetachPublishForVanillaMismatch(
-                    normalizedJournalDirectory,
-                    normalizedCanonicalDirectory,
-                    normalizedStagingDirectory,
-                    normalizedBackupDirectory,
-                    token,
-                    vanillaRelativeSavePath,
-                    stagingDirectoryName,
-                    expectedVanillaContentIdentity,
-                    phase,
-                    canonicalExists,
-                    stagingExists,
-                    backupExists,
-                    vanillaFingerprintError,
-                    out errorMessage);
-            }
-
-            string markerContainerDirectory = stagingExists
-                ? normalizedStagingDirectory
-                : (canonicalExists
-                    ? normalizedCanonicalDirectory
-                    : string.Empty);
-            if (!string.IsNullOrEmpty(markerContainerDirectory) &&
-                !TryValidateStagePublishMarker(
-                    markerContainerDirectory,
-                    token,
-                    vanillaRelativeSavePath,
-                    stagingDirectoryName,
-                    expectedVanillaContentIdentity,
-                    out errorMessage))
-            {
-                if (phase == "prepared" &&
-                    !stagingExists &&
-                    canonicalExists &&
-                    !backupExists)
-                {
-                    // No rename could have installed the marked stage. Preserve the
-                    // existing canonical and remove only the empty intent journal.
-                    string validatedAbortedJournal;
-                    if (!TryValidateContainedMutationPath(
-                        normalizedJournalDirectory,
-                        true,
-                        out validatedAbortedJournal,
-                        out errorMessage))
-                    {
-                        return false;
-                    }
-
-                    Directory.Delete(validatedAbortedJournal, true);
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (phase == "prepared")
-            {
-                if (stagingExists && canonicalExists)
-                {
-                    if (backupExists)
-                    {
-                        errorMessage =
-                            "The prepared publish has both canonical and backup directories.";
-                        return false;
-                    }
-
-                    Directory.Move(
-                        normalizedCanonicalDirectory,
-                        normalizedBackupDirectory);
-                    canonicalExists = false;
-                    backupExists = true;
-                    if (!TryWritePublishJournal(
-                        normalizedJournalDirectory,
-                        token,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        "canonical_backed_up",
-                        out errorMessage))
-                    {
-                        Directory.Move(
-                            normalizedBackupDirectory,
-                            normalizedCanonicalDirectory);
-                        return false;
-                    }
-
-                    phase = "canonical_backed_up";
-                }
-                else if (stagingExists && !canonicalExists && backupExists)
-                {
-                    // The first rename completed before the phase update became
-                    // durable. Continue from the observed filesystem state.
-                    phase = "canonical_backed_up";
-                }
-            }
-
-            if ((phase == "prepared" ||
-                 phase == "canonical_backed_up") &&
-                stagingExists &&
-                !canonicalExists)
-            {
-                string canonicalParent = Path.GetDirectoryName(
-                    normalizedCanonicalDirectory);
-                string ignoredDirectory;
-                if (!TryCreateContainedDirectory(
-                    canonicalParent,
-                    out ignoredDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                Directory.Move(
-                    normalizedStagingDirectory,
-                    normalizedCanonicalDirectory);
-                canonicalExists = true;
-                stagingExists = false;
-                if (!TryWritePublishJournal(
-                    normalizedJournalDirectory,
-                    token,
-                    vanillaRelativeSavePath,
-                    stagingDirectoryName,
-                    expectedVanillaContentIdentity,
-                    "published",
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                phase = "published";
-            }
-
-            if (phase == "canonical_backed_up" &&
-                canonicalExists && stagingExists)
-            {
-                errorMessage =
-                    "The backed-up publish has conflicting canonical and staging directories.";
-                return false;
-            }
-
-            if (!canonicalExists && !stagingExists && backupExists)
-            {
-                // The verified stage is gone, so preserve the prior canonical rather
-                // than claiming a publish that cannot be proven.
-                Directory.Move(
-                    normalizedBackupDirectory,
-                    normalizedCanonicalDirectory);
-                canonicalExists = true;
-                backupExists = false;
-                string validatedRestoredJournal;
-                if (!TryValidateContainedMutationPath(
-                    normalizedJournalDirectory,
-                    true,
-                    out validatedRestoredJournal,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                Directory.Delete(validatedRestoredJournal, true);
-                return true;
-            }
-
-            if (!canonicalExists || stagingExists)
-            {
-                errorMessage =
-                    "An interrupted sidecar publish could not install its verified staging directory.";
-                return false;
-            }
-
-            if (!TryValidateStagePublishMarker(
-                normalizedCanonicalDirectory,
-                token,
-                vanillaRelativeSavePath,
-                stagingDirectoryName,
-                expectedVanillaContentIdentity,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            CoreFileFingerprint finalVanillaFingerprint;
-            string finalFingerprintErrorMessage;
-            bool finalVanillaContentMatches =
-                CoreFileFingerprintUtility.TryReadStable(
-                    vanillaSaveFilePath,
-                    out finalVanillaFingerprint,
-                    out finalFingerprintErrorMessage) &&
-                string.Equals(
-                    finalVanillaFingerprint.ContentIdentity,
-                    expectedVanillaContentIdentity,
-                    StringComparison.Ordinal);
-            if (!finalVanillaContentMatches)
-            {
-                return TryDetachPublishForVanillaMismatch(
-                    normalizedJournalDirectory,
-                    normalizedCanonicalDirectory,
-                    normalizedStagingDirectory,
-                    normalizedBackupDirectory,
-                    token,
-                    vanillaRelativeSavePath,
-                    stagingDirectoryName,
-                    expectedVanillaContentIdentity,
-                    phase,
-                    canonicalExists,
-                    stagingExists,
-                    backupExists,
-                    finalFingerprintErrorMessage,
-                    out errorMessage);
-            }
-
-            if (backupExists)
-            {
-                string validatedBackupDirectory;
-                if (!TryValidateContainedMutationPath(
-                    normalizedBackupDirectory,
-                    true,
-                    out validatedBackupDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                Directory.Delete(validatedBackupDirectory, true);
-            }
-
-            string validatedJournalDirectory;
-            if (!TryValidateContainedMutationPath(
-                normalizedJournalDirectory,
-                true,
-                out validatedJournalDirectory,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            Directory.Delete(validatedJournalDirectory, true);
-            if (!TryDeleteContainedFile(
-                Path.Combine(
-                    normalizedCanonicalDirectory,
-                    "publish.stage"),
-                out errorMessage))
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Reverses an interrupted publish when the vanilla file no longer has the
-        /// exact content identity bound into the durable journal. The prepared stage
-        /// is detached for its owning save intent; it is never installed beside a
-        /// different vanilla payload.
-        /// </summary>
-        private static bool TryDetachPublishForVanillaMismatch(
-            string journalDirectory,
-            string canonicalDirectory,
-            string stagingDirectory,
-            string backupDirectory,
-            string token,
-            string vanillaRelativeSavePath,
-            string stagingDirectoryName,
-            string expectedVanillaContentIdentity,
-            string phase,
-            bool canonicalExists,
-            bool stagingExists,
-            bool backupExists,
-            string fingerprintErrorMessage,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            try
-            {
-                bool stagingHasMarker = stagingExists &&
-                    TryValidateStagePublishMarker(
-                        stagingDirectory,
-                        token,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        out errorMessage);
-                bool canonicalHasMarker = canonicalExists &&
-                    TryValidateStagePublishMarker(
-                        canonicalDirectory,
-                        token,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        out errorMessage);
-
-                if (canonicalHasMarker)
-                {
-                    if (stagingExists)
-                    {
-                        errorMessage =
-                            "The stale published sidecar cannot be detached because its staging path is occupied.";
-                        return false;
-                    }
-
-                    Directory.Move(canonicalDirectory, stagingDirectory);
-                    canonicalExists = false;
-                    stagingExists = true;
-                    stagingHasMarker = true;
-                }
-                else if (canonicalExists &&
-                    !stagingHasMarker &&
-                    (phase != "prepared" || backupExists))
-                {
-                    errorMessage =
-                        "The interrupted sidecar publish cannot identify the installed stage while the vanilla content differs.";
-                    return false;
-                }
-
-                if (!canonicalExists && backupExists)
-                {
-                    Directory.Move(backupDirectory, canonicalDirectory);
-                    canonicalExists = true;
-                    backupExists = false;
-                }
-                else if (canonicalExists && backupExists)
-                {
-                    errorMessage =
-                        "The interrupted sidecar publish retained both a canonical directory and its prior backup.";
-                    return false;
-                }
-
-                string validatedJournalDirectory;
-                if (!TryValidateContainedMutationPath(
-                    journalDirectory,
-                    true,
-                    out validatedJournalDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                Directory.Delete(validatedJournalDirectory, true);
-                if (stagingHasMarker)
-                {
-                    string markerCleanupErrorMessage;
-                    if (!TryDeleteContainedFile(
-                        Path.Combine(stagingDirectory, "publish.stage"),
-                        out markerCleanupErrorMessage))
-                    {
-                        CoreLog.Warn(
-                            "The detached sidecar stage marker was retained: " +
-                            markerCleanupErrorMessage);
-                    }
-                }
-
-                errorMessage = string.IsNullOrEmpty(fingerprintErrorMessage)
-                    ? "The sidecar stage was detached because the vanilla content changed."
-                    : "The sidecar stage was detached because the vanilla content could not be verified: " +
-                        fingerprintErrorMessage;
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage =
-                    "The stale sidecar publish could not be safely detached: " +
-                    exception.Message;
-                return false;
-            }
-        }
-
-        private static bool TryWritePublishJournal(
-            string journalDirectory,
-            string token,
-            string vanillaRelativeSavePath,
-            string stagingDirectoryName,
-            string expectedVanillaContentIdentity,
-            string phase,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (!IsValidLowerHexToken(token) ||
-                !IsSupportedVanillaSaveRelativePath(vanillaRelativeSavePath) ||
-                !IsValidTransactionDirectoryName(stagingDirectoryName) ||
-                !IsValidContentIdentity(expectedVanillaContentIdentity) ||
-                (phase != "prepared" &&
-                 phase != "canonical_backed_up" &&
-                 phase != "published"))
-            {
-                errorMessage = "The sidecar publish journal fields are invalid.";
-                return false;
-            }
-
-            string journalPath = Path.Combine(
-                journalDirectory,
-                "publish.journal");
-            string temporaryJournalPath = journalPath + "." + token + ".tmp";
-            string normalizedJournalPath;
-            string normalizedTemporaryJournalPath;
-            if (!TryValidateContainedMutationPath(
-                    journalPath,
-                    false,
-                    out normalizedJournalPath,
-                    out errorMessage) ||
-                !TryValidateContainedMutationPath(
-                    temporaryJournalPath,
-                    false,
-                    out normalizedTemporaryJournalPath,
-                    out errorMessage))
-            {
-                return false;
-            }
-
-            string journalPayload = string.Join(
-                "\n",
-                new string[]
-                {
-                    "version=2",
-                    "token=" + token,
-                    "vanilla=" + vanillaRelativeSavePath.Replace('\\', '/'),
-                    "staging=" + stagingDirectoryName,
-                    "content=" + expectedVanillaContentIdentity,
-                    "phase=" + phase,
-                    string.Empty
-                });
-            string journalText = journalPayload +
-                "checksum=" +
-                ComputeSha256Text(journalPayload) +
-                "\n";
-            try
-            {
-                byte[] bytes = new UTF8Encoding(false).GetBytes(journalText);
-                using (FileStream journalStream = new FileStream(
-                    normalizedTemporaryJournalPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None))
-                {
-                    journalStream.Write(bytes, 0, bytes.Length);
-                    journalStream.Flush(true);
-                }
-
-                if (File.Exists(normalizedJournalPath))
-                {
-                    File.Replace(
-                        normalizedTemporaryJournalPath,
-                        normalizedJournalPath,
-                        null);
-                }
-                else
-                {
-                    File.Move(
-                        normalizedTemporaryJournalPath,
-                        normalizedJournalPath);
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        private static bool TryWriteStagePublishMarker(
-            string stagingDirectory,
-            string token,
-            string vanillaRelativeSavePath,
-            string stagingDirectoryName,
-            string expectedVanillaContentIdentity,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (!IsValidLowerHexToken(token) ||
-                !IsSupportedVanillaSaveRelativePath(vanillaRelativeSavePath) ||
-                !IsValidTransactionDirectoryName(stagingDirectoryName) ||
-                !IsValidContentIdentity(expectedVanillaContentIdentity))
-            {
-                errorMessage = "The sidecar stage marker fields are invalid.";
-                return false;
-            }
-
-            string markerPayload = string.Join(
-                "\n",
-                new string[]
-                {
-                    "version=2",
-                    "token=" + token,
-                    "vanilla=" + vanillaRelativeSavePath.Replace('\\', '/'),
-                    "staging=" + stagingDirectoryName,
-                    "content=" + expectedVanillaContentIdentity,
-                    string.Empty
-                });
-            string markerText = markerPayload +
-                "checksum=" +
-                ComputeSha256Text(markerPayload) +
-                "\n";
-            string markerPath = Path.Combine(
-                stagingDirectory,
-                "publish.stage");
-            string temporaryMarkerPath = markerPath + "." + token + ".tmp";
-            string normalizedMarkerPath;
-            string normalizedTemporaryMarkerPath;
-            if (!TryValidateContainedMutationPath(
-                    markerPath,
-                    false,
-                    out normalizedMarkerPath,
-                    out errorMessage) ||
-                !TryValidateContainedMutationPath(
-                    temporaryMarkerPath,
-                    false,
-                    out normalizedTemporaryMarkerPath,
-                    out errorMessage))
-            {
-                return false;
-            }
-
-            try
-            {
-                if (File.Exists(normalizedMarkerPath))
-                {
-                    return TryValidateStagePublishMarkerFile(
-                        normalizedMarkerPath,
-                        token,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        out errorMessage);
-                }
-
-                if (!File.Exists(normalizedMarkerPath) &&
-                    File.Exists(normalizedTemporaryMarkerPath))
-                {
-                    string temporaryValidationError;
-                    if (!TryValidateStagePublishMarkerFile(
-                        normalizedTemporaryMarkerPath,
-                        token,
-                        vanillaRelativeSavePath,
-                        stagingDirectoryName,
-                        expectedVanillaContentIdentity,
-                        out temporaryValidationError))
-                    {
-                        errorMessage =
-                            "The durable temporary stage marker is invalid: " +
-                            temporaryValidationError;
-                        return false;
-                    }
-
-                    File.Move(
-                        normalizedTemporaryMarkerPath,
-                        normalizedMarkerPath);
-                    return true;
-                }
-
-                byte[] bytes = new UTF8Encoding(false).GetBytes(markerText);
-                using (FileStream markerStream = new FileStream(
-                    normalizedTemporaryMarkerPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None))
-                {
-                    markerStream.Write(bytes, 0, bytes.Length);
-                    markerStream.Flush(true);
-                }
-
-                if (File.Exists(normalizedMarkerPath))
-                {
-                    File.Replace(
-                        normalizedTemporaryMarkerPath,
-                        normalizedMarkerPath,
-                        null);
-                }
-                else
-                {
-                    File.Move(
-                        normalizedTemporaryMarkerPath,
-                        normalizedMarkerPath);
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        private static bool TryValidateStagePublishMarker(
-            string containerDirectory,
-            string expectedToken,
-            string expectedVanillaRelativeSavePath,
-            string expectedStagingDirectoryName,
-            string expectedVanillaContentIdentity,
-            out string errorMessage)
-        {
-            return TryValidateStagePublishMarkerFile(
-                Path.Combine(containerDirectory, "publish.stage"),
-                expectedToken,
-                expectedVanillaRelativeSavePath,
-                expectedStagingDirectoryName,
-                expectedVanillaContentIdentity,
+            return TryDeleteContainedDirectory(
+                Application.persistentDataPath,
+                directoryPath,
+                recursive,
                 out errorMessage);
         }
 
-        private static bool TryValidateStagePublishMarkerFile(
-            string markerPath,
-            string expectedToken,
-            string expectedVanillaRelativeSavePath,
-            string expectedStagingDirectoryName,
-            string expectedVanillaContentIdentity,
+        /// <summary>
+        /// Pure-root overload used by tests.
+        /// </summary>
+        internal static bool TryDeleteContainedDirectory(
+            string persistentDataRoot,
+            string directoryPath,
+            bool recursive,
             out string errorMessage)
         {
-            errorMessage = string.Empty;
-            try
-            {
-                string normalizedMarkerPath;
-                if (!TryValidateContainedMutationPath(
-                    markerPath,
-                    false,
-                    out normalizedMarkerPath,
-                    out errorMessage) ||
-                    !File.Exists(normalizedMarkerPath))
-                {
-                    errorMessage = "The durable sidecar stage marker is missing.";
-                    return false;
-                }
-
-                string[] lines = File.ReadAllLines(
-                    normalizedMarkerPath,
-                    new UTF8Encoding(false, true));
-                Dictionary<string, string> fields =
-                    new Dictionary<string, string>(StringComparer.Ordinal);
-                for (int lineIndex = 0;
-                    lineIndex < lines.Length;
-                    lineIndex++)
-                {
-                    string line = lines[lineIndex];
-                    int separatorIndex = line.IndexOf('=');
-                    if (separatorIndex <= 0)
-                    {
-                        continue;
-                    }
-
-                    string key = line.Substring(0, separatorIndex);
-                    string value = line.Substring(separatorIndex + 1);
-                    if (fields.ContainsKey(key) ||
-                        (key != "version" &&
-                         key != "token" &&
-                         key != "vanilla" &&
-                         key != "staging" &&
-                         key != "content" &&
-                         key != "checksum"))
-                    {
-                        errorMessage = "The sidecar stage marker is malformed.";
-                        return false;
-                    }
-
-                    fields.Add(key, value);
-                }
-
-                string version;
-                string token;
-                string vanilla;
-                string staging;
-                string content;
-                string checksum;
-                if (fields.Count != 6 ||
-                    !fields.TryGetValue("version", out version) ||
-                    !fields.TryGetValue("token", out token) ||
-                    !fields.TryGetValue("vanilla", out vanilla) ||
-                    !fields.TryGetValue("staging", out staging) ||
-                    !fields.TryGetValue("content", out content) ||
-                    !fields.TryGetValue("checksum", out checksum))
-                {
-                    errorMessage = "The sidecar stage marker is incomplete.";
-                    return false;
-                }
-
-                string markerPayload = string.Join(
-                    "\n",
-                    new string[]
-                    {
-                        "version=2",
-                        "token=" + token,
-                        "vanilla=" + vanilla,
-                        "staging=" + staging,
-                        "content=" + content,
-                        string.Empty
-                    });
-                if (version != "2" ||
-                    !string.Equals(token, expectedToken, StringComparison.Ordinal) ||
-                    !string.Equals(
-                        vanilla.Replace('/', Path.DirectorySeparatorChar),
-                        expectedVanillaRelativeSavePath,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(
-                        staging,
-                        expectedStagingDirectoryName,
-                        StringComparison.Ordinal) ||
-                    !string.Equals(
-                        content,
-                        expectedVanillaContentIdentity,
-                        StringComparison.Ordinal) ||
-                    !string.Equals(
-                        checksum,
-                        ComputeSha256Text(markerPayload),
-                        StringComparison.Ordinal))
-                {
-                    errorMessage = "The sidecar stage marker identity is invalid.";
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        private static bool TryReadPublishJournal(
-            string journalDirectory,
-            string expectedToken,
-            out string vanillaRelativeSavePath,
-            out string stagingDirectoryName,
-            out string expectedVanillaContentIdentity,
-            out string phase,
-            out string errorMessage)
-        {
-            vanillaRelativeSavePath = string.Empty;
-            stagingDirectoryName = string.Empty;
-            expectedVanillaContentIdentity = string.Empty;
-            phase = string.Empty;
-            errorMessage = string.Empty;
-            try
-            {
-                string journalPath = Path.Combine(
-                    journalDirectory,
-                    "publish.journal");
-                string normalizedJournalPath;
-                if (!TryValidateContainedMutationPath(
-                    journalPath,
-                    false,
-                    out normalizedJournalPath,
+            string normalizedDirectoryPath;
+            if (!TryValidateContainedMutationPath(
+                    persistentDataRoot,
+                    directoryPath,
+                    recursive,
+                    out normalizedDirectoryPath,
                     out errorMessage))
-                {
-                    return false;
-                }
-
-                if (!File.Exists(normalizedJournalPath))
-                {
-                    string temporaryJournalPath = journalPath + "." +
-                        expectedToken +
-                        ".tmp";
-                    string normalizedTemporaryJournalPath;
-                    if (!TryValidateContainedMutationPath(
-                        temporaryJournalPath,
-                        false,
-                        out normalizedTemporaryJournalPath,
-                        out errorMessage) ||
-                        !File.Exists(normalizedTemporaryJournalPath))
-                    {
-                        errorMessage =
-                            "The publish journal and its durable temporary file are missing.";
-                        return false;
-                    }
-
-                    // A crash may occur after Flush(true) and before the initial move.
-                    // Promote only the exact token-scoped temporary file.
-                    File.Move(
-                        normalizedTemporaryJournalPath,
-                        normalizedJournalPath);
-                }
-
-                string[] lines = File.ReadAllLines(
-                    normalizedJournalPath,
-                    new UTF8Encoding(false, true));
-                string token = string.Empty;
-                string version = string.Empty;
-                string checksum = string.Empty;
-                HashSet<string> observedKeys =
-                    new HashSet<string>(StringComparer.Ordinal);
-                for (int lineIndex = 0;
-                    lineIndex < lines.Length;
-                    lineIndex++)
-                {
-                    string line = lines[lineIndex];
-                    int separatorIndex = line.IndexOf('=');
-                    if (separatorIndex <= 0)
-                    {
-                        continue;
-                    }
-
-                    string key = line.Substring(0, separatorIndex);
-                    string value = line.Substring(separatorIndex + 1);
-                    if (!observedKeys.Add(key))
-                    {
-                        errorMessage =
-                            "The publish journal contains a duplicate field.";
-                        return false;
-                    }
-
-                    if (key == "version") version = value;
-                    else if (key == "token") token = value;
-                    else if (key == "vanilla") vanillaRelativeSavePath = value.Replace('/', Path.DirectorySeparatorChar);
-                    else if (key == "staging") stagingDirectoryName = value;
-                    else if (key == "content") expectedVanillaContentIdentity = value;
-                    else if (key == "phase") phase = value;
-                    else if (key == "checksum") checksum = value;
-                    else
-                    {
-                        errorMessage =
-                            "The publish journal contains an unknown field.";
-                        return false;
-                    }
-                }
-
-                string canonicalPayload = string.Join(
-                    "\n",
-                    new string[]
-                    {
-                        "version=2",
-                        "token=" + token,
-                        "vanilla=" + vanillaRelativeSavePath.Replace('\\', '/'),
-                        "staging=" + stagingDirectoryName,
-                        "content=" + expectedVanillaContentIdentity,
-                        "phase=" + phase,
-                        string.Empty
-                    });
-                bool supportedStagingName =
-                    stagingDirectoryName.StartsWith(
-                        LoadTransactionPrefix,
-                        StringComparison.Ordinal) ||
-                    stagingDirectoryName.StartsWith(
-                        SaveTransactionPrefix,
-                        StringComparison.Ordinal);
-                string stagingToken = supportedStagingName
-                    ? stagingDirectoryName.Substring(
-                        stagingDirectoryName.IndexOf('_') + 1)
-                    : string.Empty;
-                if (version != "2" ||
-                    observedKeys.Count != 7 ||
-                    !string.Equals(
-                        checksum,
-                        ComputeSha256Text(canonicalPayload),
-                        StringComparison.Ordinal) ||
-                    !string.Equals(token, expectedToken, StringComparison.Ordinal) ||
-                    !IsValidLowerHexToken(token) ||
-                    !IsSupportedVanillaSaveRelativePath(vanillaRelativeSavePath) ||
-                    !IsValidContentIdentity(expectedVanillaContentIdentity) ||
-                    !supportedStagingName ||
-                    !string.Equals(
-                        stagingToken,
-                        token,
-                        StringComparison.Ordinal) ||
-                    !IsValidTransactionDirectoryName(stagingDirectoryName) ||
-                    (phase != "prepared" &&
-                     phase != "canonical_backed_up" &&
-                     phase != "published"))
-                {
-                    errorMessage = "The sidecar publish journal is invalid.";
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        private static string ComputeSha256Text(string value)
-        {
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] hash = sha256.ComputeHash(
-                    new UTF8Encoding(false).GetBytes(value ?? string.Empty));
-                StringBuilder builder = new StringBuilder(hash.Length * 2);
-                for (int byteIndex = 0;
-                    byteIndex < hash.Length;
-                    byteIndex++)
-                {
-                    builder.Append(hash[byteIndex].ToString(
-                        "x2",
-                        CultureInfo.InvariantCulture));
-                }
-
-                return builder.ToString();
-            }
-        }
-
-        private static bool IsValidLowerHexToken(string token)
-        {
-            if (string.IsNullOrEmpty(token) || token.Length != 32)
             {
                 return false;
             }
 
-            for (int characterIndex = 0;
-                characterIndex < token.Length;
-                characterIndex++)
-            {
-                char character = token[characterIndex];
-                if (!((character >= '0' && character <= '9') ||
-                    (character >= 'a' && character <= 'f')))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool IsValidContentIdentity(string contentIdentity)
-        {
-            if (string.IsNullOrEmpty(contentIdentity))
-            {
-                return false;
-            }
-
-            string[] parts = contentIdentity.Split(':');
-            long contentLength;
-            if (parts.Length != 3 ||
-                parts[0] != "v1" ||
-                !long.TryParse(
-                    parts[1],
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out contentLength) ||
-                contentLength < 0 ||
-                parts[2].Length != 64)
-            {
-                return false;
-            }
-
-            for (int characterIndex = 0;
-                characterIndex < parts[2].Length;
-                characterIndex++)
-            {
-                char character = parts[2][characterIndex];
-                if (!((character >= '0' && character <= '9') ||
-                    (character >= 'a' && character <= 'f')))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool TryVerifyVanillaContentIdentity(
-            string vanillaSaveFilePath,
-            string expectedContentIdentity,
-            out string errorMessage)
-        {
-            CoreFileFingerprint fingerprint;
-            if (!CoreFileFingerprintUtility.TryReadStable(
-                vanillaSaveFilePath,
-                out fingerprint,
-                out errorMessage))
-            {
-                return false;
-            }
-
-            if (!string.Equals(
-                fingerprint.ContentIdentity,
-                expectedContentIdentity,
-                StringComparison.Ordinal))
-            {
-                errorMessage =
-                    "The vanilla save content identity does not match the durable sidecar intent.";
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryValidateTreeHasNoReparsePoints(
-            string rootDirectory,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            Stack<string> pendingDirectories = new Stack<string>();
-            pendingDirectories.Push(rootDirectory);
             try
             {
-                while (pendingDirectories.Count > 0)
+                if (File.Exists(normalizedDirectoryPath))
                 {
-                    string directoryPath = pendingDirectories.Pop();
-                    FileAttributes directoryAttributes =
-                        File.GetAttributes(directoryPath);
-                    if ((directoryAttributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        errorMessage =
-                            "Refused recursive cleanup through a reparse point: " +
-                            directoryPath;
-                        return false;
-                    }
+                    errorMessage = "Refused to delete a file through the directory API.";
+                    return false;
+                }
 
-                    string[] entries = Directory.GetFileSystemEntries(
-                        directoryPath);
-                    for (int entryIndex = 0;
-                        entryIndex < entries.Length;
-                        entryIndex++)
-                    {
-                        string entryPath = entries[entryIndex];
-                        FileAttributes entryAttributes =
-                            File.GetAttributes(entryPath);
-                        if ((entryAttributes & FileAttributes.ReparsePoint) != 0)
-                        {
-                            errorMessage =
-                                "Refused recursive cleanup through a reparse point: " +
-                                entryPath;
-                            return false;
-                        }
-
-                        if ((entryAttributes & FileAttributes.Directory) != 0)
-                        {
-                            pendingDirectories.Push(entryPath);
-                        }
-                    }
+                if (Directory.Exists(normalizedDirectoryPath))
+                {
+                    Directory.Delete(normalizedDirectoryPath, recursive);
                 }
 
                 return true;
@@ -2008,207 +1081,16 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Stores one best-effort save-file path hint used for save-scope derivation.
+        /// Returns plausible logical keys used by immutable legacy stores.
         /// </summary>
-        internal static void SetActiveSaveFilePathHint(string saveFilePath)
-        {
-            CoreSaveScope resolvedSaveScope;
-            if (!TryCreateSaveScope(saveFilePath, out resolvedSaveScope))
-            {
-                return;
-            }
-
-            lock (saveScopeLock)
-            {
-                activeSaveFilePathHint = resolvedSaveScope.SaveFilePath;
-                activeSaveScopeOverride = null;
-            }
-        }
-
-        /// <summary>
-        /// Resolves one physical vanilla save path without changing the active scope.
-        /// </summary>
-        internal static bool TryResolveSaveScope(
-            string saveFilePath,
-            out CoreSaveScope saveScope)
-        {
-            return TryCreateSaveScope(saveFilePath, out saveScope);
-        }
-
-        /// <summary>
-        /// Creates a private storage scope that keeps the target save identity while
-        /// directing all I/O into a disposable transaction directory.
-        /// </summary>
-        internal static CoreSaveScope CreateStagingSaveScope(
-            CoreSaveScope targetSaveScope,
-            bool forLoad)
-        {
-            if (targetSaveScope == null || targetSaveScope.IsTransient)
-            {
-                return null;
-            }
-
-            string transactionToken = Guid.NewGuid().ToString("N");
-            return new CoreSaveScope
-            {
-                SaveFilePath = targetSaveScope.SaveFilePath,
-                StorageRelativeDirectory = Path.Combine(
-                    TransactionFolderName,
-                    (forLoad
-                        ? LoadTransactionPrefix
-                        : SaveTransactionPrefix) + transactionToken),
-                InternalSaveKey = targetSaveScope.InternalSaveKey,
-                LegacyOwnerSaveKey = targetSaveScope.LegacyOwnerSaveKey,
-                IsStaging = true
-            };
-        }
-
-        /// <summary>
-        /// Selects an already-resolved scope. Staging scopes are retained verbatim so
-        /// EnsureInitialized cannot accidentally switch back to the canonical folder.
-        /// </summary>
-        internal static void UseSaveScope(CoreSaveScope saveScope)
-        {
-            if (saveScope == null)
-            {
-                return;
-            }
-
-            lock (saveScopeLock)
-            {
-                activeSaveFilePathHint = saveScope.SaveFilePath ?? string.Empty;
-                activeSaveScopeOverride = saveScope.IsStaging
-                    ? saveScope
-                    : null;
-
-                if (saveScope.IsTransient)
-                {
-                    transientSaveScope = saveScope;
-                    activeSaveFilePathHint = string.Empty;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Returns true only for a physical vanilla game-save path. Global settings
-        /// and arbitrary JSON files beneath the data root can never own a sidecar.
-        /// </summary>
-        internal static bool IsSupportedGameSavePath(string saveFilePath)
-        {
-            CoreSaveScope ignoredSaveScope;
-            return TryCreateSaveScope(saveFilePath, out ignoredSaveScope);
-        }
-
-        /// <summary>
-        /// Starts a fresh non-vanilla scope for a brand-new game. It prevents a new
-        /// campaign from opening the previous game's auto-save sidecar before the
-        /// first exact DataSaver target is known.
-        /// </summary>
-        internal static void ResetToTransientSaveScope()
-        {
-            lock (saveScopeLock)
-            {
-                activeSaveFilePathHint = string.Empty;
-                activeSaveScopeOverride = null;
-                transientSaveScope = CreateTransientSaveScope();
-            }
-        }
-
-        /// <summary>
-        /// Restores an earlier resolved scope after vanilla rejects or aborts a load.
-        /// Keeping the same transient object is important because it already owns the
-        /// temporary storage opened before the failed load attempt.
-        /// </summary>
-        internal static void RestoreSaveScope(CoreSaveScope saveScope)
-        {
-            if (saveScope == null)
-            {
-                return;
-            }
-
-            lock (saveScopeLock)
-            {
-                activeSaveScopeOverride = saveScope.IsStaging
-                    ? saveScope
-                    : null;
-
-                if (saveScope.IsTransient)
-                {
-                    transientSaveScope = saveScope;
-                    activeSaveFilePathHint = string.Empty;
-                    return;
-                }
-
-                activeSaveFilePathHint = saveScope.SaveFilePath ??
-                    string.Empty;
-            }
-        }
-
-        /// <summary>
-        /// Resolves the active save into its canonical vanilla path, mirrored storage
-        /// directory, historical internal key, and prior owner-folder key.
-        /// </summary>
-        internal static CoreSaveScope GetSaveScope()
-        {
-            string saveFilePath;
-            lock (saveScopeLock)
-            {
-                if (activeSaveScopeOverride != null)
-                {
-                    return activeSaveScopeOverride;
-                }
-
-                saveFilePath = activeSaveFilePathHint;
-            }
-
-            if (string.IsNullOrEmpty(saveFilePath))
-            {
-                lock (saveScopeLock)
-                {
-                    return transientSaveScope;
-                }
-            }
-
-            CoreSaveScope saveScope;
-            if (TryCreateSaveScope(saveFilePath, out saveScope))
-            {
-                return saveScope;
-            }
-
-            lock (saveScopeLock)
-            {
-                return transientSaveScope;
-            }
-        }
-
-        /// <summary>
-        /// Compatibility accessor for callers that only need the active internal key.
-        /// </summary>
-        internal static string GetSaveKey()
-        {
-            return GetSaveScope().InternalSaveKey;
-        }
-
-        /// <summary>
-        /// Returns the exact path-derived key used by the previous file-scoped layout.
-        /// </summary>
-        internal static string GetLegacyFileScopedSaveKey()
-        {
-            return GetSaveScope().InternalSaveKey;
-        }
-
-        /// <summary>
-        /// Returns every historical key that may legitimately belong to this save.
-        /// Empty optional candidates are omitted rather than normalized to "default".
-        /// </summary>
-        internal static List<string> GetPlausibleLegacySaveKeys(CoreSaveScope saveScope)
+        internal static List<string> GetPlausibleLegacySaveKeys(
+            CoreSaveScope saveScope)
         {
             return GetPlausibleLegacySaveKeys(saveScope, null);
         }
 
         /// <summary>
-        /// Returns historical keys using PlayerData read from the target vanilla save
-        /// when it is available during LoadEvent processing.
+        /// Returns plausible logical keys using already-deserialized player data.
         /// </summary>
         internal static List<string> GetPlausibleLegacySaveKeys(
             CoreSaveScope saveScope,
@@ -2218,557 +1100,230 @@ namespace IMDataCore
             if (saveScope != null)
             {
                 AddUniqueToken(saveKeys, saveScope.InternalSaveKey);
-                AddUniqueToken(saveKeys, saveScope.LegacyOwnerSaveKey);
-
-                if (saveScope.IsTransient)
+                if (!saveScope.IsTransient)
+                {
+                    AddUniqueToken(
+                        saveKeys,
+                        BuildLegacyOwnerSaveKey(saveScope));
+                }
+                else
                 {
                     return saveKeys;
                 }
             }
 
-            List<string> agencySaveKeys = GetLegacyAgencySaveKeys(
+            List<string> agencyKeys = GetLegacyAgencySaveKeys(
                 loadedPlayerData);
-            for (
-                int agencyKeyIndex = CoreConstants.ZeroBasedListStartIndex;
-                agencyKeyIndex < agencySaveKeys.Count;
-                agencyKeyIndex++)
+            for (int index = 0; index < agencyKeys.Count; index++)
             {
-                AddUniqueToken(saveKeys, agencySaveKeys[agencyKeyIndex]);
+                AddUniqueToken(saveKeys, agencyKeys[index]);
             }
 
             return saveKeys;
         }
 
         /// <summary>
-        /// Removes one temporary pre-save directory after its contents have been
-        /// successfully cloned into a canonical mirrored save directory.
-        /// </summary>
-        internal static bool TryDeleteTransientSaveDirectory(
-            string saveDirectory,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (string.IsNullOrEmpty(saveDirectory))
-            {
-                return true;
-            }
-
-            try
-            {
-                string transientRootDirectory = Path.GetFullPath(
-                    Path.Combine(
-                        GetSavesRootDirectory(),
-                        "_transient")).TrimEnd(
-                            Path.DirectorySeparatorChar,
-                            Path.AltDirectorySeparatorChar);
-
-                string normalizedSaveDirectory = Path.GetFullPath(
-                    saveDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-
-                string transientRootPrefix = transientRootDirectory +
-                    Path.DirectorySeparatorChar;
-
-                if (!normalizedSaveDirectory.StartsWith(
-                    transientRootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    errorMessage =
-                        "Refused to delete a non-transient save directory.";
-                    return false;
-                }
-
-                string validatedSaveDirectory;
-                if (!TryValidateContainedMutationPath(
-                    normalizedSaveDirectory,
-                    true,
-                    out validatedSaveDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                if (Directory.Exists(validatedSaveDirectory))
-                {
-                    Directory.Delete(validatedSaveDirectory, true);
-                }
-
-                try
-                {
-                    if (Directory.Exists(transientRootDirectory) &&
-                        Directory.GetFileSystemEntries(
-                            transientRootDirectory).Length == 0)
-                    {
-                        Directory.Delete(transientRootDirectory, false);
-                    }
-                }
-                catch
-                {
-                    // Removing the now-empty parent is cosmetic and best-effort.
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Removes one abandoned transaction directory after its engine is closed.
-        /// The containment check prevents cleanup from ever reaching canonical saves,
-        /// legacy migration sources, or vanilla data.
-        /// </summary>
-        internal static bool TryDeleteStagingSaveDirectory(
-            string saveDirectory,
-            out string errorMessage)
-        {
-            errorMessage = string.Empty;
-            if (string.IsNullOrEmpty(saveDirectory))
-            {
-                return true;
-            }
-
-            try
-            {
-                string transactionRootDirectory = Path.GetFullPath(
-                    Path.Combine(
-                        GetSavesRootDirectory(),
-                        TransactionFolderName)).TrimEnd(
-                            Path.DirectorySeparatorChar,
-                            Path.AltDirectorySeparatorChar);
-
-                string normalizedSaveDirectory = Path.GetFullPath(
-                    saveDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-
-                string transactionRootPrefix = transactionRootDirectory +
-                    Path.DirectorySeparatorChar;
-                if (!normalizedSaveDirectory.StartsWith(
-                    transactionRootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    errorMessage =
-                        "Refused to delete a non-transaction save directory.";
-                    return false;
-                }
-
-
-                string transactionDirectoryName = Path.GetFileName(
-                    normalizedSaveDirectory);
-                if (!IsValidTransactionDirectoryName(
-                    transactionDirectoryName))
-                {
-                    errorMessage =
-                        "Refused to delete an invalid transaction directory.";
-                    return false;
-                }
-
-                string validatedSaveDirectory;
-                if (!TryValidateContainedMutationPath(
-                    normalizedSaveDirectory,
-                    true,
-                    out validatedSaveDirectory,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
-                if (Directory.Exists(validatedSaveDirectory))
-                {
-                    Directory.Delete(validatedSaveDirectory, true);
-                }
-
-                try
-                {
-                    if (Directory.Exists(transactionRootDirectory) &&
-                        Directory.GetFileSystemEntries(
-                            transactionRootDirectory).Length == 0)
-                    {
-                        Directory.Delete(transactionRootDirectory, false);
-                    }
-                }
-                catch
-                {
-                    // Removing the now-empty parent is cosmetic and best-effort.
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage = exception.Message;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Accepts only transaction directories created by IM Data Core itself.
-        /// </summary>
-        internal static bool IsValidTransactionDirectoryName(
-            string directoryName)
-        {
-            if (string.IsNullOrEmpty(directoryName))
-            {
-                return false;
-            }
-
-            string token;
-            if (directoryName.StartsWith(
-                LoadTransactionPrefix,
-                StringComparison.Ordinal))
-            {
-                token = directoryName.Substring(LoadTransactionPrefix.Length);
-            }
-            else if (directoryName.StartsWith(
-                SaveTransactionPrefix,
-                StringComparison.Ordinal))
-            {
-                token = directoryName.Substring(SaveTransactionPrefix.Length);
-            }
-            else if (directoryName.StartsWith(
-                "backup_",
-                StringComparison.Ordinal))
-            {
-                token = directoryName.Substring("backup_".Length);
-            }
-            else if (directoryName.StartsWith(
-                "copy_",
-                StringComparison.Ordinal))
-            {
-                token = directoryName.Substring("copy_".Length);
-            }
-            else if (directoryName.StartsWith(
-                "publish_",
-                StringComparison.Ordinal))
-            {
-                token = directoryName.Substring("publish_".Length);
-            }
-            else
-            {
-                return false;
-            }
-
-            if (token.Length != 32)
-            {
-                return false;
-            }
-
-            for (int characterIndex = 0;
-                characterIndex < token.Length;
-                characterIndex++)
-            {
-                char character = token[characterIndex];
-                bool isLowerHex = character >= 'a' && character <= 'f';
-                bool isDigit = character >= '0' && character <= '9';
-                if (!isLowerHex && !isDigit)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Returns both historical PlayerData-derived agency keys. Older builds used
-        /// the identity fallback before SaveFolderName was assigned, so both must be tried.
-        /// </summary>
-        internal static List<string> GetLegacyAgencySaveKeys()
-        {
-            return GetLegacyAgencySaveKeys(null);
-        }
-
-        private static List<string> GetLegacyAgencySaveKeys(
-            staticVars._playerData loadedPlayerData)
-        {
-            List<string> saveKeys = new List<string>();
-            try
-            {
-                staticVars._playerData playerData =
-                    loadedPlayerData ?? staticVars.PlayerData;
-                if (playerData == null)
-                {
-                    return saveKeys;
-                }
-
-                string saveFolderName = playerData.SaveFolderName;
-
-                AddUniqueToken(
-                    saveKeys,
-                    CoreTokenUtility.SanitizeToken(
-                        saveFolderName,
-                        CoreConstants.SaveTokenMaximumLength));
-
-                string identityKeySource = string.Join(
-                    CoreConstants.SaveKeyJoinSeparator,
-                    new string[]
-                    {
-                        playerData.IsStoryMode
-                            ? CoreConstants.SaveModeStory
-                            : CoreConstants.SaveModeFreePlay,
-                        playerData.FirstName ?? string.Empty,
-                        playerData.LastName ?? string.Empty,
-                        playerData.GroupName ?? string.Empty,
-                        playerData.Chapter.ToString()
-                    });
-
-                AddUniqueToken(
-                    saveKeys,
-                    CoreTokenUtility.SanitizeToken(
-                        identityKeySource,
-                        CoreConstants.SaveKeyMaximumLength));
-            }
-            catch
-            {
-                // Historical migration probing is best-effort.
-            }
-
-            return saveKeys;
-        }
-
-        /// <summary>
-        /// Returns every current and historical install-root directory that may contain
-        /// keyed storage from an older IM Data Core build.
+        /// Returns historical keyed directories as read-only migration candidates.
+        /// This method performs no filesystem mutation.
         /// </summary>
         internal static List<string> GetStorageSourceDirectories(string saveKey)
         {
-            List<string> directories = new List<string>();
-            string normalizedCandidateKey = NormalizeOptionalSaveKey(saveKey);
-            if (string.IsNullOrEmpty(normalizedCandidateKey))
-            {
-                return directories;
-            }
-
-            AddLegacyKeyedDirectories(
-                directories,
-                GetRootDirectory(),
-                normalizedCandidateKey);
-
-            string localModsDirectory = Path.Combine(
+            return GetStorageSourceDirectories(
                 Application.persistentDataPath,
-                CoreConstants.ModsFolderName);
-
-            AddLegacyKeyedDirectories(
-                directories,
-                Path.Combine(localModsDirectory, CoreConstants.ModFolderName),
-                normalizedCandidateKey);
-
-            AddLegacyKeyedDirectories(
-                directories,
-                Path.Combine(localModsDirectory, LegacyDisplayModFolderName),
-                normalizedCandidateKey);
-
-            try
-            {
-                string assemblyDirectory = Path.GetDirectoryName(
-                    Assembly.GetExecutingAssembly().Location);
-                AddLegacyKeyedDirectories(
-                    directories,
-                    assemblyDirectory,
-                    normalizedCandidateKey);
-            }
-            catch
-            {
-                // Assembly-location probing is best-effort.
-            }
-
-            AddLoadedModInstallDirectories(
-                directories,
-                normalizedCandidateKey);
-
-            AddKnownWorkshopInstallDirectory(
-                directories,
-                normalizedCandidateKey);
-
-            return directories;
+                saveKey,
+                true);
         }
 
         /// <summary>
-        /// Returns the mirrored directory for a save scope.
+        /// Returns possible legacy SQLite/fallback files without opening or changing
+        /// any source.
         /// </summary>
-        internal static string GetSaveDirectory(CoreSaveScope saveScope)
+        internal static List<string> GetLegacyStorageFileCandidates(
+            CoreSaveScope saveScope,
+            staticVars._playerData loadedPlayerData)
         {
-            if (saveScope == null ||
-                string.IsNullOrEmpty(saveScope.StorageRelativeDirectory))
+            return GetLegacyStorageFileCandidates(
+                Application.persistentDataPath,
+                saveScope,
+                loadedPlayerData);
+        }
+
+        /// <summary>
+        /// Pure-root overload used by tests and the read-only importer.
+        /// </summary>
+        internal static List<string> GetLegacyStorageFileCandidates(
+            string persistentDataRoot,
+            CoreSaveScope saveScope,
+            staticVars._playerData loadedPlayerData)
+        {
+            List<string> candidates = new List<string>();
+            if (saveScope == null || saveScope.IsTransient)
             {
-                return Path.Combine(
-                    GetSavesRootDirectory(),
-                    CoreConstants.DefaultSaveKey);
+                return candidates;
             }
 
-            string savesRootDirectory = GetSavesRootDirectory();
-            string candidateDirectory = Path.Combine(
-                savesRootDirectory,
-                saveScope.StorageRelativeDirectory);
-
-            try
+            string rootDirectory = GetRootDirectory(persistentDataRoot);
+            string legacyRelativeDirectory =
+                BuildLegacyStorageRelativeDirectory(
+                    saveScope.RelativeSavePath);
+            if (!string.IsNullOrEmpty(rootDirectory) &&
+                !string.IsNullOrEmpty(legacyRelativeDirectory))
             {
-                string normalizedSavesRoot = Path.GetFullPath(
-                    savesRootDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
+                AddLegacyFilesFromDirectory(
+                    candidates,
+                    Path.Combine(
+                        rootDirectory,
+                        LegacySavesFolderName,
+                        legacyRelativeDirectory));
+                AddLegacyFilesFromDirectory(
+                    candidates,
+                    Path.Combine(rootDirectory, legacyRelativeDirectory));
+            }
 
-                string normalizedCandidate = Path.GetFullPath(
-                    candidateDirectory).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
-
-                string savesRootPrefix = normalizedSavesRoot +
-                    Path.DirectorySeparatorChar;
-
-                if (normalizedCandidate.StartsWith(
-                    savesRootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
+            List<string> saveKeys = GetPlausibleLegacySaveKeys(
+                saveScope,
+                loadedPlayerData);
+            for (int keyIndex = 0; keyIndex < saveKeys.Count; keyIndex++)
+            {
+                List<string> sourceDirectories =
+                    GetStorageSourceDirectories(
+                        persistentDataRoot,
+                        saveKeys[keyIndex],
+                        true);
+                for (
+                    int directoryIndex = 0;
+                    directoryIndex < sourceDirectories.Count;
+                    directoryIndex++)
                 {
-                    return normalizedCandidate;
+                    AddLegacyFilesFromDirectory(
+                        candidates,
+                        sourceDirectories[directoryIndex]);
                 }
             }
-            catch
-            {
-                // Return the safe fallback below.
-            }
 
-            return Path.Combine(
-                savesRootDirectory,
-                CoreConstants.DefaultSaveKey);
+            return candidates;
         }
 
         /// <summary>
-        /// Returns the full save-scoped SQLite file path.
+        /// Filters legacy candidates to existing ordinary non-reparse files. Sources
+        /// remain immutable and are never moved or deleted.
         /// </summary>
-        internal static string GetDatabasePath(CoreSaveScope saveScope)
+        internal static List<string> GetExistingLegacyStorageFiles(
+            CoreSaveScope saveScope,
+            staticVars._playerData loadedPlayerData)
         {
-            return Path.Combine(
-                GetSaveDirectory(saveScope),
-                CoreConstants.DatabaseFileName);
+            List<string> candidates = GetLegacyStorageFileCandidates(
+                saveScope,
+                loadedPlayerData);
+            List<string> existingFiles = new List<string>();
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                string candidate = candidates[index];
+                try
+                {
+                    if (!File.Exists(candidate))
+                    {
+                        continue;
+                    }
+
+                    FileAttributes attributes = File.GetAttributes(candidate);
+                    if ((attributes & FileAttributes.Directory) != 0 ||
+                        (attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        continue;
+                    }
+
+                    AddUniquePath(existingFiles, candidate);
+                }
+                catch
+                {
+                    // Legacy discovery is best-effort and read-only.
+                }
+            }
+
+            return existingFiles;
         }
 
-        /// <summary>
-        /// Returns the full save-scoped flat-file fallback path.
-        /// </summary>
-        internal static string GetFlatFileDatabasePath(CoreSaveScope saveScope)
+        private static bool TryResolveSeparatedRoots(
+            string persistentDataRoot,
+            out string normalizedPersistentRoot,
+            out string dataRootDirectory,
+            out string dataCoreRootDirectory)
         {
-            return Path.Combine(
-                GetSaveDirectory(saveScope),
-                CoreConstants.FlatFileDatabaseFileName);
-        }
-
-        /// <summary>
-        /// Creates a scope only for canonical save paths contained by the vanilla data root.
-        /// </summary>
-        private static bool TryCreateSaveScope(
-            string saveFilePath,
-            out CoreSaveScope saveScope)
-        {
-            saveScope = null;
-            string normalizedSaveFilePath = NormalizeSaveFilePath(saveFilePath);
-            if (string.IsNullOrEmpty(normalizedSaveFilePath))
+            normalizedPersistentRoot = string.Empty;
+            dataRootDirectory = string.Empty;
+            dataCoreRootDirectory = string.Empty;
+            if (!TryNormalizeDirectoryPath(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot))
             {
                 return false;
             }
 
-            string dataRootDirectory;
-            try
-            {
-                dataRootDirectory = Path.GetFullPath(
-                    Path.Combine(
-                        Application.persistentDataPath,
-                        GameDataRootFolderName)).TrimEnd(
-                            Path.DirectorySeparatorChar,
-                            Path.AltDirectorySeparatorChar);
-            }
-            catch
-            {
-                return false;
-            }
-
-            string dataRootPrefix = dataRootDirectory +
-                Path.DirectorySeparatorChar;
-
-            if (!normalizedSaveFilePath.StartsWith(
-                dataRootPrefix,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                CoreLog.Warn(
-                    CoreConstants.MessageSaveKeyDerivationFailurePrefix +
-                    "Save file is outside the vanilla data directory: " +
-                    normalizedSaveFilePath);
-                return false;
-            }
-
-            string relativeSaveFilePath = normalizedSaveFilePath.Substring(
-                dataRootPrefix.Length);
-
-            if (!IsSupportedVanillaSaveRelativePath(relativeSaveFilePath))
+            dataRootDirectory = NormalizeDirectoryPathOrEmpty(
+                Path.Combine(
+                    normalizedPersistentRoot,
+                    GameDataRootFolderName));
+            dataCoreRootDirectory = NormalizeDirectoryPathOrEmpty(
+                Path.Combine(
+                    normalizedPersistentRoot,
+                    DataCoreRootFolderName));
+            if (string.IsNullOrEmpty(dataRootDirectory) ||
+                string.IsNullOrEmpty(dataCoreRootDirectory) ||
+                string.Equals(
+                    dataRootDirectory,
+                    dataCoreRootDirectory,
+                    StringComparison.OrdinalIgnoreCase) ||
+                IsStrictlyContainedPath(
+                    dataRootDirectory,
+                    dataCoreRootDirectory) ||
+                IsStrictlyContainedPath(
+                    dataCoreRootDirectory,
+                    dataRootDirectory))
             {
                 return false;
             }
-
-            string storageRelativeDirectory;
-            if (!TryBuildStorageRelativeDirectory(
-                relativeSaveFilePath,
-                out storageRelativeDirectory))
-            {
-                return false;
-            }
-
-            string internalSaveKey = BuildFileScopedSaveKey(
-                normalizedSaveFilePath);
-            if (internalSaveKey.Length < CoreConstants.SaveKeyMinimumLength)
-            {
-                return false;
-            }
-
-            saveScope = new CoreSaveScope
-            {
-                SaveFilePath = normalizedSaveFilePath,
-                StorageRelativeDirectory = storageRelativeDirectory,
-                InternalSaveKey = internalSaveKey,
-                LegacyOwnerSaveKey = BuildLegacyOwnerSaveKey(
-                    normalizedSaveFilePath,
-                    dataRootDirectory)
-            };
 
             return true;
         }
 
-        /// <summary>
-        /// Restricts sidecars to the file shapes written by vanilla. This is also a
-        /// hard exclusion for data/global_data.json, even if a future caller passes it
-        /// to the scope resolver accidentally.
-        /// </summary>
-        private static bool IsSupportedVanillaSaveRelativePath(
-            string relativeSaveFilePath)
+        private static bool TryNormalizeSupportedRelativeSavePath(
+            string relativeSaveFilePath,
+            out string normalizedRelativePath)
         {
+            normalizedRelativePath = string.Empty;
             if (string.IsNullOrWhiteSpace(relativeSaveFilePath) ||
                 Path.IsPathRooted(relativeSaveFilePath))
             {
                 return false;
             }
 
-            string normalizedRelativePath = relativeSaveFilePath
-                .Replace(
-                    Path.AltDirectorySeparatorChar,
-                    Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-            if (!AreRelativePathSegmentsSafe(normalizedRelativePath))
+            string candidate = relativeSaveFilePath.Replace(
+                Path.AltDirectorySeparatorChar,
+                Path.DirectorySeparatorChar);
+            candidate = candidate.TrimStart(
+                Path.DirectorySeparatorChar);
+            if (!AreRelativePathSegmentsSafe(candidate))
             {
                 return false;
             }
 
-            string[] pathSegments = normalizedRelativePath.Split(
-                new char[]
-                {
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar
-                },
-                StringSplitOptions.RemoveEmptyEntries);
-            if (pathSegments.Length <= CoreConstants.ZeroBasedListStartIndex)
+            string[] pathSegments = SplitRelativePath(candidate);
+            if (!IsSupportedVanillaSaveSegments(pathSegments))
+            {
+                return false;
+            }
+
+            normalizedRelativePath = string.Join(
+                Path.DirectorySeparatorChar.ToString(),
+                pathSegments);
+            return true;
+        }
+
+        private static bool IsSupportedVanillaSaveSegments(
+            string[] pathSegments)
+        {
+            if (pathSegments == null || pathSegments.Length == 0)
             {
                 return false;
             }
@@ -2793,13 +1348,16 @@ namespace IMDataCore
                     ManualSavesFolderName,
                     StringComparison.OrdinalIgnoreCase))
             {
-                return IsSaveJsonFileName(fileName);
+                return IsOpaquePathSegment(pathSegments[1]) &&
+                    IsSaveJsonFileName(fileName);
             }
 
             if (!string.Equals(
-                pathSegments[0],
-                StoryModeFolderName,
-                StringComparison.OrdinalIgnoreCase))
+                    pathSegments[0],
+                    StoryModeFolderName,
+                    StringComparison.OrdinalIgnoreCase) ||
+                pathSegments.Length < 3 ||
+                !IsOpaquePathSegment(pathSegments[1]))
             {
                 return false;
             }
@@ -2815,7 +1373,8 @@ namespace IMDataCore
                     ManualSavesFolderName,
                     StringComparison.OrdinalIgnoreCase))
             {
-                return IsSaveJsonFileName(fileName);
+                return IsOpaquePathSegment(pathSegments[3]) &&
+                    IsSaveJsonFileName(fileName);
             }
 
             if (pathSegments.Length == 4 &&
@@ -2831,11 +1390,11 @@ namespace IMDataCore
         {
             return string.Equals(
                     fileName,
-                    AutoSaveFileName + SaveFileExtension,
+                    AutoSaveFileName,
                     StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
                     fileName,
-                    ManualSaveFileName + SaveFileExtension,
+                    ManualSaveFileName,
                     StringComparison.OrdinalIgnoreCase);
         }
 
@@ -2843,7 +1402,7 @@ namespace IMDataCore
         {
             return string.Equals(
                 fileName,
-                SaveFileName + SaveFileExtension,
+                SaveFileName,
                 StringComparison.OrdinalIgnoreCase);
         }
 
@@ -2859,7 +1418,8 @@ namespace IMDataCore
 
             int chapterIndex;
             return int.TryParse(
-                    folderName.Substring(StoryChapterFolderPrefix.Length),
+                    folderName.Substring(
+                        StoryChapterFolderPrefix.Length),
                     NumberStyles.None,
                     CultureInfo.InvariantCulture,
                     out chapterIndex) &&
@@ -2867,62 +1427,13 @@ namespace IMDataCore
                 chapterIndex <= LastStoryChapterIndex;
         }
 
-        /// <summary>
-        /// Mirrors the vanilla relative path. A terminal save.json is represented by
-        /// its owner directory; direct auto_save/manual_save files retain their stems.
-        /// </summary>
-        private static bool TryBuildStorageRelativeDirectory(
-            string relativeSaveFilePath,
-            out string storageRelativeDirectory)
+        private static bool IsOpaquePathSegment(string segment)
         {
-            storageRelativeDirectory = string.Empty;
-            if (string.IsNullOrWhiteSpace(relativeSaveFilePath) ||
-                Path.IsPathRooted(relativeSaveFilePath))
-            {
-                return false;
-            }
-
-            string normalizedRelativePath = relativeSaveFilePath
-                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            if (!AreRelativePathSegmentsSafe(normalizedRelativePath))
-            {
-                return false;
-            }
-
-            string fileName = Path.GetFileName(normalizedRelativePath);
-            string relativeOwnerDirectory = Path.GetDirectoryName(
-                normalizedRelativePath) ?? string.Empty;
-
-            if (string.Equals(
-                fileName,
-                SaveFileName + SaveFileExtension,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                storageRelativeDirectory = relativeOwnerDirectory;
-            }
-            else
-            {
-                string fileStem = Path.GetFileNameWithoutExtension(fileName);
-                storageRelativeDirectory = string.IsNullOrEmpty(
-                    relativeOwnerDirectory)
-                        ? fileStem
-                        : Path.Combine(relativeOwnerDirectory, fileStem);
-            }
-
-            if (string.IsNullOrEmpty(storageRelativeDirectory))
-            {
-                storageRelativeDirectory = SaveFileName;
-            }
-
-            return AreRelativePathSegmentsSafe(storageRelativeDirectory);
+            return !string.IsNullOrWhiteSpace(segment) &&
+                !string.Equals(segment, ".", StringComparison.Ordinal) &&
+                !string.Equals(segment, "..", StringComparison.Ordinal);
         }
 
-        /// <summary>
-        /// Rejects traversal and invalid filename segments while preserving valid case,
-        /// spaces, punctuation, and vanilla folder names exactly.
-        /// </summary>
         private static bool AreRelativePathSegmentsSafe(string relativePath)
         {
             if (string.IsNullOrWhiteSpace(relativePath) ||
@@ -2931,33 +1442,21 @@ namespace IMDataCore
                 return false;
             }
 
-            char[] separators = new char[]
-            {
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar
-            };
-
-            string[] segments = relativePath.Split(
-                separators,
-                StringSplitOptions.RemoveEmptyEntries);
-
-            if (segments.Length <= CoreConstants.ZeroBasedListStartIndex)
+            string[] segments = SplitRelativePath(relativePath);
+            if (segments.Length == 0)
             {
                 return false;
             }
 
-            char[] invalidFileNameCharacters = Path.GetInvalidFileNameChars();
-            for (
-                int segmentIndex = CoreConstants.ZeroBasedListStartIndex;
-                segmentIndex < segments.Length;
-                segmentIndex++)
+            char[] invalidFileNameCharacters =
+                Path.GetInvalidFileNameChars();
+            for (int index = 0; index < segments.Length; index++)
             {
-                string segment = segments[segmentIndex];
+                string segment = segments[index];
                 if (string.IsNullOrEmpty(segment) ||
                     string.Equals(segment, ".", StringComparison.Ordinal) ||
                     string.Equals(segment, "..", StringComparison.Ordinal) ||
-                    segment.IndexOfAny(invalidFileNameCharacters) >=
-                        CoreConstants.ZeroBasedListStartIndex)
+                    segment.IndexOfAny(invalidFileNameCharacters) >= 0)
                 {
                     return false;
                 }
@@ -2966,21 +1465,324 @@ namespace IMDataCore
             return true;
         }
 
-        /// <summary>
-        /// Reconstructs the exact historical file-scoped key algorithm.
-        /// </summary>
+        private static string[] SplitRelativePath(string relativePath)
+        {
+            return relativePath.Split(
+                new char[]
+                {
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar
+                },
+                StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        private static bool TryValidateExistingPathChain(
+            string rootDirectory,
+            string candidatePath,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            string normalizedRoot;
+            string normalizedCandidate;
+            if (!TryNormalizeDirectoryPath(
+                    rootDirectory,
+                    out normalizedRoot))
+            {
+                errorMessage = "The containment root is invalid.";
+                return false;
+            }
+
+            try
+            {
+                normalizedCandidate = Path.GetFullPath(candidatePath);
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            if (!IsSameOrContainedPath(
+                    normalizedRoot,
+                    normalizedCandidate))
+            {
+                errorMessage = "The path is outside its containment root.";
+                return false;
+            }
+
+            string currentPath = normalizedCandidate;
+            while (!string.IsNullOrEmpty(currentPath))
+            {
+                try
+                {
+                    if (File.Exists(currentPath) ||
+                        Directory.Exists(currentPath))
+                    {
+                        FileAttributes attributes =
+                            File.GetAttributes(currentPath);
+                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            errorMessage =
+                                "Refused a path through a reparse point: " +
+                                currentPath;
+                            return false;
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = exception.Message;
+                    return false;
+                }
+
+                if (string.Equals(
+                        TrimTrailingDirectorySeparators(currentPath),
+                        normalizedRoot,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string parentPath = Path.GetDirectoryName(currentPath);
+                if (string.IsNullOrEmpty(parentPath) ||
+                    string.Equals(
+                        parentPath,
+                        currentPath,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    !IsSameOrContainedPath(normalizedRoot, parentPath))
+                {
+                    errorMessage =
+                        "The path chain escaped its containment root.";
+                    return false;
+                }
+
+                currentPath = TrimTrailingDirectorySeparators(parentPath);
+            }
+
+            errorMessage = "The containment root was not reached.";
+            return false;
+        }
+
+        private static bool TryValidateTreeHasNoReparsePoints(
+            string rootDirectory,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            try
+            {
+                Stack<string> pendingDirectories = new Stack<string>();
+                pendingDirectories.Push(rootDirectory);
+                while (pendingDirectories.Count > 0)
+                {
+                    string directoryPath = pendingDirectories.Pop();
+                    FileAttributes directoryAttributes =
+                        File.GetAttributes(directoryPath);
+                    if ((directoryAttributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        errorMessage =
+                            "Refused recursive access through a reparse point: " +
+                            directoryPath;
+                        return false;
+                    }
+
+                    string[] entries =
+                        Directory.GetFileSystemEntries(directoryPath);
+                    for (int index = 0; index < entries.Length; index++)
+                    {
+                        string entryPath = entries[index];
+                        FileAttributes entryAttributes =
+                            File.GetAttributes(entryPath);
+                        if ((entryAttributes & FileAttributes.ReparsePoint) != 0)
+                        {
+                            errorMessage =
+                                "Refused recursive access through a reparse point: " +
+                                entryPath;
+                            return false;
+                        }
+
+                        if ((entryAttributes & FileAttributes.Directory) != 0)
+                        {
+                            pendingDirectories.Push(entryPath);
+                        }
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+        }
+
+        private static bool IsSameOrContainedPath(
+            string rootDirectory,
+            string candidatePath)
+        {
+            string normalizedRoot = TrimTrailingDirectorySeparators(
+                Path.GetFullPath(rootDirectory));
+            string normalizedCandidate = TrimTrailingDirectorySeparators(
+                Path.GetFullPath(candidatePath));
+            return string.Equals(
+                    normalizedRoot,
+                    normalizedCandidate,
+                    StringComparison.OrdinalIgnoreCase) ||
+                normalizedCandidate.StartsWith(
+                    BuildDirectoryPrefix(normalizedRoot),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsStrictlyContainedPath(
+            string rootDirectory,
+            string candidatePath)
+        {
+            try
+            {
+                string normalizedRoot = TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(rootDirectory));
+                string normalizedCandidate = TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(candidatePath));
+                return normalizedCandidate.StartsWith(
+                    BuildDirectoryPrefix(normalizedRoot),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string BuildDirectoryPrefix(string directoryPath)
+        {
+            string trimmedPath = TrimTrailingDirectorySeparators(
+                directoryPath);
+            return trimmedPath + Path.DirectorySeparatorChar;
+        }
+
+        private static bool TryNormalizeDirectoryPath(
+            string directoryPath,
+            out string normalizedDirectoryPath)
+        {
+            normalizedDirectoryPath = string.Empty;
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                normalizedDirectoryPath = TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(directoryPath));
+                return !string.IsNullOrEmpty(normalizedDirectoryPath);
+            }
+            catch
+            {
+                normalizedDirectoryPath = string.Empty;
+                return false;
+            }
+        }
+
+        private static string NormalizeDirectoryPathOrEmpty(
+            string directoryPath)
+        {
+            string normalizedDirectoryPath;
+            return TryNormalizeDirectoryPath(
+                    directoryPath,
+                    out normalizedDirectoryPath)
+                ? normalizedDirectoryPath
+                : string.Empty;
+        }
+
+        private static string TrimTrailingDirectorySeparators(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return string.Empty;
+            }
+
+            string pathRoot = Path.GetPathRoot(path) ?? string.Empty;
+            int minimumLength = pathRoot.Length;
+            int endIndex = path.Length;
+            while (endIndex > minimumLength)
+            {
+                char character = path[endIndex - 1];
+                if (character != Path.DirectorySeparatorChar &&
+                    character != Path.AltDirectorySeparatorChar)
+                {
+                    break;
+                }
+
+                endIndex--;
+            }
+
+            return endIndex == path.Length
+                ? path
+                : path.Substring(0, endIndex);
+        }
+
+        private static CoreSaveScope CreateTransientSaveScope()
+        {
+            return new CoreSaveScope
+            {
+                SaveFilePath = string.Empty,
+                RelativeSavePath = string.Empty,
+                SidecarFilePath = string.Empty,
+                InternalSaveKey =
+                    TransientSaveKeyPrefix + Guid.NewGuid().ToString("N"),
+                IsTransient = true
+            };
+        }
+
+        private static CoreSaveScope CloneScope(CoreSaveScope source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new CoreSaveScope
+            {
+                SaveFilePath = source.SaveFilePath ?? string.Empty,
+                RelativeSavePath =
+                    source.RelativeSavePath ?? string.Empty,
+                SidecarFilePath = source.SidecarFilePath ?? string.Empty,
+                InternalSaveKey = source.InternalSaveKey ?? DefaultSaveKey,
+                IsTransient = source.IsTransient
+            };
+        }
+
         private static string BuildFileScopedSaveKey(
+            string normalizedPersistentRoot,
             string normalizedSaveFilePath)
         {
-            if (string.IsNullOrEmpty(normalizedSaveFilePath))
+            if (string.IsNullOrEmpty(normalizedPersistentRoot) ||
+                string.IsNullOrEmpty(normalizedSaveFilePath))
             {
                 return string.Empty;
             }
 
             string normalizedLowerPath =
                 normalizedSaveFilePath.ToLowerInvariant();
-            string relativePath = ResolveRelativeSavePath(
-                normalizedLowerPath);
+            string dataRootDirectory = NormalizeDirectoryPathOrEmpty(
+                Path.Combine(
+                    normalizedPersistentRoot,
+                    GameDataRootFolderName));
+            string relativePath = normalizedLowerPath;
+            if (!string.IsNullOrEmpty(dataRootDirectory))
+            {
+                string lowerDataRoot =
+                    dataRootDirectory.ToLowerInvariant();
+                string dataRootPrefix = BuildDirectoryPrefix(lowerDataRoot);
+                if (normalizedLowerPath.StartsWith(
+                    dataRootPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    relativePath = normalizedLowerPath.Substring(
+                        dataRootPrefix.Length);
+                }
+            }
+
             string pathTokenSource = relativePath
                 .Replace(
                     Path.DirectorySeparatorChar,
@@ -2988,163 +1790,23 @@ namespace IMDataCore
                 .Replace(
                     Path.AltDirectorySeparatorChar,
                     SavePathSeparatorReplacement);
-            string pathToken = CoreTokenUtility.SanitizeToken(
+            string pathToken = SanitizeToken(
                 pathTokenSource,
                 SavePathTokenLength);
-            string pathHashToken = CoreTokenUtility.SanitizeToken(
+            string pathHashToken = SanitizeToken(
                 ComputeStablePathHash(normalizedLowerPath),
-                CoreConstants.SaveTokenMaximumLength);
+                SaveTokenMaximumLength);
             string joinedToken = string.Join(
-                CoreConstants.SaveKeyJoinSeparator,
+                SaveKeyJoinSeparator,
                 new string[]
                 {
                     SaveFileKeyPrefix,
                     pathToken,
                     pathHashToken
                 });
-
-            return CoreTokenUtility.SanitizeToken(
-                joinedToken,
-                CoreConstants.SaveKeyMaximumLength);
+            return SanitizeToken(joinedToken, SaveKeyMaximumLength);
         }
 
-        /// <summary>
-        /// Reconstructs the immediate owner-folder key introduced by the prior draft.
-        /// </summary>
-        private static string BuildLegacyOwnerSaveKey(
-            string normalizedSaveFilePath,
-            string dataRootDirectory)
-        {
-            string saveDirectoryPath = Path.GetDirectoryName(
-                normalizedSaveFilePath);
-            if (string.IsNullOrEmpty(saveDirectoryPath))
-            {
-                return string.Empty;
-            }
-
-            string trimmedSaveDirectoryPath = saveDirectoryPath.TrimEnd(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar);
-            string saveFolderName = Path.GetFileName(
-                trimmedSaveDirectoryPath);
-
-            if (string.Equals(
-                trimmedSaveDirectoryPath,
-                dataRootDirectory,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                saveFolderName = Path.GetFileNameWithoutExtension(
-                    normalizedSaveFilePath);
-            }
-
-            return CoreTokenUtility.SanitizeToken(
-                saveFolderName,
-                CoreConstants.SaveKeyMaximumLength);
-        }
-
-        /// <summary>
-        /// Normalizes one save-file path to an absolute JSON path.
-        /// </summary>
-        private static string NormalizeSaveFilePath(string saveFilePath)
-        {
-            if (string.IsNullOrWhiteSpace(saveFilePath))
-            {
-                return string.Empty;
-            }
-
-            string candidatePath = saveFilePath.Trim();
-            if (!candidatePath.EndsWith(
-                SaveFileExtension,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                candidatePath += SaveFileExtension;
-            }
-
-            if (!Path.IsPathRooted(candidatePath))
-            {
-                candidatePath = Path.Combine(
-                    Application.persistentDataPath,
-                    GameDataRootFolderName,
-                    candidatePath);
-            }
-
-            try
-            {
-                return Path.GetFullPath(candidatePath);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        /// <summary>
-        /// Creates a unique temporary scope used only until DataSaver supplies an exact
-        /// vanilla target for a new game.
-        /// </summary>
-        private static CoreSaveScope CreateTransientSaveScope()
-        {
-            string transientToken = Guid.NewGuid().ToString("N");
-            return new CoreSaveScope
-            {
-                SaveFilePath = string.Empty,
-                StorageRelativeDirectory = Path.Combine(
-                    "_transient",
-                    transientToken),
-                InternalSaveKey = "transient_" + transientToken,
-                LegacyOwnerSaveKey = string.Empty,
-                IsTransient = true
-            };
-        }
-
-        /// <summary>
-        /// Resolves a save-file path relative to the vanilla data root when possible.
-        /// This method deliberately matches the previous key algorithm.
-        /// </summary>
-        private static string ResolveRelativeSavePath(string absoluteSavePath)
-        {
-            if (string.IsNullOrEmpty(absoluteSavePath))
-            {
-                return string.Empty;
-            }
-
-            string dataRootPath;
-            try
-            {
-                dataRootPath = Path.GetFullPath(
-                    Path.Combine(
-                        Application.persistentDataPath,
-                        GameDataRootFolderName));
-            }
-            catch
-            {
-                return absoluteSavePath;
-            }
-
-            string dataRootPrefix = dataRootPath;
-            string separatorText =
-                Path.DirectorySeparatorChar.ToString();
-            if (!dataRootPrefix.EndsWith(
-                separatorText,
-                StringComparison.Ordinal))
-            {
-                dataRootPrefix += separatorText;
-            }
-
-            if (absoluteSavePath.StartsWith(
-                dataRootPrefix,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return absoluteSavePath.Substring(
-                    dataRootPrefix.Length);
-            }
-
-            return absoluteSavePath;
-        }
-
-        /// <summary>
-        /// Computes the short deterministic hash used by the historical key format.
-        /// </summary>
         private static string ComputeStablePathHash(string normalizedPath)
         {
             if (string.IsNullOrEmpty(normalizedPath))
@@ -3158,31 +1820,20 @@ namespace IMDataCore
                 using (SHA256 hash = SHA256.Create())
                 {
                     byte[] hashBytes = hash.ComputeHash(bytes);
-                    if (hashBytes == null ||
-                        hashBytes.Length <= CoreConstants.ZeroBasedListStartIndex)
-                    {
-                        return string.Empty;
-                    }
-
                     StringBuilder builder = new StringBuilder(
                         hashBytes.Length * 2);
-                    for (
-                        int byteIndex = CoreConstants.ZeroBasedListStartIndex;
-                        byteIndex < hashBytes.Length;
-                        byteIndex++)
+                    for (int index = 0; index < hashBytes.Length; index++)
                     {
                         builder.Append(
-                            hashBytes[byteIndex].ToString(
-                                CoreConstants.ByteToLowerHexFormat,
+                            hashBytes[index].ToString(
+                                "x2",
                                 CultureInfo.InvariantCulture));
                     }
 
                     string hashHex = builder.ToString();
                     return hashHex.Length <= SavePathHashLength
                         ? hashHex
-                        : hashHex.Substring(
-                            CoreConstants.ZeroBasedListStartIndex,
-                            SavePathHashLength);
+                        : hashHex.Substring(0, SavePathHashLength);
                 }
             }
             catch
@@ -3191,46 +1842,236 @@ namespace IMDataCore
             }
         }
 
-        /// <summary>
-        /// Keeps an optional historical candidate empty when no key is available.
-        /// </summary>
-        private static string NormalizeOptionalSaveKey(string rawSaveKey)
+        private static string SanitizeToken(
+            string rawValue,
+            int maximumLength)
         {
-            if (string.IsNullOrEmpty(rawSaveKey))
+            if (string.IsNullOrEmpty(rawValue) || maximumLength <= 0)
             {
                 return string.Empty;
             }
 
-            return CoreTokenUtility.SanitizeToken(
-                rawSaveKey,
-                CoreConstants.SaveKeyMaximumLength);
+            int expectedLength = Math.Min(rawValue.Length, maximumLength);
+            char[] output = new char[expectedLength];
+            int outputLength = 0;
+            for (
+                int index = 0;
+                index < rawValue.Length && outputLength < maximumLength;
+                index++)
+            {
+                char character = rawValue[index];
+                bool isAsciiLetter =
+                    (character >= 'a' && character <= 'z') ||
+                    (character >= 'A' && character <= 'Z');
+                bool isDigit = character >= '0' && character <= '9';
+                bool isPunctuation =
+                    character == '_' ||
+                    character == '-' ||
+                    character == '.';
+                if (isAsciiLetter || isDigit || isPunctuation)
+                {
+                    output[outputLength] = character;
+                    outputLength++;
+                }
+            }
+
+            return outputLength == 0
+                ? string.Empty
+                : new string(output, 0, outputLength);
         }
 
-        private static void AddUniqueToken(
-            List<string> tokens,
-            string rawToken)
+        private static string BuildLegacyOwnerSaveKey(
+            CoreSaveScope saveScope)
         {
-            string token = NormalizeOptionalSaveKey(rawToken);
-            if (string.IsNullOrEmpty(token))
+            if (saveScope == null || saveScope.IsTransient)
+            {
+                return string.Empty;
+            }
+
+            string ownerDirectory = Path.GetDirectoryName(
+                saveScope.SaveFilePath);
+            string ownerName = string.IsNullOrEmpty(ownerDirectory)
+                ? string.Empty
+                : Path.GetFileName(
+                    TrimTrailingDirectorySeparators(ownerDirectory));
+            if (saveScope.RelativeSavePath.IndexOf(
+                    Path.DirectorySeparatorChar) < 0)
+            {
+                ownerName = Path.GetFileNameWithoutExtension(
+                    saveScope.SaveFilePath);
+            }
+
+            return SanitizeToken(ownerName, SaveKeyMaximumLength);
+        }
+
+        private static List<string> GetLegacyAgencySaveKeys(
+            staticVars._playerData loadedPlayerData)
+        {
+            List<string> saveKeys = new List<string>();
+            try
+            {
+                staticVars._playerData playerData =
+                    loadedPlayerData ?? staticVars.PlayerData;
+                if (playerData == null)
+                {
+                    return saveKeys;
+                }
+
+                AddUniqueToken(
+                    saveKeys,
+                    SanitizeToken(
+                        playerData.SaveFolderName,
+                        SaveTokenMaximumLength));
+
+                string identityKeySource = string.Join(
+                    SaveKeyJoinSeparator,
+                    new string[]
+                    {
+                        playerData.IsStoryMode
+                            ? SaveModeStory
+                            : SaveModeFreePlay,
+                        playerData.FirstName ?? string.Empty,
+                        playerData.LastName ?? string.Empty,
+                        playerData.GroupName ?? string.Empty,
+                        playerData.Chapter.ToString()
+                    });
+                AddUniqueToken(
+                    saveKeys,
+                    SanitizeToken(
+                        identityKeySource,
+                        SaveKeyMaximumLength));
+            }
+            catch
+            {
+                // Legacy migration discovery is best-effort and read-only.
+            }
+
+            return saveKeys;
+        }
+
+        private static List<string> GetStorageSourceDirectories(
+            string persistentDataRoot,
+            string saveKey,
+            bool includeInstallLocations)
+        {
+            List<string> directories = new List<string>();
+            string normalizedSaveKey = SanitizeToken(
+                saveKey,
+                SaveKeyMaximumLength);
+            if (string.IsNullOrEmpty(normalizedSaveKey))
+            {
+                return directories;
+            }
+
+            string rootDirectory = GetRootDirectory(persistentDataRoot);
+            AddLegacyKeyedDirectories(
+                directories,
+                rootDirectory,
+                normalizedSaveKey);
+
+            string normalizedPersistentRoot;
+            if (TryNormalizeDirectoryPath(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot))
+            {
+                string localModsDirectory = Path.Combine(
+                    normalizedPersistentRoot,
+                    LegacyModsFolderName);
+                AddLegacyKeyedDirectories(
+                    directories,
+                    Path.Combine(
+                        localModsDirectory,
+                        DataCoreRootFolderName),
+                    normalizedSaveKey);
+                AddLegacyKeyedDirectories(
+                    directories,
+                    Path.Combine(
+                        localModsDirectory,
+                        LegacyDisplayModFolderName),
+                    normalizedSaveKey);
+            }
+
+            if (!includeInstallLocations)
+            {
+                return directories;
+            }
+
+            try
+            {
+                string assemblyDirectory = Path.GetDirectoryName(
+                    Assembly.GetExecutingAssembly().Location);
+                AddLegacyKeyedDirectories(
+                    directories,
+                    assemblyDirectory,
+                    normalizedSaveKey);
+            }
+            catch
+            {
+                // Assembly-location probing is read-only and best-effort.
+            }
+
+            AddLoadedModInstallDirectories(
+                directories,
+                normalizedSaveKey);
+            AddKnownWorkshopInstallDirectory(
+                directories,
+                normalizedSaveKey);
+            return directories;
+        }
+
+        private static string BuildLegacyStorageRelativeDirectory(
+            string relativeSaveFilePath)
+        {
+            string normalizedRelativePath;
+            if (!TryNormalizeSupportedRelativeSavePath(
+                    relativeSaveFilePath,
+                    out normalizedRelativePath))
+            {
+                return string.Empty;
+            }
+
+            string fileName = Path.GetFileName(normalizedRelativePath);
+            string ownerDirectory = Path.GetDirectoryName(
+                normalizedRelativePath) ?? string.Empty;
+            if (string.Equals(
+                    fileName,
+                    SaveFileName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return ownerDirectory;
+            }
+
+            string fileStem = Path.GetFileNameWithoutExtension(fileName);
+            return string.IsNullOrEmpty(ownerDirectory)
+                ? fileStem
+                : Path.Combine(ownerDirectory, fileStem);
+        }
+
+        private static void AddLegacyFilesFromDirectory(
+            List<string> candidates,
+            string directoryPath)
+        {
+            if (string.IsNullOrEmpty(directoryPath))
             {
                 return;
             }
 
-            for (
-                int tokenIndex = CoreConstants.ZeroBasedListStartIndex;
-                tokenIndex < tokens.Count;
-                tokenIndex++)
-            {
-                if (string.Equals(
-                    tokens[tokenIndex],
-                    token,
-                    StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-
-            tokens.Add(token);
+            AddUniquePath(
+                candidates,
+                Path.Combine(directoryPath, LegacyDatabaseFileName));
+            AddUniquePath(
+                candidates,
+                Path.Combine(directoryPath, LegacyFlatFileName));
+            AddUniquePath(
+                candidates,
+                Path.Combine(
+                    directoryPath,
+                    LegacyFlatFileName + LegacyRecoveryBackupSuffix));
+            AddUniquePath(
+                candidates,
+                Path.Combine(
+                    directoryPath,
+                    LegacyFlatFileName + LegacyRecoveryTemporarySuffix));
         }
 
         private static void AddLegacyKeyedDirectories(
@@ -3244,14 +2085,13 @@ namespace IMDataCore
                 return;
             }
 
-            AddUniqueDirectory(
+            AddUniquePath(
                 directories,
                 Path.Combine(
                     installRootDirectory,
-                    CoreConstants.SaveFolderName,
+                    LegacySavesFolderName,
                     saveKey));
-
-            AddUniqueDirectory(
+            AddUniquePath(
                 directories,
                 Path.Combine(installRootDirectory, saveKey));
         }
@@ -3267,12 +2107,9 @@ namespace IMDataCore
                     return;
                 }
 
-                for (
-                    int modIndex = CoreConstants.ZeroBasedListStartIndex;
-                    modIndex < Mods._Mods.Count;
-                    modIndex++)
+                for (int index = 0; index < Mods._Mods.Count; index++)
                 {
-                    Mods._mod loadedMod = Mods._Mods[modIndex];
+                    Mods._mod loadedMod = Mods._Mods[index];
                     if (!IsMatchingDataCoreMod(loadedMod))
                     {
                         continue;
@@ -3286,7 +2123,7 @@ namespace IMDataCore
             }
             catch
             {
-                // Loaded-mod migration probing is best-effort.
+                // Loaded-mod discovery is read-only and best-effort.
             }
         }
 
@@ -3299,7 +2136,7 @@ namespace IMDataCore
 
             if (string.Equals(
                     loadedMod.ModName,
-                    CoreConstants.ModFolderName,
+                    DataCoreRootFolderName,
                     StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(
                     loadedMod.ModName,
@@ -3354,7 +2191,6 @@ namespace IMDataCore
                     WorkshopContentFolderName,
                     IdolManagerSteamApplicationIdentifier,
                     LegacyWorkshopItemIdentifier);
-
                 AddLegacyKeyedDirectories(
                     directories,
                     workshopInstallDirectory,
@@ -3362,90 +2198,65 @@ namespace IMDataCore
             }
             catch
             {
-                // Steam library probing is best-effort.
+                // Known-install discovery is read-only and best-effort.
             }
         }
 
-        private static void AddUniqueDirectory(
-            List<string> directories,
-            string directoryPath)
+        private static void AddUniqueToken(
+            List<string> tokens,
+            string rawToken)
         {
-            if (string.IsNullOrEmpty(directoryPath))
+            string token = SanitizeToken(rawToken, SaveKeyMaximumLength);
+            if (string.IsNullOrEmpty(token))
             {
                 return;
             }
 
-            string normalizedDirectoryPath = directoryPath;
+            for (int index = 0; index < tokens.Count; index++)
+            {
+                if (string.Equals(
+                    tokens[index],
+                    token,
+                    StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+
+            tokens.Add(token);
+        }
+
+        private static void AddUniquePath(
+            List<string> paths,
+            string candidatePath)
+        {
+            if (string.IsNullOrEmpty(candidatePath))
+            {
+                return;
+            }
+
+            string normalizedPath;
             try
             {
-                normalizedDirectoryPath = Path.GetFullPath(
-                    directoryPath).TrimEnd(
-                        Path.DirectorySeparatorChar,
-                        Path.AltDirectorySeparatorChar);
+                normalizedPath = Path.GetFullPath(candidatePath);
             }
             catch
             {
+                return;
             }
 
-            for (
-                int directoryIndex = CoreConstants.ZeroBasedListStartIndex;
-                directoryIndex < directories.Count;
-                directoryIndex++)
+            for (int index = 0; index < paths.Count; index++)
             {
                 if (string.Equals(
-                    directories[directoryIndex],
-                    normalizedDirectoryPath,
+                    paths[index],
+                    normalizedPath,
                     StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
             }
 
-            directories.Add(normalizedDirectoryPath);
-        }
-    }
-
-    /// <summary>
-    /// Detects runtime SQLite support without loading external managed dependencies.
-    /// </summary>
-    internal static class CoreRuntimeCapabilities
-    {
-        private static readonly object runtimeProbeLock = new object();
-        private static bool runtimeProbeCompleted;
-        private static bool runtimeSupportAvailable;
-        private static string runtimeSupportErrorMessage = string.Empty;
-
-        /// <summary>
-        /// Ensures a native SQLite runtime is reachable through the OS-provided winsqlite3 library.
-        /// </summary>
-        internal static bool TryEnsureSqliteRuntimeSupport(
-            out string errorMessage)
-        {
-            lock (runtimeProbeLock)
-            {
-                if (runtimeProbeCompleted)
-                {
-                    errorMessage = runtimeSupportErrorMessage;
-                    return runtimeSupportAvailable;
-                }
-
-                runtimeProbeCompleted = true;
-
-                string runtimeCheckErrorMessage;
-                if (SqliteCoreStorageEngine.TryProbeRuntime(
-                    out runtimeCheckErrorMessage))
-                {
-                    runtimeSupportAvailable = true;
-                    runtimeSupportErrorMessage = string.Empty;
-                    errorMessage = string.Empty;
-                    return true;
-                }
-
-                runtimeSupportAvailable = false;
-                runtimeSupportErrorMessage = runtimeCheckErrorMessage;
-                errorMessage = runtimeSupportErrorMessage;
-                return false;
-            }
+            paths.Add(normalizedPath);
         }
     }
 }

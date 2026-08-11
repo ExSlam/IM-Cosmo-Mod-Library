@@ -1,0 +1,564 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace IMDataCore
+{
+    /// <summary>
+    /// Lightweight save/load coordination for IM Data Core 2.0. This partial is
+    /// deliberately limited to in-memory branch management and explicit sidecar
+    /// persistence boundaries.
+    /// </summary>
+    internal sealed partial class IMDataCoreController
+    {
+        /// <summary>
+        /// Captures vanilla's already-populated SavedData stamp and writes the
+        /// current logical IMDC branch to the exact mirrored target. Exceptions
+        /// never escape into vanilla's save call.
+        /// </summary>
+        internal void PrepareVanillaSaveWrite(
+            SaveManager.SavedData savedData,
+            string dataFileName,
+            bool isJson,
+            bool fullPath)
+        {
+            try
+            {
+                string resolvedVanillaPath;
+                if (!CorePaths.TryResolveDataSaverPath(
+                    dataFileName,
+                    isJson,
+                    fullPath,
+                    out resolvedVanillaPath))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core rejected an unsupported vanilla save target.");
+                    return;
+                }
+
+                CoreSaveScope targetScope;
+                if (!CorePaths.TryResolveSaveScope(
+                    resolvedVanillaPath,
+                    out targetScope))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not resolve the vanilla save scope.");
+                    return;
+                }
+
+                CaptureResolvedSingleChartPositionsBeforeSave();
+                lock (runtimeLock)
+                {
+                    string errorMessage;
+                    if (!EnsureInitializedLocked(out errorMessage) ||
+                        !FlushLocked(true, out errorMessage))
+                    {
+                        CoreLog.Warn(errorMessage);
+                        return;
+                    }
+
+                    VanillaSaveStamp stamp;
+                    if (!VanillaSaveStamp.TryCreate(
+                            savedData,
+                            targetScope.RelativeSavePath,
+                            out stamp,
+                            out errorMessage) ||
+                        !storageEngine.AddOrReplaceCheckpoint(
+                            stamp,
+                            captureSequence,
+                            out errorMessage) ||
+                        !storageEngine.TryPersistForScope(
+                            targetScope,
+                            out errorMessage))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not persist its sidecar: " +
+                            errorMessage);
+                        return;
+                    }
+
+                    activeSaveScope = targetScope;
+                    activeSaveKey = NormalizeSaveKey(
+                        targetScope.InternalSaveKey);
+                    CorePaths.SetActiveSaveFilePathHint(
+                        targetScope.SaveFilePath);
+                }
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core sidecar preparation failed without blocking vanilla: " +
+                    exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Replaces the supplemental runtime immediately after vanilla assigns
+        /// SaveManager.Data and before any LoadEvent subscriber mutates its stamp.
+        /// </summary>
+        internal void OnVanillaSaveDataRead(
+            SaveManager.SavedData loadedSaveData,
+            string dataFileName)
+        {
+            LightweightCoreStorageEngine loadedEngine = null;
+            CoreSaveScope targetScope = null;
+            bool engineInstalled = false;
+            try
+            {
+                string resolvedVanillaPath;
+                if (loadedSaveData == null ||
+                    !CorePaths.TryResolveDataSaverLoadPath(
+                        dataFileName,
+                        out resolvedVanillaPath) ||
+                    !CorePaths.TryResolveSaveScope(
+                        resolvedVanillaPath,
+                        out targetScope))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not resolve the loaded vanilla save path; " +
+                        "supplemental state was detached safely.");
+                    InstallSafeEmptyLoadedState(null);
+                    return;
+                }
+
+                VanillaSaveStamp stamp;
+                string errorMessage;
+                if (!VanillaSaveStamp.TryCreate(
+                    loadedSaveData,
+                    targetScope.RelativeSavePath,
+                    out stamp,
+                    out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    InstallSafeEmptyLoadedState(targetScope);
+                    return;
+                }
+
+                bool lightweightSidecarExisted =
+                    File.Exists(targetScope.SidecarFilePath);
+                loadedEngine = new LightweightCoreStorageEngine();
+                string loadError;
+                bool sidecarLoaded = loadedEngine.Initialize(
+                    targetScope,
+                    out loadError);
+                if (!sidecarLoaded)
+                {
+                    CoreLog.Warn(loadError);
+                    string emptyError;
+                    if (!loadedEngine.InitializeEmpty(
+                        targetScope,
+                        out emptyError))
+                    {
+                        loadedEngine.Dispose();
+                        CoreLog.Warn(emptyError);
+                        InstallSafeEmptyLoadedState(targetScope);
+                        return;
+                    }
+                }
+
+                if (sidecarLoaded && !lightweightSidecarExisted)
+                {
+                    LegacyFlatFileImportResult importResult =
+                        LegacyFlatFileImporter.TryImportExactGeneration(
+                            targetScope,
+                            loadedSaveData,
+                            loadedEngine);
+                    if (importResult.Succeeded)
+                    {
+                        long importedWatermark =
+                            loadedEngine.LastIssuedSequence;
+                        if (!loadedEngine.AddOrReplaceCheckpoint(
+                                stamp,
+                                importedWatermark,
+                                out errorMessage) ||
+                            !loadedEngine.TryPersistForScope(
+                                targetScope,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(
+                                "The exact legacy checkpoint was imported in memory " +
+                                "but its new lightweight sidecar could not be committed: " +
+                                errorMessage);
+                            loadedEngine.Dispose();
+                            loadedEngine = CreateSafeEmptyEngine(targetScope);
+                            sidecarLoaded = false;
+                        }
+                        else
+                        {
+                            CoreLog.Info(
+                                importResult.Message + " Events: " +
+                                importResult.ImportedEventCount.ToString() +
+                                "; custom values: " +
+                                importResult.ImportedCustomDataCount.ToString() + ".");
+                        }
+                    }
+                    else if (importResult.Status !=
+                        LegacyFlatFileImportStatus.NoLegacySource)
+                    {
+                        CoreLog.Warn(importResult.Message);
+                    }
+
+                    if (!importResult.Succeeded)
+                    {
+                        // Some importer failures can occur after a pristine target
+                        // has accepted an earlier record. Never expose a partial
+                        // compatibility import.
+                        loadedEngine.Dispose();
+                        loadedEngine = CreateSafeEmptyEngine(targetScope);
+                        sidecarLoaded = false;
+                    }
+                }
+
+                bool checkpointFound = false;
+                long activatedSequence = 0L;
+                if (sidecarLoaded &&
+                    !loadedEngine.TryActivateCheckpoint(
+                        stamp,
+                        out checkpointFound,
+                        out activatedSequence,
+                        out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                }
+
+                if (sidecarLoaded && !checkpointFound)
+                {
+                    DateTime loadedGameDate;
+                    try
+                    {
+                        loadedGameDate = ExtensionMethods.ToDateTime(
+                            stamp.GameDateTime);
+                    }
+                    catch (Exception exception)
+                    {
+                        loadedGameDate = DateTime.MinValue;
+                        CoreLog.Warn(
+                            "IM Data Core could not parse the loaded game date: " +
+                            exception.Message);
+                    }
+
+                    if (loadedGameDate == DateTime.MinValue ||
+                        !loadedEngine.TryActivateThroughGameDate(
+                            loadedGameDate,
+                            out activatedSequence,
+                            out errorMessage))
+                    {
+                        if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            CoreLog.Warn(errorMessage);
+                        }
+
+                        loadedEngine.Dispose();
+                        loadedEngine = CreateSafeEmptyEngine(targetScope);
+                        sidecarLoaded = false;
+                    }
+                }
+
+                InstallLoadedEngine(loadedEngine, targetScope);
+                engineInstalled = true;
+            }
+            catch (Exception exception)
+            {
+                // Vanilla remains canonical. A supplemental failure must never
+                // prevent LoadEvent or mutate the loaded game save.
+                CoreLog.Warn(
+                    "IM Data Core load restoration failed without blocking vanilla: " +
+                    exception.Message);
+                if (!engineInstalled && loadedEngine != null)
+                {
+                    loadedEngine.Dispose();
+                }
+
+                InstallSafeEmptyLoadedState(targetScope);
+            }
+        }
+
+        private void InstallSafeEmptyLoadedState(CoreSaveScope targetScope)
+        {
+            LightweightCoreStorageEngine safeEngine =
+                CreateSafeEmptyEngine(targetScope);
+            CoreSaveScope safeScope = targetScope;
+            if (safeScope == null || safeScope.IsTransient)
+            {
+                CorePaths.ResetToTransientSaveScope();
+                safeScope = CorePaths.GetSaveScope();
+            }
+
+            InstallLoadedEngine(safeEngine, safeScope);
+        }
+
+        private static LightweightCoreStorageEngine CreateSafeEmptyEngine(
+            CoreSaveScope targetScope)
+        {
+            LightweightCoreStorageEngine safeEngine =
+                new LightweightCoreStorageEngine();
+            string ignoredError;
+            if (targetScope != null &&
+                !targetScope.IsTransient &&
+                safeEngine.InitializeEmpty(targetScope, out ignoredError))
+            {
+                return safeEngine;
+            }
+
+            safeEngine.InitializeTransient();
+            return safeEngine;
+        }
+
+        private void InstallLoadedEngine(
+            LightweightCoreStorageEngine loadedEngine,
+            CoreSaveScope targetScope)
+        {
+            // If even a pristine physical engine could not be initialized, keep
+            // the engine and its advertised scope aligned.  This is a last-resort
+            // fail-safe: vanilla may still load, but IMDC remains detached until
+            // a later real save successfully establishes a physical sidecar.
+            if (!loadedEngine.HasPhysicalScope &&
+                (targetScope == null || !targetScope.IsTransient))
+            {
+                CorePaths.ResetToTransientSaveScope();
+                targetScope = CorePaths.GetSaveScope();
+            }
+
+            lock (runtimeLock)
+            {
+                if (storageEngine != null)
+                {
+                    storageEngine.Dispose();
+                }
+
+                storageEngine = loadedEngine;
+                initialized = true;
+                activeSaveScope = targetScope;
+                activeSaveKey = NormalizeSaveKey(
+                    targetScope.InternalSaveKey);
+                captureSequence = loadedEngine.LastIssuedSequence;
+                bufferedEvents.Clear();
+                ResetRuntimeCaptureStateLocked();
+                saveLoadPreparationActive = true;
+                if (targetScope.IsTransient)
+                {
+                    CorePaths.ResetToTransientSaveScope();
+                }
+                else
+                {
+                    CorePaths.SetActiveSaveFilePathHint(
+                        targetScope.SaveFilePath);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Detaches the prior save without writing it and starts a fresh transient
+        /// branch. The first real vanilla save supplies the physical scope.
+        /// </summary>
+        internal void OnNewGameStarting()
+        {
+            lock (runtimeLock)
+            {
+                if (storageEngine != null)
+                {
+                    storageEngine.Dispose();
+                }
+
+                storageEngine = new LightweightCoreStorageEngine();
+                storageEngine.InitializeTransient();
+                CorePaths.ResetToTransientSaveScope();
+                activeSaveScope = CorePaths.GetSaveScope();
+                activeSaveKey = NormalizeSaveKey(
+                    activeSaveScope.InternalSaveKey);
+                initialized = true;
+                saveLoadPreparationActive = false;
+                captureSequence = 0L;
+                bufferedEvents.Clear();
+                ResetRuntimeCaptureStateLocked();
+            }
+        }
+
+        internal void OnVanillaLoadCompleted()
+        {
+            lock (runtimeLock)
+            {
+                saveLoadPreparationActive = false;
+                SeedResolvedSingleChartPositionsFromVanillaLocked();
+            }
+        }
+
+        private bool EnsureInitialized(out string errorMessage)
+        {
+            lock (runtimeLock)
+            {
+                return EnsureInitializedLocked(out errorMessage);
+            }
+        }
+
+        private bool EnsureInitializedLocked(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (initialized && storageEngine != null)
+            {
+                return true;
+            }
+
+            try
+            {
+                storageEngine = new LightweightCoreStorageEngine();
+                storageEngine.InitializeTransient();
+                CorePaths.ResetToTransientSaveScope();
+                activeSaveScope = CorePaths.GetSaveScope();
+                activeSaveKey = NormalizeSaveKey(
+                    activeSaveScope.InternalSaveKey);
+                captureSequence = 0L;
+                initialized = true;
+                saveLoadPreparationActive = false;
+                ResetRuntimeCaptureStateLocked();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = CoreConstants.MessageStorageInitializationFailure +
+                    exception.Message;
+                storageEngine = null;
+                initialized = false;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Moves captured events into the in-memory branch. A non-forced call is
+        /// intentionally a no-op; it exists for compatibility with capture sites
+        /// that previously triggered periodic/threshold persistence checks.
+        /// </summary>
+        private bool FlushLocked(bool forceFlush, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (storageEngine == null)
+            {
+                errorMessage = CoreConstants.MessageStorageUnavailable;
+                return false;
+            }
+
+            if (!forceFlush)
+            {
+                return true;
+            }
+
+            if (bufferedEvents.Count > 0 &&
+                !storageEngine.AppendEvents(bufferedEvents, out errorMessage))
+            {
+                return false;
+            }
+
+            bufferedEvents.Clear();
+            storageEngine.SetLastIssuedSequence(captureSequence);
+            return true;
+        }
+
+        /// <summary>
+        /// Captures chart-position backfill events before a vanilla save boundary.
+        /// </summary>
+        private void CaptureResolvedSingleChartPositionsBeforeSave()
+        {
+            List<KeyValuePair<singles._single, int>> pendingChartUpdates =
+                new List<KeyValuePair<singles._single, int>>();
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                if (singles.Singles == null ||
+                    singles.Singles.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+                {
+                    return;
+                }
+
+                for (int index = 0; index < singles.Singles.Count; index++)
+                {
+                    singles._single releasedSingle = singles.Singles[index];
+                    if (releasedSingle == null ||
+                        releasedSingle.id < CoreConstants.MinimumValidIdolIdentifier ||
+                        releasedSingle.status != singles._single._status.released)
+                    {
+                        continue;
+                    }
+
+                    int chartPosition = ResolveChartPosition(releasedSingle);
+                    if (chartPosition <= 0)
+                    {
+                        continue;
+                    }
+
+                    int knownChartPosition;
+                    if (resolvedSingleChartPositionBySingleId.TryGetValue(
+                            releasedSingle.id,
+                            out knownChartPosition) &&
+                        knownChartPosition == chartPosition)
+                    {
+                        continue;
+                    }
+
+                    pendingChartUpdates.Add(
+                        new KeyValuePair<singles._single, int>(
+                            releasedSingle,
+                            chartPosition));
+                }
+            }
+
+            for (int index = 0; index < pendingChartUpdates.Count; index++)
+            {
+                KeyValuePair<singles._single, int> update =
+                    pendingChartUpdates[index];
+                CaptureSingleChartPositionResolved(
+                    update.Key,
+                    update.Value,
+                    CoreConstants.EventSourceSingleChartBackfillPatch);
+            }
+        }
+
+        private void ResetRuntimeCaptureStateLocked()
+        {
+            tourRuntimeStateByTourId.Clear();
+            concertEditBaselineByConcertId.Clear();
+            resolvedSingleChartPositionBySingleId.Clear();
+            pendingSubstoryCompletionCountByDialogueId.Clear();
+            idempotencyKeysForCurrentDate.Clear();
+            idempotencyDateKey = CoreConstants.UninitializedDateKey;
+        }
+
+        /// <summary>
+        /// LoadEvent has now rebuilt vanilla's canonical singles. Seed only the
+        /// transient duplicate-suppression index; do not emit or persist a second
+        /// copy of that canonical state.
+        /// </summary>
+        private void SeedResolvedSingleChartPositionsFromVanillaLocked()
+        {
+            resolvedSingleChartPositionBySingleId.Clear();
+            if (singles.Singles == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < singles.Singles.Count; index++)
+            {
+                singles._single releasedSingle = singles.Singles[index];
+                if (releasedSingle == null ||
+                    releasedSingle.id < CoreConstants.MinimumValidIdolIdentifier ||
+                    releasedSingle.status != singles._single._status.released)
+                {
+                    continue;
+                }
+
+                int chartPosition = ResolveChartPosition(releasedSingle);
+                if (chartPosition > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    resolvedSingleChartPositionBySingleId[releasedSingle.id] =
+                        chartPosition;
+                }
+            }
+        }
+    }
+}

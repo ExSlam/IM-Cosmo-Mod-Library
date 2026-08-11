@@ -787,7 +787,6 @@ namespace IMDataCore
 
                 int boundedCount = Math.Min(maxCount, MoneyLedgerConstants.MaximumReadCount);
                 return storageEngine.TryReadMoneyTransactions(
-                    activeSaveKey,
                     startInclusive,
                     endExclusive,
                     boundedCount,
@@ -808,7 +807,9 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (storageEngine.TryGetMoneyLedgerCoverageStart(activeSaveKey, out coverageStart, out errorMessage))
+                if (storageEngine.TryGetMoneyLedgerCoverageStart(
+                    out coverageStart,
+                    out errorMessage))
                 {
                     return true;
                 }
@@ -826,7 +827,9 @@ namespace IMDataCore
         {
             DateTime existingCoverage;
             string ignoredError;
-            if (storageEngine.TryGetMoneyLedgerCoverageStart(activeSaveKey, out existingCoverage, out ignoredError))
+            if (storageEngine.TryGetMoneyLedgerCoverageStart(
+                out existingCoverage,
+                out ignoredError))
             {
                 return;
             }

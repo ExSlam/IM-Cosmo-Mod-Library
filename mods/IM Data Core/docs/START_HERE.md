@@ -213,7 +213,8 @@ internal static List<IMDataCoreEvent> ReadRecentEvents(int idolId, int maxCount)
 
 ## Step 8: Optional explicit flush
 
-If your mod is about to trigger a risky transition and you want immediate persistence:
+If your mod needs its current IMDC branch persisted before the next vanilla
+save, and a physical vanilla save scope already exists:
 
 ```csharp
 internal static void FlushNow()
@@ -225,6 +226,10 @@ internal static void FlushNow()
     }
 }
 ```
+
+`TryFlushNow` writes only the IMDC sidecar. It does not trigger or modify a
+vanilla save, and it returns a clean failure before the first real vanilla save
+has established a physical scope.
 
 ## Step 9: Optional shutdown cleanup
 
@@ -249,7 +254,8 @@ internal static void Shutdown()
 - Event append fails with invalid token:
   - Check `entityKind` and `eventType` characters/length.
 - Reads seem stale:
-  - Call `TryFlushNow` before reading.
+  - Check the session and returned error. Reads already include in-memory
+    mutations; no disk flush is required first.
 - `IsReady()` never true at early startup:
   - Initialize later in lifecycle.
 

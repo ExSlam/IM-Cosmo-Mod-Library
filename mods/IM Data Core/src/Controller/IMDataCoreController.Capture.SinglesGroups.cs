@@ -210,7 +210,6 @@ namespace IMDataCore
                     PendingEvent pendingEvent = new PendingEvent
                     {
                         CaptureSequence = NextCaptureSequenceLocked(),
-                        SaveKey = activeSaveKey,
                         GameDateKey = gameDateKey,
                         GameDateTime = gameDateTime,
                         IdolId = idol.id,
@@ -220,35 +219,7 @@ namespace IMDataCore
                         SourcePatch = resolvedSourcePatch,
                         PayloadJson = payloadJson
                     };
-                    PendingEvent participationRecordedEvent = new PendingEvent
-                    {
-                        CaptureSequence = NextCaptureSequenceLocked(),
-                        SaveKey = activeSaveKey,
-                        GameDateKey = gameDateKey,
-                        GameDateTime = gameDateTime,
-                        IdolId = idol.id,
-                        EntityKind = CoreConstants.EventEntityKindSingle,
-                        EntityId = releasedSingle.id.ToString(CultureInfo.InvariantCulture),
-                        EventType = CoreConstants.EventTypeSingleParticipationRecorded,
-                        SourcePatch = resolvedSourcePatch,
-                        PayloadJson = payloadJson
-                    };
-
-                    SingleParticipationProjection projection = new SingleParticipationProjection
-                    {
-                        CaptureSequence = NextCaptureSequenceLocked(),
-                        SaveKey = activeSaveKey,
-                        SingleId = releasedSingle.id,
-                        IdolId = idol.id,
-                        RowIndex = rowIndex,
-                        PositionIndex = positionIndex,
-                        IsCenterFlag = isCenter ? CoreConstants.EnabledCenterFlag : CoreConstants.DisabledCenterFlag,
-                        ReleaseDate = releaseDate
-                    };
-
                     bufferedEvents.Add(pendingEvent);
-                    bufferedEvents.Add(participationRecordedEvent);
-                    bufferedSingleParticipationRows.Add(projection);
                 }
 
                 if (!FlushLocked(false, out errorMessage))
@@ -1255,7 +1226,6 @@ namespace IMDataCore
                 PendingEvent pendingEvent = new PendingEvent
                 {
                     CaptureSequence = NextCaptureSequenceLocked(),
-                    SaveKey = activeSaveKey,
                     GameDateKey = CoreDateTimeUtility.BuildGameDateKey(gameDate),
                     GameDateTime = transitionDate,
                     IdolId = idol.id,
@@ -1266,26 +1236,7 @@ namespace IMDataCore
                     PayloadJson = eventPayloadJson
                 };
 
-                StatusTransitionProjection transition = new StatusTransitionProjection
-                {
-                    CaptureSequence = NextCaptureSequenceLocked(),
-                    SaveKey = activeSaveKey,
-                    IdolId = idol.id,
-                    PreviousStatusCode = previousStatusCode,
-                    NewStatusCode = newStatusCode,
-                    TransitionDate = transitionDate
-                };
-
                 bufferedEvents.Add(pendingEvent);
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    idol.id,
-                    CoreConstants.EventEntityKindStatus,
-                    idolEntityIdentifier,
-                    CoreConstants.EventTypeStatusChangedLegacy,
-                    CoreConstants.EventSourceStatusTransitionPatch,
-                    eventPayloadJson);
-
                 if (CoreConstants.StatusCodesTrackedAsWindows.Contains(previousStatusCode))
                 {
                     EnqueueEventRecordLocked(
@@ -1309,8 +1260,6 @@ namespace IMDataCore
                         CoreConstants.EventSourceStatusTransitionPatch,
                         eventPayloadJson);
                 }
-
-                bufferedStatusTransitions.Add(transition);
 
                 if (!FlushLocked(false, out errorMessage))
                 {

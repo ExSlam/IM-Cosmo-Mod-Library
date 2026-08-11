@@ -216,15 +216,6 @@ namespace IMDataCore
                     CoreConstants.EventTypeContractCancelled,
                     CoreConstants.EventSourceContractCancellationPatch,
                     CoreJsonUtility.SerializeContractLifecyclePayload(payload));
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    idolId,
-                    CoreConstants.EventEntityKindContract,
-                    contractEntityIdentifier,
-                    CoreConstants.EventTypeContractCanceled,
-                    CoreConstants.EventSourceContractCancellationPatch,
-                    CoreJsonUtility.SerializeContractLifecyclePayload(payload));
-
                 FlushAfterCaptureLocked();
             }
         }
@@ -880,14 +871,6 @@ namespace IMDataCore
                         CoreConstants.EventTypeShowEpisodeReleased,
                         CoreConstants.EventSourceShowEpisodePatch,
                         eventPayloadJson);
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindShow,
-                        showEntityIdentifier,
-                        CoreConstants.EventTypeShowEpisode,
-                        CoreConstants.EventSourceShowEpisodePatch,
-                        eventPayloadJson);
                 }
                 else
                 {
@@ -899,14 +882,6 @@ namespace IMDataCore
                             CoreConstants.EventEntityKindShow,
                             showEntityIdentifier,
                             CoreConstants.EventTypeShowEpisodeReleased,
-                            CoreConstants.EventSourceShowEpisodePatch,
-                            eventPayloadJson);
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindShow,
-                            showEntityIdentifier,
-                            CoreConstants.EventTypeShowEpisode,
                             CoreConstants.EventSourceShowEpisodePatch,
                             eventPayloadJson);
                     }

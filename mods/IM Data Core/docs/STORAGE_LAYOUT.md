@@ -1,69 +1,98 @@
-# IM Data Core Save Storage Layout
+# IM Data Core 2.0 storage layout
 
-IM Data Core stores persistent data below this Windows directory:
+IM Data Core stores its lightweight sidecars below:
 
 ```text
-%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\IMDataCore\saves
+Application.persistentDataPath/IMDataCore/
 ```
 
-`Application.persistentDataPath` is used at runtime, so the same rule also works
-if the game runs under a different user profile or supported operating system.
+This is a sibling of Idol Manager's vanilla `data` directory. Version 2.0 has
+no required `IMDataCore/saves` layer and no normal-runtime SQLite database.
 
-## Vanilla-to-sidecar mapping
+## Exact vanilla-to-sidecar mapping
 
-The path below Idol Manager's vanilla `data` directory is mirrored below
-`IMDataCore\saves`. A terminal `save.json` represents its owner directory. A
-direct file such as `auto_save.json` or `manual_save.json` gets a directory with
-the same filename stem.
+IMDC canonicalizes a supported vanilla save beneath the `data` root, removes
+that root, preserves every relative segment, and prepends the `IMDataCore` root.
 
-| Vanilla save | IM Data Core directory |
+| Vanilla save | IM Data Core sidecar |
 | --- | --- |
-| `data\manual_saves\12\save.json` | `IMDataCore\saves\manual_saves\12` |
-| `data\story_mode\Agency_123\manual_saves\A1B2C3D4\save.json` | `IMDataCore\saves\story_mode\Agency_123\manual_saves\A1B2C3D4` |
-| `data\story_mode\Agency_123\chapter_1\save.json` | `IMDataCore\saves\story_mode\Agency_123\chapter_1` |
-| `data\story_mode\Agency_123\auto_save.json` | `IMDataCore\saves\story_mode\Agency_123\auto_save` |
-| `data\story_mode\Agency_123\manual_save.json` | `IMDataCore\saves\story_mode\Agency_123\manual_save` |
-| `data\auto_save.json` | `IMDataCore\saves\auto_save` |
-| `data\manual_save.json` | `IMDataCore\saves\manual_save` |
+| `data/auto_save.json` | `IMDataCore/auto_save.json` |
+| `data/manual_save.json` | `IMDataCore/manual_save.json` |
+| `data/manual_saves/1c5ec635/save.json` | `IMDataCore/manual_saves/1c5ec635/save.json` |
+| `data/story_mode/Agency_123/auto_save.json` | `IMDataCore/story_mode/Agency_123/auto_save.json` |
+| `data/story_mode/Agency_123/manual_save.json` | `IMDataCore/story_mode/Agency_123/manual_save.json` |
+| `data/story_mode/Agency_123/manual_saves/A1B2C3D4/save.json` | `IMDataCore/story_mode/Agency_123/manual_saves/A1B2C3D4/save.json` |
+| `data/story_mode/Agency_123/chapter_3/save.json` | `IMDataCore/story_mode/Agency_123/chapter_3/save.json` |
 
-Each directory contains either `im_data_core.db` or, on a runtime without the
-required SQLite support, `im_data_core.fallback.json`.
+Manual-save and playthrough directory names are opaque. IMDC copies them
+verbatim; it does not replace them with a save title, group name, or derived
+identity. The public logical `save_key` remains separate from this physical
+layout for consumer compatibility.
 
-The readable directory and the internal `save_key` serve different purposes.
-The directory follows the vanilla path. The persisted key retains the previous
-absolute-path hash convention so existing rows and API behavior remain compatible.
+Only vanilla paths matching verified freeplay, Story, manual, autosave, and
+chapter-save shapes are accepted. `data/global_data.json`, traversal paths,
+paths outside `data`, and reparse escapes are rejected.
 
-## Save As and overwrite saves
+## Sidecar contents
 
-When vanilla writes a different save target, IM Data Core first flushes and
-closes the currently active sidecar, then clones that explicit source directory
-into the resolved target directory. This gives a new manual save the same history
-as the game state from which it was created. A failed clone does not cause IM Data
-Core to open an older, unrelated target sidecar.
+The mirrored `.json` is an IMDC document, not a vanilla-save copy. Its envelope
+is:
 
-## Backward-compatible migration
+```text
+FormatName    = IMDataCore.LightweightSidecar
+FormatVersion = 1
+```
 
-If the mirrored target has no storage yet, IM Data Core copies compatible data
-from older layouts. It tries save identities in this order:
+It contains only:
 
-1. The prior exact full-path hash key.
-2. The prior immediate owner-directory key.
-3. The historical `PlayerData.SaveFolderName` key.
-4. The historical player/agency identity fallback key.
+- the exact relative vanilla path;
+- the last-issued IMDC mutation sequence;
+- tiny vanilla-stamp-to-sequence checkpoints;
+- IMDC historical/supplemental event records;
+- historical custom JSON `SET`/`REMOVE` mutations;
 
-For each identity it probes the old keyed layout under:
+It does not contain `SaveManager.SavedData`, vanilla entity collections,
+embedded checkpoint snapshots, SQL tables, or derived runtime indexes.
 
-- `Application.persistentDataPath\IMDataCore`
-- `Application.persistentDataPath\Mods\IMDataCore`
-- `Application.persistentDataPath\Mods\IM Data Core`
-- The currently loaded or assembly-adjacent mod installation directory
-- The known Workshop installation (`workshop\content\821880\3680836490`)
+## Save, Save As, and rollback
 
-Both `saves\<key>` and the older direct `<key>` form are recognized at these
-roots. Existing flat-file fallback storage remains a fallback file; migration
-does not silently replace it with an empty SQLite database.
+At a vanilla save callsite, IMDC writes the current active in-memory branch to
+the exactly mirrored target and adds the actual vanilla checkpoint. Saving to a
+different or overwritten target never merges stale IMDC history already at that
+target.
 
-Migration is copy-only. Legacy files and directories are not moved or deleted,
-so they remain available for rollback to an older mod build. Direct auto/manual
-directories that already overlap the new layout are opened in place and their
-plausible historical row keys are remapped to the exact current key.
+On load, IMDC reads only the selected sidecar. An exact vanilla stamp activates
+history through its mapped sequence. Without a matching checkpoint, IMDC filters
+its own records through the loaded vanilla game date. This rollback is initially
+in memory: the durable sidecar is not shortened until a later vanilla save or an
+explicit `TryFlushNow` commits the active branch.
+
+Sidecar writes use an IMDC-owned temporary file, flush it, and atomically
+replace or move the target. Every write, backup, and cleanup target is validated
+under the private `IMDataCore` root. Vanilla files are never temporary,
+replacement, backup, or cleanup targets.
+
+## Legacy compatibility
+
+Old 1.2 and 1.3 artifacts remain immutable. Discovery may find historical
+`im_data_core.db`, `im_data_core.fallback.json`, and fallback recovery files in
+the old keyed/mirrored roots, including `IMDataCore/saves`,
+`Mods/IMDataCore`, installed-mod roots, and the prior Workshop location.
+
+Automatic import is deliberately narrow:
+
+- it runs only when the new lightweight sidecar is absent;
+- it never opens legacy SQLite;
+- it accepts only the late-1.3 fallback `FormatVersion = 2` format with valid
+  integrity data and an exact generation matching the already-deserialized
+  vanilla `SavedData`;
+- it imports historical events and current custom values (as migration-baseline
+  `SET` mutations), while omitting redundant legacy projections;
+- conflicting exact sources are rejected;
+- after success, the new sidecar is written and normal runtime uses only it.
+
+The importer reproduces the old fingerprint solely in memory for this one-time
+compatibility decision. Normal 2.0 identity and rollback do not hash vanilla.
+Early/unversioned fallback files and legacy SQLite lack a safely proven mapping
+to the loaded vanilla checkpoint, so they are left untouched and a clear
+limitation is logged instead of guessing.
