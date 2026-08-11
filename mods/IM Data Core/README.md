@@ -1,4 +1,4 @@
-﻿# IM Data Core
+# IM Data Core
 
 IM Data Core is a lightweight history and supplemental-data framework for Idol
 Manager. It gives other mods a stable way to persist rollback-safe custom JSON
@@ -259,3 +259,32 @@ When refactoring this codebase:
 - Keep Harmony target symbols unchanged unless intentional behavior change.
 - Prefer small commits with a build after each structural move.
 - Avoid reintroducing disabled duplicate legacy storage blocks.
+
+## 2.0.4 compact-history refactor
+
+IM Data Core 2.0.4 keeps the lightweight mirrored-sidecar architecture and
+reduces long-save growth without changing the public API.
+
+- Vanilla remains canonical for ordinary saved game state. IMDC never rewrites a
+  vanilla save and explicitly rejects `data\global_data.json` as a save scope.
+- The private sidecar continues to mirror the exact vanilla path beneath
+  `<Application.persistentDataPath>\IMDataCore`.
+- Three built-in technical telemetry streams are no longer retained as durable
+  IMDC history: raw `idol_status_changed`, `research_points_accrued`, and
+  `idol_earnings_recorded`. Vanilla already saves the corresponding canonical
+  current/status, research, and monthly earnings state. Higher-level career,
+  research, and finance events remain.
+- Consumer-owned custom/namespaced events are never filtered, even if they reuse
+  one of those event type strings.
+- Existing lightweight sidecars are filtered in memory when loaded. The retired
+  technical rows disappear from disk only when IMDC later writes its own sidecar.
+- Idol timeline reads and money-ledger reads use derived in-memory indexes rebuilt
+  from source history. The indexes are not serialized.
+- Money transactions remain exact and lossless. 2.0.4 does not prune transaction
+  history or strip structured transaction details.
+- The sidecar JSON boundary uses IMDC's managed schema codec instead of Unity
+  `JsonUtility`, and missing required history arrays are treated as malformed
+  sidecars rather than silently normalized to empty history.
+- Vanilla load restoration occurs exactly once, immediately after
+  `SaveManager.Data` is assigned and before vanilla `LoadEvent`. The postfix only
+  performs fail-soft completion.

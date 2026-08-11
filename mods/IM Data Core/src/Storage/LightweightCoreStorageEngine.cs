@@ -151,6 +151,18 @@ namespace IMDataCore
         private readonly HashSet<long> activeMutationSequences = new HashSet<long>();
         private readonly HashSet<long> activeEventIdentifiers = new HashSet<long>();
 
+        // Derived read indexes. They are rebuilt from activeEvents and are never
+        // serialized, so they add no sidecar duplication.
+        private readonly Dictionary<int, List<LightweightEventRecord>>
+            timelineEventsByIdolId =
+                new Dictionary<int, List<LightweightEventRecord>>();
+        private readonly List<LightweightEventRecord> globalTimelineEvents =
+            new List<LightweightEventRecord>();
+        private readonly SortedDictionary<int, List<LightweightEventRecord>>
+            moneyTransactionsByDateKey =
+                new SortedDictionary<int, List<LightweightEventRecord>>();
+        private LightweightEventRecord moneyLedgerCoverageStartEvent;
+
         private List<LightweightEventRecord> durableEvents =
             new List<LightweightEventRecord>();
         private List<LightweightCustomMutationRecord> durableCustomMutations =
@@ -351,16 +363,29 @@ namespace IMDataCore
                 try
                 {
                     ThrowIfDisposed();
-                    HashSet<long> batchSequences = new HashSet<long>();
-                    HashSet<long> batchEventIdentifiers = new HashSet<long>();
+
+                    List<PendingEvent> retained =
+                        new List<PendingEvent>(pendingEvents.Count);
                     for (int index = 0; index < pendingEvents.Count; index++)
                     {
                         PendingEvent pending = pendingEvents[index];
-                        if (pending == null)
+                        if (pending != null &&
+                            CoreEventRetention.ShouldPersist(pending))
                         {
-                            continue;
+                            retained.Add(pending);
                         }
+                    }
 
+                    if (retained.Count == 0)
+                    {
+                        return true;
+                    }
+
+                    HashSet<long> batchSequences = new HashSet<long>();
+                    HashSet<long> batchEventIdentifiers = new HashSet<long>();
+                    for (int index = 0; index < retained.Count; index++)
+                    {
+                        PendingEvent pending = retained[index];
                         long eventIdentifier = pending.CaptureSequence;
                         if (pending.CaptureSequence <= 0L ||
                             activeMutationSequences.Contains(pending.CaptureSequence) ||
@@ -374,14 +399,9 @@ namespace IMDataCore
                         }
                     }
 
-                    for (int index = 0; index < pendingEvents.Count; index++)
+                    for (int index = 0; index < retained.Count; index++)
                     {
-                        PendingEvent pending = pendingEvents[index];
-                        if (pending == null)
-                        {
-                            continue;
-                        }
-
+                        PendingEvent pending = retained[index];
                         LightweightEventRecord record = new LightweightEventRecord
                         {
                             Sequence = pending.CaptureSequence,
@@ -393,12 +413,15 @@ namespace IMDataCore
                             EntityId = pending.EntityId ?? string.Empty,
                             EventType = pending.EventType ?? string.Empty,
                             SourcePatch = pending.SourcePatch ?? string.Empty,
-                            NamespaceIdentifier = pending.NamespaceIdentifier ?? string.Empty,
-                            PayloadJson = pending.PayloadJson ?? CoreConstants.EmptyJsonObject
+                            NamespaceIdentifier =
+                                pending.NamespaceIdentifier ?? string.Empty,
+                            PayloadJson =
+                                pending.PayloadJson ?? CoreConstants.EmptyJsonObject
                         };
                         activeEvents.Add(record);
                         activeMutationSequences.Add(record.Sequence);
                         activeEventIdentifiers.Add(record.EventId);
+                        IndexEventLocked(record);
                         if (record.Sequence > lastIssuedSequence)
                         {
                             lastIssuedSequence = record.Sequence;
@@ -414,9 +437,7 @@ namespace IMDataCore
                     return false;
                 }
             }
-        }
-
-        internal bool TryValidateCustomDataMutation(
+        }        internal bool TryValidateCustomDataMutation(
             string namespaceIdentifier,
             string dataKey,
             string jsonValue,
@@ -622,30 +643,20 @@ namespace IMDataCore
                         return true;
                     }
 
+                    List<LightweightEventRecord> indexedIdolEvents;
                     List<LightweightEventRecord> idolEvents =
-                        new List<LightweightEventRecord>();
-                    List<LightweightEventRecord> globalEvents =
-                        new List<LightweightEventRecord>();
-                    for (int index = 0; index < activeEvents.Count; index++)
-                    {
-                        LightweightEventRecord record = activeEvents[index];
-                        if (record == null || IsMoneyLedgerInternalEvent(record))
-                        {
-                            continue;
-                        }
+                        timelineEventsByIdolId.TryGetValue(
+                            idolId,
+                            out indexedIdolEvents)
+                            ? new List<LightweightEventRecord>(indexedIdolEvents)
+                            : new List<LightweightEventRecord>();
 
-                        if (record.IdolId == idolId)
-                        {
-                            idolEvents.Add(record);
-                        }
-                        else if (record.IdolId < CoreConstants.MinimumValidIdolIdentifier)
-                        {
-                            globalEvents.Add(record);
-                        }
-                    }
+                    List<LightweightEventRecord> globalEvents =
+                        new List<LightweightEventRecord>(globalTimelineEvents);
 
                     idolEvents.Sort(CompareEventsDescending);
                     globalEvents.Sort(CompareEventsDescending);
+
                     AppendPublicEvents(idolEvents, maxCount, events);
                     if (events.Count < maxCount)
                     {
@@ -661,9 +672,7 @@ namespace IMDataCore
                     return false;
                 }
             }
-        }
-
-        internal bool TryReadMoneyTransactions(
+        }        internal bool TryReadMoneyTransactions(
             DateTime startInclusive,
             DateTime endExclusive,
             int maxCount,
@@ -679,62 +688,61 @@ namespace IMDataCore
                 try
                 {
                     ThrowIfDisposed();
-                    int startDateKey = CoreDateTimeUtility.BuildGameDateKey(startInclusive);
-                    int endDateKey = CoreDateTimeUtility.BuildGameDateKey(endExclusive);
-                    List<LightweightEventRecord> matching =
-                        new List<LightweightEventRecord>();
-                    for (int index = 0; index < activeEvents.Count; index++)
-                    {
-                        LightweightEventRecord record = activeEvents[index];
-                        if (record == null ||
-                            !string.Equals(
-                                record.EventType,
-                                MoneyLedgerConstants.EventTypeTransaction,
-                                StringComparison.Ordinal) ||
-                            record.GameDateKey < startDateKey ||
-                            record.GameDateKey >= endDateKey)
-                        {
-                            continue;
-                        }
-
-                        matching.Add(record);
-                    }
-
-                    matching.Sort(CompareEventsAscending);
+                    int startDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(startInclusive);
+                    int endDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(endExclusive);
                     int requestedCount = Math.Max(
                         MoneyLedgerConstants.MinimumReadCount,
                         maxCount);
-                    for (int index = 0; index < matching.Count; index++)
+
+                    foreach (KeyValuePair<
+                        int,
+                        List<LightweightEventRecord>> pair
+                        in moneyTransactionsByDateKey)
                     {
-                        IMDataCoreMoneyTransaction transaction =
-                            MoneyLedgerPayloadUtility.ToPublicModel(
-                                ToPublicEvent(matching[index]));
-                        if (transaction == null)
+                        if (pair.Key < startDateKey)
                         {
                             continue;
                         }
-
-                        if (transactions.Count >= requestedCount)
+                        if (pair.Key >= endDateKey)
                         {
-                            wasTruncated = true;
                             break;
                         }
 
-                        transactions.Add(transaction);
+                        List<LightweightEventRecord> rows = pair.Value;
+                        for (int index = 0;
+                            rows != null && index < rows.Count;
+                            index++)
+                        {
+                            IMDataCoreMoneyTransaction transaction =
+                                MoneyLedgerPayloadUtility.ToPublicModel(
+                                    ToPublicEvent(rows[index]));
+                            if (transaction == null)
+                            {
+                                continue;
+                            }
+                            if (transactions.Count >= requestedCount)
+                            {
+                                wasTruncated = true;
+                                return true;
+                            }
+
+                            transactions.Add(transaction);
+                        }
                     }
 
                     return true;
                 }
                 catch (Exception exception)
                 {
-                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix +
+                    errorMessage =
+                        CoreConstants.MessageTryReadRecentEventsFailedPrefix +
                         exception.Message;
                     return false;
                 }
             }
-        }
-
-        internal bool TryGetMoneyLedgerCoverageStart(
+        }        internal bool TryGetMoneyLedgerCoverageStart(
             out DateTime coverageStart,
             out string errorMessage)
         {
@@ -745,43 +753,23 @@ namespace IMDataCore
                 try
                 {
                     ThrowIfDisposed();
-                    LightweightEventRecord earliest = null;
-                    for (int index = 0; index < activeEvents.Count; index++)
-                    {
-                        LightweightEventRecord record = activeEvents[index];
-                        if (record == null ||
-                            !string.Equals(
-                                record.EventType,
-                                MoneyLedgerConstants.EventTypeCoverageStarted,
-                                StringComparison.Ordinal))
-                        {
-                            continue;
-                        }
-
-                        if (earliest == null ||
-                            CompareEventsAscending(record, earliest) < 0)
-                        {
-                            earliest = record;
-                        }
-                    }
-
-                    return earliest != null && DateTime.TryParseExact(
-                        earliest.GameDateTime,
-                        CoreConstants.RoundTripDateFormat,
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.RoundtripKind,
-                        out coverageStart);
+                    return moneyLedgerCoverageStartEvent != null &&
+                        DateTime.TryParseExact(
+                            moneyLedgerCoverageStartEvent.GameDateTime,
+                            CoreConstants.RoundTripDateFormat,
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.RoundtripKind,
+                            out coverageStart);
                 }
                 catch (Exception exception)
                 {
-                    errorMessage = CoreConstants.MessageTryReadRecentEventsFailedPrefix +
+                    errorMessage =
+                        CoreConstants.MessageTryReadRecentEventsFailedPrefix +
                         exception.Message;
                     return false;
                 }
             }
-        }
-
-        /// <summary>
+        }        /// <summary>
         /// Selects the sequence explicitly associated with the loaded vanilla
         /// checkpoint. The greatest sidecar sequence is never an implicit choice.
         /// </summary>
@@ -1063,6 +1051,10 @@ namespace IMDataCore
             {
                 return true;
             }
+            if (!CoreEventRetention.ShouldPersist(importedEvent))
+            {
+                return true;
+            }
 
             lock (storageLock)
             {
@@ -1084,8 +1076,11 @@ namespace IMDataCore
                         return false;
                     }
 
-                    activeEvents.Add(CloneEvent(importedEvent));
+                    LightweightEventRecord importedClone =
+                        CloneEvent(importedEvent);
+                    activeEvents.Add(importedClone);
                     activeEventIdentifiers.Add(importedEvent.EventId);
+                    IndexEventLocked(importedClone);
                     if (importedEvent.EventId > lastIssuedSequence)
                     {
                         lastIssuedSequence = importedEvent.EventId;
@@ -1278,17 +1273,33 @@ namespace IMDataCore
 
         private void LoadDocumentLocked(LightweightSidecarDocument document)
         {
-            durableEvents = CloneEvents(document.Events);
-            durableCustomMutations = CloneCustomMutations(document.CustomMutations);
+            int retiredTechnicalEventCount;
+            List<LightweightEventRecord> retainedEvents =
+                CoreEventRetention.FilterLoadedEvents(
+                    document.Events,
+                    out retiredTechnicalEventCount);
+
+            if (retiredTechnicalEventCount > 0)
+            {
+                CoreLog.Info(
+                    "IM Data Core retired " +
+                    retiredTechnicalEventCount.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " redundant built-in telemetry rows while loading this sidecar. " +
+                    "The smaller history will be written at the next IMDC save boundary.");
+            }
+
+            durableEvents = CloneEvents(retainedEvents);
+            durableCustomMutations =
+                CloneCustomMutations(document.CustomMutations);
             durableCheckpoints = CloneCheckpoints(document.Checkpoints);
             activeEvents = CloneEvents(durableEvents);
-            activeCustomMutations = CloneCustomMutations(durableCustomMutations);
+            activeCustomMutations =
+                CloneCustomMutations(durableCustomMutations);
             activeCheckpoints = CloneCheckpoints(durableCheckpoints);
             lastIssuedSequence = document.LastIssuedSequence;
             RebuildRuntimeIndexesLocked();
-        }
-
-        private void ActivateThroughSequenceLocked(long sequence)
+        }        private void ActivateThroughSequenceLocked(long sequence)
         {
             activeEvents = new List<LightweightEventRecord>();
             activeCustomMutations = new List<LightweightCustomMutationRecord>();
@@ -1329,8 +1340,14 @@ namespace IMDataCore
             customValues.Clear();
             activeMutationSequences.Clear();
             activeEventIdentifiers.Clear();
+            timelineEventsByIdolId.Clear();
+            globalTimelineEvents.Clear();
+            moneyTransactionsByDateKey.Clear();
+            moneyLedgerCoverageStartEvent = null;
+
             activeEvents.Sort(CompareEventsBySequenceAscending);
-            activeCustomMutations.Sort(CompareCustomMutationsBySequenceAscending);
+            activeCustomMutations.Sort(
+                CompareCustomMutationsBySequenceAscending);
 
             for (int index = 0; index < activeEvents.Count; index++)
             {
@@ -1342,9 +1359,12 @@ namespace IMDataCore
 
                 activeMutationSequences.Add(record.Sequence);
                 activeEventIdentifiers.Add(record.EventId);
+                IndexEventLocked(record);
             }
 
-            for (int index = 0; index < activeCustomMutations.Count; index++)
+            for (int index = 0;
+                index < activeCustomMutations.Count;
+                index++)
             {
                 LightweightCustomMutationRecord mutation =
                     activeCustomMutations[index];
@@ -1366,17 +1386,77 @@ namespace IMDataCore
                 }
                 else
                 {
-                    customValues[compositeKey] = new MaterializedCustomValue
-                    {
-                        NamespaceIdentifier = mutation.NamespaceIdentifier ?? string.Empty,
-                        DataKey = mutation.DataKey ?? string.Empty,
-                        ValueJson = mutation.ValueJson ?? string.Empty
-                    };
+                    customValues[compositeKey] =
+                        new MaterializedCustomValue
+                        {
+                            NamespaceIdentifier =
+                                mutation.NamespaceIdentifier ?? string.Empty,
+                            DataKey = mutation.DataKey ?? string.Empty,
+                            ValueJson = mutation.ValueJson ?? string.Empty
+                        };
                 }
             }
         }
 
-        private bool TryReserveMutationSequenceLocked(
+        private void IndexEventLocked(LightweightEventRecord record)
+        {
+            if (record == null)
+            {
+                return;
+            }
+
+            if (string.Equals(
+                record.EventType,
+                MoneyLedgerConstants.EventTypeTransaction,
+                StringComparison.Ordinal))
+            {
+                List<LightweightEventRecord> rows;
+                if (!moneyTransactionsByDateKey.TryGetValue(
+                    record.GameDateKey,
+                    out rows))
+                {
+                    rows = new List<LightweightEventRecord>();
+                    moneyTransactionsByDateKey.Add(
+                        record.GameDateKey,
+                        rows);
+                }
+                rows.Add(record);
+                return;
+            }
+
+            if (string.Equals(
+                record.EventType,
+                MoneyLedgerConstants.EventTypeCoverageStarted,
+                StringComparison.Ordinal))
+            {
+                if (moneyLedgerCoverageStartEvent == null ||
+                    CompareEventsAscending(
+                        record,
+                        moneyLedgerCoverageStartEvent) < 0)
+                {
+                    moneyLedgerCoverageStartEvent = record;
+                }
+                return;
+            }
+
+            if (record.IdolId >= CoreConstants.MinimumValidIdolIdentifier)
+            {
+                List<LightweightEventRecord> idolRows;
+                if (!timelineEventsByIdolId.TryGetValue(
+                    record.IdolId,
+                    out idolRows))
+                {
+                    idolRows = new List<LightweightEventRecord>();
+                    timelineEventsByIdolId.Add(
+                        record.IdolId,
+                        idolRows);
+                }
+                idolRows.Add(record);
+                return;
+            }
+
+            globalTimelineEvents.Add(record);
+        }        private bool TryReserveMutationSequenceLocked(
             long sequence,
             out string errorMessage)
         {
@@ -1533,6 +1613,10 @@ namespace IMDataCore
             customValues.Clear();
             activeMutationSequences.Clear();
             activeEventIdentifiers.Clear();
+            timelineEventsByIdolId.Clear();
+            globalTimelineEvents.Clear();
+            moneyTransactionsByDateKey.Clear();
+            moneyLedgerCoverageStartEvent = null;
             currentSidecarPath = string.Empty;
             currentRelativeSavePath = string.Empty;
             lastIssuedSequence = 0L;
