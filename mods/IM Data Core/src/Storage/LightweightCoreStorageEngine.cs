@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using UnityEngine;
 
 namespace IMDataCore
 {
@@ -265,7 +264,7 @@ namespace IMDataCore
 
                     string rawJson = File.ReadAllText(currentSidecarPath);
                     LightweightSidecarDocument document =
-                        JsonUtility.FromJson<LightweightSidecarDocument>(rawJson);
+                        LightweightSidecarJson.Deserialize(rawJson);
                     if (!TryValidateDocumentLocked(document, out errorMessage))
                     {
                         ResetStateLocked();
@@ -992,7 +991,7 @@ namespace IMDataCore
 
                     LightweightSidecarDocument document = BuildDocumentLocked(
                         saveScope.RelativeSavePath);
-                    string json = JsonUtility.ToJson(document, false);
+                    string json = LightweightSidecarJson.Serialize(document);
                     if (!TryWriteAtomicallyLocked(candidatePath, json, out errorMessage))
                     {
                         return false;
@@ -1032,7 +1031,7 @@ namespace IMDataCore
 
                     LightweightSidecarDocument document = BuildDocumentLocked(
                         currentRelativeSavePath);
-                    string json = JsonUtility.ToJson(document, false);
+                    string json = LightweightSidecarJson.Serialize(document);
                     if (!TryWriteAtomicallyLocked(
                         currentSidecarPath,
                         json,
@@ -1184,20 +1183,13 @@ namespace IMDataCore
                 return false;
             }
 
-            if (document.Events == null)
+            if (document.Events == null ||
+                document.CustomMutations == null ||
+                document.Checkpoints == null)
             {
-                document.Events = new List<LightweightEventRecord>();
-            }
-
-            if (document.CustomMutations == null)
-            {
-                document.CustomMutations =
-                    new List<LightweightCustomMutationRecord>();
-            }
-
-            if (document.Checkpoints == null)
-            {
-                document.Checkpoints = new List<LightweightCheckpointRecord>();
+                errorMessage =
+                    "The sidecar is missing one or more required history collections.";
+                return false;
             }
 
             HashSet<long> sequences = new HashSet<long>();

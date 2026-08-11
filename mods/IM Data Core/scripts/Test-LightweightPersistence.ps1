@@ -257,18 +257,24 @@ function Invoke-TestPersistenceBoundary {
         [System.Web.Script.Serialization.JavaScriptSerializer]$Serializer
     )
 
-    # JsonUtility and Application.persistentDataPath are Unity InternalCall APIs
-    # and cannot execute in a standalone PowerShell/.NET process. Reflect the
-    # production document builder and durable commit, substituting only the native
-    # JSON/file boundary. Document shape, branch selection, and committed state all
-    # remain the compiled LightweightCoreStorageEngine implementation.
+    # Application.persistentDataPath is a Unity InternalCall and cannot execute in
+    # this standalone PowerShell/.NET process. The JSON codec, however, is managed
+    # IMDC code and must be the exact production codec. This regression test must
+    # never substitute JavaScriptSerializer for the sidecar serialization boundary.
     $relativePath = [string](Get-FieldValue $Scope 'RelativeSavePath')
     $buildCall = Invoke-InstanceMethod `
         $Engine `
         'BuildDocumentLocked' `
         ([object[]]@($relativePath))
     $document = $buildCall.ReturnValue
-    $json = $Serializer.Serialize($document)
+    $sidecarJsonType = $Engine.GetType().Assembly.GetType(
+        'IMDataCore.LightweightSidecarJson',
+        $true)
+    $serializeCall = Invoke-StaticMethod `
+        $sidecarJsonType `
+        'Serialize' `
+        ([object[]]@($document))
+    $json = [string]$serializeCall.ReturnValue
     $sidecarPath = [string](Get-FieldValue $Scope 'SidecarFilePath')
     $parentDirectory = [System.IO.Path]::GetDirectoryName($sidecarPath)
     [System.IO.Directory]::CreateDirectory($parentDirectory) | Out-Null
@@ -343,7 +349,14 @@ function Import-TestSidecar {
         [System.Collections.IList]$DisposableEngines
     )
 
-    $document = $Serializer.Deserialize($Json, $DocumentType)
+    $sidecarJsonType = $EngineType.Assembly.GetType(
+        'IMDataCore.LightweightSidecarJson',
+        $true)
+    $deserializeCall = Invoke-StaticMethod `
+        $sidecarJsonType `
+        'Deserialize' `
+        ([object[]]@($Json))
+    $document = $deserializeCall.ReturnValue
     $engine = New-ScopedEngine $EngineType $Scope
     $DisposableEngines.Add($engine) | Out-Null
     $validationArguments = [object[]]@($document, $null)
@@ -540,10 +553,10 @@ try {
     [System.IO.Directory]::CreateDirectory($testRoot) | Out-Null
     Add-Type -AssemblyName System.Web.Extensions
 
-    # Supply the managed surface of Unity JsonUtility before loading IMDC. Unity's
-    # real implementation is an InternalCall that cannot run in this standalone
-    # process; the shim lets compiled payload parsers execute without changing
-    # their call sites or types.
+    # Supply the managed surface of Unity JsonUtility before loading IMDC only for
+    # unrelated compiled payload helpers that still use it. The lightweight
+    # sidecar itself must use IMDC's production LightweightSidecarJson codec in
+    # this test so the test cannot hide runtime collection-loss bugs.
     $jsonShimPath = Join-Path $testRoot 'UnityEngine.JSONSerializeModule.dll'
     $jsonShimSource = @'
 using System;
@@ -836,6 +849,35 @@ namespace UnityEngine
         (Test-Path -LiteralPath $sidecarPath -PathType Leaf) `
         'The lightweight sidecar was not persisted beneath the temporary IMDC root.'
     $initialJson = [System.IO.File]::ReadAllText($sidecarPath)
+    Assert-True `
+        ($initialJson.Contains('"Checkpoints":[')) `
+        'The production sidecar JSON omitted the Checkpoints collection.'
+    Assert-True `
+        ($initialJson.Contains('"Events":[')) `
+        'The production sidecar JSON omitted the Events collection.'
+    Assert-True `
+        ($initialJson.Contains('"CustomMutations":[')) `
+        'The production sidecar JSON omitted the CustomMutations collection.'
+
+    # Regression for the real failure observed in Idol Manager: a header-only
+    # sidecar with a sequence watermark but no persisted collections must be
+    # rejected instead of being normalized into three empty lists.
+    $sidecarJsonType = $engineType.Assembly.GetType(
+        'IMDataCore.LightweightSidecarJson',
+        $true)
+    $headerOnlyRejected = $false
+    try {
+        Invoke-StaticMethod `
+            $sidecarJsonType `
+            'Deserialize' `
+            ([object[]]@(
+                '{"FormatName":"IMDataCore.LightweightSidecar","FormatVersion":1,"RelativeSavePath":"manual_saves/1c5ec635/save.json","LastIssuedSequence":2711}')) |
+            Out-Null
+    }
+    catch {
+        $headerOnlyRejected = $true
+    }
+    Assert-True $headerOnlyRejected 'A header-only/truncated sidecar was accepted.'
     $initialBytes = [Convert]::ToBase64String(
         [System.IO.File]::ReadAllBytes($sidecarPath))
     Assert-Equal $formatName `
