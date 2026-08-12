@@ -134,7 +134,7 @@ namespace IMDataCore
     internal sealed class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
-        internal const int SidecarFormatVersion = 1;
+        internal const int SidecarFormatVersion = 2;
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
 
@@ -364,16 +364,33 @@ namespace IMDataCore
                 {
                     ThrowIfDisposed();
 
+                    long highestIncomingSequence = lastIssuedSequence;
                     List<PendingEvent> retained =
                         new List<PendingEvent>(pendingEvents.Count);
                     for (int index = 0; index < pendingEvents.Count; index++)
                     {
                         PendingEvent pending = pendingEvents[index];
-                        if (pending != null &&
-                            CoreEventRetention.ShouldPersist(pending))
+                        if (pending == null)
+                        {
+                            continue;
+                        }
+
+                        if (pending.CaptureSequence > highestIncomingSequence)
+                        {
+                            highestIncomingSequence = pending.CaptureSequence;
+                        }
+
+                        if (CoreEventRetention.ShouldPersist(pending))
                         {
                             retained.Add(pending);
                         }
+                    }
+
+                    // Sequence watermarks describe issued mutations, not the count
+                    // of physical rows. Compaction intentionally leaves gaps.
+                    if (highestIncomingSequence > lastIssuedSequence)
+                    {
+                        lastIssuedSequence = highestIncomingSequence;
                     }
 
                     if (retained.Count == 0)
@@ -381,11 +398,19 @@ namespace IMDataCore
                         return true;
                     }
 
+                    int sparseMoneyPayloadCount;
+                    int sharedShowRowsRemoved;
+                    List<PendingEvent> compacted =
+                        CorePayloadCompaction.CompactPendingEvents(
+                            retained,
+                            out sparseMoneyPayloadCount,
+                            out sharedShowRowsRemoved);
+
                     HashSet<long> batchSequences = new HashSet<long>();
                     HashSet<long> batchEventIdentifiers = new HashSet<long>();
-                    for (int index = 0; index < retained.Count; index++)
+                    for (int index = 0; index < compacted.Count; index++)
                     {
-                        PendingEvent pending = retained[index];
+                        PendingEvent pending = compacted[index];
                         long eventIdentifier = pending.CaptureSequence;
                         if (pending.CaptureSequence <= 0L ||
                             activeMutationSequences.Contains(pending.CaptureSequence) ||
@@ -399,9 +424,9 @@ namespace IMDataCore
                         }
                     }
 
-                    for (int index = 0; index < retained.Count; index++)
+                    for (int index = 0; index < compacted.Count; index++)
                     {
-                        PendingEvent pending = retained[index];
+                        PendingEvent pending = compacted[index];
                         LightweightEventRecord record = new LightweightEventRecord
                         {
                             Sequence = pending.CaptureSequence,
@@ -422,10 +447,6 @@ namespace IMDataCore
                         activeMutationSequences.Add(record.Sequence);
                         activeEventIdentifiers.Add(record.EventId);
                         IndexEventLocked(record);
-                        if (record.Sequence > lastIssuedSequence)
-                        {
-                            lastIssuedSequence = record.Sequence;
-                        }
                     }
 
                     return true;
@@ -657,7 +678,11 @@ namespace IMDataCore
                     idolEvents.Sort(CompareEventsDescending);
                     globalEvents.Sort(CompareEventsDescending);
 
-                    AppendPublicEvents(idolEvents, maxCount, events);
+                    AppendPublicEventsForIdol(
+                        idolEvents,
+                        idolId,
+                        maxCount,
+                        events);
                     if (events.Count < maxCount)
                     {
                         AppendPublicEvents(globalEvents, maxCount, events);
@@ -715,9 +740,15 @@ namespace IMDataCore
                             rows != null && index < rows.Count;
                             index++)
                         {
+                            IMDataCoreEvent publicMoneyEvent =
+                                ToPublicEvent(rows[index]);
+                            publicMoneyEvent.PayloadJson =
+                                CorePayloadCompaction
+                                    .ExpandMoneyTransactionPayloadForPublic(
+                                        rows[index]);
                             IMDataCoreMoneyTransaction transaction =
                                 MoneyLedgerPayloadUtility.ToPublicModel(
-                                    ToPublicEvent(rows[index]));
+                                    publicMoneyEvent);
                             if (transaction == null)
                             {
                                 continue;
@@ -1161,7 +1192,8 @@ namespace IMDataCore
                     document.FormatName,
                     SidecarFormatName,
                     StringComparison.Ordinal) ||
-                document.FormatVersion != SidecarFormatVersion)
+                (document.FormatVersion != SidecarFormatVersion &&
+                 document.FormatVersion != 1))
             {
                 errorMessage = "The sidecar format is unsupported.";
                 return false;
@@ -1279,17 +1311,37 @@ namespace IMDataCore
                     document.Events,
                     out retiredTechnicalEventCount);
 
+            int sparseMoneyPayloadCount;
+            int sharedShowRowsRemoved;
+            List<LightweightEventRecord> compactedEvents =
+                CorePayloadCompaction.CompactLoadedEvents(
+                    retainedEvents,
+                    out sparseMoneyPayloadCount,
+                    out sharedShowRowsRemoved);
+
             if (retiredTechnicalEventCount > 0)
             {
                 CoreLog.Info(
                     "IM Data Core retired " +
                     retiredTechnicalEventCount.ToString(
                         CultureInfo.InvariantCulture) +
-                    " redundant built-in telemetry rows while loading this sidecar. " +
-                    "The smaller history will be written at the next IMDC save boundary.");
+                    " redundant built-in telemetry rows while loading this sidecar.");
             }
 
-            durableEvents = CloneEvents(retainedEvents);
+            if (sparseMoneyPayloadCount > 0 || sharedShowRowsRemoved > 0)
+            {
+                CoreLog.Info(
+                    "IM Data Core 2.0.5 compacted " +
+                    sparseMoneyPayloadCount.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " money-detail payloads and removed " +
+                    sharedShowRowsRemoved.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " duplicate show-participant rows in memory. " +
+                    "The smaller format will be written at the next IMDC save boundary.");
+            }
+
+            durableEvents = CloneEvents(compactedEvents);
             durableCustomMutations =
                 CloneCustomMutations(document.CustomMutations);
             durableCheckpoints = CloneCheckpoints(document.Checkpoints);
@@ -1416,9 +1468,7 @@ namespace IMDataCore
                     out rows))
                 {
                     rows = new List<LightweightEventRecord>();
-                    moneyTransactionsByDateKey.Add(
-                        record.GameDateKey,
-                        rows);
+                    moneyTransactionsByDateKey.Add(record.GameDateKey, rows);
                 }
                 rows.Add(record);
                 return;
@@ -1439,23 +1489,42 @@ namespace IMDataCore
                 return;
             }
 
+            List<int> showParticipantIds;
+            if (record.IdolId < CoreConstants.MinimumValidIdolIdentifier &&
+                CorePayloadCompaction.TryGetSharedTimelineParticipantIds(
+                    record,
+                    out showParticipantIds))
+            {
+                for (int index = 0; index < showParticipantIds.Count; index++)
+                {
+                    AddTimelineEventForIdolLocked(
+                        showParticipantIds[index],
+                        record);
+                }
+                return;
+            }
+
             if (record.IdolId >= CoreConstants.MinimumValidIdolIdentifier)
             {
-                List<LightweightEventRecord> idolRows;
-                if (!timelineEventsByIdolId.TryGetValue(
-                    record.IdolId,
-                    out idolRows))
-                {
-                    idolRows = new List<LightweightEventRecord>();
-                    timelineEventsByIdolId.Add(
-                        record.IdolId,
-                        idolRows);
-                }
-                idolRows.Add(record);
+                AddTimelineEventForIdolLocked(record.IdolId, record);
                 return;
             }
 
             globalTimelineEvents.Add(record);
+        }
+
+        private void AddTimelineEventForIdolLocked(
+            int idolId,
+            LightweightEventRecord record)
+        {
+            List<LightweightEventRecord> idolRows;
+            if (!timelineEventsByIdolId.TryGetValue(idolId, out idolRows))
+            {
+                idolRows = new List<LightweightEventRecord>();
+                timelineEventsByIdolId.Add(idolId, idolRows);
+            }
+
+            idolRows.Add(record);
         }        private bool TryReserveMutationSequenceLocked(
             long sequence,
             out string errorMessage)
@@ -1635,6 +1704,25 @@ namespace IMDataCore
                     StringComparison.Ordinal);
         }
 
+        private static void AppendPublicEventsForIdol(
+            IReadOnlyList<LightweightEventRecord> source,
+            int requestedIdolId,
+            int maximumCount,
+            ICollection<IMDataCoreEvent> target)
+        {
+            for (int index = 0;
+                index < source.Count && target.Count < maximumCount;
+                index++)
+            {
+                LightweightEventRecord record = source[index];
+                IMDataCoreEvent publicEvent = ToPublicEvent(record);
+                if (CorePayloadCompaction.IsSharedTimelineEvent(record))
+                {
+                    publicEvent.IdolId = requestedIdolId;
+                }
+                target.Add(publicEvent);
+            }
+        }
         private static void AppendPublicEvents(
             IReadOnlyList<LightweightEventRecord> source,
             int maximumCount,

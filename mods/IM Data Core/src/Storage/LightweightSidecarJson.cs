@@ -108,6 +108,643 @@ namespace IMDataCore
             return document;
         }
 
+        internal static string CompactMoneyTransactionPayload(
+            string payloadJson,
+            out bool changed)
+        {
+            changed = false;
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                return payloadJson ?? string.Empty;
+            }
+
+            try
+            {
+                JsonValue outerValue = new JsonParser(payloadJson).ParseDocument();
+                if (outerValue == null || outerValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                JsonValue detailMember;
+                if (!outerValue.ObjectValue.TryGetValue(
+                        "detail_json",
+                        out detailMember) ||
+                    detailMember == null ||
+                    detailMember.Kind != JsonValueKind.String ||
+                    string.IsNullOrEmpty(detailMember.StringValue))
+                {
+                    return payloadJson;
+                }
+
+                JsonValue detailValue =
+                    new JsonParser(detailMember.StringValue).ParseDocument();
+                if (detailValue == null || detailValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                List<string> keysToRemove = new List<string>();
+                foreach (KeyValuePair<string, JsonValue> pair
+                    in detailValue.ObjectValue)
+                {
+                    if (string.Equals(
+                            pair.Key,
+                            "kind",
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (IsMoneyDetailDefault(pair.Key, pair.Value))
+                    {
+                        keysToRemove.Add(pair.Key);
+                    }
+                }
+
+                if (keysToRemove.Count == 0)
+                {
+                    return payloadJson;
+                }
+
+                for (int index = 0; index < keysToRemove.Count; index++)
+                {
+                    detailValue.ObjectValue.Remove(keysToRemove[index]);
+                }
+
+                outerValue.ObjectValue["detail_json"] = new JsonValue
+                {
+                    Kind = JsonValueKind.String,
+                    StringValue = SerializeJsonValue(detailValue)
+                };
+
+                changed = true;
+                return SerializeJsonValue(outerValue);
+            }
+            catch
+            {
+                // Payload compaction is an optimization. Preserve the original
+                // capture verbatim if a future payload shape is not understood.
+                changed = false;
+                return payloadJson;
+            }
+        }
+
+        internal static bool TryReadCsvIntProperty(
+            string json,
+            string propertyName,
+            int minimumValue,
+            out List<int> values)
+        {
+            values = new List<int>();
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                JsonValue root = new JsonParser(json).ParseDocument();
+                if (root == null || root.Kind != JsonValueKind.Object)
+                {
+                    return false;
+                }
+
+                JsonValue property;
+                if (!root.ObjectValue.TryGetValue(propertyName, out property) ||
+                    property == null ||
+                    property.Kind != JsonValueKind.String ||
+                    string.IsNullOrWhiteSpace(property.StringValue))
+                {
+                    return false;
+                }
+
+                HashSet<int> uniqueValues = new HashSet<int>();
+                string[] tokens = property.StringValue.Split(',');
+                for (int index = 0; index < tokens.Length; index++)
+                {
+                    int parsed;
+                    if (int.TryParse(
+                            tokens[index].Trim(),
+                            NumberStyles.Integer,
+                            CultureInfo.InvariantCulture,
+                            out parsed) &&
+                        parsed >= minimumValue &&
+                        uniqueValues.Add(parsed))
+                    {
+                        values.Add(parsed);
+                    }
+                }
+
+                return values.Count > 0;
+            }
+            catch
+            {
+                values.Clear();
+                return false;
+            }
+        }
+
+        internal static bool TryReadIntProperty(
+            string json,
+            string propertyName,
+            out int value)
+        {
+            value = 0;
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                JsonValue root = new JsonParser(json).ParseDocument();
+                JsonValue property;
+                long parsed;
+                if (root == null ||
+                    root.Kind != JsonValueKind.Object ||
+                    !root.ObjectValue.TryGetValue(propertyName, out property) ||
+                    property == null ||
+                    property.Kind != JsonValueKind.Number ||
+                    !long.TryParse(
+                        property.NumberValue,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out parsed) ||
+                    parsed < int.MinValue ||
+                    parsed > int.MaxValue)
+                {
+                    return false;
+                }
+
+                value = (int)parsed;
+                return true;
+            }
+            catch
+            {
+                value = 0;
+                return false;
+            }
+        }
+
+        internal static bool TryReadStringProperty(
+            string json,
+            string propertyName,
+            out string value)
+        {
+            value = string.Empty;
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                JsonValue root = new JsonParser(json).ParseDocument();
+                JsonValue property;
+                if (root == null ||
+                    root.Kind != JsonValueKind.Object ||
+                    !root.ObjectValue.TryGetValue(propertyName, out property) ||
+                    property == null ||
+                    property.Kind != JsonValueKind.String)
+                {
+                    return false;
+                }
+
+                value = property.StringValue ?? string.Empty;
+                return true;
+            }
+            catch
+            {
+                value = string.Empty;
+                return false;
+            }
+        }
+
+        internal static string ExpandMoneyTransactionPayloadForPublic(
+            string payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                return payloadJson ?? string.Empty;
+            }
+
+            try
+            {
+                JsonValue outerValue = new JsonParser(payloadJson).ParseDocument();
+                if (outerValue == null || outerValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                JsonValue detailMember;
+                if (!outerValue.ObjectValue.TryGetValue(
+                        "detail_json",
+                        out detailMember) ||
+                    detailMember == null ||
+                    detailMember.Kind != JsonValueKind.String ||
+                    string.IsNullOrEmpty(detailMember.StringValue))
+                {
+                    return payloadJson;
+                }
+
+                JsonValue detailValue =
+                    new JsonParser(detailMember.StringValue).ParseDocument();
+                if (detailValue == null || detailValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                AddMoneyDetailDefaults(detailValue.ObjectValue);
+                outerValue.ObjectValue["detail_json"] = new JsonValue
+                {
+                    Kind = JsonValueKind.String,
+                    StringValue = SerializeJsonValue(detailValue)
+                };
+                return SerializeJsonValue(outerValue);
+            }
+            catch
+            {
+                return payloadJson;
+            }
+        }
+
+        private static bool IsMoneyDetailDefault(
+            string fieldName,
+            JsonValue value)
+        {
+            if (string.IsNullOrEmpty(fieldName) || value == null)
+            {
+                return false;
+            }
+
+            MoneyDetailDefaultKind defaultKind;
+            if (!TryGetMoneyDetailDefaultKind(fieldName, out defaultKind))
+            {
+                // Future fields are retained until 2.0.5 explicitly knows their
+                // declared default. This prevents accidental lossy compaction.
+                return false;
+            }
+
+            switch (defaultKind)
+            {
+                case MoneyDetailDefaultKind.EmptyString:
+                    return value.Kind == JsonValueKind.String &&
+                        string.IsNullOrEmpty(value.StringValue);
+
+                case MoneyDetailDefaultKind.Zero:
+                    double number;
+                    return value.Kind == JsonValueKind.Number &&
+                        double.TryParse(
+                            value.NumberValue,
+                            NumberStyles.Float,
+                            CultureInfo.InvariantCulture,
+                            out number) &&
+                        number == 0d;
+
+                case MoneyDetailDefaultKind.MinusOne:
+                    long integer;
+                    return value.Kind == JsonValueKind.Number &&
+                        long.TryParse(
+                            value.NumberValue,
+                            NumberStyles.Integer,
+                            CultureInfo.InvariantCulture,
+                            out integer) &&
+                        integer == -1L;
+
+                case MoneyDetailDefaultKind.False:
+                    return value.Kind == JsonValueKind.Boolean &&
+                        !value.BooleanValue;
+
+                case MoneyDetailDefaultKind.EmptyArray:
+                    return value.Kind == JsonValueKind.Array &&
+                        (value.ArrayValue == null || value.ArrayValue.Count == 0);
+
+                default:
+                    return false;
+            }
+        }
+
+        private static void AddMoneyDetailDefaults(
+            Dictionary<string, JsonValue> fields)
+        {
+            if (fields == null)
+            {
+                return;
+            }
+
+            string[] fieldNames = MoneyDetailFieldNames;
+            for (int index = 0; index < fieldNames.Length; index++)
+            {
+                string fieldName = fieldNames[index];
+                if (fields.ContainsKey(fieldName))
+                {
+                    continue;
+                }
+
+                MoneyDetailDefaultKind defaultKind;
+                if (TryGetMoneyDetailDefaultKind(fieldName, out defaultKind))
+                {
+                    fields.Add(fieldName, CreateMoneyDetailDefault(defaultKind));
+                }
+            }
+        }
+
+        private static JsonValue CreateMoneyDetailDefault(
+            MoneyDetailDefaultKind defaultKind)
+        {
+            switch (defaultKind)
+            {
+                case MoneyDetailDefaultKind.EmptyString:
+                    return new JsonValue
+                    {
+                        Kind = JsonValueKind.String,
+                        StringValue = string.Empty
+                    };
+
+                case MoneyDetailDefaultKind.MinusOne:
+                    return new JsonValue
+                    {
+                        Kind = JsonValueKind.Number,
+                        NumberValue = "-1"
+                    };
+
+                case MoneyDetailDefaultKind.False:
+                    return new JsonValue
+                    {
+                        Kind = JsonValueKind.Boolean,
+                        BooleanValue = false
+                    };
+
+                case MoneyDetailDefaultKind.EmptyArray:
+                    return new JsonValue
+                    {
+                        Kind = JsonValueKind.Array,
+                        ArrayValue = new List<JsonValue>()
+                    };
+
+                default:
+                    return new JsonValue
+                    {
+                        Kind = JsonValueKind.Number,
+                        NumberValue = "0"
+                    };
+            }
+        }
+
+        private static bool TryGetMoneyDetailDefaultKind(
+            string fieldName,
+            out MoneyDetailDefaultKind defaultKind)
+        {
+            defaultKind = MoneyDetailDefaultKind.Zero;
+
+            switch (fieldName)
+            {
+                case "contract_type_code":
+                case "contractor_name":
+                case "product_name":
+                case "idol_name":
+                case "single_title":
+                case "single_group_name":
+                case "single_genre_token":
+                case "single_lyrics_token":
+                case "single_choreography_token":
+                case "show_title":
+                case "show_medium_token":
+                case "show_genre_token":
+                case "show_host_token":
+                case "staff_name":
+                case "staff_role_code":
+                case "theater_title":
+                case "theater_income_type":
+                case "theater_performance_type":
+                case "theater_audience_type":
+                case "cafe_title":
+                case "cafe_dish_title":
+                case "cafe_dish_type":
+                case "cafe_appeal_type":
+                case "concert_title":
+                case "concert_venue":
+                    defaultKind = MoneyDetailDefaultKind.EmptyString;
+                    return true;
+
+                case "idol_id":
+                case "theater_id":
+                case "cafe_id":
+                case "concert_id":
+                    defaultKind = MoneyDetailDefaultKind.MinusOne;
+                    return true;
+
+                case "single_marketing_tokens":
+                case "participant_names":
+                case "cafe_staff_names":
+                    defaultKind = MoneyDetailDefaultKind.EmptyArray;
+                    return true;
+
+                case "has_fan_audience":
+                case "concert_finished":
+                    defaultKind = MoneyDetailDefaultKind.False;
+                    return true;
+
+                case "payment_amount":
+                case "stamina_cost":
+                case "liability_amount":
+                case "multiplier":
+                case "negotiations":
+                case "gross_revenue":
+                case "production_cost":
+                case "show_episode_number":
+                case "show_audience":
+                case "show_fan_audience":
+                case "show_fatigue":
+                case "show_weekly_budget":
+                case "salary_amount":
+                case "idol_fame":
+                case "idol_scandal_points":
+                case "theater_ticket_price":
+                case "theater_attendance":
+                case "theater_subscription_price":
+                case "theater_subscriber_delta":
+                case "theater_subscriber_total":
+                case "cafe_new_fans":
+                case "concert_ticket_price":
+                case "concert_projected_attendance":
+                case "concert_projected_hype":
+                case "concert_finished_hype":
+                case "concert_finished_revenue":
+                case "concert_finished_profit":
+                case "concert_accident_count":
+                case "concert_accident_successes":
+                case "concert_accident_failures":
+                case "concert_accident_critical_failures":
+                    defaultKind = MoneyDetailDefaultKind.Zero;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private static readonly string[] MoneyDetailFieldNames =
+        {
+            "contract_type_code",
+            "contractor_name",
+            "product_name",
+            "payment_amount",
+            "stamina_cost",
+            "liability_amount",
+            "idol_id",
+            "idol_name",
+            "multiplier",
+            "negotiations",
+            "single_title",
+            "single_group_name",
+            "single_genre_token",
+            "single_lyrics_token",
+            "single_choreography_token",
+            "single_marketing_tokens",
+            "participant_names",
+            "gross_revenue",
+            "production_cost",
+            "show_title",
+            "show_medium_token",
+            "show_genre_token",
+            "show_host_token",
+            "show_episode_number",
+            "show_audience",
+            "has_fan_audience",
+            "show_fan_audience",
+            "show_fatigue",
+            "show_weekly_budget",
+            "staff_name",
+            "staff_role_code",
+            "salary_amount",
+            "idol_fame",
+            "idol_scandal_points",
+            "theater_id",
+            "theater_title",
+            "theater_income_type",
+            "theater_ticket_price",
+            "theater_performance_type",
+            "theater_audience_type",
+            "theater_attendance",
+            "theater_subscription_price",
+            "theater_subscriber_delta",
+            "theater_subscriber_total",
+            "cafe_id",
+            "cafe_title",
+            "cafe_dish_title",
+            "cafe_dish_type",
+            "cafe_staff_names",
+            "cafe_new_fans",
+            "cafe_appeal_type",
+            "concert_id",
+            "concert_title",
+            "concert_venue",
+            "concert_ticket_price",
+            "concert_projected_attendance",
+            "concert_projected_hype",
+            "concert_finished_hype",
+            "concert_finished",
+            "concert_finished_revenue",
+            "concert_finished_profit",
+            "concert_accident_count",
+            "concert_accident_successes",
+            "concert_accident_failures",
+            "concert_accident_critical_failures"
+        };
+
+        private enum MoneyDetailDefaultKind
+        {
+            EmptyString,
+            Zero,
+            MinusOne,
+            False,
+            EmptyArray
+        }
+
+        private static string SerializeJsonValue(JsonValue value)
+        {
+            StringBuilder builder = new StringBuilder(256);
+            AppendJsonValue(builder, value);
+            return builder.ToString();
+        }
+
+        private static void AppendJsonValue(
+            StringBuilder builder,
+            JsonValue value)
+        {
+            if (value == null || value.Kind == JsonValueKind.Null)
+            {
+                builder.Append("null");
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Object)
+            {
+                builder.Append('{');
+                bool first = true;
+                foreach (KeyValuePair<string, JsonValue> pair
+                    in value.ObjectValue)
+                {
+                    if (!first)
+                    {
+                        builder.Append(',');
+                    }
+
+                    first = false;
+                    AppendString(builder, pair.Key);
+                    builder.Append(':');
+                    AppendJsonValue(builder, pair.Value);
+                }
+
+                builder.Append('}');
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Array)
+            {
+                builder.Append('[');
+                for (int index = 0;
+                    value.ArrayValue != null && index < value.ArrayValue.Count;
+                    index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(',');
+                    }
+
+                    AppendJsonValue(builder, value.ArrayValue[index]);
+                }
+
+                builder.Append(']');
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.String)
+            {
+                AppendString(builder, value.StringValue);
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Number)
+            {
+                builder.Append(value.NumberValue ?? "0");
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Boolean)
+            {
+                builder.Append(value.BooleanValue ? "true" : "false");
+                return;
+            }
+
+            builder.Append("null");
+        }
+
         private static int EstimateCapacity(LightweightSidecarDocument document)
         {
             long estimate = 192L;

@@ -46,6 +46,12 @@ namespace IMDataCore
                     return;
                 }
 
+                // Final safety net for direct field writes or third-party patches
+                // that bypass a known show mutation method. Observe only the
+                // settled runtime state that will accompany this vanilla save.
+                ReconcileAllPostModShows(
+                    CorePayloadCompaction.CanonicalShowCastSourcePrefix +
+                        "save_boundary");
                 CaptureResolvedSingleChartPositionsBeforeSave();
                 lock (runtimeLock)
                 {
