@@ -17845,7 +17845,7 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Resolves one canonical timeline row date from payload-first date sources.
+        /// Resolves one canonical timeline row date from the event occurrence date.
         /// </summary>
         private static string ResolveTimelineRowDate(IMDataCoreEvent ev)
         {
@@ -17870,6 +17870,9 @@ namespace IdolCareerDiary
 
         /// <summary>
         /// Resolves one canonical timeline date for timeline ordering/labels.
+        /// The IMDC event occurrence date is authoritative. Payload lifecycle
+        /// dates such as contract_end_date are descriptive details and must not
+        /// replace the date on which the event itself occurred.
         /// </summary>
         private static bool TryResolveTimelineDate(IMDataCoreEvent ev, out DateTime parsed)
         {
@@ -17879,23 +17882,20 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            JSONNode payload = ParsePayload(ev.PayloadJson);
-            if (TryResolveTimelineDateFromPayload(payload, out parsed))
+            if (TryResolveEventOccurrenceDate(ev, out parsed))
             {
                 return true;
             }
 
+            // Compatibility fallback for incomplete legacy/foreign events that do
+            // not carry a usable IMDC occurrence timestamp.
             if (TryResolveSingleReleaseDateFromLiveData(ev, out parsed))
             {
                 return true;
             }
 
-            if (TryParseDateKeyForUi(ev.GameDateKey, out parsed))
-            {
-                return true;
-            }
-
-            return TryParseEventDate(ev.GameDateTime, out parsed);
+            JSONNode payload = ParsePayload(ev.PayloadJson);
+            return TryResolveTimelineDateFromPayload(payload, out parsed);
         }
 
         /// <summary>
