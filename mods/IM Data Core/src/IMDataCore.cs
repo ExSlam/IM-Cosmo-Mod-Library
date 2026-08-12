@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -1381,6 +1381,12 @@ namespace IMDataCore
         private CoreSaveScope activeSaveScope;
         // This is capture suppression only. It is not a filesystem transaction.
         private bool saveLoadPreparationActive;
+        // While vanilla LoadEvent reconstructs globals, staticVars.dateTime can
+        // still belong to the save being left. Public IMDC writes remain usable,
+        // but they must be stamped with the date frozen from the newly loaded
+        // SavedData instead of that mutable global.
+        private DateTime preparedLoadGameDate = DateTime.MinValue;
+        private bool preparedLoadGameDateValid;
         private long captureSequence;
         private int idempotencyDateKey = CoreConstants.UninitializedDateKey;
 
@@ -1495,6 +1501,37 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Resolves the timestamp used by public custom-data mutations.
+        /// Reads are never blocked during vanilla loading. During the load
+        /// reconstruction window, writes use the immutable date captured from the
+        /// newly deserialized vanilla SavedData so they cannot inherit the date of
+        /// the save that was active immediately before the load.
+        /// </summary>
+        private bool TryResolvePublicMutationGameDateLocked(
+            out DateTime gameDate,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (saveLoadPreparationActive)
+            {
+                if (!preparedLoadGameDateValid)
+                {
+                    gameDate = DateTime.MinValue;
+                    errorMessage =
+                        "IM Data Core cannot timestamp a persistent mutation while " +
+                        "vanilla is loading because the loaded save date is unavailable.";
+                    return false;
+                }
+
+                gameDate = preparedLoadGameDate;
+                return true;
+            }
+
+            gameDate = staticVars.dateTime;
+            return true;
+        }
+
+        /// <summary>
         /// Persists a caller-scoped JSON document under a namespaced key.
         /// </summary>
         internal bool TrySetCustomJson(IMDataCoreSession session, Assembly callingAssembly, string dataKey, string jsonValue, out string errorMessage)
@@ -1550,9 +1587,17 @@ namespace IMDataCore
                     return false;
                 }
 
+                DateTime mutationGameDate;
+                if (!TryResolvePublicMutationGameDateLocked(
+                    out mutationGameDate,
+                    out errorMessage))
+                {
+                    return false;
+                }
+
                 return storageEngine.TrySetCustomData(
                     NextCaptureSequenceLocked(),
-                    staticVars.dateTime,
+                    mutationGameDate,
                     registration.NamespaceIdentifier,
                     sanitizedDataKey,
                     jsonValue,
@@ -1633,9 +1678,17 @@ namespace IMDataCore
                     return false;
                 }
 
+                DateTime mutationGameDate;
+                if (!TryResolvePublicMutationGameDateLocked(
+                    out mutationGameDate,
+                    out errorMessage))
+                {
+                    return false;
+                }
+
                 return storageEngine.TryRemoveCustomData(
                     NextCaptureSequenceLocked(),
-                    staticVars.dateTime,
+                    mutationGameDate,
                     registration.NamespaceIdentifier,
                     sanitizedDataKey,
                     out errorMessage);
@@ -1708,7 +1761,14 @@ namespace IMDataCore
                     return false;
                 }
 
-                DateTime gameDate = staticVars.dateTime;
+                DateTime gameDate;
+                if (!TryResolvePublicMutationGameDateLocked(
+                    out gameDate,
+                    out errorMessage))
+                {
+                    return false;
+                }
+
                 PendingEvent pendingEvent = new PendingEvent
                 {
                     CaptureSequence = NextCaptureSequenceLocked(),

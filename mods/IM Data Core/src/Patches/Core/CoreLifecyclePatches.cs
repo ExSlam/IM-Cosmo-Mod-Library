@@ -58,8 +58,9 @@ namespace IMDataCore
 
     /// <summary>
     /// Persists the lightweight IMDC branch immediately before vanilla schedules
-    /// its SavedData write. The exact SavedData object and DataSaver target are
-    /// passed through unchanged. IMDC does not serialize or hash vanilla SavedData.
+    /// its SavedData write. A detached JSON-equivalent SavedData snapshot is passed
+    /// to both IMDC and DataSaver so the background vanilla serializer cannot observe
+    /// later mutations of the live SaveManager.Data object.
     /// </summary>
     [HarmonyPatch]
     internal static class VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
@@ -124,6 +125,17 @@ namespace IMDataCore
                     nameof(CoreSaveLifecycleBinding.PrepareSaveWrite));
             }
 
+            MethodInfo stableSnapshotMethod = AccessTools.Method(
+                typeof(VanillaSavedDataWrite_IMDataCoreSaveScope_Patch),
+                nameof(CreateStableSaveSnapshot),
+                new Type[] { typeof(SaveManager.SavedData) });
+            if (stableSnapshotMethod == null)
+            {
+                throw new MissingMethodException(
+                    typeof(VanillaSavedDataWrite_IMDataCoreSaveScope_Patch).FullName,
+                    nameof(CreateStableSaveSnapshot));
+            }
+
             int injectedWriteCount = 0;
 
             foreach (CodeInstruction instruction in instructions)
@@ -135,8 +147,9 @@ namespace IMDataCore
                 }
 
                 // The four DataSaver arguments are already on the evaluation stack.
-                // Store them temporarily, let IMDC persist its private sidecar, then
-                // restore the exact original arguments and call vanilla unchanged.
+                // Store them temporarily, detach the SavedData graph, let IMDC
+                // persist against that snapshot, then call vanilla with the same
+                // snapshot and the original target arguments.
                 CodeInstruction firstInjectedInstruction =
                     new CodeInstruction(OpCodes.Stloc, fullPathLocal);
                 firstInjectedInstruction.labels.AddRange(instruction.labels);
@@ -149,6 +162,15 @@ namespace IMDataCore
                 yield return new CodeInstruction(
                     OpCodes.Stloc,
                     dataFileNameLocal);
+                yield return new CodeInstruction(OpCodes.Stloc, dataToSaveLocal);
+
+                // Vanilla DataSaver serializes on a worker thread. Freeze one
+                // detached snapshot now and pass that same object to IMDC and
+                // DataSaver so their checkpoint/file identities cannot diverge.
+                yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
+                yield return new CodeInstruction(
+                    OpCodes.Call,
+                    stableSnapshotMethod);
                 yield return new CodeInstruction(OpCodes.Stloc, dataToSaveLocal);
 
                 yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
@@ -181,6 +203,29 @@ namespace IMDataCore
                           injectedWriteCount.ToString() +
                           "."));
             }
+        }
+
+        private static SaveManager.SavedData CreateStableSaveSnapshot(
+            SaveManager.SavedData source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            // DataSaver ultimately uses Unity's JSON serializer as well. Cloning
+            // through the same representation gives the worker thread an object
+            // graph that is no longer shared with SaveManager.Data.
+            string json = UnityEngine.JsonUtility.ToJson(source, false);
+            SaveManager.SavedData snapshot =
+                UnityEngine.JsonUtility.FromJson<SaveManager.SavedData>(json);
+            if (snapshot == null)
+            {
+                throw new InvalidOperationException(
+                    "Unity JsonUtility returned a null SavedData snapshot.");
+            }
+
+            return snapshot;
         }
 
         private static bool IsSavedDataWrite(CodeInstruction instruction)

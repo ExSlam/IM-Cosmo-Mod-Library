@@ -848,7 +848,23 @@ namespace IMDataCore
                         return true;
                     }
 
-                    ActivateThroughSequenceLocked(matchingCheckpoint.Sequence);
+                    DateTime checkpointGameDate;
+                    try
+                    {
+                        checkpointGameDate = ExtensionMethods.ToDateTime(
+                            matchingCheckpoint.GameDateTime);
+                    }
+                    catch (Exception exception)
+                    {
+                        errorMessage =
+                            "The exact IMDC checkpoint has an invalid game date: " +
+                            exception.Message;
+                        return false;
+                    }
+
+                    ActivateThroughSequenceLocked(
+                        matchingCheckpoint.Sequence,
+                        checkpointGameDate);
                     checkpointFound = true;
                     activatedSequence = matchingCheckpoint.Sequence;
                     return true;
@@ -946,6 +962,28 @@ namespace IMDataCore
                 try
                 {
                     ThrowIfDisposed();
+
+                    DateTime checkpointGameDate;
+                    try
+                    {
+                        checkpointGameDate = ExtensionMethods.ToDateTime(
+                            stamp.GameDateTime);
+                    }
+                    catch (Exception exception)
+                    {
+                        errorMessage =
+                            "The vanilla save checkpoint has an invalid game date: " +
+                            exception.Message;
+                        return false;
+                    }
+
+                    // A save boundary is a branch boundary. Never allow a row from
+                    // a later in-game date, even one carrying an older sequence
+                    // number, to become durable under this checkpoint.
+                    TrimActiveStateToCheckpointLocked(
+                        sequence,
+                        checkpointGameDate);
+
                     for (int index = activeCheckpoints.Count - 1; index >= 0; index--)
                     {
                         if (stamp.Matches(activeCheckpoints[index]))
@@ -1351,15 +1389,22 @@ namespace IMDataCore
             activeCheckpoints = CloneCheckpoints(durableCheckpoints);
             lastIssuedSequence = document.LastIssuedSequence;
             RebuildRuntimeIndexesLocked();
-        }        private void ActivateThroughSequenceLocked(long sequence)
+        }
+
+        private void ActivateThroughSequenceLocked(
+            long sequence,
+            DateTime cutoffGameDate)
         {
             activeEvents = new List<LightweightEventRecord>();
             activeCustomMutations = new List<LightweightCustomMutationRecord>();
             activeCheckpoints = new List<LightweightCheckpointRecord>();
+
             for (int index = 0; index < durableEvents.Count; index++)
             {
                 LightweightEventRecord record = durableEvents[index];
-                if (record != null && record.Sequence <= sequence)
+                if (record != null &&
+                    record.Sequence <= sequence &&
+                    EventIsAtOrBefore(record, cutoffGameDate))
                 {
                     activeEvents.Add(CloneEvent(record));
                 }
@@ -1369,7 +1414,9 @@ namespace IMDataCore
             {
                 LightweightCustomMutationRecord mutation =
                     durableCustomMutations[index];
-                if (mutation != null && mutation.Sequence <= sequence)
+                if (mutation != null &&
+                    mutation.Sequence <= sequence &&
+                    CustomMutationIsAtOrBefore(mutation, cutoffGameDate))
                 {
                     activeCustomMutations.Add(CloneCustomMutation(mutation));
                 }
@@ -1378,9 +1425,58 @@ namespace IMDataCore
             for (int index = 0; index < durableCheckpoints.Count; index++)
             {
                 LightweightCheckpointRecord checkpoint = durableCheckpoints[index];
-                if (checkpoint != null && checkpoint.Sequence <= sequence)
+                if (checkpoint != null &&
+                    checkpoint.Sequence <= sequence &&
+                    CheckpointIsAtOrBefore(checkpoint, cutoffGameDate))
                 {
                     activeCheckpoints.Add(CloneCheckpoint(checkpoint));
+                }
+            }
+
+            RebuildRuntimeIndexesLocked();
+        }
+
+        /// <summary>
+        /// Prunes the active branch to the vanilla save checkpoint before the
+        /// sidecar is serialized. The global sequence watermark is intentionally
+        /// not rewound, so identifiers remain monotonic if play continues from an
+        /// older branch.
+        /// </summary>
+        private void TrimActiveStateToCheckpointLocked(
+            long sequence,
+            DateTime cutoffGameDate)
+        {
+            for (int index = activeEvents.Count - 1; index >= 0; index--)
+            {
+                LightweightEventRecord record = activeEvents[index];
+                if (record == null ||
+                    record.Sequence > sequence ||
+                    !EventIsAtOrBefore(record, cutoffGameDate))
+                {
+                    activeEvents.RemoveAt(index);
+                }
+            }
+
+            for (int index = activeCustomMutations.Count - 1; index >= 0; index--)
+            {
+                LightweightCustomMutationRecord mutation =
+                    activeCustomMutations[index];
+                if (mutation == null ||
+                    mutation.Sequence > sequence ||
+                    !CustomMutationIsAtOrBefore(mutation, cutoffGameDate))
+                {
+                    activeCustomMutations.RemoveAt(index);
+                }
+            }
+
+            for (int index = activeCheckpoints.Count - 1; index >= 0; index--)
+            {
+                LightweightCheckpointRecord checkpoint = activeCheckpoints[index];
+                if (checkpoint == null ||
+                    checkpoint.Sequence > sequence ||
+                    !CheckpointIsAtOrBefore(checkpoint, cutoffGameDate))
+                {
+                    activeCheckpoints.RemoveAt(index);
                 }
             }
 

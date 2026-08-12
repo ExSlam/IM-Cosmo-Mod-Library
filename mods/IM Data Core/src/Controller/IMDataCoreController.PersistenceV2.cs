@@ -122,6 +122,8 @@ namespace IMDataCore
                 // This flag is now an idempotency guard for one vanilla LoadData
                 // invocation. The successful postfix clears it.
                 saveLoadPreparationActive = true;
+                preparedLoadGameDate = DateTime.MinValue;
+                preparedLoadGameDateValid = false;
             }
             try
             {
@@ -152,6 +154,20 @@ namespace IMDataCore
                     CoreLog.Warn(errorMessage);
                     InstallSafeEmptyLoadedState(targetScope);
                     return;
+                }
+
+                DateTime loadedGameDate;
+                try
+                {
+                    loadedGameDate = ExtensionMethods.ToDateTime(
+                        stamp.GameDateTime);
+                }
+                catch (Exception exception)
+                {
+                    loadedGameDate = DateTime.MinValue;
+                    CoreLog.Warn(
+                        "IM Data Core could not parse the loaded game date: " +
+                        exception.Message);
                 }
 
                 bool lightweightSidecarExisted =
@@ -243,20 +259,6 @@ namespace IMDataCore
 
                 if (sidecarLoaded && !checkpointFound)
                 {
-                    DateTime loadedGameDate;
-                    try
-                    {
-                        loadedGameDate = ExtensionMethods.ToDateTime(
-                            stamp.GameDateTime);
-                    }
-                    catch (Exception exception)
-                    {
-                        loadedGameDate = DateTime.MinValue;
-                        CoreLog.Warn(
-                            "IM Data Core could not parse the loaded game date: " +
-                            exception.Message);
-                    }
-
                     if (loadedGameDate == DateTime.MinValue ||
                         !loadedEngine.TryActivateThroughGameDate(
                             loadedGameDate,
@@ -274,7 +276,10 @@ namespace IMDataCore
                     }
                 }
 
-                InstallLoadedEngine(loadedEngine, targetScope);
+                InstallLoadedEngine(
+                    loadedEngine,
+                    targetScope,
+                    loadedGameDate);
                 engineInstalled = true;
             }
             catch (Exception exception)
@@ -304,7 +309,10 @@ namespace IMDataCore
                 safeScope = CorePaths.GetSaveScope();
             }
 
-            InstallLoadedEngine(safeEngine, safeScope);
+            InstallLoadedEngine(
+                safeEngine,
+                safeScope,
+                DateTime.MinValue);
         }
 
         private static LightweightCoreStorageEngine CreateSafeEmptyEngine(
@@ -326,7 +334,8 @@ namespace IMDataCore
 
         private void InstallLoadedEngine(
             LightweightCoreStorageEngine loadedEngine,
-            CoreSaveScope targetScope)
+            CoreSaveScope targetScope,
+            DateTime loadedGameDate)
         {
             // If even a pristine physical engine could not be initialized, keep
             // the engine and its advertised scope aligned.  This is a last-resort
@@ -354,6 +363,9 @@ namespace IMDataCore
                 captureSequence = loadedEngine.LastIssuedSequence;
                 bufferedEvents.Clear();
                 ResetRuntimeCaptureStateLocked();
+                preparedLoadGameDate = loadedGameDate;
+                preparedLoadGameDateValid =
+                    loadedGameDate != DateTime.MinValue;
                 saveLoadPreparationActive = true;
                 if (targetScope.IsTransient)
                 {
@@ -388,6 +400,8 @@ namespace IMDataCore
                     activeSaveScope.InternalSaveKey);
                 initialized = true;
                 saveLoadPreparationActive = false;
+                preparedLoadGameDate = DateTime.MinValue;
+                preparedLoadGameDateValid = false;
                 captureSequence = 0L;
                 bufferedEvents.Clear();
                 ResetRuntimeCaptureStateLocked();
@@ -399,6 +413,8 @@ namespace IMDataCore
             lock (runtimeLock)
             {
                 saveLoadPreparationActive = false;
+                preparedLoadGameDate = DateTime.MinValue;
+                preparedLoadGameDateValid = false;
                 try
                 {
                     SeedResolvedSingleChartPositionsFromVanillaLocked();
@@ -422,6 +438,8 @@ namespace IMDataCore
                 // Used only by Harmony failure/finalizer paths. Do not seed
                 // supplemental state when vanilla itself did not complete loading.
                 saveLoadPreparationActive = false;
+                preparedLoadGameDate = DateTime.MinValue;
+                preparedLoadGameDateValid = false;
             }
         }
 
@@ -452,6 +470,8 @@ namespace IMDataCore
                 captureSequence = 0L;
                 initialized = true;
                 saveLoadPreparationActive = false;
+                preparedLoadGameDate = DateTime.MinValue;
+                preparedLoadGameDateValid = false;
                 ResetRuntimeCaptureStateLocked();
                 return true;
             }
