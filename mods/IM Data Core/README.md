@@ -234,20 +234,41 @@ Staff salary details include the stable job-role code plus level and progress sn
 
 Single releases and show episodes are represented by paired income/expense records in one transaction group so gross revenue and production cost or weekly budget remain distinct. A zero-cost expense record is retained for digital-only singles.
 
-New 2.0 captures do not emit four byte-for-byte legacy alias rows when the canonical event is already emitted:
+New 2.0 captures do not emit redundant aliases or per-idol projection rows when
+the canonical event already contains all historical information:
 
 - `single_participation_recorded` -> use `single_released`
 - `show_episode` -> use `show_episode_released`
 - `contract_canceled` -> use `contract_cancelled`
 - `status_changed` -> use `idol_status_changed`
+- `concert_participation` -> use the shared concert lifecycle event
+- `tour_participation` -> use the shared tour lifecycle/country event
+- `election_result_recorded` -> use the shared election result event
 
 Imported historical aliases remain readable.
 
-New `single_released` captures store one shared physical event for the release
-snapshot. Its `single_cast_id_list` preserves senbatsu slot order (`-1` marks an
-empty slot), including idols whom vanilla removes from the live formation after
-graduation. Per-idol timeline reads project `idol_id`, `position_index`,
-`row_index`, and `is_center` from that ordered historical source.
+Built-in multi-idol occurrences now use a first-class shared participant model:
+one physical row is stored with `IdolId = -1`, its compact participant IDs
+rebuild the nonserialized per-idol indexes, and public reads substitute the
+requested idol ID. This covers Shows, Singles, Concerts, Tours, Elections,
+completed/cancelled room work, idol-idol relationships, mentorship, random
+events, and substories. Missing or malformed participant metadata is
+quarantined rather than exposed globally to unrelated idols.
+
+For `single_released`, `single_cast_id_list` preserves senbatsu slot order (`-1`
+marks an empty slot), including idols whom vanilla removes from the live
+formation after graduation. Per-idol reads derive `idol_id`, `position_index`,
+`row_index`, and `is_center`. Election reads similarly derive each idol's
+place, votes, fame points, and expected place from the shared primitive ranking
+summaries. Concert setlists and common results are therefore stored once rather
+than once per participant.
+
+Graduation-sensitive mutable state is captured before vanilla culls it. This
+includes released-single formations, cancelled room assignments, active tasks,
+individual active contracts, idol-idol relationship rows, mentorship pairs,
+clique bullying targets/visibility, and unfinished concert rosters. Graduated
+idol IDs remain stable historical identifiers; later live-object cleanup does
+not remove their sidecar history.
 
 New 2.0 payloads also omit identifiers that are already represented by `EntityId`, including `single_id`, `show_id`, `concert_id`, `tour_id`, `election_id`, and `relationship_pair_key`, along with lifecycle or status echoes already encoded by the event type. Historical imported payloads remain readable.
 

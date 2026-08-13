@@ -54,7 +54,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one world-tour start lifecycle event and participant rows.
+        /// Captures one shared world-tour start occurrence.
         /// </summary>
         internal void CaptureTourStarted(SEvent_Tour.tour tour)
         {
@@ -98,25 +98,6 @@ namespace IMDataCore
                     CoreConstants.EventSourceTourStartPatch,
                     CoreJsonUtility.SerializeTourLifecyclePayload(lifecyclePayload));
 
-                for (int participantIndex = CoreConstants.ZeroBasedListStartIndex; participantIndex < participantIdolIdentifiers.Count; participantIndex++)
-                {
-                    int participantIdolIdentifier = participantIdolIdentifiers[participantIndex];
-                    TourParticipationPayload participationPayload = BuildTourParticipationPayload(
-                        tour.ID,
-                        participantIdolIdentifier,
-                        participantIdolIdentifiers,
-                        CoreConstants.TourLifecycleActionStarted);
-
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        participantIdolIdentifier,
-                        CoreConstants.EventEntityKindTour,
-                        tourEntityIdentifier,
-                        CoreConstants.EventTypeTourParticipation,
-                        CoreConstants.EventSourceTourStartPatch,
-                        CoreJsonUtility.SerializeTourParticipationPayload(participationPayload));
-                }
-
                 FlushAfterCaptureLocked();
             }
         }
@@ -137,7 +118,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one world-tour finish lifecycle event with country and idol participation rows.
+        /// Captures one shared world-tour finish occurrence and shared country results.
         /// </summary>
         internal void CaptureTourFinished(TourFinishSnapshot finishSnapshot)
         {
@@ -158,6 +139,14 @@ namespace IMDataCore
                     participantIdolIdentifiers = runtimeTourState.ParticipantIdolIdentifiers != null
                         ? new List<int>(runtimeTourState.ParticipantIdolIdentifiers)
                         : new List<int>();
+                    tourStartDate = runtimeTourState.StartDate ?? string.Empty;
+                }
+                else if (TryResolveRecordedTourRuntimeStateLocked(
+                    finishedTour.ID,
+                    out runtimeTourState))
+                {
+                    participantIdolIdentifiers =
+                        new List<int>(runtimeTourState.ParticipantIdolIdentifiers);
                     tourStartDate = runtimeTourState.StartDate ?? string.Empty;
                 }
             }
@@ -205,7 +194,10 @@ namespace IMDataCore
                         }
 
                         string countryCode = CoreEnumNameMapping.ToTourCountryCode(selectedCountry.Country.Type);
-                        TourCountryResultPayload countryResultPayload = BuildTourCountryResultPayload(finishedTour, selectedCountry);
+                        TourCountryResultPayload countryResultPayload = BuildTourCountryResultPayload(
+                            finishedTour,
+                            selectedCountry,
+                            participantIdolIdentifiers);
 
                         EnqueueEventRecordLocked(
                             gameDate,
@@ -218,25 +210,6 @@ namespace IMDataCore
                     }
                 }
 
-                for (int participantIndex = CoreConstants.ZeroBasedListStartIndex; participantIndex < participantIdolIdentifiers.Count; participantIndex++)
-                {
-                    int participantIdolIdentifier = participantIdolIdentifiers[participantIndex];
-                    TourParticipationPayload participationPayload = BuildTourParticipationPayload(
-                        finishedTour.ID,
-                        participantIdolIdentifier,
-                        participantIdolIdentifiers,
-                        CoreConstants.TourLifecycleActionFinished);
-
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        participantIdolIdentifier,
-                        CoreConstants.EventEntityKindTour,
-                        tourEntityIdentifier,
-                        CoreConstants.EventTypeTourParticipation,
-                        CoreConstants.EventSourceTourFinishPatch,
-                        CoreJsonUtility.SerializeTourParticipationPayload(participationPayload));
-                }
-
                 tourRuntimeStateByTourId.Remove(finishedTour.ID);
 
                 FlushAfterCaptureLocked();
@@ -244,7 +217,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one world-tour cancellation lifecycle event and optional participant rows.
+        /// Captures one shared world-tour cancellation occurrence.
         /// </summary>
         internal void CaptureTourCancelled(SEvent_Tour.tour cancelledTour)
         {
@@ -264,6 +237,14 @@ namespace IMDataCore
                     participantIdolIdentifiers = runtimeTourState.ParticipantIdolIdentifiers != null
                         ? new List<int>(runtimeTourState.ParticipantIdolIdentifiers)
                         : new List<int>();
+                    tourStartDate = runtimeTourState.StartDate ?? string.Empty;
+                }
+                else if (TryResolveRecordedTourRuntimeStateLocked(
+                    cancelledTour.ID,
+                    out runtimeTourState))
+                {
+                    participantIdolIdentifiers =
+                        new List<int>(runtimeTourState.ParticipantIdolIdentifiers);
                     tourStartDate = runtimeTourState.StartDate ?? string.Empty;
                 }
             }
@@ -300,29 +281,79 @@ namespace IMDataCore
                     CoreConstants.EventSourceTourCancelPatch,
                     CoreJsonUtility.SerializeTourLifecyclePayload(lifecyclePayload));
 
-                for (int participantIndex = CoreConstants.ZeroBasedListStartIndex; participantIndex < participantIdolIdentifiers.Count; participantIndex++)
-                {
-                    int participantIdolIdentifier = participantIdolIdentifiers[participantIndex];
-                    TourParticipationPayload participationPayload = BuildTourParticipationPayload(
-                        cancelledTour.ID,
-                        participantIdolIdentifier,
-                        participantIdolIdentifiers,
-                        CoreConstants.TourLifecycleActionCancelled);
-
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        participantIdolIdentifier,
-                        CoreConstants.EventEntityKindTour,
-                        tourEntityIdentifier,
-                        CoreConstants.EventTypeTourParticipation,
-                        CoreConstants.EventSourceTourCancelPatch,
-                        CoreJsonUtility.SerializeTourParticipationPayload(participationPayload));
-                }
-
                 tourRuntimeStateByTourId.Remove(cancelledTour.ID);
 
                 FlushAfterCaptureLocked();
             }
+        }
+
+        /// <summary>
+        /// Resolves a tour's start-time roster from pending or active shared
+        /// history after the transient runtime cache has been cleared by load.
+        /// </summary>
+        private bool TryResolveRecordedTourRuntimeStateLocked(
+            int tourId,
+            out TourRuntimeCaptureState runtimeState)
+        {
+            runtimeState = null;
+            string entityId = tourId.ToString(CultureInfo.InvariantCulture);
+            for (int eventIndex = bufferedEvents.Count - 1;
+                eventIndex >= CoreConstants.ZeroBasedListStartIndex;
+                eventIndex--)
+            {
+                PendingEvent pending = bufferedEvents[eventIndex];
+                if (pending == null ||
+                    !string.IsNullOrEmpty(pending.NamespaceIdentifier) ||
+                    !string.Equals(pending.EntityKind,
+                        CoreConstants.EventEntityKindTour,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(pending.EntityId, entityId,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(pending.EventType,
+                        CoreConstants.EventTypeTourStarted,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                List<int> participantIds;
+                if (!SharedTimelineParticipants.TryReadTourParticipantIds(
+                        pending.PayloadJson,
+                        out participantIds))
+                {
+                    continue;
+                }
+
+                string startDate;
+                LightweightSidecarJson.TryReadStringProperty(
+                    pending.PayloadJson,
+                    CoreConstants.JsonFieldTourStartDate,
+                    out startDate);
+                runtimeState = new TourRuntimeCaptureState
+                {
+                    StartDate = startDate ?? string.Empty,
+                    ParticipantIdolIdentifiers = participantIds
+                };
+                return true;
+            }
+
+            List<int> storedParticipantIds;
+            string storedStartDate;
+            if (storageEngine != null &&
+                storageEngine.TryGetLatestTourRuntimeState(
+                    tourId,
+                    out storedParticipantIds,
+                    out storedStartDate))
+            {
+                runtimeState = new TourRuntimeCaptureState
+                {
+                    StartDate = storedStartDate ?? string.Empty,
+                    ParticipantIdolIdentifiers = storedParticipantIds
+                };
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -470,28 +501,13 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures generated election rankings for all currently eligible idols.
+        /// Captures one shared generated-election snapshot for every eligible idol.
         /// </summary>
         internal void CaptureElectionResultsGenerated(SEvent_SSK._SSK election)
         {
             if (election == null || data_girls.girl == null)
             {
                 return;
-            }
-
-            Dictionary<int, SEvent_SSK._SSK._result> resultRowsByIdolId = new Dictionary<int, SEvent_SSK._SSK._result>();
-            if (election.Results != null)
-            {
-                for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < election.Results.Count; resultIndex++)
-                {
-                    SEvent_SSK._SSK._result resultRow = election.Results[resultIndex];
-                    if (resultRow == null || resultRow.Girl == null || resultRow.Girl.id < CoreConstants.MinimumValidIdolIdentifier)
-                    {
-                        continue;
-                    }
-
-                    resultRowsByIdolId[resultRow.Girl.id] = resultRow;
-                }
             }
 
             lock (runtimeLock)
@@ -504,60 +520,36 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                string electionEntityIdentifier = election.ID.ToString(CultureInfo.InvariantCulture);
-                string electionBroadcastTypeCode = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast);
-                string electionRankingSummary = BuildElectionRankingSummary(election);
-                string electionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election);
-                int electionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex;
-                int electionSingleId = ResolveSingleIdOrInvalid(election.Single);
-                int electionConcertId = ResolveConcertIdOrInvalid(election.Concert);
-                int electionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle);
-
-                for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < data_girls.girl.Count; idolIndex++)
+                ElectionGeneratedResultPayload payload =
+                    new ElectionGeneratedResultPayload
                 {
-                    data_girls.girls idol = data_girls.girl[idolIndex];
-                    if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier || !idol.CanParticipateInSSK())
-                    {
-                        continue;
-                    }
+                    ElectionId = election.ID,
+                    ElectionGeneratedResultSummary =
+                        BuildElectionGeneratedResultSummary(),
+                    ElectionBroadcastType =
+                        CoreEnumNameMapping.ToElectionBroadcastCode(
+                            election.Broadcast),
+                    ElectionSingleId = ResolveSingleIdOrInvalid(election.Single),
+                    ElectionConcertId = ResolveConcertIdOrInvalid(election.Concert),
+                    ElectionReleaseSingleId =
+                        ResolveSingleIdOrInvalid(election.ReleaseSingle),
+                    ElectionResultCount = election.Results != null
+                        ? election.Results.Count
+                        : CoreConstants.ZeroBasedListStartIndex,
+                    ElectionRankingSummary = BuildElectionRankingSummary(election),
+                    ElectionRankedIdolIdList =
+                        BuildElectionRankedIdolIdentifierList(election),
+                    ElectionNumber = ResolveSaveScopedElectionNumber(election)
+                };
 
-                    int generatedPlace = ResolveElectionPlaceForIdol(election, idol.id);
-                    long generatedVotes = CoreConstants.ZeroLongValue;
-                    int generatedFamePoints = CoreConstants.ZeroBasedListStartIndex;
-                    SEvent_SSK._SSK._result resultRow;
-                    if (resultRowsByIdolId.TryGetValue(idol.id, out resultRow))
-                    {
-                        generatedVotes = resultRow.Votes;
-                        generatedFamePoints = resultRow.FamePoints;
-                    }
-
-                    ElectionGeneratedResultPayload payload = new ElectionGeneratedResultPayload
-                    {
-                        ElectionId = election.ID,
-                        IdolId = idol.id,
-                        ElectionExpectedPlace = idol.SSK_Expected_Place,
-                        ElectionGeneratedPlace = generatedPlace,
-                        ElectionGeneratedVotes = generatedVotes,
-                        ElectionGeneratedFamePoints = generatedFamePoints,
-                        ElectionBroadcastType = electionBroadcastTypeCode,
-                        ElectionSingleId = electionSingleId,
-                        ElectionConcertId = electionConcertId,
-                        ElectionReleaseSingleId = electionReleaseSingleId,
-                        ElectionResultCount = electionResultCount,
-                        ElectionRankingSummary = electionRankingSummary,
-                        ElectionRankedIdolIdList = electionRankedIdolIdList,
-                        ElectionNumber = ResolveSaveScopedElectionNumber(election)
-                    };
-
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        idol.id,
-                        CoreConstants.EventEntityKindElection,
-                        electionEntityIdentifier,
-                        CoreConstants.EventTypeElectionResultsGenerated,
-                        CoreConstants.EventSourceElectionGenerateResultsPatch,
-                        CoreJsonUtility.SerializeElectionGeneratedResultPayload(payload));
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindElection,
+                    election.ID.ToString(CultureInfo.InvariantCulture),
+                    CoreConstants.EventTypeElectionResultsGenerated,
+                    CoreConstants.EventSourceElectionGenerateResultsPatch,
+                    CoreJsonUtility.SerializeElectionGeneratedResultPayload(payload));
 
                 FlushAfterCaptureLocked();
             }
@@ -688,7 +680,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one election-result event for each idol in result rankings.
+        /// Captures one shared final-election result for all ranked idols.
         /// </summary>
         internal void CaptureElectionResults(SEvent_SSK._SSK election)
         {
@@ -707,15 +699,7 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                string electionFinishDate = CoreDateTimeUtility.ToRoundTripString(election.FinishDate);
-                string electionBroadcastCode = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast);
                 string electionEntityIdentifier = election.ID.ToString(CultureInfo.InvariantCulture);
-                string electionRankingSummary = BuildElectionRankingSummary(election);
-                string electionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election);
-                int electionResultCount = election.Results.Count;
-                int electionSingleId = ResolveSingleIdOrInvalid(election.Single);
-                int electionConcertId = ResolveConcertIdOrInvalid(election.Concert);
-                int electionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle);
                 ElectionLifecyclePayload lifecyclePayload = BuildElectionLifecyclePayload(election, CoreConstants.ElectionLifecycleActionFinished);
 
                 EnqueueEventRecordLocked(
@@ -726,42 +710,6 @@ namespace IMDataCore
                     CoreConstants.EventTypeElectionFinished,
                     CoreConstants.EventSourceElectionResultPatch,
                     CoreJsonUtility.SerializeElectionLifecyclePayload(lifecyclePayload));
-
-                for (int resultIndex = CoreConstants.ZeroBasedListStartIndex; resultIndex < election.Results.Count; resultIndex++)
-                {
-                    SEvent_SSK._SSK._result result = election.Results[resultIndex];
-                    if (result == null || result.Girl == null || result.Girl.id < CoreConstants.MinimumValidIdolIdentifier)
-                    {
-                        continue;
-                    }
-
-                    ElectionResultPayload payload = new ElectionResultPayload
-                    {
-                        ElectionId = election.ID,
-                        IdolId = result.Girl.id,
-                        ElectionPlace = result.Place,
-                        ElectionVotes = result.Votes,
-                        ElectionFamePoints = result.FamePoints,
-                        ElectionBroadcastType = electionBroadcastCode,
-                        ElectionSingleId = electionSingleId,
-                        ElectionConcertId = electionConcertId,
-                        ElectionReleaseSingleId = electionReleaseSingleId,
-                        ElectionResultCount = electionResultCount,
-                        ElectionRankingSummary = electionRankingSummary,
-                        ElectionRankedIdolIdList = electionRankedIdolIdList,
-                        ElectionNumber = ResolveSaveScopedElectionNumber(election),
-                        ElectionFinishDate = electionFinishDate
-                    };
-
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        result.Girl.id,
-                        CoreConstants.EventEntityKindElection,
-                        electionEntityIdentifier,
-                        CoreConstants.EventTypeElectionResultRecorded,
-                        CoreConstants.EventSourceElectionResultPatch,
-                        CoreJsonUtility.SerializeElectionResultPayload(payload));
-                }
 
                 FlushAfterCaptureLocked();
             }
@@ -2828,6 +2776,7 @@ namespace IMDataCore
                 return snapshot;
             }
 
+            snapshot.Task = task;
             snapshot.TaskCustom = task.Custom ?? string.Empty;
             snapshot.TaskTypeCode = CoreEnumNameMapping.ToTaskTypeCode(task.Type);
             snapshot.TaskGoalCode = CoreEnumNameMapping.ToTaskGoalCode(task.Goal);
@@ -2842,6 +2791,70 @@ namespace IMDataCore
                 ? CoreDateTimeUtility.ToRoundTripString(task.AvailableFrom.Value)
                 : string.Empty;
             return snapshot;
+        }
+
+        /// <summary>
+        /// Captures every active task tied to an idol before vanilla graduation
+        /// silently removes those tasks from its live collection.
+        /// </summary>
+        internal List<TaskLifecycleSnapshot> CreateGraduationTaskSnapshots(
+            data_girls.girls idol)
+        {
+            List<TaskLifecycleSnapshot> snapshots =
+                new List<TaskLifecycleSnapshot>();
+            if (idol == null ||
+                idol.id < CoreConstants.MinimumValidIdolIdentifier ||
+                tasks.ActiveTasks == null)
+            {
+                return snapshots;
+            }
+
+            for (int taskIndex = CoreConstants.ZeroBasedListStartIndex;
+                taskIndex < tasks.ActiveTasks.Count;
+                taskIndex++)
+            {
+                tasks._task task = tasks.ActiveTasks[taskIndex];
+                if (task != null && task.Girl == idol)
+                {
+                    snapshots.Add(CreateTaskLifecycleSnapshot(task));
+                }
+            }
+
+            return snapshots;
+        }
+
+        /// <summary>
+        /// Records task closures that vanilla performed without a task callback.
+        /// </summary>
+        internal void CaptureTasksRemovedOnGraduation(
+            List<TaskLifecycleSnapshot> snapshots)
+        {
+            if (snapshots == null)
+            {
+                return;
+            }
+
+            for (int snapshotIndex = CoreConstants.ZeroBasedListStartIndex;
+                snapshotIndex < snapshots.Count;
+                snapshotIndex++)
+            {
+                TaskLifecycleSnapshot snapshot = snapshots[snapshotIndex];
+                tasks._task task = snapshot != null ? snapshot.Task : null;
+                if (task == null ||
+                    !snapshot.WasActiveBefore ||
+                    (tasks.ActiveTasks != null && tasks.ActiveTasks.Contains(task)))
+                {
+                    continue;
+                }
+
+                EmitTaskLifecycleEvent(
+                    task,
+                    snapshot,
+                    CoreConstants.EventTypeTaskRemovedOnGraduation,
+                    CoreConstants.EventSourceTasksOnGraduationPatch,
+                    CoreConstants.TaskLifecycleActionRemovedOnGraduation,
+                    false);
+            }
         }
 
         /// <summary>
@@ -4783,6 +4796,8 @@ namespace IMDataCore
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
             List<int> idolIds = ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
+            payload.random_event_actor_id_list =
+                BuildDelimitedIdentifierList(idolIds);
 
             lock (runtimeLock)
             {
@@ -4827,6 +4842,9 @@ namespace IMDataCore
 
             snapshot.ActiveEventStateBefore = ResolveRandomEventStateCode(snapshot.ActiveEventBefore.state);
             snapshot.ActorSummaryBefore = BuildRandomEventActorSummary(snapshot.ActiveEventBefore.actors);
+            snapshot.ActorIdolIdentifiersBefore =
+                ResolveDistinctRandomEventIdolIdentifiers(
+                    snapshot.ActiveEventBefore.actors);
 
             business businessSystem = Camera.main != null
                 ? Camera.main.GetComponent<mainScript>().Data.GetComponent<business>()
@@ -4892,7 +4910,11 @@ namespace IMDataCore
                 buzz_delta = buzzAfter - snapshotBefore.BuzzBefore,
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
-            List<int> idolIds = ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
+            List<int> idolIds = snapshotBefore.ActorIdolIdentifiersBefore != null
+                ? new List<int>(snapshotBefore.ActorIdolIdentifiersBefore)
+                : ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
+            payload.random_event_actor_id_list =
+                BuildDelimitedIdentifierList(idolIds);
 
             lock (runtimeLock)
             {
@@ -4969,6 +4991,7 @@ namespace IMDataCore
             {
                 substory_id = dialogue.id ?? string.Empty,
                 substory_parent_id = dialogue.parent ?? string.Empty,
+                substory_actor_id_list = BuildDelimitedIdentifierList(idolIds),
                 actors_summary = actorSummary,
                 substory_type = ResolveSubstoryTypeCode(dialogue),
                 debug_mode = debug,
@@ -5353,6 +5376,8 @@ namespace IMDataCore
                 return;
             }
 
+            payload.substory_actor_id_list =
+                BuildDelimitedIdentifierList(idolIds);
             EnqueueNarrativeEventForIdolsOrGlobalLocked(
                 staticVars.dateTime,
                 idolIds,
@@ -5628,7 +5653,7 @@ namespace IMDataCore
                 string mentorshipId = BuildMentorshipIdentifier(payload.mentor_id, payload.kohai_id);
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
-                    payload.mentor_id,
+                    CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindMentorship,
                     mentorshipId,
                     CoreConstants.EventTypeMentorshipStarted,
@@ -5719,7 +5744,7 @@ namespace IMDataCore
 
                     EnqueueEventRecordLocked(
                         staticVars.dateTime,
-                        payload.mentor_id,
+                        CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindMentorship,
                         BuildMentorshipIdentifier(payload.mentor_id, payload.kohai_id),
                         CoreConstants.EventTypeMentorshipEnded,
@@ -5803,7 +5828,7 @@ namespace IMDataCore
 
                     EnqueueEventRecordLocked(
                         staticVars.dateTime,
-                        payload.mentor_id,
+                        CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindMentorship,
                         BuildMentorshipIdentifier(payload.mentor_id, payload.kohai_id),
                         CoreConstants.EventTypeMentorshipWeeklyTick,
@@ -6273,7 +6298,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Enqueues one narrative event once per involved idol, or once globally when no idol can be resolved.
+        /// Enqueues one narrative event. Explicit participant ids in the payload
+        /// fan the physical row into each involved idol's derived timeline.
         /// </summary>
         private void EnqueueNarrativeEventForIdolsOrGlobalLocked(
             DateTime gameDate,
@@ -6284,49 +6310,14 @@ namespace IMDataCore
             string sourcePatch,
             string payloadJson)
         {
-            if (idolIds == null || idolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-            {
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    CoreConstants.InvalidIdValue,
-                    entityKind,
-                    entityId,
-                    eventType,
-                    sourcePatch,
-                    payloadJson);
-                return;
-            }
-
-            HashSet<int> emittedIdolIds = new HashSet<int>();
-            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < idolIds.Count; idolIndex++)
-            {
-                int idolId = idolIds[idolIndex];
-                if (idolId < CoreConstants.MinimumValidIdolIdentifier || !emittedIdolIds.Add(idolId))
-                {
-                    continue;
-                }
-
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    idolId,
-                    entityKind,
-                    entityId,
-                    eventType,
-                    sourcePatch,
-                    payloadJson);
-            }
-
-            if (emittedIdolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-            {
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    CoreConstants.InvalidIdValue,
-                    entityKind,
-                    entityId,
-                    eventType,
-                    sourcePatch,
-                    payloadJson);
-            }
+            EnqueueEventRecordLocked(
+                gameDate,
+                CoreConstants.InvalidIdValue,
+                entityKind,
+                entityId,
+                eventType,
+                sourcePatch,
+                payloadJson);
         }
 
         /// <summary>

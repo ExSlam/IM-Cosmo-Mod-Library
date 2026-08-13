@@ -40,7 +40,7 @@ is:
 
 ```text
 FormatName    = IMDataCore.LightweightSidecar
-FormatVersion = 1
+FormatVersion = 2
 ```
 
 It contains only:
@@ -53,6 +53,11 @@ It contains only:
 
 It does not contain `SaveManager.SavedData`, vanilla entity collections,
 embedded checkpoint snapshots, SQL tables, or derived runtime indexes.
+
+Multi-idol occurrences are persisted once with `IdolId = -1` and a small,
+event-specific participant list or primitive ranking. The per-idol timeline
+indexes and any tiny per-idol payload projection are rebuilt in memory and are
+never serialized as duplicate rows.
 
 ## Save, Save As, and rollback
 

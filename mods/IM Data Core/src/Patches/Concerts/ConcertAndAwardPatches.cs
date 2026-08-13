@@ -12,6 +12,42 @@ using UnityEngine;
 
 namespace IMDataCore
 {
+    internal sealed class ConcertCastRemovalPatchState
+    {
+        internal ConcertCastChangeSnapshot Snapshot;
+        internal ConcertCastChangeSnapshot PreviousAmbientSnapshot;
+    }
+
+    internal sealed class ConcertCancellationCaptureSnapshot
+    {
+        internal SEvent_Concerts._concert Concert;
+        internal List<int> ParticipantIds = new List<int>();
+    }
+
+    internal static class ConcertCastRemovalContext
+    {
+        [ThreadStatic]
+        private static ConcertCastChangeSnapshot current;
+
+        internal static ConcertCastChangeSnapshot Current
+        {
+            get { return current; }
+        }
+
+        internal static ConcertCastChangeSnapshot Push(
+            ConcertCastChangeSnapshot snapshot)
+        {
+            ConcertCastChangeSnapshot previous = current;
+            current = snapshot;
+            return previous;
+        }
+
+        internal static void Restore(ConcertCastChangeSnapshot previous)
+        {
+            current = previous;
+        }
+    }
+
     /// Captures concert creation/setup events.
     /// </summary>
     [HarmonyPatch(typeof(SEvent_Concerts), nameof(SEvent_Concerts.SetConcert))]
@@ -76,16 +112,31 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(SEvent_Concerts __instance, out SEvent_Concerts._concert __state)
+        private static void Prefix(
+            SEvent_Concerts __instance,
+            out ConcertCancellationCaptureSnapshot __state)
         {
-            __state = __instance != null ? __instance.Concert : null;
+            __state = new ConcertCancellationCaptureSnapshot
+            {
+                Concert = __instance != null ? __instance.Concert : null
+            };
+            ConcertCastChangeSnapshot removalSnapshot =
+                ConcertCastRemovalContext.Current;
+            if (removalSnapshot != null &&
+                removalSnapshot.ConcertParticipantIdolIdentifiersBefore != null)
+            {
+                __state.ParticipantIds.AddRange(
+                    removalSnapshot.ConcertParticipantIdolIdentifiersBefore);
+            }
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(SEvent_Concerts._concert __state)
+        private static void Postfix(ConcertCancellationCaptureSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureConcertCancelled(__state);
+            IMDataCoreController.Instance.CaptureConcertCancelled(
+                __state != null ? __state.Concert : null,
+                __state != null ? __state.ParticipantIds : null);
         }
     }
 
@@ -99,18 +150,51 @@ namespace IMDataCore
         /// Captures concert cast snapshot before setlist removal mutation.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(SEvent_Concerts._concert __instance, out ConcertCastChangeSnapshot __state)
+        private static void Prefix(
+            SEvent_Concerts._concert __instance,
+            out ConcertCastRemovalPatchState __state)
         {
-            __state = IMDataCoreController.Instance.CreateConcertCastChangeSnapshot(__instance);
+            ConcertCastChangeSnapshot snapshot =
+                IMDataCoreController.Instance.CreateConcertCastChangeSnapshot(__instance);
+            __state = new ConcertCastRemovalPatchState
+            {
+                Snapshot = snapshot,
+                PreviousAmbientSnapshot = ConcertCastRemovalContext.Push(snapshot)
+            };
         }
 
         /// <summary>
         /// Records concert cast-change event after setlist removal logic completes.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(SEvent_Concerts._concert __instance, data_girls.girls __0, ConcertCastChangeSnapshot __state)
+        private static void Postfix(
+            SEvent_Concerts._concert __instance,
+            data_girls.girls __0,
+            ConcertCastRemovalPatchState __state)
         {
-            IMDataCoreController.Instance.CaptureConcertCastChanged(__instance, __0, __state);
+            try
+            {
+                IMDataCoreController.Instance.CaptureConcertCastChanged(
+                    __instance,
+                    __0,
+                    __state != null ? __state.Snapshot : null);
+            }
+            finally
+            {
+                ConcertCastRemovalContext.Restore(
+                    __state != null ? __state.PreviousAmbientSnapshot : null);
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(
+            Exception __exception,
+            ConcertCastRemovalPatchState __state)
+        {
+            ConcertCastRemovalContext.Restore(
+                __state != null ? __state.PreviousAmbientSnapshot : null);
+            return __exception;
         }
     }
 
@@ -141,7 +225,7 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Captures concert finish events and per-idol participation records.
+    /// Captures one shared concert finish event for the historical participants.
     /// </summary>
     [HarmonyPatch(typeof(SEvent_Concerts._concert), nameof(SEvent_Concerts._concert.Finish))]
     internal static class SEvent_Concerts_concert_Finish_IMDataCoreCapture_Patch

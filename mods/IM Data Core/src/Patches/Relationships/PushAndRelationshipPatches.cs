@@ -155,6 +155,27 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Preserves pair state before graduation removes vanilla relationship rows.
+    /// </summary>
+    [HarmonyPatch(typeof(Relationships), nameof(Relationships.RemoveFromEverything))]
+    internal static class Relationships_RemoveFromEverything_IMDataCoreCapture_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            data_girls.girls Girl,
+            out List<RelationshipRemovalSnapshot> __state)
+        {
+            __state = IMDataCoreController.Instance.CreateRelationshipRemovalSnapshots(Girl);
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(List<RelationshipRemovalSnapshot> __state)
+        {
+            IMDataCoreController.Instance.CaptureRelationshipsRemoved(__state);
+        }
+    }
+
+    /// <summary>
     /// Captures relationship-level stop-bullying flows.
     /// </summary>
     [HarmonyPatch(typeof(Relationships._relationship), nameof(Relationships._relationship.StopBullying))]
@@ -255,18 +276,18 @@ namespace IMDataCore
         /// Captures pre-mutation bullied-state snapshot for one target idol.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(Relationships._clique __instance, data_girls.girls Girl, out bool __state)
+        private static void Prefix(Relationships._clique __instance, data_girls.girls Girl, out BullyingStateSnapshot __state)
         {
-            __state = __instance != null && Girl != null && __instance.IsBullied(Girl);
+            __state = IMDataCoreController.Instance.CreateBullyingStopSnapshot(__instance, Girl);
         }
 
         /// <summary>
         /// Records bullying end event after clique stop-bullying mutation.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Relationships._clique __instance, data_girls.girls Girl, bool __state)
+        private static void Postfix(Relationships._clique __instance, data_girls.girls Girl, BullyingStateSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureBullyingEnded(__instance, Girl, __state);
+            IMDataCoreController.Instance.CaptureBullyingEnded(__instance, __state);
         }
     }
 

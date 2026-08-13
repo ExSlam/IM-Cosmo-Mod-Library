@@ -399,12 +399,12 @@ namespace IMDataCore
                     }
 
                     int sparseMoneyPayloadCount;
-                    int sharedShowRowsRemoved;
+                    int sharedParticipantRowsRemoved;
                     List<PendingEvent> compacted =
                         CorePayloadCompaction.CompactPendingEvents(
                             retained,
                             out sparseMoneyPayloadCount,
-                            out sharedShowRowsRemoved);
+                            out sharedParticipantRowsRemoved);
 
                     HashSet<long> batchSequences = new HashSet<long>();
                     HashSet<long> batchEventIdentifiers = new HashSet<long>();
@@ -739,11 +739,8 @@ namespace IMDataCore
                     }
 
                     List<int> candidateSlotIdolIdentifiers;
-                    if (!LightweightSidecarJson.TryReadCsvIntSlotsProperty(
+                    if (!SharedTimelineParticipants.TryReadSingleCastSlotIds(
                             record.PayloadJson,
-                            CoreConstants.JsonFieldSingleCastIdList,
-                            CoreConstants.MinimumValidIdolIdentifier,
-                            CoreConstants.InvalidIdValue,
                             out candidateSlotIdolIdentifiers) ||
                         !ContainsValidIdolIdentifier(
                             candidateSlotIdolIdentifiers))
@@ -753,6 +750,64 @@ namespace IMDataCore
 
                     newestSequence = record.Sequence;
                     slotIdolIdentifiers = candidateSlotIdolIdentifiers;
+                }
+
+                return newestSequence != long.MinValue;
+            }
+        }
+
+        /// <summary>
+        /// Reads the newest active start snapshot for one world tour. The stored
+        /// participant set survives save/load and later vanilla roster changes.
+        /// </summary>
+        internal bool TryGetLatestTourRuntimeState(
+            int tourId,
+            out List<int> participantIdolIdentifiers,
+            out string startDate)
+        {
+            participantIdolIdentifiers = new List<int>();
+            startDate = string.Empty;
+            lock (storageLock)
+            {
+                ThrowIfDisposed();
+                string entityId = tourId.ToString(CultureInfo.InvariantCulture);
+                long newestSequence = long.MinValue;
+                for (int eventIndex = CoreConstants.ZeroBasedListStartIndex;
+                    eventIndex < activeEvents.Count;
+                    eventIndex++)
+                {
+                    LightweightEventRecord record = activeEvents[eventIndex];
+                    if (record == null ||
+                        record.Sequence <= newestSequence ||
+                        !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
+                        !string.Equals(record.EntityKind,
+                            CoreConstants.EventEntityKindTour,
+                            StringComparison.Ordinal) ||
+                        !string.Equals(record.EntityId, entityId,
+                            StringComparison.Ordinal) ||
+                        !string.Equals(record.EventType,
+                            CoreConstants.EventTypeTourStarted,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    List<int> candidateParticipants;
+                    if (!SharedTimelineParticipants.TryReadTourParticipantIds(
+                            record.PayloadJson,
+                            out candidateParticipants))
+                    {
+                        continue;
+                    }
+
+                    string candidateStartDate;
+                    LightweightSidecarJson.TryReadStringProperty(
+                        record.PayloadJson,
+                        CoreConstants.JsonFieldTourStartDate,
+                        out candidateStartDate);
+                    newestSequence = record.Sequence;
+                    participantIdolIdentifiers = candidateParticipants;
+                    startDate = candidateStartDate ?? string.Empty;
                 }
 
                 return newestSequence != long.MinValue;
@@ -1412,12 +1467,12 @@ namespace IMDataCore
                     out retiredTechnicalEventCount);
 
             int sparseMoneyPayloadCount;
-            int sharedShowRowsRemoved;
+            int sharedParticipantRowsRemoved;
             List<LightweightEventRecord> compactedEvents =
                 CorePayloadCompaction.CompactLoadedEvents(
                     retainedEvents,
                     out sparseMoneyPayloadCount,
-                    out sharedShowRowsRemoved);
+                    out sharedParticipantRowsRemoved);
 
             if (retiredTechnicalEventCount > 0)
             {
@@ -1428,16 +1483,16 @@ namespace IMDataCore
                     " redundant built-in telemetry rows while loading this sidecar.");
             }
 
-            if (sparseMoneyPayloadCount > 0 || sharedShowRowsRemoved > 0)
+            if (sparseMoneyPayloadCount > 0 || sharedParticipantRowsRemoved > 0)
             {
                 CoreLog.Info(
-                    "IM Data Core 2.0.5 compacted " +
+                    "IM Data Core compacted " +
                     sparseMoneyPayloadCount.ToString(
                         CultureInfo.InvariantCulture) +
                     " money-detail payloads and removed " +
-                    sharedShowRowsRemoved.ToString(
+                    sharedParticipantRowsRemoved.ToString(
                         CultureInfo.InvariantCulture) +
-                    " duplicate show-participant rows in memory. " +
+                    " duplicate shared-participant rows in memory. " +
                     "The smaller format will be written at the next IMDC save boundary.");
             }
 
@@ -1648,10 +1703,12 @@ namespace IMDataCore
             }
 
             List<int> timelineParticipantIds;
-            if (record.IdolId < CoreConstants.MinimumValidIdolIdentifier &&
-                CorePayloadCompaction.TryGetSharedTimelineParticipantIds(
+            SharedTimelineParticipantResolution participantResolution =
+                SharedTimelineParticipants.ResolveParticipantIds(
                     record,
-                    out timelineParticipantIds))
+                    out timelineParticipantIds);
+            if (participantResolution ==
+                SharedTimelineParticipantResolution.Shared)
             {
                 for (int index = 0; index < timelineParticipantIds.Count; index++)
                 {
@@ -1659,6 +1716,19 @@ namespace IMDataCore
                         timelineParticipantIds[index],
                         record);
                 }
+                return;
+            }
+
+            if (participantResolution ==
+                SharedTimelineParticipantResolution.ValidEmpty)
+            {
+                globalTimelineEvents.Add(record);
+                return;
+            }
+
+            if (participantResolution ==
+                SharedTimelineParticipantResolution.Malformed)
+            {
                 return;
             }
 
@@ -1898,11 +1968,11 @@ namespace IMDataCore
             {
                 LightweightEventRecord record = source[index];
                 IMDataCoreEvent publicEvent = ToPublicEvent(record);
-                if (CorePayloadCompaction.IsSharedTimelineEvent(record))
+                if (SharedTimelineParticipants.IsSharedEvent(record))
                 {
                     publicEvent.IdolId = requestedIdolId;
-                    publicEvent.PayloadJson = CorePayloadCompaction
-                        .ExpandSharedTimelinePayloadForPublic(
+                    publicEvent.PayloadJson = SharedTimelineParticipants
+                        .ExpandPayloadForPublic(
                             record,
                             requestedIdolId);
                 }

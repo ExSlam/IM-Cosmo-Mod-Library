@@ -246,60 +246,6 @@ namespace IMDataCore
             }
         }
 
-        internal static bool TryReadCsvIntSlotsProperty(
-            string json,
-            string propertyName,
-            int minimumValue,
-            int emptySlotValue,
-            out List<int> values)
-        {
-            values = new List<int>();
-            if (string.IsNullOrEmpty(json) ||
-                string.IsNullOrEmpty(propertyName))
-            {
-                return false;
-            }
-
-            try
-            {
-                JsonValue root = new JsonParser(json).ParseDocument();
-                JsonValue property;
-                if (root == null ||
-                    root.Kind != JsonValueKind.Object ||
-                    !root.ObjectValue.TryGetValue(propertyName, out property) ||
-                    property == null ||
-                    property.Kind != JsonValueKind.String ||
-                    string.IsNullOrWhiteSpace(property.StringValue))
-                {
-                    return false;
-                }
-
-                string[] tokens = property.StringValue.Split(',');
-                for (int index = 0; index < tokens.Length; index++)
-                {
-                    int parsed;
-                    if (!int.TryParse(
-                            tokens[index].Trim(),
-                            NumberStyles.Integer,
-                            CultureInfo.InvariantCulture,
-                            out parsed))
-                    {
-                        values.Clear();
-                        return false;
-                    }
-
-                    values.Add(parsed >= minimumValue ? parsed : emptySlotValue);
-                }
-
-                return values.Count > 0;
-            }
-            catch
-            {
-                values.Clear();
-                return false;
-            }
-        }
-
         internal static bool TryReadIntProperty(
             string json,
             string propertyName,
@@ -477,7 +423,60 @@ namespace IMDataCore
             }
         }
 
+        /// <summary>
+        /// Adds or replaces integer fields on a cloned public payload. Shared
+        /// timeline rows use this to reconstruct the small per-idol projection
+        /// while leaving the persisted common snapshot unchanged.
+        /// </summary>
+        internal static string ExpandIntegerPayloadForPublic(
+            string payloadJson,
+            IReadOnlyDictionary<string, long> projectedValues)
+        {
+            if (string.IsNullOrEmpty(payloadJson) ||
+                projectedValues == null ||
+                projectedValues.Count == 0)
+            {
+                return payloadJson ?? string.Empty;
+            }
+
+            try
+            {
+                JsonValue payloadValue =
+                    new JsonParser(payloadJson).ParseDocument();
+                if (payloadValue == null ||
+                    payloadValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                foreach (KeyValuePair<string, long> projectedValue
+                    in projectedValues)
+                {
+                    if (string.IsNullOrEmpty(projectedValue.Key))
+                    {
+                        continue;
+                    }
+
+                    payloadValue.ObjectValue[projectedValue.Key] =
+                        CreateNumberValue(projectedValue.Value);
+                }
+
+                return SerializeJsonValue(payloadValue);
+            }
+            catch
+            {
+                // Projection is an API convenience. Never alter or reject the
+                // durable row when a future payload shape is not understood.
+                return payloadJson;
+            }
+        }
+
         private static JsonValue CreateNumberValue(int value)
+        {
+            return CreateNumberValue((long)value);
+        }
+
+        private static JsonValue CreateNumberValue(long value)
         {
             return new JsonValue
             {
@@ -498,8 +497,8 @@ namespace IMDataCore
             MoneyDetailDefaultKind defaultKind;
             if (!TryGetMoneyDetailDefaultKind(fieldName, out defaultKind))
             {
-                // Future fields are retained until 2.0.5 explicitly knows their
-                // declared default. This prevents accidental lossy compaction.
+                // Future fields are retained until this compactor explicitly
+                // knows their declared default, preventing accidental data loss.
                 return false;
             }
 

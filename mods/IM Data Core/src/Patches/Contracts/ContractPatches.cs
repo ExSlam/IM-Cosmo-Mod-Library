@@ -355,24 +355,28 @@ namespace IMDataCore
     internal static class business_BreakContracts_Idol_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures total broken liability before the game removes active contracts.
+        /// Captures every contract before the game removes active rows.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(business __instance, data_girls.girls _girl, out long __state)
+        private static void Prefix(
+            business __instance,
+            data_girls.girls _girl,
+            out List<ContractBreakSnapshot> __state)
         {
-            __state = IMDataCoreController.Instance.CreateContractBreakLiabilitySnapshotForIdol(__instance, _girl);
+            __state = IMDataCoreController.Instance.CreateContractBreakSnapshotsForIdol(
+                __instance,
+                _girl,
+                CoreConstants.ContractBreakContextSingleIdol);
         }
 
         /// <summary>
         /// Records contract-break event after liabilities are applied by game code.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls _girl, long __state)
+        private static void Postfix(List<ContractBreakSnapshot> __state)
         {
-            IMDataCoreController.Instance.CaptureContractBrokenForIdol(
-                _girl,
+            IMDataCoreController.Instance.CaptureContractBreakSnapshots(
                 __state,
-                CoreConstants.ContractBreakContextSingleIdol,
                 CoreConstants.EventSourceContractBreakSingleIdolPatch);
         }
     }
@@ -384,26 +388,28 @@ namespace IMDataCore
     internal static class business_BreakContracts_Actors_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures per-idol liability snapshot before contract rows are removed.
+        /// Captures every actor contract before active rows are removed.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(
             business __instance,
             List<Event_Manager._activeEvent._actor> Actors,
-            out Dictionary<int, long> __state)
+            out List<ContractBreakSnapshot> __state)
         {
-            __state = IMDataCoreController.Instance.CreateContractBreakLiabilitySnapshotForActors(__instance, Actors);
+            __state = IMDataCoreController.Instance.CreateContractBreakSnapshotsForActors(
+                __instance,
+                Actors,
+                CoreConstants.ContractBreakContextEventActors);
         }
 
         /// <summary>
         /// Records per-idol contract-break events after liabilities are applied.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Dictionary<int, long> __state)
+        private static void Postfix(List<ContractBreakSnapshot> __state)
         {
-            IMDataCoreController.Instance.CaptureContractBrokenForActorBatch(
+            IMDataCoreController.Instance.CaptureContractBreakSnapshots(
                 __state,
-                CoreConstants.ContractBreakContextEventActors,
                 CoreConstants.EventSourceContractBreakEventActorsPatch);
         }
     }

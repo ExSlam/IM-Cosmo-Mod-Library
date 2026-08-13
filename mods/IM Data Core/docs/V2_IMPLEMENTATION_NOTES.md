@@ -131,7 +131,7 @@ Format identity:
 
 ```text
 formatName    = "IMDataCore.LightweightSidecar"
-formatVersion = 1
+formatVersion = 2
 ```
 
 Persisted source data is limited to:
@@ -146,6 +146,10 @@ Runtime dictionaries and query indexes are rebuilt from those records after a
 load. Whole vanilla objects, `SaveManager.SavedData`, current vanilla
 collections, embedded snapshots, hashes, SQL pages, and derived indexes are not
 persisted.
+
+Shared built-in timeline records use the same rule: one occurrence is stored
+once with explicit primitive participant identity. Derived per-idol references
+and reconstructed idol-specific result fields exist only at query time.
 
 ## Runtime and persistence flow
 

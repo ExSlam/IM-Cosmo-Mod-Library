@@ -384,140 +384,119 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Computes total liability that will be removed by `BreakContracts(data_girls.girls)`.
+        /// Captures each active contract that BreakContracts will remove for one idol.
         /// </summary>
-        internal long CreateContractBreakLiabilitySnapshotForIdol(business businessSystem, data_girls.girls idol)
-        {
-            if (businessSystem == null || idol == null || businessSystem.ActiveProposals == null)
-            {
-                return CoreConstants.ZeroLongValue;
-            }
-
-            long totalLiability = CoreConstants.ZeroLongValue;
-            for (int i = CoreConstants.ZeroBasedListStartIndex; i < businessSystem.ActiveProposals.Count; i++)
-            {
-                business.active_proposal activeProposal = businessSystem.ActiveProposals[i];
-                if (activeProposal != null && activeProposal.Girl == idol)
-                {
-                    totalLiability += activeProposal.Liability;
-                }
-            }
-
-            return totalLiability;
-        }
-
-        /// <summary>
-        /// Computes per-idol liability that will be removed by `BreakContracts(List<actor>)`.
-        /// </summary>
-        internal Dictionary<int, long> CreateContractBreakLiabilitySnapshotForActors(
+        internal List<ContractBreakSnapshot> CreateContractBreakSnapshotsForIdol(
             business businessSystem,
-            List<Event_Manager._activeEvent._actor> actors)
+            data_girls.girls idol,
+            string breakContextCode)
         {
-            Dictionary<int, long> totalLiabilityByIdolId = new Dictionary<int, long>();
-            if (businessSystem == null || actors == null || actors.Count < CoreConstants.MinimumNonEmptyCollectionCount || businessSystem.ActiveProposals == null)
+            HashSet<data_girls.girls> targetIdols =
+                new HashSet<data_girls.girls>();
+            if (idol != null)
             {
-                return totalLiabilityByIdolId;
+                targetIdols.Add(idol);
             }
 
-            HashSet<data_girls.girls> targetIdols = new HashSet<data_girls.girls>();
-            for (int actorIndex = CoreConstants.ZeroBasedListStartIndex; actorIndex < actors.Count; actorIndex++)
+            return CreateContractBreakSnapshots(
+                businessSystem,
+                targetIdols,
+                breakContextCode);
+        }
+
+        /// <summary>
+        /// Captures each active contract that BreakContracts will remove for actors.
+        /// </summary>
+        internal List<ContractBreakSnapshot> CreateContractBreakSnapshotsForActors(
+            business businessSystem,
+            List<Event_Manager._activeEvent._actor> actors,
+            string breakContextCode)
+        {
+            HashSet<data_girls.girls> targetIdols =
+                new HashSet<data_girls.girls>();
+            if (actors != null)
             {
-                Event_Manager._activeEvent._actor actor = actors[actorIndex];
-                if (actor != null && actor.girl != null)
+                for (int actorIndex = CoreConstants.ZeroBasedListStartIndex;
+                    actorIndex < actors.Count;
+                    actorIndex++)
                 {
-                    targetIdols.Add(actor.girl);
+                    Event_Manager._activeEvent._actor actor = actors[actorIndex];
+                    if (actor != null && actor.girl != null)
+                    {
+                        targetIdols.Add(actor.girl);
+                    }
                 }
             }
 
-            if (targetIdols.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            return CreateContractBreakSnapshots(
+                businessSystem,
+                targetIdols,
+                breakContextCode);
+        }
+
+        private static List<ContractBreakSnapshot> CreateContractBreakSnapshots(
+            business businessSystem,
+            ISet<data_girls.girls> targetIdols,
+            string breakContextCode)
+        {
+            List<ContractBreakSnapshot> snapshots =
+                new List<ContractBreakSnapshot>();
+            if (businessSystem == null ||
+                businessSystem.ActiveProposals == null ||
+                targetIdols == null ||
+                targetIdols.Count < CoreConstants.MinimumNonEmptyCollectionCount)
             {
-                return totalLiabilityByIdolId;
+                return snapshots;
             }
 
-            for (int proposalIndex = CoreConstants.ZeroBasedListStartIndex; proposalIndex < businessSystem.ActiveProposals.Count; proposalIndex++)
+            for (int proposalIndex = CoreConstants.ZeroBasedListStartIndex;
+                proposalIndex < businessSystem.ActiveProposals.Count;
+                proposalIndex++)
             {
-                business.active_proposal activeProposal = businessSystem.ActiveProposals[proposalIndex];
-                if (activeProposal == null || activeProposal.Girl == null || !targetIdols.Contains(activeProposal.Girl))
+                business.active_proposal activeContract =
+                    businessSystem.ActiveProposals[proposalIndex];
+                if (activeContract == null ||
+                    activeContract.Girl == null ||
+                    !targetIdols.Contains(activeContract.Girl) ||
+                    activeContract.Girl.id < CoreConstants.MinimumValidIdolIdentifier)
                 {
                     continue;
                 }
 
-                int idolId = activeProposal.Girl.id;
-                if (idolId < CoreConstants.MinimumValidIdolIdentifier)
+                int idolId = activeContract.Girl.id;
+                string contractType =
+                    CoreEnumNameMapping.ToBusinessContractTypeCode(
+                        activeContract.Type);
+                snapshots.Add(new ContractBreakSnapshot
                 {
-                    continue;
-                }
-
-                long previousLiability;
-                totalLiabilityByIdolId.TryGetValue(idolId, out previousLiability);
-                totalLiabilityByIdolId[idolId] = previousLiability + activeProposal.Liability;
+                    BusinessSystem = businessSystem,
+                    ActiveContract = activeContract,
+                    IdolId = idolId,
+                    EntityIdentifier = BuildContractEntityIdentifier(
+                        idolId,
+                        contractType,
+                        activeContract.EndDate),
+                    Payload = BuildContractLifecyclePayloadFromActiveContract(
+                        activeContract,
+                        idolId,
+                        true,
+                        activeContract.Liability,
+                        breakContextCode)
+                });
             }
 
-            return totalLiabilityByIdolId;
+            return snapshots;
         }
 
         /// <summary>
-        /// Captures one idol-scoped contract-break event.
+        /// Records one precise event for every contract actually removed.
         /// </summary>
-        internal void CaptureContractBrokenForIdol(data_girls.girls idol, long totalBrokenLiability, string breakContextCode, string sourcePatchCode)
-        {
-            if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier || totalBrokenLiability <= CoreConstants.ZeroLongValue)
-            {
-                return;
-            }
-
-            ContractLifecyclePayload payload = new ContractLifecyclePayload
-            {
-                IdolId = idol.id,
-                ContractType = CoreConstants.StatusCodeUnknown,
-                ContractSkill = CoreConstants.StatusCodeUnknown,
-                IsGroupContract = false,
-                WeeklyPayment = CoreConstants.ZeroBasedListStartIndex,
-                WeeklyBuzz = CoreConstants.ZeroBasedListStartIndex,
-                WeeklyFame = CoreConstants.ZeroBasedListStartIndex,
-                WeeklyFans = CoreConstants.ZeroBasedListStartIndex,
-                WeeklyStamina = CoreConstants.ZeroBasedListStartIndex,
-                ContractLiability = totalBrokenLiability,
-                AgentName = string.Empty,
-                ProductName = string.Empty,
-                ContractEndDate = string.Empty,
-                DamagesApplied = true,
-                TotalBrokenLiability = totalBrokenLiability,
-                ContractBreakContext = breakContextCode ?? string.Empty
-            };
-
-            lock (runtimeLock)
-            {
-                string errorMessage;
-                if (!EnsureInitializedLocked(out errorMessage))
-                {
-                    CoreLog.Warn(errorMessage);
-                    return;
-                }
-
-                DateTime gameDate = staticVars.dateTime;
-                EnqueueEventRecordLocked(
-                    gameDate,
-                    idol.id,
-                    CoreConstants.EventEntityKindContract,
-                    idol.id.ToString(CultureInfo.InvariantCulture),
-                    CoreConstants.EventTypeContractBroken,
-                    sourcePatchCode ?? CoreConstants.EventSourceContractBreakSingleIdolPatch,
-                    CoreJsonUtility.SerializeContractLifecyclePayload(payload));
-
-                FlushAfterCaptureLocked();
-            }
-        }
-
-        /// <summary>
-        /// Captures multiple idol-scoped contract-break events in one pass.
-        /// </summary>
-        internal void CaptureContractBrokenForActorBatch(
-            Dictionary<int, long> idolLiabilityById,
-            string breakContextCode,
+        internal void CaptureContractBreakSnapshots(
+            List<ContractBreakSnapshot> snapshots,
             string sourcePatchCode)
         {
-            if (idolLiabilityById == null || idolLiabilityById.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            if (snapshots == null ||
+                snapshots.Count < CoreConstants.MinimumNonEmptyCollectionCount)
             {
                 return;
             }
@@ -532,41 +511,32 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                foreach (KeyValuePair<int, long> liabilityByIdEntry in idolLiabilityById)
+                for (int snapshotIndex = CoreConstants.ZeroBasedListStartIndex;
+                    snapshotIndex < snapshots.Count;
+                    snapshotIndex++)
                 {
-                    if (liabilityByIdEntry.Key < CoreConstants.MinimumValidIdolIdentifier || liabilityByIdEntry.Value <= CoreConstants.ZeroLongValue)
+                    ContractBreakSnapshot snapshot = snapshots[snapshotIndex];
+                    if (snapshot == null ||
+                        snapshot.Payload == null ||
+                        snapshot.IdolId < CoreConstants.MinimumValidIdolIdentifier ||
+                        (snapshot.BusinessSystem != null &&
+                         snapshot.BusinessSystem.ActiveProposals != null &&
+                         snapshot.BusinessSystem.ActiveProposals.Contains(
+                             snapshot.ActiveContract)))
                     {
                         continue;
                     }
 
-                    ContractLifecyclePayload payload = new ContractLifecyclePayload
-                    {
-                        IdolId = liabilityByIdEntry.Key,
-                        ContractType = CoreConstants.StatusCodeUnknown,
-                        ContractSkill = CoreConstants.StatusCodeUnknown,
-                        IsGroupContract = false,
-                        WeeklyPayment = CoreConstants.ZeroBasedListStartIndex,
-                        WeeklyBuzz = CoreConstants.ZeroBasedListStartIndex,
-                        WeeklyFame = CoreConstants.ZeroBasedListStartIndex,
-                        WeeklyFans = CoreConstants.ZeroBasedListStartIndex,
-                        WeeklyStamina = CoreConstants.ZeroBasedListStartIndex,
-                        ContractLiability = liabilityByIdEntry.Value,
-                        AgentName = string.Empty,
-                        ProductName = string.Empty,
-                        ContractEndDate = string.Empty,
-                        DamagesApplied = true,
-                        TotalBrokenLiability = liabilityByIdEntry.Value,
-                        ContractBreakContext = breakContextCode ?? string.Empty
-                    };
-
                     EnqueueEventRecordLocked(
                         gameDate,
-                        liabilityByIdEntry.Key,
+                        snapshot.IdolId,
                         CoreConstants.EventEntityKindContract,
-                        liabilityByIdEntry.Key.ToString(CultureInfo.InvariantCulture),
+                        snapshot.EntityIdentifier ?? string.Empty,
                         CoreConstants.EventTypeContractBroken,
-                        sourcePatchCode ?? CoreConstants.EventSourceContractBreakEventActorsPatch,
-                        CoreJsonUtility.SerializeContractLifecyclePayload(payload));
+                        sourcePatchCode ??
+                            CoreConstants.EventSourceContractBreakSingleIdolPatch,
+                        CoreJsonUtility.SerializeContractLifecyclePayload(
+                            snapshot.Payload));
                 }
 
                 FlushAfterCaptureLocked();
@@ -642,7 +612,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one show lifecycle event and emits one row per cast idol when available.
+        /// Captures one shared show lifecycle event for its historical cast.
         /// </summary>
         private void CaptureShowLifecycleEvent(
             Shows._show show,
@@ -677,38 +647,21 @@ namespace IMDataCore
 
                 string eventPayloadJson = CoreJsonUtility.SerializeShowLifecyclePayload(payload);
 
-                if (castIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindShow,
-                        showEntityIdentifier,
-                        lifecycleEventTypeCode,
-                        sourcePatchCode,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int castIndex = CoreConstants.ZeroBasedListStartIndex; castIndex < castIdolIdentifiers.Count; castIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindShow,
-                            showEntityIdentifier,
-                            lifecycleEventTypeCode,
-                            sourcePatchCode,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindShow,
+                    showEntityIdentifier,
+                    lifecycleEventTypeCode,
+                    sourcePatchCode,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
         }
 
         /// <summary>
-        /// Captures show status transitions for each cast idol.
+        /// Captures one shared show status transition for its historical cast.
         /// </summary>
         internal void CaptureShowStatusTransition(Shows._show show, Shows._show._status previousStatus, Shows._show._status newStatus)
         {
@@ -734,6 +687,7 @@ namespace IMDataCore
                 ShowCastType = CoreEnumNameMapping.ToShowCastTypeCode(show.castType),
                 ShowEpisodeCount = show.episodeCount,
                 ShowCastCount = castIdolIdentifiers.Count,
+                ShowCastIdList = BuildDelimitedIdentifierList(castIdolIdentifiers),
                 ShowLatestAudience = ResolveLatestLongMetric(show.audience),
                 ShowLatestRevenue = ResolveLatestLongMetric(show.revenue),
                 ShowLatestNewFans = ResolveLatestIntMetric(show.fans),
@@ -753,31 +707,14 @@ namespace IMDataCore
                 string eventPayloadJson = CoreJsonUtility.SerializeShowStatusPayload(payload);
                 string showEntityIdentifier = show.id.ToString(CultureInfo.InvariantCulture);
 
-                if (castIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindShow,
-                        showEntityIdentifier,
-                        CoreConstants.EventTypeShowStatusChanged,
-                        CoreConstants.EventSourceShowStatusPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int castIndex = CoreConstants.ZeroBasedListStartIndex; castIndex < castIdolIdentifiers.Count; castIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindShow,
-                            showEntityIdentifier,
-                            CoreConstants.EventTypeShowStatusChanged,
-                            CoreConstants.EventSourceShowStatusPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindShow,
+                    showEntityIdentifier,
+                    CoreConstants.EventTypeShowStatusChanged,
+                    CoreConstants.EventSourceShowStatusPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -976,10 +913,6 @@ namespace IMDataCore
                 productionCostAfter,
                 fanAppealSummaryAfter);
             string eventPayloadJson = CoreJsonUtility.SerializeShowConfigurationChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                castIdolIdentifiersBefore,
-                castIdolIdentifiersAfter,
-                CoreConstants.InvalidIdValue);
             string showEntityIdentifier = show.id.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -992,31 +925,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindShow,
-                        showEntityIdentifier,
-                        CoreConstants.EventTypeShowConfigurationChanged,
-                        CoreConstants.EventSourceShowPopupContinuePatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindShow,
-                            showEntityIdentifier,
-                            CoreConstants.EventTypeShowConfigurationChanged,
-                            CoreConstants.EventSourceShowPopupContinuePatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindShow,
+                    showEntityIdentifier,
+                    CoreConstants.EventTypeShowConfigurationChanged,
+                    CoreConstants.EventSourceShowPopupContinuePatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -1060,10 +976,6 @@ namespace IMDataCore
                 removedCastIdolIdentifiers,
                 removedIdol);
             string eventPayloadJson = CoreJsonUtility.SerializeShowCastChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                castIdolIdentifiersBefore,
-                castIdolIdentifiersAfter,
-                removedIdol != null ? removedIdol.id : CoreConstants.InvalidIdValue);
             string showEntityIdentifier = show.id.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -1076,31 +988,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindShow,
-                        showEntityIdentifier,
-                        CoreConstants.EventTypeShowCastChanged,
-                        sourcePatchCode,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindShow,
-                            showEntityIdentifier,
-                            CoreConstants.EventTypeShowCastChanged,
-                            sourcePatchCode,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindShow,
+                    showEntityIdentifier,
+                    CoreConstants.EventTypeShowCastChanged,
+                    sourcePatchCode,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -1111,7 +1006,7 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureConcertCreated(SEvent_Concerts._concert concert)
         {
-            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertCreated, CoreConstants.EventSourceConcertSetPatch, false);
+            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertCreated, CoreConstants.EventSourceConcertSetPatch);
         }
 
         /// <summary>
@@ -1119,23 +1014,29 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureConcertStarted(SEvent_Concerts._concert concert)
         {
-            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertStarted, CoreConstants.EventSourceConcertStartPatch, false);
+            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertStarted, CoreConstants.EventSourceConcertStartPatch);
         }
 
         /// <summary>
-        /// Captures one concert-finish lifecycle event and per-idol participation rows.
+        /// Captures one shared concert-finish occurrence.
         /// </summary>
         internal void CaptureConcertFinished(SEvent_Concerts._concert concert)
         {
-            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertFinished, CoreConstants.EventSourceConcertFinishPatch, true);
+            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertFinished, CoreConstants.EventSourceConcertFinishPatch);
         }
 
         /// <summary>
-        /// Captures one concert-cancel lifecycle event and per-idol participation rows.
+        /// Captures one shared concert-cancel occurrence.
         /// </summary>
-        internal void CaptureConcertCancelled(SEvent_Concerts._concert concert)
+        internal void CaptureConcertCancelled(
+            SEvent_Concerts._concert concert,
+            IReadOnlyList<int> participantIdsBeforeCancellation)
         {
-            CaptureConcertLifecycleEvent(concert, CoreConstants.EventTypeConcertCancelled, CoreConstants.EventSourceConcertCancelPatch, true);
+            CaptureConcertLifecycleEvent(
+                concert,
+                CoreConstants.EventTypeConcertCancelled,
+                CoreConstants.EventSourceConcertCancelPatch,
+                participantIdsBeforeCancellation);
         }
 
         /// <summary>
@@ -1292,10 +1193,6 @@ namespace IMDataCore
                 venueAfterCode,
                 ticketPriceAfter);
             string eventPayloadJson = CoreJsonUtility.SerializeConcertConfigurationChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                participantsBefore,
-                participantsAfter,
-                CoreConstants.InvalidIdValue);
             string concertEntityIdentifier = concert.ID.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -1308,31 +1205,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindConcert,
-                        concertEntityIdentifier,
-                        CoreConstants.EventTypeConcertConfigurationChanged,
-                        CoreConstants.EventSourceConcertNewPopupContinuePatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindConcert,
-                            concertEntityIdentifier,
-                            CoreConstants.EventTypeConcertConfigurationChanged,
-                            CoreConstants.EventSourceConcertNewPopupContinuePatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindConcert,
+                    concertEntityIdentifier,
+                    CoreConstants.EventTypeConcertConfigurationChanged,
+                    CoreConstants.EventSourceConcertNewPopupContinuePatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -1395,10 +1275,6 @@ namespace IMDataCore
                 setlistSummaryAfter,
                 removedIdol);
             string eventPayloadJson = CoreJsonUtility.SerializeConcertCastChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                participantsBefore,
-                participantsAfter,
-                removedIdol != null ? removedIdol.id : CoreConstants.InvalidIdValue);
             string concertEntityIdentifier = concert.ID.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -1411,51 +1287,41 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindConcert,
-                        concertEntityIdentifier,
-                        CoreConstants.EventTypeConcertCastChanged,
-                        sourcePatchCode,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindConcert,
-                            concertEntityIdentifier,
-                            CoreConstants.EventTypeConcertCastChanged,
-                            sourcePatchCode,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindConcert,
+                    concertEntityIdentifier,
+                    CoreConstants.EventTypeConcertCastChanged,
+                    sourcePatchCode,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
         }
 
         /// <summary>
-        /// Captures one concert lifecycle record and optional per-idol participation records.
+        /// Captures one concert lifecycle record. Terminal rows fan out through
+        /// their stored participant list rather than a second participation row.
         /// </summary>
         private void CaptureConcertLifecycleEvent(
             SEvent_Concerts._concert concert,
             string lifecycleEventTypeCode,
             string sourcePatchCode,
-            bool includeParticipationRows)
+            IReadOnlyList<int> participantIdolIdentifiersOverride = null)
         {
             if (concert == null)
             {
                 return;
             }
 
-            List<int> participantIdolIdentifiers = ResolveDistinctConcertParticipantIdolIdentifiers(concert);
+            List<int> participantIdolIdentifiers =
+                participantIdolIdentifiersOverride != null &&
+                participantIdolIdentifiersOverride.Count >=
+                    CoreConstants.MinimumNonEmptyCollectionCount
+                    ? ResolveDistinctValidIdentifiers(
+                        participantIdolIdentifiersOverride)
+                    : ResolveDistinctConcertParticipantIdolIdentifiers(concert);
             ConcertLifecyclePayload lifecyclePayload = BuildConcertLifecyclePayload(
                 concert,
                 CoreConstants.InvalidIdValue,
@@ -1481,29 +1347,33 @@ namespace IMDataCore
                     sourcePatchCode,
                     CoreJsonUtility.SerializeConcertLifecyclePayload(lifecyclePayload));
 
-                if (includeParticipationRows && participantIdolIdentifiers.Count >= CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    for (int participantIndex = CoreConstants.ZeroBasedListStartIndex; participantIndex < participantIdolIdentifiers.Count; participantIndex++)
-                    {
-                        int participantIdolId = participantIdolIdentifiers[participantIndex];
-                        ConcertLifecyclePayload participationPayload = BuildConcertLifecyclePayload(
-                            concert,
-                            participantIdolId,
-                            participantIdolIdentifiers);
-
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            participantIdolId,
-                            CoreConstants.EventEntityKindConcert,
-                            concertEntityIdentifier,
-                            CoreConstants.EventTypeConcertParticipation,
-                            sourcePatchCode,
-                            CoreJsonUtility.SerializeConcertLifecyclePayload(participationPayload));
-                    }
-                }
-
                 FlushAfterCaptureLocked();
             }
+        }
+
+        private static List<int> ResolveDistinctValidIdentifiers(
+            IReadOnlyList<int> identifiers)
+        {
+            List<int> distinctIdentifiers = new List<int>();
+            if (identifiers == null)
+            {
+                return distinctIdentifiers;
+            }
+
+            HashSet<int> emitted = new HashSet<int>();
+            for (int identifierIndex = CoreConstants.ZeroBasedListStartIndex;
+                identifierIndex < identifiers.Count;
+                identifierIndex++)
+            {
+                int identifier = identifiers[identifierIndex];
+                if (identifier >= CoreConstants.MinimumValidIdolIdentifier &&
+                    emitted.Add(identifier))
+                {
+                    distinctIdentifiers.Add(identifier);
+                }
+            }
+
+            return distinctIdentifiers;
         }
 
         /// <summary>
@@ -1949,24 +1819,12 @@ namespace IMDataCore
                 string payloadJson = CoreJsonUtility.SerializeIdolRelationshipLifecyclePayload(payload);
                 EnqueueEventRecordLocked(
                     gameDate,
-                    idolAId,
+                    CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindRelationship,
                     relationshipPairEntityIdentifier,
                     CoreConstants.EventTypeIdolDatingStarted,
                     CoreConstants.EventSourceIdolRelationshipStartPatch,
                     payloadJson);
-
-                if (idolBId != idolAId)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        idolBId,
-                        CoreConstants.EventEntityKindRelationship,
-                        relationshipPairEntityIdentifier,
-                        CoreConstants.EventTypeIdolDatingStarted,
-                        CoreConstants.EventSourceIdolRelationshipStartPatch,
-                        payloadJson);
-                }
 
                 FlushAfterCaptureLocked();
             }
@@ -2015,24 +1873,12 @@ namespace IMDataCore
                 string payloadJson = CoreJsonUtility.SerializeIdolRelationshipLifecyclePayload(payload);
                 EnqueueEventRecordLocked(
                     gameDate,
-                    idolAId,
+                    CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindRelationship,
                     relationshipPairEntityIdentifier,
                     CoreConstants.EventTypeIdolDatingEnded,
                     CoreConstants.EventSourceIdolRelationshipBreakPatch,
                     payloadJson);
-
-                if (idolBId != idolAId)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        idolBId,
-                        CoreConstants.EventEntityKindRelationship,
-                        relationshipPairEntityIdentifier,
-                        CoreConstants.EventTypeIdolDatingEnded,
-                        CoreConstants.EventSourceIdolRelationshipBreakPatch,
-                        payloadJson);
-                }
 
                 FlushAfterCaptureLocked();
             }
@@ -2092,23 +1938,122 @@ namespace IMDataCore
                 string payloadJson = CoreJsonUtility.SerializeIdolRelationshipStatusChangePayload(payload);
                 EnqueueEventRecordLocked(
                     gameDate,
-                    idolAId,
+                    CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindRelationship,
                     relationshipPairEntityIdentifier,
                     CoreConstants.EventTypeIdolRelationshipStatusChanged,
                     CoreConstants.EventSourceIdolRelationshipAddPatch,
                     payloadJson);
 
-                if (idolBId != idolAId)
+                FlushAfterCaptureLocked();
+            }
+        }
+
+        /// <summary>
+        /// Captures portable pair state before vanilla graduation deletes it.
+        /// </summary>
+        internal List<RelationshipRemovalSnapshot> CreateRelationshipRemovalSnapshots(
+            data_girls.girls idol)
+        {
+            List<RelationshipRemovalSnapshot> snapshots =
+                new List<RelationshipRemovalSnapshot>();
+            if (idol == null || Relationships.RelationshipsData == null)
+            {
+                return snapshots;
+            }
+
+            for (int relationshipIndex = CoreConstants.ZeroBasedListStartIndex;
+                relationshipIndex < Relationships.RelationshipsData.Count;
+                relationshipIndex++)
+            {
+                Relationships._relationship relationship =
+                    Relationships.RelationshipsData[relationshipIndex];
+                int idolAId;
+                int idolBId;
+                if (relationship == null ||
+                    relationship.Girls == null ||
+                    !relationship.Girls.Contains(idol) ||
+                    !TryResolveRelationshipPairIdolIdentifiers(
+                        relationship,
+                        out idolAId,
+                        out idolBId))
                 {
+                    continue;
+                }
+
+                string entityIdentifier =
+                    BuildRelationshipPairEntityIdentifier(idolAId, idolBId);
+                snapshots.Add(new RelationshipRemovalSnapshot
+                {
+                    Relationship = relationship,
+                    EntityIdentifier = entityIdentifier,
+                    Payload = new IdolRelationshipLifecyclePayload
+                    {
+                        IdolAId = idolAId,
+                        IdolBId = idolBId,
+                        RelationshipStatus =
+                            CoreEnumNameMapping.ToRelationshipStatusCode(
+                                relationship.Status),
+                        RelationshipDynamic =
+                            CoreEnumNameMapping.ToRelationshipDynamicCode(
+                                relationship.Dynamic),
+                        RelationshipKnownToPlayer =
+                            relationship.IsRelationshipKnown(),
+                        RelationshipPairKey = entityIdentifier,
+                        RelationshipBreakReason =
+                            CoreConstants.RelationshipBreakReasonGraduation,
+                        RelationshipIsDating = relationship.Dating
+                    }
+                });
+            }
+
+            return snapshots;
+        }
+
+        /// <summary>
+        /// Records only pair rows that the vanilla removal actually deleted.
+        /// </summary>
+        internal void CaptureRelationshipsRemoved(
+            List<RelationshipRemovalSnapshot> snapshots)
+        {
+            if (snapshots == null)
+            {
+                return;
+            }
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                DateTime gameDate = staticVars.dateTime;
+                for (int snapshotIndex = CoreConstants.ZeroBasedListStartIndex;
+                    snapshotIndex < snapshots.Count;
+                    snapshotIndex++)
+                {
+                    RelationshipRemovalSnapshot snapshot = snapshots[snapshotIndex];
+                    if (snapshot == null ||
+                        snapshot.Payload == null ||
+                        (Relationships.RelationshipsData != null &&
+                         Relationships.RelationshipsData.Contains(
+                             snapshot.Relationship)))
+                    {
+                        continue;
+                    }
+
                     EnqueueEventRecordLocked(
                         gameDate,
-                        idolBId,
+                        CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindRelationship,
-                        relationshipPairEntityIdentifier,
-                        CoreConstants.EventTypeIdolRelationshipStatusChanged,
-                        CoreConstants.EventSourceIdolRelationshipAddPatch,
-                        payloadJson);
+                        snapshot.EntityIdentifier ?? string.Empty,
+                        CoreConstants.EventTypeIdolRelationshipRemoved,
+                        CoreConstants.EventSourceRelationshipsRemoveFromEverythingPatch,
+                        CoreJsonUtility.SerializeIdolRelationshipLifecyclePayload(
+                            snapshot.Payload));
                 }
 
                 FlushAfterCaptureLocked();
@@ -2177,6 +2122,24 @@ namespace IMDataCore
 
             snapshot.WasMemberBeforeQuit = clique.Members.Contains(leavingIdol);
             snapshot.PreviousLeaderId = ResolveCliqueLeaderIdOrInvalid(clique);
+            snapshot.MemberCountBefore = clique.Members.Count;
+            snapshot.CliqueSignatureBefore = BuildCliqueSignature(clique);
+            if (clique.Bullied_Girls != null)
+            {
+                for (int targetIndex = CoreConstants.ZeroBasedListStartIndex;
+                    targetIndex < clique.Bullied_Girls.Count;
+                    targetIndex++)
+                {
+                    BullyingStateSnapshot targetSnapshot =
+                        CreateBullyingStopSnapshot(
+                            clique,
+                            clique.Bullied_Girls[targetIndex]);
+                    if (targetSnapshot.WasBullied)
+                    {
+                        snapshot.BulliedTargetsBefore.Add(targetSnapshot);
+                    }
+                }
+            }
             return snapshot;
         }
 
@@ -2203,7 +2166,11 @@ namespace IMDataCore
             }
 
             int leaderIdAfter = ResolveCliqueLeaderIdOrInvalid(clique);
-            string cliqueSignature = BuildCliqueSignature(clique);
+            string cliqueSignature = quitSnapshot.CliqueSignatureBefore ?? string.Empty;
+            if (string.IsNullOrEmpty(cliqueSignature))
+            {
+                cliqueSignature = BuildCliqueSignature(clique);
+            }
             string cliqueEntityIdentifier = !string.IsNullOrEmpty(cliqueSignature)
                 ? cliqueSignature
                 : CoreConstants.UnknownCliqueEntityIdentifier;
@@ -2239,6 +2206,31 @@ namespace IMDataCore
                     CoreJsonUtility.SerializeCliqueLifecyclePayload(payload));
 
                 FlushAfterCaptureLocked();
+            }
+
+            bool cliqueStillActive = clique != null &&
+                Relationships.Cliques != null &&
+                Relationships.Cliques.Contains(clique);
+            if (quitSnapshot.MemberCountBefore > 1 &&
+                quitSnapshot.BulliedTargetsBefore != null)
+            {
+                for (int targetIndex = CoreConstants.ZeroBasedListStartIndex;
+                    targetIndex < quitSnapshot.BulliedTargetsBefore.Count;
+                    targetIndex++)
+                {
+                    BullyingStateSnapshot targetSnapshot =
+                        quitSnapshot.BulliedTargetsBefore[targetIndex];
+                    if (!cliqueStillActive ||
+                        targetSnapshot == null ||
+                        targetSnapshot.Target == null ||
+                        !clique.IsBullied(targetSnapshot.Target))
+                    {
+                        CaptureBullyingEnded(
+                            clique,
+                            targetSnapshot,
+                            CoreConstants.EventSourceCliqueQuitPatch);
+                    }
+                }
             }
         }
 
@@ -2299,31 +2291,68 @@ namespace IMDataCore
         /// <summary>
         /// Captures one bullying-end event.
         /// </summary>
-        internal void CaptureBullyingEnded(Relationships._clique clique, data_girls.girls targetIdol, bool wasBulliedBefore)
+        internal BullyingStateSnapshot CreateBullyingStopSnapshot(
+            Relationships._clique clique,
+            data_girls.girls targetIdol)
         {
-            CaptureBullyingEnded(clique, targetIdol, wasBulliedBefore, CoreConstants.EventSourceCliqueStopBullyingPatch);
+            BullyingStateSnapshot snapshot = new BullyingStateSnapshot
+            {
+                Target = targetIdol,
+                TargetId = targetIdol != null
+                    ? targetIdol.id
+                    : CoreConstants.InvalidIdValue,
+                LeaderId = ResolveCliqueLeaderIdOrInvalid(clique),
+                CliqueMemberCount = clique != null && clique.Members != null
+                    ? clique.Members.Count
+                    : CoreConstants.ZeroBasedListStartIndex,
+                CliqueSignature = BuildCliqueSignature(clique)
+            };
+            if (clique != null && targetIdol != null)
+            {
+                snapshot.WasBullied = clique.IsBullied(targetIdol);
+                snapshot.WasKnownToPlayer = clique.KnownBulliedGirls != null &&
+                    clique.KnownBulliedGirls.Contains(targetIdol);
+            }
+
+            return snapshot;
         }
 
         /// <summary>
-        /// Captures one bullying-end event with explicit source patch code for multi-hook compatibility.
+        /// Captures one bullying-end event using pre-mutation identity and visibility.
         /// </summary>
         internal void CaptureBullyingEnded(
             Relationships._clique clique,
-            data_girls.girls targetIdol,
-            bool wasBulliedBefore,
+            BullyingStateSnapshot snapshot)
+        {
+            CaptureBullyingEnded(
+                clique,
+                snapshot,
+                CoreConstants.EventSourceCliqueStopBullyingPatch);
+        }
+
+        /// <summary>
+        /// Captures one bullying-end event with an explicit source patch code.
+        /// </summary>
+        private void CaptureBullyingEnded(
+            Relationships._clique clique,
+            BullyingStateSnapshot snapshot,
             string sourcePatchCode)
         {
-            if (clique == null
-                || targetIdol == null
-                || targetIdol.id < CoreConstants.MinimumValidIdolIdentifier
-                || !wasBulliedBefore
-                || clique.IsBullied(targetIdol))
+            if (snapshot == null ||
+                snapshot.TargetId < CoreConstants.MinimumValidIdolIdentifier ||
+                !snapshot.WasBullied ||
+                (clique != null &&
+                 Relationships.Cliques != null &&
+                 Relationships.Cliques.Contains(clique) &&
+                 snapshot.Target != null &&
+                 clique.IsBullied(snapshot.Target)))
             {
                 return;
             }
 
-            int leaderId = ResolveCliqueLeaderIdOrInvalid(clique);
-            string bullyingEntityIdentifier = BuildBullyingEntityIdentifier(leaderId, targetIdol.id);
+            string bullyingEntityIdentifier = BuildBullyingEntityIdentifier(
+                snapshot.LeaderId,
+                snapshot.TargetId);
             if (string.IsNullOrEmpty(bullyingEntityIdentifier))
             {
                 bullyingEntityIdentifier = CoreConstants.UnknownBullyingEntityIdentifier;
@@ -2331,12 +2360,12 @@ namespace IMDataCore
 
             BullyingLifecyclePayload payload = new BullyingLifecyclePayload
             {
-                IdolId = targetIdol.id,
-                BullyingTargetId = targetIdol.id,
-                BullyingLeaderId = leaderId,
-                BullyingKnownToPlayer = clique.KnownBulliedGirls != null && clique.KnownBulliedGirls.Contains(targetIdol),
-                CliqueMemberCount = clique.Members != null ? clique.Members.Count : CoreConstants.ZeroBasedListStartIndex,
-                CliqueSignature = BuildCliqueSignature(clique)
+                IdolId = snapshot.TargetId,
+                BullyingTargetId = snapshot.TargetId,
+                BullyingLeaderId = snapshot.LeaderId,
+                BullyingKnownToPlayer = snapshot.WasKnownToPlayer,
+                CliqueMemberCount = snapshot.CliqueMemberCount,
+                CliqueSignature = snapshot.CliqueSignature ?? string.Empty
             };
 
             lock (runtimeLock)
@@ -2352,7 +2381,7 @@ namespace IMDataCore
                 string idempotencyKey = BuildBullyingLifecycleIdempotencyKey(
                     CoreConstants.EventTypeBullyingEnded,
                     bullyingEntityIdentifier,
-                    targetIdol.id);
+                    snapshot.TargetId);
                 if (!TryReserveIdempotencyKeyLocked(gameDate, idempotencyKey))
                 {
                     return;
@@ -2360,7 +2389,7 @@ namespace IMDataCore
 
                 EnqueueEventRecordLocked(
                     gameDate,
-                    targetIdol.id,
+                    snapshot.TargetId,
                     CoreConstants.EventEntityKindBullying,
                     bullyingEntityIdentifier,
                     CoreConstants.EventTypeBullyingEnded,
@@ -2387,12 +2416,14 @@ namespace IMDataCore
             if (firstIdol != null && secondIdol != null)
             {
                 snapshot.FirstClique = firstIdol.GetClique();
-                snapshot.FirstTarget = secondIdol;
-                snapshot.FirstWasBullied = snapshot.FirstClique != null && snapshot.FirstClique.IsBullied(secondIdol);
+                snapshot.FirstState = CreateBullyingStopSnapshot(
+                    snapshot.FirstClique,
+                    secondIdol);
 
                 snapshot.SecondClique = secondIdol.GetClique();
-                snapshot.SecondTarget = firstIdol;
-                snapshot.SecondWasBullied = snapshot.SecondClique != null && snapshot.SecondClique.IsBullied(firstIdol);
+                snapshot.SecondState = CreateBullyingStopSnapshot(
+                    snapshot.SecondClique,
+                    firstIdol);
             }
 
             return snapshot;
@@ -2408,21 +2439,19 @@ namespace IMDataCore
                 return;
             }
 
-            if (snapshot.FirstWasBullied)
+            if (snapshot.FirstState != null && snapshot.FirstState.WasBullied)
             {
                 CaptureBullyingEnded(
                     snapshot.FirstClique,
-                    snapshot.FirstTarget,
-                    true,
+                    snapshot.FirstState,
                     CoreConstants.EventSourceRelationshipStopBullyingPatch);
             }
 
-            if (snapshot.SecondWasBullied)
+            if (snapshot.SecondState != null && snapshot.SecondState.WasBullied)
             {
                 CaptureBullyingEnded(
                     snapshot.SecondClique,
-                    snapshot.SecondTarget,
-                    true,
+                    snapshot.SecondState,
                     CoreConstants.EventSourceRelationshipStopBullyingPatch);
             }
         }

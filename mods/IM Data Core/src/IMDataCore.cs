@@ -86,7 +86,6 @@ namespace IMDataCore
         internal const string EventTypeTourFinished = "tour_finished";
         internal const string EventTypeTourCancelled = "tour_cancelled";
         internal const string EventTypeTourCountryResult = "tour_country_result";
-        internal const string EventTypeTourParticipation = "tour_participation";
         internal const string EventTypeTourStatusChanged = "tour_status_changed";
         internal const string EventTypeElectionCreated = "election_created";
         internal const string EventTypeElectionFinished = "election_finished";
@@ -94,7 +93,6 @@ namespace IMDataCore
         internal const string EventTypeElectionResultsGenerated = "election_results_generated";
         internal const string EventTypeElectionPlaceAdjusted = "election_place_adjusted";
         internal const string EventTypeElectionStatusChanged = "election_status_changed";
-        internal const string EventTypeElectionResultRecorded = "election_result_recorded";
         internal const string EventTypeScandalPointsChanged = "scandal_points_changed";
         internal const string EventTypeMedicalInjury = "medical_injury";
         internal const string EventTypeMedicalDepression = "medical_depression";
@@ -105,7 +103,6 @@ namespace IMDataCore
         internal const string EventTypeConcertStarted = "concert_started";
         internal const string EventTypeConcertFinished = "concert_finished";
         internal const string EventTypeConcertCancelled = "concert_cancelled";
-        internal const string EventTypeConcertParticipation = "concert_participation";
         internal const string EventTypeConcertCastChanged = "concert_cast_changed";
         internal const string EventTypeConcertStatusChanged = "concert_status_changed";
         internal const string EventTypeConcertConfigurationChanged = "concert_configuration_changed";
@@ -125,6 +122,7 @@ namespace IMDataCore
         internal const string EventTypePlayerDateInteraction = "player_date_interaction";
         internal const string EventTypePlayerMarriageOutcome = "player_marriage_outcome";
         internal const string EventTypeIdolRelationshipStatusChanged = "idol_relationship_status_changed";
+        internal const string EventTypeIdolRelationshipRemoved = "idol_relationship_removed";
         internal const string EventTypeIdolHired = "idol_hired";
         internal const string EventTypeIdolGraduationAnnounced = "idol_graduation_announced";
         internal const string EventTypeIdolGraduated = "idol_graduated";
@@ -159,6 +157,7 @@ namespace IMDataCore
         internal const string EventTypeTaskCompleted = "task_completed";
         internal const string EventTypeTaskFailed = "task_failed";
         internal const string EventTypeTaskDone = "task_done";
+        internal const string EventTypeTaskRemovedOnGraduation = "task_removed_on_graduation";
         internal const string EventTypeIdolOutfitChanged = "idol_outfit_changed";
         internal const string EventTypeConcertCardUsed = "concert_card_used";
         internal const string EventTypeConcertCrisisDecision = "concert_crisis_decision";
@@ -172,10 +171,10 @@ namespace IMDataCore
         internal const string EventTypeAgencyRoomBuilt = "agency_room_built";
         internal const string EventTypeAgencyRoomDestroyed = "agency_room_destroyed";
         internal const string EventTypeAgencyRoomCostPaid = "agency_room_cost_paid";
-        // Room work is emitted once per participating idol when a staffed room completes a
-        // preparation or practice task.  The JSON payload deliberately carries optional
-        // staff attribution, so databases written by older Core versions remain valid.
+        // Room work is persisted once with an explicit participant list. The derived
+        // timeline index fans the same occurrence into every involved idol's diary.
         internal const string EventTypeRoomWorkCompleted = "room_work_completed";
+        internal const string EventTypeRoomWorkCancelled = "room_work_cancelled";
         internal const string EventTypeAuditionStarted = "audition_started";
         internal const string EventTypeAuditionCostPaid = "audition_cost_paid";
         internal const string EventTypeAuditionCooldownReset = "audition_cooldown_reset";
@@ -319,6 +318,7 @@ namespace IMDataCore
         internal const string EventSourcePlayerMarriageGirlQuitsPatch = "patch.Dating.Marriage_Girl_Quits.Postfix";
         internal const string EventSourcePlayerMarriageAfterPatch = "patch.Dating.AfterMarriage.Postfix";
         internal const string EventSourceIdolRelationshipAddPatch = "patch.Relationships._relationship.Add.Postfix";
+        internal const string EventSourceRelationshipsRemoveFromEverythingPatch = "patch.Relationships.RemoveFromEverything.Postfix";
         internal const string EventSourceDataGirlsHirePatch = "patch.data_girls.Hire.Postfix";
         internal const string EventSourceDataGirlsGraduationAnnounceConfirmPatch = "patch.data_girls.girls.Graduation_Announce_Confirm.Postfix";
         internal const string EventSourceDataGirlsGraduatePatch = "patch.data_girls.girls.Graduate.Postfix";
@@ -354,10 +354,12 @@ namespace IMDataCore
         internal const string EventSourceTasksTaskOnCompletePatch = "patch.tasks._task.OnComplete.Postfix";
         internal const string EventSourceTasksTaskOnFailPatch = "patch.tasks._task.OnFail.Postfix";
         internal const string EventSourceTasksTaskDonePatch = "patch.tasks._task.Done.Postfix";
+        internal const string EventSourceTasksOnGraduationPatch = "patch.tasks.OnGraduation.Postfix";
         internal const string EventSourceConcertUseCardPatch = "patch.SEvent_Concerts.UseCard.Postfix";
         internal const string EventSourceConcertCrisisOptionPatch = "patch.Concert_CrisisPopup.Option.Postfix";
         internal const string EventSourceConcertCrisisClosePatch = "patch.Concert_CrisisPopup.Close.Postfix";
         internal const string EventSourceConcertPopupFinishPatch = "patch.Concert_Popup.FinishConcert.Postfix";
+        internal const string EventSourceRoomWorkCancelJobPatch = "patch.agency._room.CancelJob.Postfix";
         internal const string EventSourceElectionStartPatch = "patch.SEvent_SSK.StartSSK.Postfix";
         internal const string EventSourceDataGirlsWishGeneratePatch = "patch.data_girls.girls.Wish_Generate.Postfix";
         internal const string EventSourceDataGirlsWishFulfillPatch = "patch.data_girls.girls.Wish_Fullfill.Postfix";
@@ -436,6 +438,7 @@ namespace IMDataCore
         internal const string TaskLifecycleActionCompleted = "completed";
         internal const string TaskLifecycleActionFailed = "failed";
         internal const string TaskLifecycleActionDone = "done";
+        internal const string TaskLifecycleActionRemovedOnGraduation = "removed_on_graduation";
         internal const string WishLifecycleActionGenerated = "generated";
         internal const string WishLifecycleActionFulfilled = "fulfilled";
         internal const string WishLifecycleActionDone = "done";
@@ -491,6 +494,7 @@ namespace IMDataCore
         internal const string TourLifecycleIdempotencyPrefix = "tour";
         internal const string ElectionLifecycleIdempotencyPrefix = "election";
         internal const string RelationshipBreakReasonGeneric = "generic_breakup";
+        internal const string RelationshipBreakReasonGraduation = "graduation_cull";
         internal const string DateInteractionTypeGoOnDate = "go_on_date";
         internal const string DateInteractionTypeGoOnSpecificDate = "go_on_specific_date";
         internal const string DateInteractionResultTokenPublicDate = "pub";
@@ -1021,11 +1025,18 @@ namespace IMDataCore
         internal const string JsonFieldElectionPlaceAfter = "election_place_after";
         internal const string JsonFieldElectionRankingSummary = "election_ranking_summary";
         internal const string JsonFieldElectionRankedIdolIdList = "election_ranked_idol_id_list";
+        internal const string JsonFieldElectionGeneratedResultSummary = "election_generated_result_summary";
         internal const string JsonFieldElectionNumber = "election_number";
         internal const string JsonFieldElectionProductionLevel = "election_production_level";
         internal const string JsonFieldElectionLogisticsLevel = "election_logistics_level";
         internal const string JsonFieldElectionProductionCost = "election_production_cost";
         internal const string JsonFieldElectionTotalProductionCost = "election_total_production_cost";
+        internal const string JsonFieldRoomWorkParticipantIdList = "room_work_participant_id_list";
+        internal const string JsonFieldActorsSummary = "actors_summary";
+        internal const string JsonFieldRandomEventActorIdList = "random_event_actor_id_list";
+        internal const string JsonFieldSubstoryActorIdList = "substory_actor_id_list";
+        internal const string JsonFieldMentorId = "mentor_id";
+        internal const string JsonFieldKohaiId = "kohai_id";
         internal const string JsonFieldScandalPreviousPoints = "scandal_previous_points";
         internal const string JsonFieldScandalNewPoints = "scandal_new_points";
         internal const string JsonFieldScandalDeltaPoints = "scandal_delta_points";
@@ -2975,53 +2986,29 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Resolves idol targets for one contract event using active state with proposal fallback for group contracts.
+        /// Resolves the selected idol for one contract event. A proposal's Girls
+        /// collection is the candidate picker, not a group-contract participant list.
         /// </summary>
         private static List<int> ResolveContractTargetIdolIdentifiers(business.active_proposal activeContract, business._proposal sourceProposal)
         {
             List<int> idolIdentifiers = new List<int>();
-            HashSet<int> uniqueIdentifiers = new HashSet<int>();
-
             if (activeContract != null && activeContract.Girl != null && activeContract.Girl.id >= CoreConstants.MinimumValidIdolIdentifier)
             {
-                uniqueIdentifiers.Add(activeContract.Girl.id);
                 idolIdentifiers.Add(activeContract.Girl.id);
-            }
-
-            if (sourceProposal == null)
-            {
                 return idolIdentifiers;
             }
 
-            if (sourceProposal.girl != null && sourceProposal.girl.id >= CoreConstants.MinimumValidIdolIdentifier && uniqueIdentifiers.Add(sourceProposal.girl.id))
+            if (sourceProposal != null && sourceProposal.girl != null && sourceProposal.girl.id >= CoreConstants.MinimumValidIdolIdentifier)
             {
                 idolIdentifiers.Add(sourceProposal.girl.id);
-            }
-
-            if (sourceProposal.Girls == null || sourceProposal.Girls.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-            {
-                return idolIdentifiers;
-            }
-
-            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < sourceProposal.Girls.Count; idolIndex++)
-            {
-                data_girls.girls idol = sourceProposal.Girls[idolIndex];
-                if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
-                {
-                    continue;
-                }
-
-                if (uniqueIdentifiers.Add(idol.id))
-                {
-                    idolIdentifiers.Add(idol.id);
-                }
             }
 
             return idolIdentifiers;
         }
 
         /// <summary>
-        /// Resolves idol identifiers from one proposal object with duplicate suppression.
+        /// Resolves the idol selected by one proposal. Other entries in Girls are
+        /// UI candidates and did not participate in the accepted contract.
         /// </summary>
         private static List<int> ResolveProposalTargetIdolIdentifiers(business._proposal proposal)
         {
@@ -3031,29 +3018,9 @@ namespace IMDataCore
                 return idolIdentifiers;
             }
 
-            HashSet<int> uniqueIdentifiers = new HashSet<int>();
-            if (proposal.girl != null && proposal.girl.id >= CoreConstants.MinimumValidIdolIdentifier && uniqueIdentifiers.Add(proposal.girl.id))
+            if (proposal.girl != null && proposal.girl.id >= CoreConstants.MinimumValidIdolIdentifier)
             {
                 idolIdentifiers.Add(proposal.girl.id);
-            }
-
-            if (proposal.Girls == null || proposal.Girls.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-            {
-                return idolIdentifiers;
-            }
-
-            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < proposal.Girls.Count; idolIndex++)
-            {
-                data_girls.girls idol = proposal.Girls[idolIndex];
-                if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
-                {
-                    continue;
-                }
-
-                if (uniqueIdentifiers.Add(idol.id))
-                {
-                    idolIdentifiers.Add(idol.id);
-                }
             }
 
             return idolIdentifiers;
@@ -3211,6 +3178,9 @@ namespace IMDataCore
             }
 
             SingleCastChangeSnapshot previousState = snapshot ?? new SingleCastChangeSnapshot();
+            IReadOnlyList<int> castIdentifiersBefore =
+                previousState.SingleCastIdolIdentifiersBefore ??
+                new List<int>();
             IReadOnlyList<int> castIdentifiers = castIdolIdentifiersAfter ?? new List<int>();
 
             return new SingleGroupChangePayload
@@ -3221,6 +3191,12 @@ namespace IMDataCore
                 NewSingleStatus = CoreEnumNameMapping.ToSingleStatusCode(single.status),
                 SingleCastCount = castIdentifiers.Count,
                 SingleCastIdList = BuildDelimitedIdentifierList(castIdentifiers),
+                SingleCastCountBefore = castIdentifiersBefore.Count,
+                SingleCastCountAfter = castIdentifiers.Count,
+                SingleCastIdListBefore = BuildDelimitedIdentifierList(
+                    castIdentifiersBefore),
+                SingleCastIdListAfter = BuildDelimitedIdentifierList(
+                    castIdentifiers),
                 FromGroupId = previousState.SingleGroupIdBefore,
                 FromGroupTitle = previousState.SingleGroupTitleBefore ?? string.Empty,
                 FromGroupStatus = string.IsNullOrEmpty(previousState.SingleGroupStatusBefore)
@@ -4021,7 +3997,10 @@ namespace IMDataCore
         /// <summary>
         /// Creates one world-tour country-result payload from selected-country state.
         /// </summary>
-        private static TourCountryResultPayload BuildTourCountryResultPayload(SEvent_Tour.tour tour, SEvent_Tour.tour.selectedCountry selectedCountry)
+        private static TourCountryResultPayload BuildTourCountryResultPayload(
+            SEvent_Tour.tour tour,
+            SEvent_Tour.tour.selectedCountry selectedCountry,
+            IReadOnlyList<int> participantIdolIdentifiers)
         {
             if (tour == null || selectedCountry == null || selectedCountry.Country == null)
             {
@@ -4031,6 +4010,11 @@ namespace IMDataCore
             return new TourCountryResultPayload
             {
                 TourId = tour.ID,
+                TourParticipantCount = participantIdolIdentifiers != null
+                    ? participantIdolIdentifiers.Count
+                    : CoreConstants.ZeroBasedListStartIndex,
+                TourParticipantIdList = BuildDelimitedIdentifierList(
+                    participantIdolIdentifiers),
                 TourStatus = CoreEnumNameMapping.ToTourStatusCode(tour.Status),
                 TourFinishDate = tour.FinishDate == default(DateTime)
                     ? string.Empty
@@ -4042,26 +4026,6 @@ namespace IMDataCore
                 TourCountryNewFans = selectedCountry.NewFans,
                 TourCountryRevenue = selectedCountry.Revenue,
                 TourCountryDiscount = selectedCountry.Discount
-            };
-        }
-
-        /// <summary>
-        /// Creates one world-tour participation payload for an idol participant.
-        /// </summary>
-        private static TourParticipationPayload BuildTourParticipationPayload(
-            int tourId,
-            int idolId,
-            IReadOnlyList<int> participantIdolIdentifiers,
-            string lifecycleActionCode)
-        {
-            IReadOnlyList<int> participants = participantIdolIdentifiers ?? new List<int>();
-            return new TourParticipationPayload
-            {
-                TourId = tourId,
-                IdolId = idolId,
-                TourParticipantCount = participants.Count,
-                TourParticipantIdList = BuildDelimitedIdentifierList(participants),
-                TourLifecycleAction = lifecycleActionCode ?? string.Empty
             };
         }
 
@@ -4155,6 +4119,52 @@ namespace IMDataCore
                 summaryBuilder.Append(result.Votes.ToString(CultureInfo.InvariantCulture));
                 summaryBuilder.Append(CoreConstants.ElectionRankingFieldSeparator);
                 summaryBuilder.Append(result.FamePoints.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return summaryBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Builds the minimal generated-result recipient mapping as
+        /// idol_id:expected_place entries. Final top-ten values are already
+        /// present once in election_ranking_summary.
+        /// </summary>
+        private static string BuildElectionGeneratedResultSummary()
+        {
+            if (data_girls.girl == null ||
+                data_girls.girl.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder summaryBuilder = new StringBuilder();
+            HashSet<int> emittedIdolIds = new HashSet<int>();
+            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex;
+                idolIndex < data_girls.girl.Count;
+                idolIndex++)
+            {
+                data_girls.girls idol = data_girls.girl[idolIndex];
+                if (idol == null ||
+                    idol.id < CoreConstants.MinimumValidIdolIdentifier ||
+                    !idol.CanParticipateInSSK() ||
+                    !emittedIdolIds.Add(idol.id))
+                {
+                    continue;
+                }
+
+                if (summaryBuilder.Length > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    summaryBuilder.Append(
+                        CoreConstants.ElectionRankingEntrySeparator);
+                }
+
+                summaryBuilder.Append(
+                    idol.id.ToString(CultureInfo.InvariantCulture));
+                summaryBuilder.Append(
+                    CoreConstants.ElectionRankingFieldSeparator);
+                summaryBuilder.Append(
+                    idol.SSK_Expected_Place.ToString(
+                        CultureInfo.InvariantCulture));
             }
 
             return summaryBuilder.ToString();
@@ -5485,6 +5495,10 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleNewStatus, payload.NewSingleStatus ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldSingleCastCount, payload.SingleCastCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdList, payload.SingleCastIdList ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldSingleCastCountBefore, payload.SingleCastCountBefore, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldSingleCastCountAfter, payload.SingleCastCountAfter, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdListBefore, payload.SingleCastIdListBefore ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdListAfter, payload.SingleCastIdListAfter ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldFromGroupId, payload.FromGroupId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldFromGroupTitle, payload.FromGroupTitle ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldFromGroupStatus, payload.FromGroupStatus ?? string.Empty, ref isFirstProperty);
@@ -5926,6 +5940,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastType, payload.ShowCastType ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowEpisodeCount, payload.ShowEpisodeCount, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowCastCount, payload.ShowCastCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowCastIdList, payload.ShowCastIdList ?? string.Empty, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestAudience, payload.ShowLatestAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestRevenue, payload.ShowLatestRevenue, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
@@ -6536,6 +6551,8 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
+            AppendIntProperty(builder, CoreConstants.JsonFieldTourParticipantCount, payload.TourParticipantCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldTourParticipantIdList, payload.TourParticipantIdList ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourStatus, payload.TourStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourFinishDate, payload.TourFinishDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourCountryCode, payload.TourCountryCode ?? string.Empty, ref isFirstProperty);
@@ -6545,29 +6562,6 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryNewFans, payload.TourCountryNewFans, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryRevenue, payload.TourCountryRevenue, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldTourCountryDiscount, payload.TourCountryDiscount, ref isFirstProperty);
-
-            builder.Append(CoreConstants.JsonObjectEndCharacter);
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// Serializes world-tour idol participation payloads into compact JSON.
-        /// </summary>
-        internal static string SerializeTourParticipationPayload(TourParticipationPayload payload)
-        {
-            if (payload == null)
-            {
-                return CoreConstants.EmptyJsonObject;
-            }
-
-            StringBuilder builder = new StringBuilder(CoreConstants.JsonBuilderDefaultCapacity);
-            builder.Append(CoreConstants.JsonObjectStartCharacter);
-            bool isFirstProperty = true;
-
-            AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourParticipantCount, payload.TourParticipantCount, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldTourParticipantIdList, payload.TourParticipantIdList ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldTourLifecycleAction, payload.TourLifecycleAction ?? string.Empty, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -6650,11 +6644,7 @@ namespace IMDataCore
             builder.Append(CoreConstants.JsonObjectStartCharacter);
             bool isFirstProperty = true;
 
-            AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionExpectedPlace, payload.ElectionExpectedPlace, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionGeneratedPlace, payload.ElectionGeneratedPlace, ref isFirstProperty);
-            AppendLongProperty(builder, CoreConstants.JsonFieldElectionGeneratedVotes, payload.ElectionGeneratedVotes, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionGeneratedFamePoints, payload.ElectionGeneratedFamePoints, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldElectionGeneratedResultSummary, payload.ElectionGeneratedResultSummary ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionSingleId, payload.ElectionSingleId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
@@ -6713,38 +6703,6 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionReleaseSingleId, payload.ElectionReleaseSingleId, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionResultCount, payload.ElectionResultCount, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionNumber, payload.ElectionNumber, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldElectionFinishDate, payload.ElectionFinishDate ?? string.Empty, ref isFirstProperty);
-
-            builder.Append(CoreConstants.JsonObjectEndCharacter);
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// Serializes one election-result payload into compact JSON.
-        /// </summary>
-        internal static string SerializeElectionResultPayload(ElectionResultPayload payload)
-        {
-            if (payload == null)
-            {
-                return CoreConstants.EmptyJsonObject;
-            }
-
-            StringBuilder builder = new StringBuilder(CoreConstants.JsonBuilderDefaultCapacity);
-            builder.Append(CoreConstants.JsonObjectStartCharacter);
-            bool isFirstProperty = true;
-
-            AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionPlace, payload.ElectionPlace, ref isFirstProperty);
-            AppendLongProperty(builder, CoreConstants.JsonFieldElectionVotes, payload.ElectionVotes, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionFamePoints, payload.ElectionFamePoints, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldElectionBroadcastType, payload.ElectionBroadcastType ?? string.Empty, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionSingleId, payload.ElectionSingleId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionConcertId, payload.ElectionConcertId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionReleaseSingleId, payload.ElectionReleaseSingleId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldElectionResultCount, payload.ElectionResultCount, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankingSummary, payload.ElectionRankingSummary ?? string.Empty, ref isFirstProperty);
-            AppendStringProperty(builder, CoreConstants.JsonFieldElectionRankedIdolIdList, payload.ElectionRankedIdolIdList ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldElectionNumber, payload.ElectionNumber, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldElectionFinishDate, payload.ElectionFinishDate ?? string.Empty, ref isFirstProperty);
 
@@ -7407,6 +7365,10 @@ namespace IMDataCore
         public string NewSingleStatus = string.Empty;
         public int SingleCastCount;
         public string SingleCastIdList = string.Empty;
+        public int SingleCastCountBefore;
+        public int SingleCastCountAfter;
+        public string SingleCastIdListBefore = string.Empty;
+        public string SingleCastIdListAfter = string.Empty;
         public int FromGroupId = CoreConstants.InvalidIdValue;
         public string FromGroupTitle = string.Empty;
         public string FromGroupStatus = string.Empty;
@@ -7709,6 +7671,7 @@ namespace IMDataCore
         public string ShowCastType = string.Empty;
         public int ShowEpisodeCount;
         public int ShowCastCount;
+        public string ShowCastIdList = string.Empty;
         public long ShowLatestAudience;
         public long ShowLatestRevenue;
         public int ShowLatestNewFans;
@@ -8058,6 +8021,7 @@ namespace IMDataCore
     internal sealed class RoomWorkCompletedEventPayload
     {
         public int idol_id = CoreConstants.InvalidIdValue;
+        public string room_work_participant_id_list = string.Empty;
         public int room_id = CoreConstants.InvalidIdValue;
         public string room_type = string.Empty;
         public string room_work_kind = string.Empty;
@@ -8133,6 +8097,8 @@ namespace IMDataCore
     internal sealed class TourCountryResultPayload
     {
         public int TourId;
+        public int TourParticipantCount;
+        public string TourParticipantIdList = string.Empty;
         public string TourStatus = string.Empty;
         public string TourFinishDate = string.Empty;
         public string TourCountryCode = string.Empty;
@@ -8142,19 +8108,6 @@ namespace IMDataCore
         public int TourCountryNewFans;
         public int TourCountryRevenue;
         public bool TourCountryDiscount;
-    }
-
-    /// <summary>
-    /// JSON payload emitted for one world-tour idol participation row.
-    /// </summary>
-    [Serializable]
-    internal sealed class TourParticipationPayload
-    {
-        public int TourId;
-        public int IdolId;
-        public int TourParticipantCount;
-        public string TourParticipantIdList = string.Empty;
-        public string TourLifecycleAction = string.Empty;
     }
 
     /// <summary>
@@ -8201,17 +8154,13 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// JSON payload emitted for generated election ranks per idol.
+    /// JSON payload emitted for one shared generated-election snapshot.
     /// </summary>
     [Serializable]
     internal sealed class ElectionGeneratedResultPayload
     {
         public int ElectionId;
-        public int IdolId;
-        public int ElectionExpectedPlace;
-        public int ElectionGeneratedPlace = CoreConstants.InvalidIdValue;
-        public long ElectionGeneratedVotes;
-        public int ElectionGeneratedFamePoints;
+        public string ElectionGeneratedResultSummary = string.Empty;
         public string ElectionBroadcastType = string.Empty;
         public int ElectionSingleId = CoreConstants.InvalidIdValue;
         public int ElectionConcertId = CoreConstants.InvalidIdValue;
@@ -8250,28 +8199,6 @@ namespace IMDataCore
         public int ElectionConcertId = CoreConstants.InvalidIdValue;
         public int ElectionReleaseSingleId = CoreConstants.InvalidIdValue;
         public int ElectionResultCount;
-        public int ElectionNumber;
-        public string ElectionFinishDate = string.Empty;
-    }
-
-    /// <summary>
-    /// JSON payload emitted for one idol election result row.
-    /// </summary>
-    [Serializable]
-    internal sealed class ElectionResultPayload
-    {
-        public int ElectionId;
-        public int IdolId;
-        public int ElectionPlace;
-        public long ElectionVotes;
-        public int ElectionFamePoints;
-        public string ElectionBroadcastType = string.Empty;
-        public int ElectionSingleId = CoreConstants.InvalidIdValue;
-        public int ElectionConcertId = CoreConstants.InvalidIdValue;
-        public int ElectionReleaseSingleId = CoreConstants.InvalidIdValue;
-        public int ElectionResultCount;
-        public string ElectionRankingSummary = string.Empty;
-        public string ElectionRankedIdolIdList = string.Empty;
         public int ElectionNumber;
         public string ElectionFinishDate = string.Empty;
     }
@@ -8978,6 +8905,7 @@ namespace IMDataCore
         public string random_event_mod_name = string.Empty;
         public string scheduled_date = string.Empty;
         public int actor_count;
+        public string random_event_actor_id_list = string.Empty;
         public string actors_summary = string.Empty;
         public int requirement_count;
         public int startup_effect_count;
@@ -9024,6 +8952,7 @@ namespace IMDataCore
         public int reply_effect_count;
         public string reply_effect_summary = string.Empty;
         public RandomEventReplyEffectEntry[] reply_effect_entries;
+        public string random_event_actor_id_list = string.Empty;
         public string actors_summary = string.Empty;
         public long estimated_liability;
         public long money_before;
@@ -9049,6 +8978,7 @@ namespace IMDataCore
     {
         public string substory_id = string.Empty;
         public string substory_parent_id = string.Empty;
+        public string substory_actor_id_list = string.Empty;
         public string actors_summary = string.Empty;
         public string substory_type = string.Empty;
         public string substory_lifecycle_action = string.Empty;
@@ -9254,6 +9184,18 @@ namespace IMDataCore
         internal business._proposal AcceptedProposal;
         internal DateTime AcceptedDate = default(DateTime);
         internal List<int> TargetIdolIdentifiers = new List<int>();
+    }
+
+    /// <summary>
+    /// Portable contract state captured before BreakContracts deletes it.
+    /// </summary>
+    internal sealed class ContractBreakSnapshot
+    {
+        internal business BusinessSystem;
+        internal business.active_proposal ActiveContract;
+        internal int IdolId = CoreConstants.InvalidIdValue;
+        internal string EntityIdentifier = string.Empty;
+        internal ContractLifecyclePayload Payload;
     }
 
     /// <summary>
@@ -9578,6 +9520,7 @@ namespace IMDataCore
     /// </summary>
     internal sealed class TaskLifecycleSnapshot
     {
+        internal tasks._task Task;
         internal string TaskCustom = string.Empty;
         internal string TaskTypeCode = CoreConstants.StatusCodeUnknown;
         internal string TaskGoalCode = CoreConstants.StatusCodeUnknown;
@@ -9739,6 +9682,24 @@ namespace IMDataCore
     {
         internal bool WasMemberBeforeQuit;
         internal int PreviousLeaderId = CoreConstants.InvalidIdValue;
+        internal int MemberCountBefore;
+        internal string CliqueSignatureBefore = string.Empty;
+        internal List<BullyingStateSnapshot> BulliedTargetsBefore =
+            new List<BullyingStateSnapshot>();
+    }
+
+    /// <summary>
+    /// Primitive pre-mutation context for one clique bullying relationship.
+    /// </summary>
+    internal sealed class BullyingStateSnapshot
+    {
+        internal data_girls.girls Target;
+        internal int TargetId = CoreConstants.InvalidIdValue;
+        internal int LeaderId = CoreConstants.InvalidIdValue;
+        internal bool WasBullied;
+        internal bool WasKnownToPlayer;
+        internal int CliqueMemberCount;
+        internal string CliqueSignature = string.Empty;
     }
 
     /// <summary>
@@ -9769,11 +9730,19 @@ namespace IMDataCore
     internal sealed class RelationshipStopBullyingSnapshot
     {
         internal Relationships._clique FirstClique;
-        internal data_girls.girls FirstTarget;
-        internal bool FirstWasBullied;
+        internal BullyingStateSnapshot FirstState;
         internal Relationships._clique SecondClique;
-        internal data_girls.girls SecondTarget;
-        internal bool SecondWasBullied;
+        internal BullyingStateSnapshot SecondState;
+    }
+
+    /// <summary>
+    /// Primitive pair state captured before vanilla removes a relationship row.
+    /// </summary>
+    internal sealed class RelationshipRemovalSnapshot
+    {
+        internal Relationships._relationship Relationship;
+        internal string EntityIdentifier = string.Empty;
+        internal IdolRelationshipLifecyclePayload Payload;
     }
 
     /// <summary>
@@ -9848,6 +9817,7 @@ namespace IMDataCore
         internal Event_Manager._activeEvent ActiveEventBefore;
         internal string ActiveEventStateBefore = string.Empty;
         internal string ActorSummaryBefore = string.Empty;
+        internal List<int> ActorIdolIdentifiersBefore = new List<int>();
         internal long EstimatedLiabilityBefore;
         internal long MoneyBefore;
         internal long FansBefore;

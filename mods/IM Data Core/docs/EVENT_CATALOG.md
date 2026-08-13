@@ -26,8 +26,8 @@ Generation note:
 ## Summary
 - Event type constants: 145
 - Event domains: 39
-- Payload JSON field constants: 386
-- Payload field domains: 41
+- Payload JSON field constants: 393
+- Payload field domains: 46
 
 ## Built-in Event Types
 
@@ -63,7 +63,6 @@ Generation note:
 | concert_crisis_decision | EventTypeConcertCrisisDecision | concert |
 | concert_final_resolved | EventTypeConcertFinalResolved | concert |
 | concert_finished | EventTypeConcertFinished | concert |
-| concert_participation | EventTypeConcertParticipation | concert |
 | concert_started | EventTypeConcertStarted | concert |
 | concert_status_changed | EventTypeConcertStatusChanged | concert |
 | contract_accepted | EventTypeContractAccepted | contract |
@@ -81,7 +80,6 @@ Generation note:
 | election_created | EventTypeElectionCreated | election |
 | election_finished | EventTypeElectionFinished | election |
 | election_place_adjusted | EventTypeElectionPlaceAdjusted | election |
-| election_result_recorded | EventTypeElectionResultRecorded | election |
 | election_results_generated | EventTypeElectionResultsGenerated | election |
 | election_started | EventTypeElectionStarted | election |
 | election_status_changed | EventTypeElectionStatusChanged | election |
@@ -98,6 +96,7 @@ Generation note:
 | idol_group_transferred | EventTypeIdolGroupTransferred | idol |
 | idol_hired | EventTypeIdolHired | idol |
 | idol_outfit_changed | EventTypeIdolOutfitChanged | idol |
+| idol_relationship_removed | EventTypeIdolRelationshipRemoved | idol |
 | idol_relationship_status_changed | EventTypeIdolRelationshipStatusChanged | idol |
 | idol_salary_changed | EventTypeIdolSalaryChanged | idol |
 | idol_status_changed | EventTypeStatusChanged | idol |
@@ -131,6 +130,7 @@ Generation note:
 | research_points_purchased | EventTypeResearchPointsPurchased | research |
 | rival_monthly_recalculated | EventTypeRivalMonthlyRecalculated | rival |
 | rival_trends_updated | EventTypeRivalTrendsUpdated | rival |
+| room_work_cancelled | EventTypeRoomWorkCancelled | room |
 | room_work_completed | EventTypeRoomWorkCompleted | room |
 | scandal_check | EventTypeScandalCheck | scandal |
 | scandal_mitigated | EventTypeScandalMitigated | scandal |
@@ -165,6 +165,7 @@ Generation note:
 | task_completed | EventTypeTaskCompleted | task |
 | task_done | EventTypeTaskDone | task |
 | task_failed | EventTypeTaskFailed | task |
+| task_removed_on_graduation | EventTypeTaskRemovedOnGraduation | task |
 | theater_created | EventTypeTheaterCreated | theater |
 | theater_daily_result | EventTypeTheaterDailyResult | theater |
 | theater_destroyed | EventTypeTheaterDestroyed | theater |
@@ -172,7 +173,6 @@ Generation note:
 | tour_country_result | EventTypeTourCountryResult | tour |
 | tour_created | EventTypeTourCreated | tour |
 | tour_finished | EventTypeTourFinished | tour |
-| tour_participation | EventTypeTourParticipation | tour |
 | tour_started | EventTypeTourStarted | tour |
 | tour_status_changed | EventTypeTourStatusChanged | tour |
 | wish_done | EventTypeWishDone | wish |
@@ -183,6 +183,7 @@ Generation note:
 
 | Field Key | Constant | Domain |
 | --- | --- | --- |
+| actors_summary | JsonFieldActorsSummary | actors |
 | assigned_staff_id | JsonFieldAssignedStaffId | assigned |
 | assigned_staff_name | JsonFieldAssignedStaffName | assigned |
 | assigned_staff_role | JsonFieldAssignedStaffRole | assigned |
@@ -287,6 +288,7 @@ Generation note:
 | election_finish_date | JsonFieldElectionFinishDate | election |
 | election_generated_fame_points | JsonFieldElectionGeneratedFamePoints | election |
 | election_generated_place | JsonFieldElectionGeneratedPlace | election |
+| election_generated_result_summary | JsonFieldElectionGeneratedResultSummary | election |
 | election_generated_votes | JsonFieldElectionGeneratedVotes | election |
 | election_lifecycle_action | JsonFieldElectionLifecycleAction | election |
 | election_logistics_level | JsonFieldElectionLogisticsLevel | election |
@@ -347,6 +349,7 @@ Generation note:
 | idol_trivia | JsonFieldIdolTrivia | idol |
 | idol_type | JsonFieldIdolType | idol |
 | is_center | JsonFieldIsCenter | is |
+| kohai_id | JsonFieldKohaiId | kohai |
 | marriage_career_string_one | JsonFieldMarriageCareerStringOne | marriage |
 | marriage_career_string_two | JsonFieldMarriageCareerStringTwo | marriage |
 | marriage_custody_string | JsonFieldMarriageCustodyString | marriage |
@@ -366,6 +369,7 @@ Generation note:
 | medical_hiatus_end_date | JsonFieldMedicalHiatusEndDate | medical |
 | medical_injury_counter | JsonFieldMedicalInjuryCounter | medical |
 | medical_previous_status | JsonFieldMedicalPreviousStatus | medical |
+| mentor_id | JsonFieldMentorId | mentor |
 | new_casual_fans | JsonFieldNewCasualFans | new |
 | new_fans | JsonFieldNewFans | new |
 | new_hardcore_fans | JsonFieldNewHardcoreFans | new |
@@ -389,6 +393,7 @@ Generation note:
 | push_previous_idol_id | JsonFieldPushPreviousIdolId | push |
 | push_slot_index | JsonFieldPushSlotIndex | push |
 | quality | JsonFieldQuality | quality |
+| random_event_actor_id_list | JsonFieldRandomEventActorIdList | random |
 | relationship_break_reason | JsonFieldRelationshipBreakReason | relationship |
 | relationship_dynamic | JsonFieldRelationshipDynamic | relationship |
 | relationship_idol_a_id | JsonFieldRelationshipIdolAId | relationship |
@@ -405,6 +410,7 @@ Generation note:
 | room_type | JsonFieldRoomType | room |
 | room_work_entity_id | JsonFieldRoomWorkEntityId | room |
 | room_work_kind | JsonFieldRoomWorkKind | room |
+| room_work_participant_id_list | JsonFieldRoomWorkParticipantIdList | room |
 | room_work_stage | JsonFieldRoomWorkStage | room |
 | room_work_title | JsonFieldRoomWorkTitle | room |
 | row_index | JsonFieldRowIndex | row |
@@ -538,6 +544,7 @@ Generation note:
 | staff_type | JsonFieldStaffType | staff |
 | staff_type_raw | JsonFieldStaffTypeRaw | staff |
 | staff_unique_type_raw | JsonFieldStaffUniqueTypeRaw | staff |
+| substory_actor_id_list | JsonFieldSubstoryActorIdList | substory |
 | target | JsonFieldReplyEffectTarget | target |
 | to_group_id | JsonFieldToGroupId | to |
 | to_group_status | JsonFieldToGroupStatus | to |

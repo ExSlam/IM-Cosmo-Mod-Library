@@ -260,8 +260,15 @@ namespace IMDataCore
     internal static class AgencyRoomCancelJob_IMDataCoreRoomWork_Patch
     {
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(agency._room __instance)
+        private static void Prefix(agency._room __instance, out RoomWorkCompletionSnapshot __state)
         {
+            __state = IMDataCoreController.Instance.CreateRoomWorkCancellationSnapshot(__instance);
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(agency._room __instance, RoomWorkCompletionSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureRoomWorkCancelled(__state);
             IMDataCoreController.Instance.ClearRoomWorkAssignment(__instance);
         }
     }

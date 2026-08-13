@@ -15,7 +15,7 @@ namespace IMDataCore
     internal sealed partial class IMDataCoreController
     {
         /// <summary>
-        /// Captures one single-created lifecycle event for each cast idol.
+        /// Captures one shared single-created lifecycle event for its cast.
         /// </summary>
         internal void CaptureSingleCreated(singles._single createdSingle)
         {
@@ -48,31 +48,14 @@ namespace IMDataCore
                 string eventPayloadJson = CoreJsonUtility.SerializeSingleLifecyclePayload(payload);
                 string singleEntityIdentifier = createdSingle.id.ToString(CultureInfo.InvariantCulture);
 
-                if (castIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindSingle,
-                        singleEntityIdentifier,
-                        CoreConstants.EventTypeSingleCreated,
-                        CoreConstants.EventSourceSingleAddNewPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int castIndex = CoreConstants.ZeroBasedListStartIndex; castIndex < castIdolIdentifiers.Count; castIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindSingle,
-                            singleEntityIdentifier,
-                            CoreConstants.EventTypeSingleCreated,
-                            CoreConstants.EventSourceSingleAddNewPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    singleEntityIdentifier,
+                    CoreConstants.EventTypeSingleCreated,
+                    CoreConstants.EventSourceSingleAddNewPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -362,11 +345,8 @@ namespace IMDataCore
                 }
 
                 List<int> candidateSlotIdolIdentifiers;
-                if (LightweightSidecarJson.TryReadCsvIntSlotsProperty(
+                if (SharedTimelineParticipants.TryReadSingleCastSlotIds(
                         pending.PayloadJson,
-                        CoreConstants.JsonFieldSingleCastIdList,
-                        CoreConstants.MinimumValidIdolIdentifier,
-                        CoreConstants.InvalidIdValue,
                         out candidateSlotIdolIdentifiers) &&
                     ContainsValidSingleCastSlotIdentifier(
                         candidateSlotIdolIdentifiers))
@@ -402,7 +382,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one canceled single lifecycle event for each cast idol.
+        /// Captures one shared canceled-single event for its historical cast.
         /// </summary>
         internal void CaptureSingleCancelled(singles._single cancelledSingle)
         {
@@ -430,38 +410,21 @@ namespace IMDataCore
                 string eventPayloadJson = CoreJsonUtility.SerializeSingleLifecyclePayload(payload);
                 string singleEntityIdentifier = cancelledSingle.id.ToString(CultureInfo.InvariantCulture);
 
-                if (castIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindSingle,
-                        singleEntityIdentifier,
-                        CoreConstants.EventTypeSingleCancelled,
-                        CoreConstants.EventSourceSingleCancelPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int castIndex = CoreConstants.ZeroBasedListStartIndex; castIndex < castIdolIdentifiers.Count; castIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindSingle,
-                            singleEntityIdentifier,
-                            CoreConstants.EventTypeSingleCancelled,
-                            CoreConstants.EventSourceSingleCancelPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    singleEntityIdentifier,
+                    CoreConstants.EventTypeSingleCancelled,
+                    CoreConstants.EventSourceSingleCancelPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
         }
 
         /// <summary>
-        /// Captures one single status transition event for each cast idol.
+        /// Captures one shared single status transition for its historical cast.
         /// </summary>
         internal void CaptureSingleStatusTransition(
             singles._single single,
@@ -506,31 +469,14 @@ namespace IMDataCore
                 string eventPayloadJson = CoreJsonUtility.SerializeSingleStatusPayload(payload);
                 string singleEntityIdentifier = single.id.ToString(CultureInfo.InvariantCulture);
 
-                if (castIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindSingle,
-                        singleEntityIdentifier,
-                        CoreConstants.EventTypeSingleStatusChanged,
-                        CoreConstants.EventSourceSingleStatusPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int castIndex = CoreConstants.ZeroBasedListStartIndex; castIndex < castIdolIdentifiers.Count; castIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            castIdolIdentifiers[castIndex],
-                            CoreConstants.EventEntityKindSingle,
-                            singleEntityIdentifier,
-                            CoreConstants.EventTypeSingleStatusChanged,
-                            CoreConstants.EventSourceSingleStatusPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    singleEntityIdentifier,
+                    CoreConstants.EventTypeSingleStatusChanged,
+                    CoreConstants.EventSourceSingleStatusPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -613,10 +559,6 @@ namespace IMDataCore
                 castIdolIdentifiersAfter,
                 groupAfter);
             string eventPayloadJson = CoreJsonUtility.SerializeSingleGroupChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                castIdolIdentifiersBefore,
-                castIdolIdentifiersAfter,
-                CoreConstants.InvalidIdValue);
             string singleEntityIdentifier = single.id.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -629,31 +571,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindSingle,
-                        singleEntityIdentifier,
-                        CoreConstants.EventTypeSingleGroupChanged,
-                        CoreConstants.EventSourceSinglePopupSenbatsuConfirmPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindSingle,
-                            singleEntityIdentifier,
-                            CoreConstants.EventTypeSingleGroupChanged,
-                            CoreConstants.EventSourceSinglePopupSenbatsuConfirmPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    singleEntityIdentifier,
+                    CoreConstants.EventTypeSingleGroupChanged,
+                    CoreConstants.EventSourceSinglePopupSenbatsuConfirmPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -695,10 +620,6 @@ namespace IMDataCore
                 removedCastIdolIdentifiers,
                 removedIdol);
             string eventPayloadJson = CoreJsonUtility.SerializeSingleCastChangePayload(payload);
-            List<int> impactedIdolIdentifiers = ResolveDistinctUnionIdentifiers(
-                castIdolIdentifiersBefore,
-                castIdolIdentifiersAfter,
-                removedIdol != null ? removedIdol.id : CoreConstants.InvalidIdValue);
             string singleEntityIdentifier = single.id.ToString(CultureInfo.InvariantCulture);
 
             lock (runtimeLock)
@@ -711,31 +632,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (impactedIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindSingle,
-                        singleEntityIdentifier,
-                        CoreConstants.EventTypeSingleCastChanged,
-                        sourcePatchCode,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < impactedIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            impactedIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindSingle,
-                            singleEntityIdentifier,
-                            CoreConstants.EventTypeSingleCastChanged,
-                            sourcePatchCode,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    singleEntityIdentifier,
+                    CoreConstants.EventTypeSingleCastChanged,
+                    sourcePatchCode,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }

@@ -576,6 +576,29 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Preserves tasks before vanilla silently culls them for a graduating idol.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks), nameof(tasks.OnGraduation))]
+    internal static class tasks_OnGraduation_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            data_girls.girls Girl,
+            out List<TaskLifecycleSnapshot> __state)
+        {
+            __state = IMDataCoreController.Instance.CreateGraduationTaskSnapshots(Girl);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(List<TaskLifecycleSnapshot> __state)
+        {
+            IMDataCoreController.Instance.CaptureTasksRemovedOnGraduation(__state);
+        }
+    }
+
+    /// <summary>
     /// Captures newly added custom tasks so mod-defined task menus appear in the timeline when they become available.
     /// </summary>
     [HarmonyPatch(typeof(tasks), nameof(tasks.AddTask), new Type[] { typeof(string), typeof(bool) })]

@@ -231,7 +231,7 @@ namespace IMDataCore
     internal static class SEvent_SSK_SSK_Finish_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Records per-idol election result rows after election finish logic.
+        /// Records one shared election result after election finish logic.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(SEvent_SSK._SSK __instance)

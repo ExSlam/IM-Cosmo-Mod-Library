@@ -9,22 +9,17 @@ namespace IMDataCore
     /// Lossless physical compaction for built-in IMDC events.
     ///
     /// Money details keep the same public DTO semantics while the private JSON
-    /// omits fields whose values are already the DTO default. Shared show episodes
-    /// and single releases are stored once and indexed under their historical
-    /// participant idol ids. Consumer-owned namespaced events are never rewritten.
+    /// omits fields whose values are already the DTO default. Shared built-in
+    /// occurrences are stored once and indexed under their historical participant
+    /// idol ids by SharedTimelineParticipants. Consumer-owned namespaced events are
+    /// never rewritten.
     /// </summary>
     internal static class CorePayloadCompaction
     {
         private const string MoneyTransactionEventType = "money_transaction";
-        private const string SingleReleasedEventType = "single_released";
         private const string ShowEpisodeReleasedEventType = "show_episode_released";
         private const string LegacyShowEpisodeEventType = "show_episode";
-        private const string SingleCastIdListPropertyName = "single_cast_id_list";
         private const string ShowCastIdListPropertyName = "show_cast_id_list";
-        private const string ShowCastIdListBeforePropertyName =
-            "show_cast_id_list_before";
-        private const string ShowCastIdListAfterPropertyName =
-            "show_cast_id_list_after";
         private const string ShowEpisodeCountPropertyName = "show_episode_count";
         private const string ShowEpisodeDatePropertyName = "show_episode_date";
         private const string ShowCastChangedEventType = "show_cast_changed";
@@ -36,10 +31,10 @@ namespace IMDataCore
         internal static List<PendingEvent> CompactPendingEvents(
             IReadOnlyList<PendingEvent> source,
             out int sparseMoneyPayloadCount,
-            out int sharedShowRowsRemoved)
+            out int sharedParticipantRowsRemoved)
         {
             sparseMoneyPayloadCount = 0;
-            sharedShowRowsRemoved = 0;
+            sharedParticipantRowsRemoved = 0;
             List<PendingEvent> result = new List<PendingEvent>();
             if (source == null || source.Count == 0)
             {
@@ -112,7 +107,7 @@ namespace IMDataCore
                 AppendPendingEpisodeRepresentatives(
                     pair.Value,
                     result,
-                    ref sharedShowRowsRemoved);
+                    ref sharedParticipantRowsRemoved);
             }
 
             foreach (KeyValuePair<string, List<PendingEvent>> pair in castChangeGroups)
@@ -120,7 +115,7 @@ namespace IMDataCore
                 AppendPendingCastChangeRepresentatives(
                     pair.Value,
                     result,
-                    ref sharedShowRowsRemoved);
+                    ref sharedParticipantRowsRemoved);
             }
 
             result.Sort(ComparePendingEventsBySequenceAscending);
@@ -130,10 +125,10 @@ namespace IMDataCore
         internal static List<LightweightEventRecord> CompactLoadedEvents(
             IReadOnlyList<LightweightEventRecord> source,
             out int sparseMoneyPayloadCount,
-            out int sharedShowRowsRemoved)
+            out int sharedParticipantRowsRemoved)
         {
             sparseMoneyPayloadCount = 0;
-            sharedShowRowsRemoved = 0;
+            sharedParticipantRowsRemoved = 0;
             List<LightweightEventRecord> result =
                 new List<LightweightEventRecord>();
             if (source == null || source.Count == 0)
@@ -210,7 +205,7 @@ namespace IMDataCore
                 AppendLoadedEpisodeRepresentatives(
                     pair.Value,
                     result,
-                    ref sharedShowRowsRemoved);
+                    ref sharedParticipantRowsRemoved);
             }
 
             foreach (KeyValuePair<string, List<LightweightEventRecord>> pair
@@ -219,7 +214,7 @@ namespace IMDataCore
                 AppendLoadedCastChangeRepresentatives(
                     pair.Value,
                     result,
-                    ref sharedShowRowsRemoved);
+                    ref sharedParticipantRowsRemoved);
             }
 
             result.Sort(CompareEventsBySequenceAscending);
@@ -249,43 +244,9 @@ namespace IMDataCore
             LightweightEventRecord record,
             int requestedIdolId)
         {
-            if (record == null ||
-                requestedIdolId < CoreConstants.MinimumValidIdolIdentifier)
-            {
-                return record == null
-                    ? CoreConstants.EmptyJsonObject
-                    : record.PayloadJson ?? CoreConstants.EmptyJsonObject;
-            }
-
-            List<int> participantIds;
-            if (!TryGetSharedSingleParticipantIds(record, out participantIds))
-            {
-                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
-            }
-
-            List<int> castSlotIds;
-            if (!LightweightSidecarJson.TryReadCsvIntSlotsProperty(
-                    record.PayloadJson,
-                    SingleCastIdListPropertyName,
-                    CoreConstants.MinimumValidIdolIdentifier,
-                    CoreConstants.InvalidIdValue,
-                    out castSlotIds))
-            {
-                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
-            }
-
-            int positionIndex = castSlotIds.IndexOf(requestedIdolId);
-            if (positionIndex < CoreConstants.ZeroBasedListStartIndex)
-            {
-                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
-            }
-
-            return LightweightSidecarJson.ExpandSingleReleasePayloadForPublic(
-                record.PayloadJson,
-                requestedIdolId,
-                positionIndex,
-                ResolveSingleSenbatsuRowIndex(positionIndex),
-                positionIndex == CoreConstants.SenbatsuCenterPositionIndex);
+            return SharedTimelineParticipants.ExpandPayloadForPublic(
+                record,
+                requestedIdolId);
         }
 
         internal static bool TryGetSharedShowParticipantIds(
@@ -305,76 +266,15 @@ namespace IMDataCore
             LightweightEventRecord record,
             out List<int> participantIds)
         {
-            participantIds = new List<int>();
-            if (record == null ||
-                !string.IsNullOrEmpty(record.NamespaceIdentifier))
-            {
-                return false;
-            }
-
-            if (TryGetSharedShowParticipantIds(record, out participantIds))
-            {
-                return participantIds.Count > 0;
-            }
-
-            if (TryGetSharedSingleParticipantIds(record, out participantIds))
-            {
-                return participantIds.Count > 0;
-            }
-
-            if (!string.Equals(
-                    record.EventType ?? string.Empty,
-                    ShowCastChangedEventType,
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            List<int> beforeIds;
-            List<int> afterIds;
-            LightweightSidecarJson.TryReadCsvIntProperty(
-                record.PayloadJson,
-                ShowCastIdListBeforePropertyName,
-                CoreConstants.MinimumValidIdolIdentifier,
-                out beforeIds);
-            LightweightSidecarJson.TryReadCsvIntProperty(
-                record.PayloadJson,
-                ShowCastIdListAfterPropertyName,
-                CoreConstants.MinimumValidIdolIdentifier,
-                out afterIds);
-
-            HashSet<int> emitted = new HashSet<int>();
-            if (beforeIds != null)
-            {
-                for (int index = 0; index < beforeIds.Count; index++)
-                {
-                    if (emitted.Add(beforeIds[index]))
-                    {
-                        participantIds.Add(beforeIds[index]);
-                    }
-                }
-            }
-            if (afterIds != null)
-            {
-                for (int index = 0; index < afterIds.Count; index++)
-                {
-                    if (emitted.Add(afterIds[index]))
-                    {
-                        participantIds.Add(afterIds[index]);
-                    }
-                }
-            }
-
-            return participantIds.Count > 0;
+            return SharedTimelineParticipants.TryGetParticipantIds(
+                record,
+                out participantIds);
         }
 
         internal static bool IsSharedTimelineEvent(
             LightweightEventRecord record)
         {
-            List<int> ignored;
-            return record != null &&
-                record.IdolId < CoreConstants.MinimumValidIdolIdentifier &&
-                TryGetSharedTimelineParticipantIds(record, out ignored);
+            return SharedTimelineParticipants.IsSharedEvent(record);
         }
 
         internal static bool IsSharedShowEvent(
@@ -382,7 +282,7 @@ namespace IMDataCore
         {
             List<int> ignored;
             return record != null &&
-                record.IdolId < CoreConstants.MinimumValidIdolIdentifier &&
+                record.IdolId == CoreConstants.InvalidIdValue &&
                 TryGetSharedShowParticipantIds(record, out ignored);
         }
 
@@ -425,56 +325,6 @@ namespace IMDataCore
                 ShowCastIdListPropertyName,
                 CoreConstants.MinimumValidIdolIdentifier,
                 out participantIds);
-        }
-
-        private static bool TryGetSharedSingleParticipantIds(
-            LightweightEventRecord record,
-            out List<int> participantIds)
-        {
-            participantIds = new List<int>();
-            if (record == null ||
-                !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
-                !string.Equals(
-                    record.EventType ?? string.Empty,
-                    SingleReleasedEventType,
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            return LightweightSidecarJson.TryReadCsvIntProperty(
-                record.PayloadJson,
-                SingleCastIdListPropertyName,
-                CoreConstants.MinimumValidIdolIdentifier,
-                out participantIds);
-        }
-
-        private static int ResolveSingleSenbatsuRowIndex(int positionIndex)
-        {
-            // Mirrors singles.GetGirlsRowInSenbatsu without retaining a separate
-            // derived row value for every idol in the physical event payload.
-            if (positionIndex <= CoreConstants.SenbatsuCenterPositionIndex)
-            {
-                return 0;
-            }
-            if (positionIndex <= 2)
-            {
-                return 1;
-            }
-            if (positionIndex <= 5)
-            {
-                return 2;
-            }
-            if (positionIndex <= 9)
-            {
-                return 3;
-            }
-            if (positionIndex <= 14)
-            {
-                return 4;
-            }
-
-            return 5;
         }
 
         private static bool IsShowEpisodeEventType(string eventType)
@@ -722,7 +572,7 @@ namespace IMDataCore
             }
 
             // Old sidecars can contain one byte-identical cast transition per
-            // participating idol. With no 2.0.5 settled observer marker, collapse
+            // participating idol. Without a settled observer marker, collapse
             // only exact payload duplicates and keep the earliest sequence.
             Dictionary<string, PendingEvent> byPayload =
                 new Dictionary<string, PendingEvent>(StringComparer.Ordinal);
