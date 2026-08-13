@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Save Write Ordering Fix</ModName>
+    <RootNamespace>SaveWriteOrderingFix</RootNamespace>
+    <AssemblyName>com.cosmo.savewriteorderingfix</AssemblyName>
+    <Version>1.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\SaveWriteOrderingCore.cs" />
+    <Compile Include="src\SaveWriteOrderingPatches.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+{
+  "Title": "Save Write Ordering Fix",
+  "Description": "Prevents older save attempts from overwriting newer ones when saving to the same slot in quick succession.",
+  "Author": "Cosmo",
+  "Version": "1.1.0",
+  "Tags": [
+    "gameplay",
+    "fix",
+    "patch",
+    "bugfix",
+    "compatibility"
+  ],
+  "HarmonyID": "com.cosmo.savewriteorderingfix"
+}

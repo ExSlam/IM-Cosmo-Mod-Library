@@ -1,0 +1,1 @@
+This mod fixes a vanilla saving bug where rapidly saving to the same slot can cause an older save to overwrite the newer one. It makes sure saves to the same slot are written in the correct order, so the latest save stays the latest save.

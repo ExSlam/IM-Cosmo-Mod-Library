@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unavailable Idols Fix", "mo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Singles Marketing Checkbox Fix", "mods\Singles Marketing Checkbox Fix\Singles Marketing Checkbox Fix.csproj", "{9D580223-5820-4844-AE3B-4E30D66124C4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Save Write Ordering Fix", "mods\Save Write Ordering Fix\Save Write Ordering Fix.csproj", "{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -295,6 +297,18 @@ Global
 		{9D580223-5820-4844-AE3B-4E30D66124C4}.Release|x64.Build.0 = Release|Any CPU
 		{9D580223-5820-4844-AE3B-4E30D66124C4}.Release|x86.ActiveCfg = Release|Any CPU
 		{9D580223-5820-4844-AE3B-4E30D66124C4}.Release|x86.Build.0 = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|x64.Build.0 = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Debug|x86.Build.0 = Debug|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|x64.ActiveCfg = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|x64.Build.0 = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|x86.ActiveCfg = Release|Any CPU
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -320,6 +334,7 @@ Global
 		{1B9E5725-A1AA-424A-B6D0-9D189D2ECC92} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 		{A6D8475C-65F2-4A2E-B879-73C92BD88142} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 		{9D580223-5820-4844-AE3B-4E30D66124C4} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
+		{BDCE9E44-BBCD-41A6-994C-7E88D804E06A} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {76CF3463-B0D3-488A-AAAA-940C1076AFF4}
