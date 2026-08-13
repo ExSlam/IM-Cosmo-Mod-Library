@@ -79,13 +79,42 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one released single and records per-idol participation projections.
+        /// Captures the ordered senbatsu before ReleaseSingle mutates live cast slots.
         /// </summary>
-        internal void CaptureSingleReleased(singles._single releasedSingle, string sourcePatch = null)
+        internal SingleReleaseSnapshot CreateSingleReleaseSnapshot(
+            singles._single single)
         {
-            if (releasedSingle == null || releasedSingle.girls == null || releasedSingle.girls.Count == CoreConstants.ZeroBasedListStartIndex)
+            return new SingleReleaseSnapshot
             {
-                return;
+                SingleId = single != null
+                    ? single.id
+                    : CoreConstants.InvalidIdValue,
+                SingleCastSlotIdolIdentifiers =
+                    ResolveSingleCastSlotIdolIdentifiers(single)
+            };
+        }
+
+        /// <summary>
+        /// Captures one released single with enough historical cast data to rebuild
+        /// each participating idol's public timeline projection.
+        /// </summary>
+        internal bool CaptureSingleReleased(singles._single releasedSingle, string sourcePatch = null)
+        {
+            return CaptureSingleReleased(releasedSingle, null, sourcePatch);
+        }
+
+        /// <summary>
+        /// Captures one released single using its pre-release historical formation.
+        /// </summary>
+        internal bool CaptureSingleReleased(
+            singles._single releasedSingle,
+            SingleReleaseSnapshot releaseSnapshot,
+            string sourcePatch = null)
+        {
+            if (releasedSingle == null ||
+                releasedSingle.status != singles._single._status.released)
+            {
+                return false;
             }
 
             string resolvedSourcePatch = string.IsNullOrEmpty(sourcePatch)
@@ -96,19 +125,27 @@ namespace IMDataCore
             {
                 if (saveLoadPreparationActive)
                 {
-                    return;
+                    return false;
                 }
 
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
                     CoreLog.Warn(errorMessage);
-                    return;
+                    return false;
+                }
+
+                List<int> castSlotIdolIdentifiers =
+                    ResolveHistoricalSingleCastSlotIdolIdentifiersLocked(
+                        releasedSingle,
+                        releaseSnapshot);
+                if (!ContainsValidSingleCastSlotIdentifier(
+                        castSlotIdolIdentifiers))
+                {
+                    return false;
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                int gameDateKey = CoreDateTimeUtility.BuildGameDateKey(gameDate);
-                string gameDateTime = CoreDateTimeUtility.ToRoundTripString(gameDate);
                 string releaseDate = ResolveReleaseDate(releasedSingle, gameDate);
                 long totalSales = ResolveTotalSales(releasedSingle);
                 int quality = ResolveQuality(releasedSingle);
@@ -145,87 +182,60 @@ namespace IMDataCore
                 string singleFanSegmentNewFansSummary = BuildSingleFanSegmentNewFansSummary(releasedSingle);
                 string singleSenbatsuStatsSnapshot = BuildSingleSenbatsuStatsSnapshot(releasedSingle);
                 int chartPosition = ResolveChartPosition(releasedSingle);
-                string singleStatus = CoreEnumNameMapping.ToSingleStatusCode(releasedSingle.status);
 
-                for (int i = CoreConstants.ZeroBasedListStartIndex; i < releasedSingle.girls.Count; i++)
+                SingleParticipationPayload payload = new SingleParticipationPayload
                 {
-                    data_girls.girls idol = releasedSingle.girls[i];
-                    if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
-                    {
-                        continue;
-                    }
+                    SingleTitle = releasedSingle.title ?? string.Empty,
+                    SingleCastIdList = BuildDelimitedIdentifierList(
+                        castSlotIdolIdentifiers),
+                    SingleReleaseDate = releaseDate,
+                    TotalSales = totalSales,
+                    Quality = quality,
+                    FanSatisfaction = fanSatisfaction,
+                    FanBuzz = fanBuzz,
+                    NewFans = newFans,
+                    NewHardcoreFans = newHardcoreFans,
+                    NewCasualFans = newCasualFans,
+                    SingleQuantity = singleQuantity,
+                    SingleProductionCost = singleProductionCost,
+                    SingleMarketingResult = singleMarketingResult,
+                    SingleMarketingResultStatus = singleMarketingResultStatus,
+                    SingleGrossRevenue = singleGrossRevenue,
+                    SingleOneCdCost = singleOneCdCost,
+                    SingleOneCdRevenue = singleOneCdRevenue,
+                    SingleOtherExpenses = singleOtherExpenses,
+                    SingleIsGroupHandshake = singleIsGroupHandshake,
+                    SingleIsIndividualHandshake = singleIsIndividualHandshake,
+                    SingleFamePointsAwarded = singleFamePointsAwarded,
+                    SingleProfit = singleProfit,
+                    SingleSalesPerFan = singleSalesPerFan,
+                    SingleFameOfSenbatsu = singleFameOfSenbatsu,
+                    SingleMostPopularGenre = singleMostPopularGenre,
+                    SingleMostPopularLyrics = singleMostPopularLyrics,
+                    SingleMostPopularChoreo = singleMostPopularChoreo,
+                    SingleFanAppealMale = singleFanAppealMale,
+                    SingleFanAppealFemale = singleFanAppealFemale,
+                    SingleFanAppealCasual = singleFanAppealCasual,
+                    SingleFanAppealHardcore = singleFanAppealHardcore,
+                    SingleFanAppealTeen = singleFanAppealTeen,
+                    SingleFanAppealYoungAdult = singleFanAppealYoungAdult,
+                    SingleFanAppealAdult = singleFanAppealAdult,
+                    SingleFanSegmentSalesSummary = singleFanSegmentSalesSummary,
+                    SingleFanSegmentNewFansSummary = singleFanSegmentNewFansSummary,
+                    SingleSenbatsuStatsSnapshot = singleSenbatsuStatsSnapshot,
+                    ChartPosition = chartPosition
+                };
 
-                    int positionIndex = singles.GetGirlsPositionInSenbatsu(releasedSingle.girls, idol);
-                    int rowIndex = singles.GetGirlsRowInSenbatsu(releasedSingle.girls, idol);
-                    bool isCenter = positionIndex == CoreConstants.SenbatsuCenterPositionIndex;
-
-                    SingleParticipationPayload payload = new SingleParticipationPayload
-                    {
-                        SingleId = releasedSingle.id,
-                        SingleTitle = releasedSingle.title ?? string.Empty,
-                        SingleStatus = singleStatus,
-                        IdolId = idol.id,
-                        RowIndex = rowIndex,
-                        PositionIndex = positionIndex,
-                        IsCenter = isCenter,
-                        SingleReleaseDate = releaseDate,
-                        TotalSales = totalSales,
-                        Quality = quality,
-                        FanSatisfaction = fanSatisfaction,
-                        FanBuzz = fanBuzz,
-                        NewFans = newFans,
-                        NewHardcoreFans = newHardcoreFans,
-                        NewCasualFans = newCasualFans,
-                        SingleQuantity = singleQuantity,
-                        SingleProductionCost = singleProductionCost,
-                        SingleMarketingResult = singleMarketingResult,
-                        SingleMarketingResultStatus = singleMarketingResultStatus,
-                        SingleGrossRevenue = singleGrossRevenue,
-                        SingleOneCdCost = singleOneCdCost,
-                        SingleOneCdRevenue = singleOneCdRevenue,
-                        SingleOtherExpenses = singleOtherExpenses,
-                        SingleIsGroupHandshake = singleIsGroupHandshake,
-                        SingleIsIndividualHandshake = singleIsIndividualHandshake,
-                        SingleFamePointsAwarded = singleFamePointsAwarded,
-                        SingleProfit = singleProfit,
-                        SingleSalesPerFan = singleSalesPerFan,
-                        SingleFameOfSenbatsu = singleFameOfSenbatsu,
-                        SingleMostPopularGenre = singleMostPopularGenre,
-                        SingleMostPopularLyrics = singleMostPopularLyrics,
-                        SingleMostPopularChoreo = singleMostPopularChoreo,
-                        SingleFanAppealMale = singleFanAppealMale,
-                        SingleFanAppealFemale = singleFanAppealFemale,
-                        SingleFanAppealCasual = singleFanAppealCasual,
-                        SingleFanAppealHardcore = singleFanAppealHardcore,
-                        SingleFanAppealTeen = singleFanAppealTeen,
-                        SingleFanAppealYoungAdult = singleFanAppealYoungAdult,
-                        SingleFanAppealAdult = singleFanAppealAdult,
-                        SingleFanSegmentSalesSummary = singleFanSegmentSalesSummary,
-                        SingleFanSegmentNewFansSummary = singleFanSegmentNewFansSummary,
-                        SingleSenbatsuStatsSnapshot = singleSenbatsuStatsSnapshot,
-                        ChartPosition = chartPosition
-                    };
-
-                    string payloadJson = CoreJsonUtility.SerializeSingleParticipationPayload(payload);
-                    PendingEvent pendingEvent = new PendingEvent
-                    {
-                        CaptureSequence = NextCaptureSequenceLocked(),
-                        GameDateKey = gameDateKey,
-                        GameDateTime = gameDateTime,
-                        IdolId = idol.id,
-                        EntityKind = CoreConstants.EventEntityKindSingle,
-                        EntityId = releasedSingle.id.ToString(CultureInfo.InvariantCulture),
-                        EventType = CoreConstants.EventTypeSingleReleased,
-                        SourcePatch = resolvedSourcePatch,
-                        PayloadJson = payloadJson
-                    };
-                    bufferedEvents.Add(pendingEvent);
-                }
-
-                if (!FlushLocked(false, out errorMessage))
-                {
-                    CoreLog.Warn(CoreConstants.MessageFlushFailed + errorMessage);
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    releasedSingle.id.ToString(CultureInfo.InvariantCulture),
+                    CoreConstants.EventTypeSingleReleased,
+                    resolvedSourcePatch,
+                    CoreJsonUtility.SerializeSingleParticipationPayload(payload));
+                FlushAfterCaptureLocked();
+                return true;
             }
         }
 
@@ -259,7 +269,6 @@ namespace IMDataCore
                     return;
                 }
 
-                resolvedSingleChartPositionBySingleId[releasedSingle.id] = chartPosition;
                 shouldCapture = true;
             }
 
@@ -271,7 +280,125 @@ namespace IMDataCore
             string resolvedSourcePatch = string.IsNullOrEmpty(sourcePatch)
                 ? CoreConstants.EventSourceSingleChartPopupPatch
                 : sourcePatch;
-            CaptureSingleReleased(releasedSingle, resolvedSourcePatch);
+            if (!CaptureSingleReleased(releasedSingle, resolvedSourcePatch))
+            {
+                return;
+            }
+
+            lock (runtimeLock)
+            {
+                resolvedSingleChartPositionBySingleId[releasedSingle.id] =
+                    chartPosition;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the canonical historical formation for a release/chart snapshot.
+        /// The explicit pre-release snapshot wins; later chart captures reuse the
+        /// newest already-recorded formation rather than the null-pruned live list.
+        /// </summary>
+        private List<int> ResolveHistoricalSingleCastSlotIdolIdentifiersLocked(
+            singles._single releasedSingle,
+            SingleReleaseSnapshot releaseSnapshot)
+        {
+            if (releaseSnapshot != null &&
+                releaseSnapshot.SingleId == releasedSingle.id &&
+                ContainsValidSingleCastSlotIdentifier(
+                    releaseSnapshot.SingleCastSlotIdolIdentifiers))
+            {
+                return new List<int>(
+                    releaseSnapshot.SingleCastSlotIdolIdentifiers);
+            }
+
+            List<int> recordedSlotIdolIdentifiers;
+            if (TryResolveBufferedSingleCastSlotIdolIdentifiersLocked(
+                    releasedSingle.id,
+                    out recordedSlotIdolIdentifiers))
+            {
+                return recordedSlotIdolIdentifiers;
+            }
+
+            if (storageEngine != null &&
+                storageEngine.TryGetLatestSingleCastSlotIdolIdentifiers(
+                    releasedSingle.id,
+                    out recordedSlotIdolIdentifiers))
+            {
+                return recordedSlotIdolIdentifiers;
+            }
+
+            return ResolveSingleCastSlotIdolIdentifiers(releasedSingle);
+        }
+
+        /// <summary>
+        /// Reads the newest not-yet-flushed shared release formation for one single.
+        /// </summary>
+        private bool TryResolveBufferedSingleCastSlotIdolIdentifiersLocked(
+            int singleId,
+            out List<int> slotIdolIdentifiers)
+        {
+            slotIdolIdentifiers = new List<int>();
+            string entityId = singleId.ToString(CultureInfo.InvariantCulture);
+            for (int eventIndex = bufferedEvents.Count - 1;
+                eventIndex >= CoreConstants.ZeroBasedListStartIndex;
+                eventIndex--)
+            {
+                PendingEvent pending = bufferedEvents[eventIndex];
+                if (pending == null ||
+                    !string.IsNullOrEmpty(pending.NamespaceIdentifier) ||
+                    !string.Equals(
+                        pending.EntityKind,
+                        CoreConstants.EventEntityKindSingle,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        pending.EntityId,
+                        entityId,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        pending.EventType,
+                        CoreConstants.EventTypeSingleReleased,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                List<int> candidateSlotIdolIdentifiers;
+                if (LightweightSidecarJson.TryReadCsvIntSlotsProperty(
+                        pending.PayloadJson,
+                        CoreConstants.JsonFieldSingleCastIdList,
+                        CoreConstants.MinimumValidIdolIdentifier,
+                        CoreConstants.InvalidIdValue,
+                        out candidateSlotIdolIdentifiers) &&
+                    ContainsValidSingleCastSlotIdentifier(
+                        candidateSlotIdolIdentifiers))
+                {
+                    slotIdolIdentifiers = candidateSlotIdolIdentifiers;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsValidSingleCastSlotIdentifier(
+            IReadOnlyList<int> slotIdolIdentifiers)
+        {
+            if (slotIdolIdentifiers == null)
+            {
+                return false;
+            }
+
+            for (int slotIndex = CoreConstants.ZeroBasedListStartIndex;
+                slotIndex < slotIdolIdentifiers.Count;
+                slotIndex++)
+            {
+                if (slotIdolIdentifiers[slotIndex] >=
+                    CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
