@@ -246,6 +246,60 @@ namespace IMDataCore
             }
         }
 
+        internal static bool TryReadCsvIntSlotsProperty(
+            string json,
+            string propertyName,
+            int minimumValue,
+            int emptySlotValue,
+            out List<int> values)
+        {
+            values = new List<int>();
+            if (string.IsNullOrEmpty(json) ||
+                string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                JsonValue root = new JsonParser(json).ParseDocument();
+                JsonValue property;
+                if (root == null ||
+                    root.Kind != JsonValueKind.Object ||
+                    !root.ObjectValue.TryGetValue(propertyName, out property) ||
+                    property == null ||
+                    property.Kind != JsonValueKind.String ||
+                    string.IsNullOrWhiteSpace(property.StringValue))
+                {
+                    return false;
+                }
+
+                string[] tokens = property.StringValue.Split(',');
+                for (int index = 0; index < tokens.Length; index++)
+                {
+                    int parsed;
+                    if (!int.TryParse(
+                            tokens[index].Trim(),
+                            NumberStyles.Integer,
+                            CultureInfo.InvariantCulture,
+                            out parsed))
+                    {
+                        values.Clear();
+                        return false;
+                    }
+
+                    values.Add(parsed >= minimumValue ? parsed : emptySlotValue);
+                }
+
+                return values.Count > 0;
+            }
+            catch
+            {
+                values.Clear();
+                return false;
+            }
+        }
+
         internal static bool TryReadIntProperty(
             string json,
             string propertyName,
@@ -370,6 +424,66 @@ namespace IMDataCore
             {
                 return payloadJson;
             }
+        }
+
+        internal static string ExpandSingleReleasePayloadForPublic(
+            string payloadJson,
+            int idolId,
+            int positionIndex,
+            int rowIndex,
+            bool isCenter)
+        {
+            if (string.IsNullOrEmpty(payloadJson) ||
+                idolId < CoreConstants.MinimumValidIdolIdentifier ||
+                positionIndex < CoreConstants.ZeroBasedListStartIndex ||
+                rowIndex < CoreConstants.ZeroBasedListStartIndex)
+            {
+                return payloadJson ?? string.Empty;
+            }
+
+            try
+            {
+                JsonValue payloadValue =
+                    new JsonParser(payloadJson).ParseDocument();
+                if (payloadValue == null ||
+                    payloadValue.Kind != JsonValueKind.Object)
+                {
+                    return payloadJson;
+                }
+
+                // Keep the ordered cast list public: it is the minimal historical
+                // source needed to rebuild the complete release-time senbatsu,
+                // including members vanilla later replaces with null.
+                payloadValue.ObjectValue[CoreConstants.JsonFieldIdolId] =
+                    CreateNumberValue(idolId);
+                payloadValue.ObjectValue[CoreConstants.JsonFieldPositionIndex] =
+                    CreateNumberValue(positionIndex);
+                payloadValue.ObjectValue[CoreConstants.JsonFieldRowIndex] =
+                    CreateNumberValue(rowIndex);
+                payloadValue.ObjectValue[CoreConstants.JsonFieldIsCenter] =
+                    new JsonValue
+                    {
+                        Kind = JsonValueKind.Boolean,
+                        BooleanValue = isCenter
+                    };
+
+                return SerializeJsonValue(payloadValue);
+            }
+            catch
+            {
+                // Public projection is fail-soft. The stored history remains
+                // unchanged if a future payload shape cannot be expanded.
+                return payloadJson;
+            }
+        }
+
+        private static JsonValue CreateNumberValue(int value)
+        {
+            return new JsonValue
+            {
+                Kind = JsonValueKind.Number,
+                NumberValue = value.ToString(CultureInfo.InvariantCulture)
+            };
         }
 
         private static bool IsMoneyDetailDefault(

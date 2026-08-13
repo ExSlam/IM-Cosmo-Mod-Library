@@ -35,12 +35,46 @@ namespace IMDataCore
     internal static class singles_ReleaseSingle_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Records single participation events and projections.
+        /// Preserves the final ordered senbatsu before vanilla removes graduated
+        /// idols from the released single's live formation.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(singles._single single)
+        private static void Prefix(
+            singles._single single,
+            out SingleReleaseSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureSingleReleased(single);
+            __state = null;
+            try
+            {
+                __state =
+                    IMDataCoreController.Instance.CreateSingleReleaseSnapshot(single);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "Pre-release single senbatsu snapshot failed without " +
+                    "blocking gameplay: " + exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Records the shared release result after release calculations finish.
+        /// </summary>
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(
+            singles._single single,
+            SingleReleaseSnapshot __state)
+        {
+            try
+            {
+                IMDataCoreController.Instance.CaptureSingleReleased(single, __state);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "Post-release single observation failed without blocking " +
+                    "gameplay: " + exception.Message);
+            }
         }
     }
 
@@ -67,10 +101,19 @@ namespace IMDataCore
                 return;
             }
 
-            IMDataCoreController.Instance.CaptureSingleChartPositionResolved(
-                playerSingle,
-                Number,
-                CoreConstants.EventSourceSingleChartPopupPatch);
+            try
+            {
+                IMDataCoreController.Instance.CaptureSingleChartPositionResolved(
+                    playerSingle,
+                    Number,
+                    CoreConstants.EventSourceSingleChartPopupPatch);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "Single chart observation failed without blocking gameplay: " +
+                    exception.Message);
+            }
         }
     }
 

@@ -10,14 +10,16 @@ namespace IMDataCore
     ///
     /// Money details keep the same public DTO semantics while the private JSON
     /// omits fields whose values are already the DTO default. Shared show episodes
-    /// are stored once and indexed under their historical participant idol ids.
-    /// Consumer-owned namespaced events are never rewritten.
+    /// and single releases are stored once and indexed under their historical
+    /// participant idol ids. Consumer-owned namespaced events are never rewritten.
     /// </summary>
     internal static class CorePayloadCompaction
     {
         private const string MoneyTransactionEventType = "money_transaction";
+        private const string SingleReleasedEventType = "single_released";
         private const string ShowEpisodeReleasedEventType = "show_episode_released";
         private const string LegacyShowEpisodeEventType = "show_episode";
+        private const string SingleCastIdListPropertyName = "single_cast_id_list";
         private const string ShowCastIdListPropertyName = "show_cast_id_list";
         private const string ShowCastIdListBeforePropertyName =
             "show_cast_id_list_before";
@@ -243,6 +245,49 @@ namespace IMDataCore
                 record.PayloadJson);
         }
 
+        internal static string ExpandSharedTimelinePayloadForPublic(
+            LightweightEventRecord record,
+            int requestedIdolId)
+        {
+            if (record == null ||
+                requestedIdolId < CoreConstants.MinimumValidIdolIdentifier)
+            {
+                return record == null
+                    ? CoreConstants.EmptyJsonObject
+                    : record.PayloadJson ?? CoreConstants.EmptyJsonObject;
+            }
+
+            List<int> participantIds;
+            if (!TryGetSharedSingleParticipantIds(record, out participantIds))
+            {
+                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
+            }
+
+            List<int> castSlotIds;
+            if (!LightweightSidecarJson.TryReadCsvIntSlotsProperty(
+                    record.PayloadJson,
+                    SingleCastIdListPropertyName,
+                    CoreConstants.MinimumValidIdolIdentifier,
+                    CoreConstants.InvalidIdValue,
+                    out castSlotIds))
+            {
+                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
+            }
+
+            int positionIndex = castSlotIds.IndexOf(requestedIdolId);
+            if (positionIndex < CoreConstants.ZeroBasedListStartIndex)
+            {
+                return record.PayloadJson ?? CoreConstants.EmptyJsonObject;
+            }
+
+            return LightweightSidecarJson.ExpandSingleReleasePayloadForPublic(
+                record.PayloadJson,
+                requestedIdolId,
+                positionIndex,
+                ResolveSingleSenbatsuRowIndex(positionIndex),
+                positionIndex == CoreConstants.SenbatsuCenterPositionIndex);
+        }
+
         internal static bool TryGetSharedShowParticipantIds(
             LightweightEventRecord record,
             out List<int> participantIds)
@@ -268,6 +313,11 @@ namespace IMDataCore
             }
 
             if (TryGetSharedShowParticipantIds(record, out participantIds))
+            {
+                return participantIds.Count > 0;
+            }
+
+            if (TryGetSharedSingleParticipantIds(record, out participantIds))
             {
                 return participantIds.Count > 0;
             }
@@ -375,6 +425,56 @@ namespace IMDataCore
                 ShowCastIdListPropertyName,
                 CoreConstants.MinimumValidIdolIdentifier,
                 out participantIds);
+        }
+
+        private static bool TryGetSharedSingleParticipantIds(
+            LightweightEventRecord record,
+            out List<int> participantIds)
+        {
+            participantIds = new List<int>();
+            if (record == null ||
+                !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
+                !string.Equals(
+                    record.EventType ?? string.Empty,
+                    SingleReleasedEventType,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return LightweightSidecarJson.TryReadCsvIntProperty(
+                record.PayloadJson,
+                SingleCastIdListPropertyName,
+                CoreConstants.MinimumValidIdolIdentifier,
+                out participantIds);
+        }
+
+        private static int ResolveSingleSenbatsuRowIndex(int positionIndex)
+        {
+            // Mirrors singles.GetGirlsRowInSenbatsu without retaining a separate
+            // derived row value for every idol in the physical event payload.
+            if (positionIndex <= CoreConstants.SenbatsuCenterPositionIndex)
+            {
+                return 0;
+            }
+            if (positionIndex <= 2)
+            {
+                return 1;
+            }
+            if (positionIndex <= 5)
+            {
+                return 2;
+            }
+            if (positionIndex <= 9)
+            {
+                return 3;
+            }
+            if (positionIndex <= 14)
+            {
+                return 4;
+            }
+
+            return 5;
         }
 
         private static bool IsShowEpisodeEventType(string eventType)

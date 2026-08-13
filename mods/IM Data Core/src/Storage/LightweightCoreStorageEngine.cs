@@ -697,7 +697,69 @@ namespace IMDataCore
                     return false;
                 }
             }
-        }        internal bool TryReadMoneyTransactions(
+        }
+
+        /// <summary>
+        /// Reads the newest active shared release formation for one single. This
+        /// allows later chart snapshots to retain idols whom vanilla already
+        /// removed from the live formation after graduation.
+        /// </summary>
+        internal bool TryGetLatestSingleCastSlotIdolIdentifiers(
+            int singleId,
+            out List<int> slotIdolIdentifiers)
+        {
+            slotIdolIdentifiers = new List<int>();
+            lock (storageLock)
+            {
+                ThrowIfDisposed();
+                string entityId = singleId.ToString(CultureInfo.InvariantCulture);
+                long newestSequence = long.MinValue;
+                for (int eventIndex = CoreConstants.ZeroBasedListStartIndex;
+                    eventIndex < activeEvents.Count;
+                    eventIndex++)
+                {
+                    LightweightEventRecord record = activeEvents[eventIndex];
+                    if (record == null ||
+                        record.Sequence <= newestSequence ||
+                        !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
+                        !string.Equals(
+                            record.EntityKind,
+                            CoreConstants.EventEntityKindSingle,
+                            StringComparison.Ordinal) ||
+                        !string.Equals(
+                            record.EntityId,
+                            entityId,
+                            StringComparison.Ordinal) ||
+                        !string.Equals(
+                            record.EventType,
+                            CoreConstants.EventTypeSingleReleased,
+                            StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    List<int> candidateSlotIdolIdentifiers;
+                    if (!LightweightSidecarJson.TryReadCsvIntSlotsProperty(
+                            record.PayloadJson,
+                            CoreConstants.JsonFieldSingleCastIdList,
+                            CoreConstants.MinimumValidIdolIdentifier,
+                            CoreConstants.InvalidIdValue,
+                            out candidateSlotIdolIdentifiers) ||
+                        !ContainsValidIdolIdentifier(
+                            candidateSlotIdolIdentifiers))
+                    {
+                        continue;
+                    }
+
+                    newestSequence = record.Sequence;
+                    slotIdolIdentifiers = candidateSlotIdolIdentifiers;
+                }
+
+                return newestSequence != long.MinValue;
+            }
+        }
+
+        internal bool TryReadMoneyTransactions(
             DateTime startInclusive,
             DateTime endExclusive,
             int maxCount,
@@ -1585,16 +1647,16 @@ namespace IMDataCore
                 return;
             }
 
-            List<int> showParticipantIds;
+            List<int> timelineParticipantIds;
             if (record.IdolId < CoreConstants.MinimumValidIdolIdentifier &&
                 CorePayloadCompaction.TryGetSharedTimelineParticipantIds(
                     record,
-                    out showParticipantIds))
+                    out timelineParticipantIds))
             {
-                for (int index = 0; index < showParticipantIds.Count; index++)
+                for (int index = 0; index < timelineParticipantIds.Count; index++)
                 {
                     AddTimelineEventForIdolLocked(
-                        showParticipantIds[index],
+                        timelineParticipantIds[index],
                         record);
                 }
                 return;
@@ -1621,7 +1683,31 @@ namespace IMDataCore
             }
 
             idolRows.Add(record);
-        }        private bool TryReserveMutationSequenceLocked(
+        }
+
+        private static bool ContainsValidIdolIdentifier(
+            IReadOnlyList<int> idolIdentifiers)
+        {
+            if (idolIdentifiers == null)
+            {
+                return false;
+            }
+
+            for (int idolIndex = CoreConstants.ZeroBasedListStartIndex;
+                idolIndex < idolIdentifiers.Count;
+                idolIndex++)
+            {
+                if (idolIdentifiers[idolIndex] >=
+                    CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryReserveMutationSequenceLocked(
             long sequence,
             out string errorMessage)
         {
@@ -1815,6 +1901,10 @@ namespace IMDataCore
                 if (CorePayloadCompaction.IsSharedTimelineEvent(record))
                 {
                     publicEvent.IdolId = requestedIdolId;
+                    publicEvent.PayloadJson = CorePayloadCompaction
+                        .ExpandSharedTimelinePayloadForPublic(
+                            record,
+                            requestedIdolId);
                 }
                 target.Add(publicEvent);
             }

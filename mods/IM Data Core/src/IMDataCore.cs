@@ -3074,7 +3074,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Resolves unique idol identifiers from one single's current cast.
+        /// Resolves unique idol identifiers from one single's current cast while
+        /// preserving senbatsu order for historical position reconstruction.
         /// </summary>
         private static List<int> ResolveDistinctSingleCastIdolIdentifiers(singles._single single)
         {
@@ -3100,6 +3101,35 @@ namespace IMDataCore
             }
 
             return castIdolIdentifiers;
+        }
+
+        /// <summary>
+        /// Resolves a slot-preserving single cast list. Empty or invalid slots use
+        /// the standard invalid identifier so formation positions survive release-
+        /// time removal of graduated idols.
+        /// </summary>
+        private static List<int> ResolveSingleCastSlotIdolIdentifiers(
+            singles._single single)
+        {
+            List<int> slotIdolIdentifiers = new List<int>();
+            if (single == null || single.girls == null)
+            {
+                return slotIdolIdentifiers;
+            }
+
+            for (int slotIndex = CoreConstants.ZeroBasedListStartIndex;
+                slotIndex < single.girls.Count;
+                slotIndex++)
+            {
+                data_girls.girls idol = single.girls[slotIndex];
+                slotIdolIdentifiers.Add(
+                    idol != null &&
+                    idol.id >= CoreConstants.MinimumValidIdolIdentifier
+                        ? idol.id
+                        : CoreConstants.InvalidIdValue);
+            }
+
+            return slotIdolIdentifiers;
         }
 
         /// <summary>
@@ -5644,7 +5674,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Serializes a single-participation payload into compact JSON.
+        /// Serializes one shared single-release payload into compact JSON.
         /// </summary>
         internal static string SerializeSingleParticipationPayload(SingleParticipationPayload payload)
         {
@@ -5658,10 +5688,7 @@ namespace IMDataCore
             bool isFirstProperty = true;
 
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleTitle, payload.SingleTitle ?? string.Empty, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldRowIndex, payload.RowIndex, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldPositionIndex, payload.PositionIndex, ref isFirstProperty);
-            AppendBooleanProperty(builder, CoreConstants.JsonFieldIsCenter, payload.IsCenter, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdList, payload.SingleCastIdList ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleReleaseDate, payload.SingleReleaseDate ?? string.Empty, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldTotalSales, payload.TotalSales, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldQuality, payload.Quality, ref isFirstProperty);
@@ -7509,18 +7536,15 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// JSON payload emitted for each single participation event.
+    /// Shared JSON payload emitted once for each single-release snapshot.
+    /// Idol-specific formation fields are reconstructed from the ordered cast list
+    /// when the event is projected through the public per-idol timeline API.
     /// </summary>
     [Serializable]
     internal sealed class SingleParticipationPayload
     {
-        public int SingleId;
         public string SingleTitle = string.Empty;
-        public string SingleStatus = string.Empty;
-        public int IdolId;
-        public int RowIndex;
-        public int PositionIndex;
-        public bool IsCenter;
+        public string SingleCastIdList = string.Empty;
         public string SingleReleaseDate = string.Empty;
         public long TotalSales;
         public int Quality;
@@ -9245,6 +9269,17 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Slot-preserving senbatsu captured immediately before vanilla release logic.
+    /// ReleaseSingle replaces graduated members with null before postfix patches run,
+    /// so this is the authoritative historical formation for the released single.
+    /// </summary>
+    internal sealed class SingleReleaseSnapshot
+    {
+        internal int SingleId = CoreConstants.InvalidIdValue;
+        internal List<int> SingleCastSlotIdolIdentifiers = new List<int>();
+    }
+
+    /// <summary>
     /// Snapshot captured before one idol group-transfer mutation executes.
     /// </summary>
     internal sealed class GroupTransferSnapshot
@@ -9984,4 +10019,3 @@ namespace IMDataCore
 
 
 }
-

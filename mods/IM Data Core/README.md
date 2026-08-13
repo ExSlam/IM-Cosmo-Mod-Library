@@ -243,6 +243,12 @@ New 2.0 captures do not emit four byte-for-byte legacy alias rows when the canon
 
 Imported historical aliases remain readable.
 
+New `single_released` captures store one shared physical event for the release
+snapshot. Its `single_cast_id_list` preserves senbatsu slot order (`-1` marks an
+empty slot), including idols whom vanilla removes from the live formation after
+graduation. Per-idol timeline reads project `idol_id`, `position_index`,
+`row_index`, and `is_center` from that ordered historical source.
+
 New 2.0 payloads also omit identifiers that are already represented by `EntityId`, including `single_id`, `show_id`, `concert_id`, `tour_id`, `election_id`, and `relationship_pair_key`, along with lifecycle or status echoes already encoded by the event type. Historical imported payloads remain readable.
 
 ## Token and quota rules
