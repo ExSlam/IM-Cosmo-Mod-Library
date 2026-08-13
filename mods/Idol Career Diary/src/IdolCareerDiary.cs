@@ -1735,6 +1735,7 @@ namespace IdolCareerDiary
         internal const string KeySingleNewStatus = "single_new_status";
         internal static string TextCastMembers { get { return ModLocalization.Get("TextCastMembers", "Cast Members"); } }
         internal const string KeySingleCastCount = "single_cast_count";
+        internal const string KeySingleCastIdList = "single_cast_id_list";
         internal static string TextCastSize { get { return ModLocalization.Get("TextCastSize", "Cast Size"); } }
         internal const string KeySingleCastCountBefore = "single_cast_count_before";
         internal const string KeySingleCastCountAfter = "single_cast_count_after";
@@ -9298,10 +9299,7 @@ namespace IdolCareerDiary
             AddTitle(diaryDetailContentRoot, sectionTitle);
             RenderSingleReleaseSnapshotCard(single, payload);
 
-            if (hasLiveSingle)
-            {
-                RenderSingleSenbatsuGrid(single);
-            }
+            RenderSingleSenbatsuGrid(hasLiveSingle ? single : null, payload);
 
             RenderSingleParticipationSenbatsuStats(hasLiveSingle ? single : null, payload);
             if (!hasLiveSingle)
@@ -11177,11 +11175,14 @@ namespace IdolCareerDiary
         /// <summary>
         /// Renders senbatsu member icons grouped by row from back to front.
         /// </summary>
-        private void RenderSingleSenbatsuGrid(singles._single single)
+        private void RenderSingleSenbatsuGrid(
+            singles._single single,
+            JSONNode payload)
         {
             AddTitle(diaryDetailContentRoot, C.TitleSingleSenbatsu);
 
-            List<SingleSenbatsuMemberRenderInfo> members = BuildSingleSenbatsuMemberRenderInfos(single);
+            List<SingleSenbatsuMemberRenderInfo> members =
+                BuildSingleSenbatsuMemberRenderInfos(single, payload);
             if (members.Count == C.ZeroIndex)
             {
                 AddText(diaryDetailContentRoot, C.LabelSingleRosterEmpty);
@@ -11256,9 +11257,44 @@ namespace IdolCareerDiary
         /// <summary>
         /// Collects and sorts senbatsu members by row (descending) then position (ascending).
         /// </summary>
-        private static List<SingleSenbatsuMemberRenderInfo> BuildSingleSenbatsuMemberRenderInfos(singles._single single)
+        private static List<SingleSenbatsuMemberRenderInfo>
+            BuildSingleSenbatsuMemberRenderInfos(
+                singles._single single,
+                JSONNode payload)
         {
             List<SingleSenbatsuMemberRenderInfo> members = new List<SingleSenbatsuMemberRenderInfo>();
+            List<int> historicalSlotIds = ParseIdSlotList(
+                ReadStr(payload, C.KeySingleCastIdList));
+            if (ContainsValidId(historicalSlotIds))
+            {
+                int historicalMemberCount = Mathf.Min(
+                    historicalSlotIds.Count,
+                    C.SenbatsuMaximumSlots);
+                for (int positionIndex = C.ZeroIndex;
+                    positionIndex < historicalMemberCount;
+                    positionIndex++)
+                {
+                    int idolId = historicalSlotIds[positionIndex];
+                    data_girls.girls historicalGirl = idolId >= C.MinId
+                        ? data_girls.GetGirlByID(idolId)
+                        : null;
+                    if (historicalGirl == null)
+                    {
+                        continue;
+                    }
+
+                    members.Add(new SingleSenbatsuMemberRenderInfo
+                    {
+                        Girl = historicalGirl,
+                        RowIndex = ResolveSingleSenbatsuRowIndex(positionIndex),
+                        PositionIndex = positionIndex
+                    });
+                }
+
+                SortSingleSenbatsuMemberRenderInfos(members);
+                return members;
+            }
+
             if (single == null || single.girls == null || single.girls.Count == C.ZeroIndex)
             {
                 return members;
@@ -11281,6 +11317,13 @@ namespace IdolCareerDiary
                 });
             }
 
+            SortSingleSenbatsuMemberRenderInfos(members);
+            return members;
+        }
+
+        private static void SortSingleSenbatsuMemberRenderInfos(
+            List<SingleSenbatsuMemberRenderInfo> members)
+        {
             members.Sort(delegate (SingleSenbatsuMemberRenderInfo left, SingleSenbatsuMemberRenderInfo right)
             {
                 if (left == null && right == null)
@@ -11314,8 +11357,31 @@ namespace IdolCareerDiary
                 int rightId = right.Girl != null ? right.Girl.id : C.InvalidId;
                 return leftId.CompareTo(rightId);
             });
+        }
 
-            return members;
+        private static int ResolveSingleSenbatsuRowIndex(int positionIndex)
+        {
+            if (positionIndex <= C.ZeroIndex)
+            {
+                return C.ZeroIndex;
+            }
+            if (positionIndex <= 2)
+            {
+                return 1;
+            }
+            if (positionIndex <= 5)
+            {
+                return 2;
+            }
+            if (positionIndex <= 9)
+            {
+                return 3;
+            }
+            if (positionIndex <= 14)
+            {
+                return 4;
+            }
+            return 5;
         }
 
         /// <summary>
@@ -12178,7 +12244,12 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            List<data_girls.girls> girls = BuildSingleSenbatsuGirls(single);
+            List<data_girls.girls> historicalSlots;
+            TryResolveHistoricalSingleSenbatsuSlots(
+                payload,
+                out historicalSlots);
+            List<data_girls.girls> girls =
+                BuildSingleSenbatsuGirls(single, historicalSlots);
             if (girls.Count == C.ZeroIndex)
             {
                 return false;
@@ -12364,7 +12435,10 @@ namespace IdolCareerDiary
                 delegate
                 {
                     senbatsuPopup.SetSingle(single, false);
-                    ApplySingleSenbatsuSnapshotIfAvailable(senbatsuPopup, single, payload);
+                    ApplySingleSenbatsuSnapshotIfAvailable(
+                        senbatsuPopup,
+                        single,
+                        payload);
                     ConfigureSingleSenbatsuViewerMode(senbatsuPopup);
                 });
 
@@ -12425,9 +12499,14 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Applies release-time senbatsu stat snapshots to base formation popup when payload data is available.
+        /// Applies release-time senbatsu stat snapshots to the base formation popup
+        /// when payload data is available. The native popup continues to use its
+        /// live formation; the diary's own grid renders the historical formation.
         /// </summary>
-        private static void ApplySingleSenbatsuSnapshotIfAvailable(SinglePopup_Senbatsu popup, singles._single single, JSONNode payload)
+        private static void ApplySingleSenbatsuSnapshotIfAvailable(
+            SinglePopup_Senbatsu popup,
+            singles._single single,
+            JSONNode payload)
         {
             if (popup == null || single == null || payload == null)
             {
@@ -12440,7 +12519,8 @@ namespace IdolCareerDiary
                 return;
             }
 
-            List<data_girls.girls> senbatsuGirls = BuildSingleSenbatsuGirls(single);
+            List<data_girls.girls> senbatsuGirls =
+                BuildSingleSenbatsuGirls(single, null);
             if (senbatsuGirls.Count == C.ZeroIndex)
             {
                 return;
@@ -12448,8 +12528,13 @@ namespace IdolCareerDiary
 
             popup.SetStats(senbatsuGirls, snapshotStats);
 
-            float fameSnapshot = ReadFloat(payload, C.JsonSingleFameOfSenbatsu);
-            if (!float.IsNaN(fameSnapshot) && !float.IsInfinity(fameSnapshot) && fameSnapshot >= C.FloatZero && popup.fame != null)
+            float fameSnapshot = ReadFloat(
+                payload,
+                C.JsonSingleFameOfSenbatsu);
+            if (!float.IsNaN(fameSnapshot) &&
+                !float.IsInfinity(fameSnapshot) &&
+                fameSnapshot >= C.FloatZero &&
+                popup.fame != null)
             {
                 Stars stars = popup.fame.GetComponent<Stars>();
                 if (stars != null)
@@ -12554,9 +12639,30 @@ namespace IdolCareerDiary
         /// <summary>
         /// Builds clean senbatsu girl list for popup stat rendering.
         /// </summary>
-        private static List<data_girls.girls> BuildSingleSenbatsuGirls(singles._single single)
+        private static List<data_girls.girls> BuildSingleSenbatsuGirls(
+            singles._single single,
+            List<data_girls.girls> historicalSlots)
         {
             List<data_girls.girls> girls = new List<data_girls.girls>();
+            if (historicalSlots != null && historicalSlots.Count > C.ZeroIndex)
+            {
+                for (int slotIndex = C.ZeroIndex;
+                    slotIndex < historicalSlots.Count;
+                    slotIndex++)
+                {
+                    data_girls.girls historicalGirl = historicalSlots[slotIndex];
+                    if (historicalGirl != null)
+                    {
+                        girls.Add(historicalGirl);
+                    }
+                }
+
+                if (girls.Count > C.ZeroIndex)
+                {
+                    return girls;
+                }
+            }
+
             if (single == null || single.girls == null)
             {
                 return girls;
@@ -12572,6 +12678,35 @@ namespace IdolCareerDiary
             }
 
             return girls;
+        }
+
+        private static bool TryResolveHistoricalSingleSenbatsuSlots(
+            JSONNode payload,
+            out List<data_girls.girls> historicalSlots)
+        {
+            historicalSlots = new List<data_girls.girls>();
+            List<int> historicalSlotIds = ParseIdSlotList(
+                ReadStr(payload, C.KeySingleCastIdList));
+            if (!ContainsValidId(historicalSlotIds))
+            {
+                return false;
+            }
+
+            int slotCount = Mathf.Min(
+                historicalSlotIds.Count,
+                C.SenbatsuMaximumSlots);
+            for (int slotIndex = C.ZeroIndex;
+                slotIndex < slotCount;
+                slotIndex++)
+            {
+                int idolId = historicalSlotIds[slotIndex];
+                historicalSlots.Add(
+                    idolId >= C.MinId
+                        ? data_girls.GetGirlByID(idolId)
+                        : null);
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -19267,6 +19402,57 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
+        /// Parses a comma-separated formation while retaining empty (-1) slots.
+        /// </summary>
+        private static List<int> ParseIdSlotList(string rawList)
+        {
+            List<int> ids = new List<int>();
+            if (string.IsNullOrEmpty(rawList))
+            {
+                return ids;
+            }
+
+            string[] tokens = rawList.Split(
+                new[] { ',' },
+                StringSplitOptions.None);
+            for (int tokenIndex = C.ZeroIndex;
+                tokenIndex < tokens.Length;
+                tokenIndex++)
+            {
+                int parsedId;
+                if (!TryParseInt(tokens[tokenIndex], out parsedId))
+                {
+                    ids.Clear();
+                    return ids;
+                }
+
+                ids.Add(parsedId >= C.MinId ? parsedId : C.InvalidId);
+            }
+
+            return ids;
+        }
+
+        private static bool ContainsValidId(IReadOnlyList<int> ids)
+        {
+            if (ids == null)
+            {
+                return false;
+            }
+
+            for (int idIndex = C.ZeroIndex;
+                idIndex < ids.Count;
+                idIndex++)
+            {
+                if (ids[idIndex] >= C.MinId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Builds readable cast summary from payload cast-id list.
         /// </summary>
         private string BuildShowCastNameSummary(IMDataCoreEvent ev, JSONNode payload, int maxNames)
@@ -21774,6 +21960,3 @@ namespace IdolCareerDiary
         }
     }
 }
-
-
-

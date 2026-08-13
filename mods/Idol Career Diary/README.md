@@ -24,6 +24,7 @@ the next vanilla save boundary, following IM Data Core 2.0's persistence model.
 - Adds a dedicated career diary view in idol profile flow.
 - Reads recent timeline events for the selected idol.
 - Groups and formats event types (career, contracts, singles, shows, finance, relationships, and more).
+- Reconstructs released-single senbatsu from recorded slot order, so later graduation does not remove an idol from that historical formation.
 - Searches player-facing timeline text and event payload keywords live from the timeline toolbar.
 - Shows complete election rankings (including votes and points), including rankings extended by Tel's Extended SSK.
 - Promotes election-attached single and concert events into the idol timeline and links to them from election details.
