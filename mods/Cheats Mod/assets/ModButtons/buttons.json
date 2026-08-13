@@ -200,6 +200,16 @@
 		"method": "MaxOutResearch"
 	},
 	{
+    "label": "Agency activities level 10",
+    "codeLabel": "cheat.button.max_agency_activities",
+    "tooltip": "Set Performance and Promotion agency activities to level 10.",
+    "codeTooltip": "cheat.tooltip.max_agency_activities",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutAgencyActivities"
+	},
+	{
 		"label": "+1 idol fame level",
 		"codeLabel": "cheat.button.increase_idol_fame",
 		"tooltip": "Increase every idol's fame by one level.",

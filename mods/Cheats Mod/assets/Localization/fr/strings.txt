@@ -154,3 +154,7 @@ notification.no_unique_idols=No loaded unique idols found.
 notification.unique_idol_recruited={0} recruited.
 notification.unique_idol_already_recruited=That unique idol is already recruited.
 notification.unique_idol_recruit_failed=Unique idol recruitment failed.
+
+cheat.button.max_agency_activities=Activités d'agence niveau 10
+cheat.tooltip.max_agency_activities=Définit les activités Performance et Promotion de l'agence au niveau 10.
+notification.max_agency_activities=Les activités Performance et Promotion sont maintenant au niveau 10.

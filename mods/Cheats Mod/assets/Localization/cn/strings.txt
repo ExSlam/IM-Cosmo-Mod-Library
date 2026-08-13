@@ -157,3 +157,7 @@ notification.no_unique_idols=No loaded unique idols found.
 notification.unique_idol_recruited={0} recruited.
 notification.unique_idol_already_recruited=That unique idol is already recruited.
 notification.unique_idol_recruit_failed=Unique idol recruitment failed.
+
+cheat.button.max_agency_activities=经纪公司活动等级10
+cheat.tooltip.max_agency_activities=将演出和宣传活动等级设为10。
+notification.max_agency_activities=演出和宣传活动等级已设为10。

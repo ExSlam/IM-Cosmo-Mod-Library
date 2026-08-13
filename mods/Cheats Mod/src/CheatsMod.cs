@@ -25,6 +25,7 @@ namespace CheatsMod
         internal const int IdolFameLevelIncrement = 1;
         internal const int MaximumIdolFameLevel = 10;
         internal const int TargetResearchLevel = 10;
+        internal const int TargetAgencyActivityLevel = 10;
         internal const int TargetStaffLevel = 20;
         internal const int MinimumRelationshipPointIncrease = 1;
         internal const int MinimumRelationshipPointDelta = 0;
@@ -63,6 +64,7 @@ namespace CheatsMod
         internal const string NotificationRevealBullies = "notification.reveal_bullies";
         internal const string NotificationRevealAllRelationships = "notification.reveal_all_relationships";
         internal const string NotificationMaxResearch = "notification.max_research";
+        internal const string NotificationMaxAgencyActivities = "notification.max_agency_activities";
         internal const string NotificationMaxStaffLevels = "notification.max_staff_levels";
         internal const string NotificationRevealDatingStatus = "notification.reveal_dating_status";
         internal const string NotificationRevealDatingPreference = "notification.reveal_dating_preference";
@@ -115,6 +117,7 @@ namespace CheatsMod
         internal const string NotificationRevealBullies = "Bullying targets revealed.";
         internal const string NotificationRevealAllRelationships = "All idol relationships, cliques, and bullying targets revealed.";
         internal const string NotificationMaxResearch = "All research unlocked and set to level 10.";
+        internal const string NotificationMaxAgencyActivities = "Performance and Promotion agency activities set to level 10.";
         internal const string NotificationMaxStaffLevels = "All staff levels set to 20.";
         internal const string NotificationRevealDatingStatus = "Dating statuses revealed.";
         internal const string NotificationRevealDatingPreference = "Dating preferences revealed.";
@@ -401,6 +404,11 @@ namespace CheatsMod
         public static void MaxOutResearch()
         {
             Execute(MaxOutResearchCore);
+        }
+
+        public static void MaxOutAgencyActivities()
+        {
+            Execute(MaxOutAgencyActivitiesCore);
         }
 
         public static void MaxOutStaffLevels()
@@ -1111,6 +1119,51 @@ namespace CheatsMod
                 CheatLocalizationKeys.NotificationMaxResearch,
                 CheatFallbackText.NotificationMaxResearch,
                 NotificationManager._notification._type.resource_change);
+        }
+
+        private static void MaxOutAgencyActivitiesCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            Activities activities = GetDataComponent<Activities>();
+            if (activities == null)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationGameUnavailable,
+                    CheatFallbackText.NotificationGameUnavailable);
+                return;
+            }
+
+            Activities._activity performance =
+                activities.GetActivity(Activity._type.performance);
+
+            Activities._activity promotion =
+                activities.GetActivity(Activity._type.promotion);
+
+            if (performance == null || promotion == null)
+            {
+                NotifyWarning(
+                    CheatLocalizationKeys.NotificationGameUnavailable,
+                    CheatFallbackText.NotificationGameUnavailable);
+                return;
+            }
+
+            performance.lvl = CheatAmounts.TargetAgencyActivityLevel;
+            promotion.lvl = CheatAmounts.TargetAgencyActivityLevel;
+
+            // Recalculate max_lvl and redraw the activity buttons.
+            // Vanilla's UpdateLevels() returns max_lvl = 10 whenever lvl >= 10.
+            activities.UpdateLevels();
+            //Have vanilla custom-task completion checks run immediately after cheating the levels
+            tasks.CheckCustomTasks();
+
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationMaxAgencyActivities,
+                CheatFallbackText.NotificationMaxAgencyActivities,
+                NotificationManager._notification._type.other);
         }
 
         private static void MaxOutStaffLevelsCore()
