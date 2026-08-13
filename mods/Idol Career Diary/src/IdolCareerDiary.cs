@@ -534,6 +534,7 @@ namespace IdolCareerDiary
         internal const string EventTaskCompleted = "task_completed";
         internal const string EventTaskFailed = "task_failed";
         internal const string EventTaskDone = "task_done";
+        internal const string EventTaskRemovedOnGraduation = "task_removed_on_graduation";
         internal const string EventIdolOutfitChanged = "idol_outfit_changed";
         internal const string EventWishGenerated = "wish_generated";
         internal const string EventWishFulfilled = "wish_fulfilled";
@@ -578,6 +579,8 @@ namespace IdolCareerDiary
         internal const string EventAgencyRoomDestroyed = "agency_room_destroyed";
         internal const string EventAgencyRoomCostPaid = "agency_room_cost_paid";
         internal const string EventRoomWorkCompleted = "room_work_completed";
+        internal const string EventRoomWorkCancelled = "room_work_cancelled";
+        internal const string EventIdolRelationshipRemoved = "idol_relationship_removed";
         internal const string EventStaffHired = "staff_hired";
         internal const string EventStaffFired = "staff_fired";
         internal const string EventStaffFiredSeverance = "staff_fired_severance";
@@ -789,6 +792,9 @@ namespace IdolCareerDiary
         internal const string JsonTourParticipantIdList = "tour_participant_id_list";
         internal const string JsonConcertParticipantIdList = "concert_participant_id_list";
         internal const string JsonStaffedIdolIdList = "staffed_idol_id_list";
+        internal const string JsonRoomWorkParticipantIdList = "room_work_participant_id_list";
+        internal const string JsonRandomEventActorIdList = "random_event_actor_id_list";
+        internal const string JsonSubstoryActorIdList = "substory_actor_id_list";
         internal const string JsonStaffType = "staff_type";
         internal const string JsonLazyCreatorRuntimeTypeName = "JSONLazyCreator";
         internal const string PatchTokenSetStatus = ".SetStatus.";
@@ -833,6 +839,10 @@ namespace IdolCareerDiary
             "show_cast_id_list_removed",
             JsonTourParticipantIdList,
             JsonConcertParticipantIdList,
+            JsonElectionRankedIdolIdList,
+            JsonRoomWorkParticipantIdList,
+            JsonRandomEventActorIdList,
+            JsonSubstoryActorIdList,
             "concert_participant_id_list_before",
             "concert_participant_id_list_after",
             "concert_participant_id_list_added",
@@ -1411,6 +1421,7 @@ namespace IdolCareerDiary
         internal static string TextTaskFailed { get { return ModLocalization.Get("TextTaskFailed", "Task Failed"); } }
         internal static string TextTaskClosed { get { return ModLocalization.Get("TextTaskClosed", "Task Closed"); } }
         internal static string TextTaskAdded { get { return ModLocalization.Get("TextTaskAdded", "Task Added"); } }
+        internal static string TextTaskRemovedOnGraduation { get { return ModLocalization.Get("TextTaskRemovedOnGraduation", "Task Closed by Graduation"); } }
         internal const string KeyTaskCustom = "task_custom";
         internal const string KeyTaskTitle = "task_title";
         internal const string KeyTaskDescription = "task_description";
@@ -1970,6 +1981,7 @@ namespace IdolCareerDiary
         internal static string TextStartedDatingAnotherIdol { get { return ModLocalization.Get("TextStartedDatingAnotherIdol", "Started Dating Another Idol"); } }
         internal static string TextDatingEnded { get { return ModLocalization.Get("TextDatingEnded", "Dating Ended"); } }
         internal static string TextRelationshipStatusUpdated { get { return ModLocalization.Get("TextRelationshipStatusUpdated", "Relationship Status Updated"); } }
+        internal static string TextRelationshipRemoved { get { return ModLocalization.Get("TextRelationshipRemoved", "Relationship Archived at Graduation"); } }
         internal static string TextDynamic { get { return ModLocalization.Get("TextDynamic", "Relationship Trend: "); } }
         internal static string TextPairStateDating { get { return ModLocalization.Get("TextPairStateDating", "Pair State: Dating"); } }
         internal static string TextRelationshipScore { get { return ModLocalization.Get("TextRelationshipScore", "Relationship Score: "); } }
@@ -1979,6 +1991,7 @@ namespace IdolCareerDiary
         internal static string TextTargetIdol { get { return ModLocalization.Get("TextTargetIdol", "Target Idol: "); } }
         internal static string TextLeaderIdol { get { return ModLocalization.Get("TextLeaderIdol", "Leader Idol: "); } }
         internal static string TextKnownToProducer { get { return ModLocalization.Get("TextKnownToProducer", "Known to Producer: "); } }
+        internal static string TextRoomWorkCancelled { get { return ModLocalization.Get("TextRoomWorkCancelled", "Room Work Cancelled"); } }
         internal static string TextContractSigned { get { return ModLocalization.Get("TextContractSigned", "Contract Signed"); } }
         internal static string TextContractBroken { get { return ModLocalization.Get("TextContractBroken", "Contract Broken"); } }
         internal static string TextContractCompleted { get { return ModLocalization.Get("TextContractCompleted", "Contract Completed"); } }
@@ -6644,7 +6657,11 @@ namespace IdolCareerDiary
                 ? C.TextTaskAdded
                 : (type == C.EventTaskCompleted
                     ? C.TextTaskCompleted
-                    : (type == C.EventTaskFailed ? C.TextTaskFailed : C.TextTaskClosed));
+                    : (type == C.EventTaskFailed
+                        ? C.TextTaskFailed
+                        : (type == C.EventTaskRemovedOnGraduation
+                            ? C.TextTaskRemovedOnGraduation
+                            : C.TextTaskClosed)));
             string taskSummary = BuildTaskSummary(payload);
             string taskTitle = NormalizeRawText(ReadStr(payload, C.KeyTaskTitle));
             string taskName = NormalizeRawText(ReadStr(payload, C.KeyTaskCustom));
@@ -13418,13 +13435,20 @@ namespace IdolCareerDiary
                     outcomeLines.Add(C.TextUsedGoodsStatusYes);
                 }
             }
-            else if (type == C.EventIdolDatingStarted || type == C.EventIdolDatingEnded || type == C.EventIdolRelationshipStatusChanged)
+            else if (type == C.EventIdolDatingStarted ||
+                     type == C.EventIdolDatingEnded ||
+                     type == C.EventIdolRelationshipStatusChanged ||
+                     type == C.EventIdolRelationshipRemoved)
             {
                 int otherId = ResolveOtherRelationshipIdolId(ev, payload);
                 string otherName = ResolveVisibleSocialParticipantName(ev, payload, otherId);
                 p.Title = type == C.EventIdolDatingStarted
                     ? C.TextStartedDatingAnotherIdol
-                    : (type == C.EventIdolDatingEnded ? C.TextDatingEnded : C.TextRelationshipStatusUpdated);
+                    : (type == C.EventIdolDatingEnded
+                        ? C.TextDatingEnded
+                        : (type == C.EventIdolRelationshipRemoved
+                            ? C.TextRelationshipRemoved
+                            : C.TextRelationshipStatusUpdated));
                 p.WithWhom = otherName != C.LabelUnknown ? otherName : C.LabelNotKnownToProducer;
 
                 string relationshipStatusTransition = BuildStatusTransitionText(
@@ -14000,7 +14024,8 @@ namespace IdolCareerDiary
             if (primaryStaff != null && primaryStaff.HasIdentity)
             {
                 p.StaffCredit = primaryStaff;
-                if (type == C.EventRoomWorkCompleted)
+                if (type == C.EventRoomWorkCompleted ||
+                    type == C.EventRoomWorkCancelled)
                 {
                     AddRoomWorkStaffCreditLines(payload, primaryStaff, outcomeLines);
                 }
@@ -14217,6 +14242,11 @@ namespace IdolCareerDiary
                 return;
             }
 
+            if (assigned != null && assigned.HasIdentity)
+            {
+                return;
+            }
+
             outcomeLines.Add(C.TextCreditedTo + C.SeparatorSpace + FormatStaffCredit(primaryStaff));
         }
 
@@ -14366,6 +14396,7 @@ namespace IdolCareerDiary
                 case C.EventMedicalHiatusFinished:
                 case C.EventIdolDatingEnded:
                 case C.EventIdolRelationshipStatusChanged:
+                case C.EventIdolRelationshipRemoved:
                 case C.EventBullyingEnded:
                 case C.EventCliqueLeft:
                 case C.EventShowCancelled:
@@ -14387,6 +14418,7 @@ namespace IdolCareerDiary
                 case C.EventTaskCompleted:
                 case C.EventTaskFailed:
                 case C.EventTaskDone:
+                case C.EventTaskRemovedOnGraduation:
                     return true;
             }
 
@@ -14407,6 +14439,7 @@ namespace IdolCareerDiary
                     return string.Equals(candidateType, C.EventIdolDatingStarted, StringComparison.Ordinal);
 
                 case C.EventIdolRelationshipStatusChanged:
+                case C.EventIdolRelationshipRemoved:
                     return string.Equals(candidateType, C.EventIdolRelationshipStatusChanged, StringComparison.Ordinal);
 
                 case C.EventBullyingEnded:
@@ -14461,6 +14494,7 @@ namespace IdolCareerDiary
                 case C.EventTaskCompleted:
                 case C.EventTaskFailed:
                 case C.EventTaskDone:
+                case C.EventTaskRemovedOnGraduation:
                     return string.Equals(candidateType, C.EventTaskAdded, StringComparison.Ordinal);
             }
 
@@ -15591,6 +15625,7 @@ namespace IdolCareerDiary
                 case C.EventTaskCompleted:
                 case C.EventTaskFailed:
                 case C.EventTaskDone:
+                case C.EventTaskRemovedOnGraduation:
                     BuildNarrativePresentation(type, ev, payload, p, outcomeLines);
                     return true;
 
@@ -15645,7 +15680,8 @@ namespace IdolCareerDiary
                     return true;
 
                 case C.EventRoomWorkCompleted:
-                    BuildRoomWorkPresentation(payload, p, outcomeLines);
+                case C.EventRoomWorkCancelled:
+                    BuildRoomWorkPresentation(type, payload, p, outcomeLines);
                     return true;
 
                 case C.EventTourCreated:
@@ -15695,7 +15731,7 @@ namespace IdolCareerDiary
         /// <summary>
         /// Builds the diary entry for a completed room preparation or training task.
         /// </summary>
-        private static void BuildRoomWorkPresentation(JSONNode payload, Presentation p, List<string> outcomeLines)
+        private static void BuildRoomWorkPresentation(string eventType, JSONNode payload, Presentation p, List<string> outcomeLines)
         {
             string kind = ReadStr(payload, C.JsonRoomWorkKind);
             string title = NormalizeRawText(ReadStr(payload, C.JsonRoomWorkTitle));
@@ -15735,6 +15771,14 @@ namespace IdolCareerDiary
             if (stage != C.LabelUnknown)
             {
                 outcomeLines.Add(C.TextWorkStage + C.SeparatorSpace + stage);
+            }
+
+            if (string.Equals(
+                    eventType,
+                    C.EventRoomWorkCancelled,
+                    StringComparison.Ordinal))
+            {
+                p.Title = C.TextRoomWorkCancelled;
             }
         }
 
@@ -16166,6 +16210,7 @@ namespace IdolCareerDiary
                 case C.EventIdolDatingStarted:
                 case C.EventIdolDatingEnded:
                 case C.EventIdolRelationshipStatusChanged:
+                case C.EventIdolRelationshipRemoved:
                 case C.EventBullyingStarted:
                 case C.EventBullyingEnded:
                 case C.EventCliqueJoined:
