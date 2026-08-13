@@ -24,7 +24,6 @@ mods/Assistant Manager/assets/Textures/AssistantManager_Female.png
 mods/Assistant Manager/assets/Textures/AssistantManager_Male_Pro.png
 mods/Assistant Manager/assets/Textures/AssistantManager_Male.png
 mods/localization issues.txt
-mods/Cheats Mod/ideas.txt
 .tmp*
 mods/Singles Marketing Checkbox Fix/assets/thumb2.png
 mods/*/assets/thumb*.png
@@ -36,3 +35,4 @@ mods/IM Data Core/scripts/Test-IMDataCore-2.0.4.ps1
 mods/IM Data Core/Test-IMDataCore-2.0.5.ps1
 to fix.txt
 to upload.txt
+mods/Save Write Ordering Fix/docs/TEST_MATRIX.md

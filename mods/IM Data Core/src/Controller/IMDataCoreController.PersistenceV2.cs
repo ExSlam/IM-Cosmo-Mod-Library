@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-
 namespace IMDataCore
 {
     /// <summary>
@@ -35,7 +33,6 @@ namespace IMDataCore
                         "IM Data Core rejected an unsupported vanilla save target.");
                     return;
                 }
-
                 CoreSaveScope targetScope;
                 if (!CorePaths.TryResolveSaveScope(
                     resolvedVanillaPath,
@@ -45,7 +42,6 @@ namespace IMDataCore
                         "IM Data Core could not resolve the vanilla save scope.");
                     return;
                 }
-
                 // Final safety net for direct field writes or third-party patches
                 // that bypass a known show mutation method. Observe only the
                 // settled runtime state that will accompany this vanilla save.
@@ -62,7 +58,6 @@ namespace IMDataCore
                         CoreLog.Warn(errorMessage);
                         return;
                     }
-
                     VanillaSaveStamp stamp;
                     if (!VanillaSaveStamp.TryCreate(
                             savedData,
@@ -82,7 +77,6 @@ namespace IMDataCore
                             errorMessage);
                         return;
                     }
-
                     activeSaveScope = targetScope;
                     activeSaveKey = NormalizeSaveKey(
                         targetScope.InternalSaveKey);
@@ -97,7 +91,6 @@ namespace IMDataCore
                     exception.Message);
             }
         }
-
         /// <summary>
         /// Replaces the supplemental runtime immediately after vanilla assigns
         /// SaveManager.Data and before any LoadEvent subscriber mutates its stamp.
@@ -118,7 +111,6 @@ namespace IMDataCore
                         "during the same vanilla load.");
                     return;
                 }
-
                 // This flag is now an idempotency guard for one vanilla LoadData
                 // invocation. The successful postfix clears it.
                 saveLoadPreparationActive = true;
@@ -142,7 +134,6 @@ namespace IMDataCore
                     InstallSafeEmptyLoadedState(null);
                     return;
                 }
-
                 VanillaSaveStamp stamp;
                 string errorMessage;
                 if (!VanillaSaveStamp.TryCreate(
@@ -155,7 +146,6 @@ namespace IMDataCore
                     InstallSafeEmptyLoadedState(targetScope);
                     return;
                 }
-
                 DateTime loadedGameDate;
                 try
                 {
@@ -169,9 +159,6 @@ namespace IMDataCore
                         "IM Data Core could not parse the loaded game date: " +
                         exception.Message);
                 }
-
-                bool lightweightSidecarExisted =
-                    File.Exists(targetScope.SidecarFilePath);
                 loadedEngine = new LightweightCoreStorageEngine();
                 string loadError;
                 bool sidecarLoaded = loadedEngine.Initialize(
@@ -191,60 +178,6 @@ namespace IMDataCore
                         return;
                     }
                 }
-
-                if (sidecarLoaded && !lightweightSidecarExisted)
-                {
-                    LegacyFlatFileImportResult importResult =
-                        LegacyFlatFileImporter.TryImportExactGeneration(
-                            targetScope,
-                            loadedSaveData,
-                            loadedEngine);
-                    if (importResult.Succeeded)
-                    {
-                        long importedWatermark =
-                            loadedEngine.LastIssuedSequence;
-                        if (!loadedEngine.AddOrReplaceCheckpoint(
-                                stamp,
-                                importedWatermark,
-                                out errorMessage) ||
-                            !loadedEngine.TryPersistForScope(
-                                targetScope,
-                                out errorMessage))
-                        {
-                            CoreLog.Warn(
-                                "The exact legacy checkpoint was imported in memory " +
-                                "but its new lightweight sidecar could not be committed: " +
-                                errorMessage);
-                            loadedEngine.Dispose();
-                            loadedEngine = CreateSafeEmptyEngine(targetScope);
-                            sidecarLoaded = false;
-                        }
-                        else
-                        {
-                            CoreLog.Info(
-                                importResult.Message + " Events: " +
-                                importResult.ImportedEventCount.ToString() +
-                                "; custom values: " +
-                                importResult.ImportedCustomDataCount.ToString() + ".");
-                        }
-                    }
-                    else if (importResult.Status !=
-                        LegacyFlatFileImportStatus.NoLegacySource)
-                    {
-                        CoreLog.Warn(importResult.Message);
-                    }
-
-                    if (!importResult.Succeeded)
-                    {
-                        // Some importer failures can occur after a pristine target
-                        // has accepted an earlier record. Never expose a partial
-                        // compatibility import.
-                        loadedEngine.Dispose();
-                        loadedEngine = CreateSafeEmptyEngine(targetScope);
-                        sidecarLoaded = false;
-                    }
-                }
-
                 bool checkpointFound = false;
                 long activatedSequence = 0L;
                 if (sidecarLoaded &&
@@ -256,7 +189,6 @@ namespace IMDataCore
                 {
                     CoreLog.Warn(errorMessage);
                 }
-
                 if (sidecarLoaded && !checkpointFound)
                 {
                     if (loadedGameDate == DateTime.MinValue ||
@@ -269,13 +201,11 @@ namespace IMDataCore
                         {
                             CoreLog.Warn(errorMessage);
                         }
-
                         loadedEngine.Dispose();
                         loadedEngine = CreateSafeEmptyEngine(targetScope);
                         sidecarLoaded = false;
                     }
                 }
-
                 InstallLoadedEngine(
                     loadedEngine,
                     targetScope,
@@ -293,11 +223,9 @@ namespace IMDataCore
                 {
                     loadedEngine.Dispose();
                 }
-
                 InstallSafeEmptyLoadedState(targetScope);
             }
         }
-
         private void InstallSafeEmptyLoadedState(CoreSaveScope targetScope)
         {
             LightweightCoreStorageEngine safeEngine =
@@ -308,13 +236,11 @@ namespace IMDataCore
                 CorePaths.ResetToTransientSaveScope();
                 safeScope = CorePaths.GetSaveScope();
             }
-
             InstallLoadedEngine(
                 safeEngine,
                 safeScope,
                 DateTime.MinValue);
         }
-
         private static LightweightCoreStorageEngine CreateSafeEmptyEngine(
             CoreSaveScope targetScope)
         {
@@ -327,11 +253,9 @@ namespace IMDataCore
             {
                 return safeEngine;
             }
-
             safeEngine.InitializeTransient();
             return safeEngine;
         }
-
         private void InstallLoadedEngine(
             LightweightCoreStorageEngine loadedEngine,
             CoreSaveScope targetScope,
@@ -347,14 +271,12 @@ namespace IMDataCore
                 CorePaths.ResetToTransientSaveScope();
                 targetScope = CorePaths.GetSaveScope();
             }
-
             lock (runtimeLock)
             {
                 if (storageEngine != null)
                 {
                     storageEngine.Dispose();
                 }
-
                 storageEngine = loadedEngine;
                 initialized = true;
                 activeSaveScope = targetScope;
@@ -378,7 +300,6 @@ namespace IMDataCore
                 }
             }
         }
-
         /// <summary>
         /// Detaches the prior save without writing it and starts a fresh transient
         /// branch. The first real vanilla save supplies the physical scope.
@@ -391,7 +312,6 @@ namespace IMDataCore
                 {
                     storageEngine.Dispose();
                 }
-
                 storageEngine = new LightweightCoreStorageEngine();
                 storageEngine.InitializeTransient();
                 CorePaths.ResetToTransientSaveScope();
@@ -407,7 +327,6 @@ namespace IMDataCore
                 ResetRuntimeCaptureStateLocked();
             }
         }
-
         internal void OnVanillaLoadCompleted()
         {
             lock (runtimeLock)
@@ -430,7 +349,6 @@ namespace IMDataCore
                 }
             }
         }
-
         internal void CancelVanillaLoadPreparation()
         {
             lock (runtimeLock)
@@ -442,7 +360,6 @@ namespace IMDataCore
                 preparedLoadGameDateValid = false;
             }
         }
-
         private bool EnsureInitialized(out string errorMessage)
         {
             lock (runtimeLock)
@@ -458,7 +375,6 @@ namespace IMDataCore
             {
                 return true;
             }
-
             try
             {
                 storageEngine = new LightweightCoreStorageEngine();
@@ -484,7 +400,6 @@ namespace IMDataCore
                 return false;
             }
         }
-
         /// <summary>
         /// Moves captured events into the in-memory branch. A non-forced call is
         /// intentionally a no-op; it exists for compatibility with capture sites
@@ -498,7 +413,6 @@ namespace IMDataCore
                 errorMessage = CoreConstants.MessageStorageUnavailable;
                 return false;
             }
-
             if (!forceFlush)
             {
                 return true;
@@ -514,7 +428,6 @@ namespace IMDataCore
             storageEngine.SetLastIssuedSequence(captureSequence);
             return true;
         }
-
         /// <summary>
         /// Captures chart-position backfill events before a vanilla save boundary.
         /// </summary>
@@ -522,7 +435,6 @@ namespace IMDataCore
         {
             List<KeyValuePair<singles._single, int>> pendingChartUpdates =
                 new List<KeyValuePair<singles._single, int>>();
-
             lock (runtimeLock)
             {
                 string errorMessage;
@@ -537,7 +449,6 @@ namespace IMDataCore
                 {
                     return;
                 }
-
                 for (int index = 0; index < singles.Singles.Count; index++)
                 {
                     singles._single releasedSingle = singles.Singles[index];
@@ -547,13 +458,11 @@ namespace IMDataCore
                     {
                         continue;
                     }
-
                     int chartPosition = ResolveChartPosition(releasedSingle);
                     if (chartPosition <= 0)
                     {
                         continue;
                     }
-
                     int knownChartPosition;
                     if (resolvedSingleChartPositionBySingleId.TryGetValue(
                             releasedSingle.id,
@@ -562,14 +471,12 @@ namespace IMDataCore
                     {
                         continue;
                     }
-
                     pendingChartUpdates.Add(
                         new KeyValuePair<singles._single, int>(
                             releasedSingle,
                             chartPosition));
                 }
             }
-
             for (int index = 0; index < pendingChartUpdates.Count; index++)
             {
                 KeyValuePair<singles._single, int> update =
@@ -580,7 +487,6 @@ namespace IMDataCore
                     CoreConstants.EventSourceSingleChartBackfillPatch);
             }
         }
-
         private void ResetRuntimeCaptureStateLocked()
         {
             tourRuntimeStateByTourId.Clear();
@@ -590,7 +496,6 @@ namespace IMDataCore
             idempotencyKeysForCurrentDate.Clear();
             idempotencyDateKey = CoreConstants.UninitializedDateKey;
         }
-
         /// <summary>
         /// LoadEvent has now rebuilt vanilla's canonical singles. Seed only the
         /// transient duplicate-suppression index; do not emit or persist a second
@@ -603,7 +508,6 @@ namespace IMDataCore
             {
                 return;
             }
-
             for (int index = 0; index < singles.Singles.Count; index++)
             {
                 singles._single releasedSingle = singles.Singles[index];
@@ -613,7 +517,6 @@ namespace IMDataCore
                 {
                     continue;
                 }
-
                 int chartPosition = ResolveChartPosition(releasedSingle);
                 if (chartPosition > CoreConstants.ZeroBasedListStartIndex)
                 {

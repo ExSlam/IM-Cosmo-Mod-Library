@@ -34,7 +34,6 @@ namespace IMDataCore
         private const string LegacyModsFolderName = "Mods";
         private const string LegacyDisplayModFolderName = "IM Data Core";
         private const string LegacySavesFolderName = "saves";
-        private const string LegacyDatabaseFileName = "im_data_core.db";
         private const string LegacyFlatFileName = "im_data_core.fallback.json";
         private const string LegacyRecoveryBackupSuffix = ".bak";
         private const string LegacyRecoveryTemporarySuffix = ".tmp";
@@ -1135,8 +1134,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Returns possible legacy SQLite/fallback files without opening or changing
-        /// any source.
+        /// Returns possible legacy fallback JSON files without opening or changing
+        /// any source. Historical non-JSON persistence formats are intentionally ignored.
         /// </summary>
         internal static List<string> GetLegacyStorageFileCandidates(
             CoreSaveScope saveScope,
@@ -1169,13 +1168,13 @@ namespace IMDataCore
             if (!string.IsNullOrEmpty(rootDirectory) &&
                 !string.IsNullOrEmpty(legacyRelativeDirectory))
             {
-                AddLegacyFilesFromDirectory(
+                AddLegacyJsonFilesFromDirectory(
                     candidates,
                     Path.Combine(
                         rootDirectory,
                         LegacySavesFolderName,
                         legacyRelativeDirectory));
-                AddLegacyFilesFromDirectory(
+                AddLegacyJsonFilesFromDirectory(
                     candidates,
                     Path.Combine(rootDirectory, legacyRelativeDirectory));
             }
@@ -1195,7 +1194,7 @@ namespace IMDataCore
                     directoryIndex < sourceDirectories.Count;
                     directoryIndex++)
                 {
-                    AddLegacyFilesFromDirectory(
+                    AddLegacyJsonFilesFromDirectory(
                         candidates,
                         sourceDirectories[directoryIndex]);
                 }
@@ -2047,7 +2046,7 @@ namespace IMDataCore
                 : Path.Combine(ownerDirectory, fileStem);
         }
 
-        private static void AddLegacyFilesFromDirectory(
+        private static void AddLegacyJsonFilesFromDirectory(
             List<string> candidates,
             string directoryPath)
         {
@@ -2056,9 +2055,6 @@ namespace IMDataCore
                 return;
             }
 
-            AddUniquePath(
-                candidates,
-                Path.Combine(directoryPath, LegacyDatabaseFileName));
             AddUniquePath(
                 candidates,
                 Path.Combine(directoryPath, LegacyFlatFileName));

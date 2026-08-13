@@ -1,0 +1,4 @@
+cheats to add (with corresponding localizations):
+-Cheat to complete all current progress on all room activities instantly
+
+- Add bullies to idol (left row dropdown to select target idol from any of the hired idols from any group/sister group, right row dropdown for selecting the bully with a similar dropdown, and a button in the next row to add the selected bully to the selected idol)

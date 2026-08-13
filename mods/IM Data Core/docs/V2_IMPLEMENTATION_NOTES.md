@@ -123,9 +123,7 @@ mutations.
 
 Release version is `2.0.0`.
 
-The new sidecar has an explicit format name and its own format version so it is
-not confused with the legacy flat-file format or SQLite schema that already
-used numeric version 2.
+The sidecar has an explicit format name and its own format version so it cannot be confused with earlier persistence formats that used their own numeric versioning.
 
 Format identity:
 
@@ -142,10 +140,7 @@ Persisted source data is limited to:
 - historical custom JSON SET/REMOVE mutations;
 - IMDC-owned historical, transient, or supplemental event records.
 
-Runtime dictionaries and query indexes are rebuilt from those records after a
-load. Whole vanilla objects, `SaveManager.SavedData`, current vanilla
-collections, embedded snapshots, hashes, SQL pages, and derived indexes are not
-persisted.
+Runtime dictionaries and query indexes are rebuilt from those records after a load. Whole vanilla objects, `SaveManager.SavedData`, current vanilla collections, embedded snapshots, hashes, and derived indexes are not persisted.
 
 Shared built-in timeline records use the same rule: one occurrence is stored
 once with explicit primitive participant identity. Derived per-idol references
@@ -159,9 +154,7 @@ Ordinary capture:
 allocate sequence -> append small in-memory record -> update index -> return
 ```
 
-No event causes a filesystem write, whole-sidecar serialization, SQLite query,
-periodic flush, queue-threshold flush, vanilla hash, or per-frame transaction
-pump.
+No event causes a filesystem write, whole-sidecar serialization, periodic flush, queue-threshold flush, vanilla hash, or per-frame persistence pump.
 
 Vanilla save boundary:
 
@@ -242,30 +235,27 @@ vanilla entities may no longer be resolvable. Removing more of those values
 requires query-time enrichment plus a coordinated consumer fallback change;
 silently substituting mutable current values would break historical meaning.
 
-## Legacy compatibility policy
+## Legacy JSON compatibility policy
 
-Version 1.2.0 and 1.3.0 used different persistence arrangements. Both are
-treated only as immutable migration sources.
+Earlier IM Data Core releases used several persistence formats. Version 2 only retains automatic migration support for the late-1.3 fallback JSON format that can be matched safely to the loaded vanilla checkpoint.
 
-- Never move, edit, truncate, or delete a legacy database or fallback file.
+Legacy sources are treated as immutable migration inputs:
+
+- Never move, edit, truncate, or delete a legacy fallback file.
 - Import only fields whose semantics can be verified.
-- Omit legacy projections that merely duplicate vanilla current state or can be
-  rebuilt from imported IMDC events.
-- A latest-only custom value with no history becomes one migration-baseline SET
-  mutation; earlier timestamps are not invented.
-- If a legacy variant cannot be imported safely without retaining the old
-  runtime architecture, leave it untouched, log the limitation, and start a
-  safe new sidecar.
+- Omit legacy projections that merely duplicate vanilla current state or can be rebuilt from imported IMDC events.
+- A latest-only custom value with no history becomes one migration-baseline `SET` mutation; earlier timestamps are not invented.
+- Unsupported or ambiguous historical formats are ignored rather than requiring old runtime persistence code.
 
 Verified compatibility matrix:
 
 | Legacy source | Automatic action in 2.0 |
 | --- | --- |
-| 1.2 / early 1.3 SQLite | Left untouched; no proven exact loaded-checkpoint mapping. |
-| 1.2 / early unversioned fallback JSON | Left untouched; latest-only custom/projection state is not rollback-safe. |
-| Late 1.3 SQLite exact generations | Left untouched; safe built-in payload rehydration would require retaining a legacy SQL/schema reader. |
+| Early/unversioned fallback JSON | Ignored because latest-only custom/projection state cannot be mapped safely to an exact rollback checkpoint. |
 | Late 1.3 fallback JSON `FormatVersion = 2` | Imported only after integrity validation and an exact in-memory vanilla fingerprint match. |
 | Late 1.3 fallback `.bak` / `.tmp` recovery candidates | Evaluated read-only under the same strict rules; conflicting matches are rejected. |
+
+The late-1.3 importer exists only for a one-time compatibility decision when the current sidecar is absent. It never reads the vanilla file and never writes or promotes a legacy source. Events retain their historical payloads and public IDs; current custom values become baseline `SET` mutations at the loaded game date. Old projection arrays are deliberately omitted.
 
 The late-1.3 importer exists only for a one-time compatibility decision when the
 new sidecar is absent. It never reads the vanilla file, never opens SQLite, and
@@ -273,15 +263,21 @@ never writes or promotes a legacy source. Events retain their historical
 payloads and public IDs; current custom values become baseline `SET` mutations
 at the loaded game date. Old projection tables/arrays are deliberately omitted.
 
-## Removal targets
+this legacy json import code must be removed. the old version of imdatacore did not save in both json and sqlite. it only saved in sqlite that exists on every modern windows 10/11 machine and so almost none of the players have migratable data. I'll consider making a tool to migrate old data from sql dbs some other time.
+I would remove the pre-2.0 flat-JSON importer completely. Keeping it no longer buys meaningful player compatibility, while it does add a surprisingly large amount of migration-only code, path probing, hashing, DTOs, and load-time branching.
 
-- SQLite backend selection, provider probing, schema, WAL, and SQL rollback;
-- vanilla/save-sidecar SHA fingerprints and generation snapshots;
-- save/load staging directories, publish journals, expected byte observation,
-  and transaction recovery;
-- periodic and queue-threshold persistence;
-- `PopupManager.Update` transaction processing;
+## Removed architecture
+
+The version-2 implementation no longer contains:
+
+- secondary persistence backend selection or provider probing;
+- vanilla/save-sidecar generation snapshots;
+- save/load staging directories, publish journals, or expected-byte observation;
+- periodic or queue-threshold persistence;
+- `PopupManager.Update` persistence processing;
 - serialized derived projections that can be rebuilt from event history.
+
+Runtime persistence is the lightweight JSON sidecar only.
 
 ## Progress checklist
 

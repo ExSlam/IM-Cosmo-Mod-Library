@@ -75,7 +75,7 @@ See `docs/STORAGE_LAYOUT.md` for the complete path mapping and legacy compatibil
 
 ### Lightweight JSON sidecar
 
-IM Data Core 2.0 uses one lightweight JSON sidecar implementation for normal runtime persistence. There is no normal-runtime SQLite provider, database schema, or fallback storage backend.
+IM Data Core 2.0 uses the lightweight JSON sidecar as its only runtime persistence implementation. There is no secondary persistence backend.
 
 The sidecar identifies itself as:
 
@@ -226,7 +226,7 @@ Public methods:
 - `IMDataCoreApi` and compatibility alias `IMDataCoreAPI` retain their existing public method signatures in the 2.0 line.
 - `IMDataCoreSession.NamespaceIdentifier`, `IMDataCoreEvent`, and `IMDataCoreMoneyTransaction` retain their externally visible consumer models.
 - Persistence implementation, sidecar format, controller internals, checkpoint mechanics, and Harmony implementation details are private and may evolve without changing the consumer API.
-- The 2.0 persistence architecture is lightweight JSON and save-path scoped. Consumers should never depend on old private database or storage internals.
+- The 2.0 persistence architecture is lightweight JSON and save-path scoped. Consumers should never depend on old private persistence internals.
 
 Money transactions expose `SectionCode` and optional structured `Details`. Structured details currently cover business contracts, single releases, show episodes, individual idol salaries, individual staff salaries, daily theater attendance, monthly theater streaming, daily cafe results, and concert costs/revenue.
 

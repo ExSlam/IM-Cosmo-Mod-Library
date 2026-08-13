@@ -6,8 +6,7 @@ IM Data Core stores its lightweight sidecars below:
 Application.persistentDataPath/IMDataCore/
 ```
 
-This is a sibling of Idol Manager's vanilla `data` directory. Version 2.0 has
-no required `IMDataCore/saves` layer and no normal-runtime SQLite database.
+This is a sibling of Idol Manager's vanilla `data` directory. Version 2.0 has no required `IMDataCore/saves` layer and uses lightweight JSON sidecars exclusively for runtime persistence.
 
 ## Exact vanilla-to-sidecar mapping
 
@@ -51,8 +50,7 @@ It contains only:
 - IMDC historical/supplemental event records;
 - historical custom JSON `SET`/`REMOVE` mutations;
 
-It does not contain `SaveManager.SavedData`, vanilla entity collections,
-embedded checkpoint snapshots, SQL tables, or derived runtime indexes.
+It does not contain `SaveManager.SavedData`, vanilla entity collections, embedded checkpoint snapshots, or derived runtime indexes.
 
 Multi-idol occurrences are persisted once with `IdolId = -1` and a small,
 event-specific participant list or primitive ranking. The per-idol timeline
@@ -77,27 +75,30 @@ replace or move the target. Every write, backup, and cleanup target is validated
 under the private `IMDataCore` root. Vanilla files are never temporary,
 replacement, backup, or cleanup targets.
 
-## Legacy compatibility
+## Legacy JSON compatibility
 
-Old 1.2 and 1.3 artifacts remain immutable. Discovery may find historical
-`im_data_core.db`, `im_data_core.fallback.json`, and fallback recovery files in
-the old keyed/mirrored roots, including `IMDataCore/saves`,
-`Mods/IMDataCore`, installed-mod roots, and the prior Workshop location.
+Legacy compatibility is limited to supported JSON fallback artifacts from late IM Data Core 1.3.
+
+Discovery may consider:
+
+- `im_data_core.fallback.json`
+- `im_data_core.fallback.json.bak`
+- `im_data_core.fallback.json.tmp`
+
+These may exist in historical keyed or mirrored locations, including old `IMDataCore/saves` layouts, mod installation directories, and the prior Workshop location.
 
 Automatic import is deliberately narrow:
 
-- it runs only when the new lightweight sidecar is absent;
-- it never opens legacy SQLite;
-- it accepts only the late-1.3 fallback `FormatVersion = 2` format with valid
-  integrity data and an exact generation matching the already-deserialized
-  vanilla `SavedData`;
-- it imports historical events and current custom values (as migration-baseline
-  `SET` mutations), while omitting redundant legacy projections;
+- it runs only when the current lightweight sidecar is absent;
+- it accepts only the supported late-1.3 fallback `FormatVersion = 2` format;
+- integrity data must validate;
+- a stored generation must exactly match the already-deserialized vanilla `SavedData`;
+- historical events and supported custom values are imported;
+- redundant legacy projections are omitted;
 - conflicting exact sources are rejected;
-- after success, the new sidecar is written and normal runtime uses only it.
+- legacy source files are never modified, moved, renamed, or deleted;
+- after a successful import, normal runtime persistence uses only the current lightweight JSON sidecar.
 
-The importer reproduces the old fingerprint solely in memory for this one-time
-compatibility decision. Normal 2.0 identity and rollback do not hash vanilla.
-Early/unversioned fallback files and legacy SQLite lack a safely proven mapping
-to the loaded vanilla checkpoint, so they are left untouched and a clear
-limitation is logged instead of guessing.
+Early or unversioned fallback JSON files without a safely proven checkpoint mapping are ignored rather than guessed at.
+
+The importer reproduces the historical vanilla fingerprint only in memory for the one-time compatibility decision. Normal 2.0 save identity and rollback do not hash vanilla save files.
