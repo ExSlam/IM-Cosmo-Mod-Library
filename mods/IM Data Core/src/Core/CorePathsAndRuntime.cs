@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -31,13 +30,6 @@ namespace IMDataCore
     {
         private const string GameDataRootFolderName = "data";
         private const string DataCoreRootFolderName = "IMDataCore";
-        private const string LegacyModsFolderName = "Mods";
-        private const string LegacyDisplayModFolderName = "IM Data Core";
-        private const string LegacySavesFolderName = "saves";
-        private const string LegacyFlatFileName = "im_data_core.fallback.json";
-        private const string LegacyRecoveryBackupSuffix = ".bak";
-        private const string LegacyRecoveryTemporarySuffix = ".tmp";
-
         private const string SaveFileName = "save.json";
         private const string AutoSaveFileName = "auto_save.json";
         private const string ManualSaveFileName = "manual_save.json";
@@ -48,7 +40,6 @@ namespace IMDataCore
         private const string StoryChapterFolderPrefix = "chapter_";
         private const int FirstStoryChapterIndex = 0;
         private const int LastStoryChapterIndex = 6;
-
         private const string DefaultSaveKey = "default";
         private const string TransientSaveKeyPrefix = "transient_";
         private const string SaveFileKeyPrefix = "file";
@@ -59,40 +50,38 @@ namespace IMDataCore
         private const int SavePathHashLength = 16;
         private const char SavePathSeparatorReplacement = '_';
 
-        private const string SaveModeStory = "story";
-        private const string SaveModeFreePlay = "freeplay";
-        private const string LegacyWorkshopItemIdentifier = "3680836490";
-        private const string IdolManagerSteamApplicationIdentifier = "821880";
-        private const string SteamAppsFolderName = "steamapps";
-        private const string WorkshopFolderName = "workshop";
-        private const string WorkshopContentFolderName = "content";
-        private const string DataCoreAssemblyFileName = "com.cosmo.imdatacore.dll";
-
         private static readonly object SaveScopeLock = new object();
         private static string activeSaveFilePathHint = string.Empty;
-        private static CoreSaveScope transientSaveScope = CreateTransientSaveScope();
+        private static CoreSaveScope transientSaveScope =
+            CreateTransientSaveScope();
 
         /// <summary>
         /// Returns the canonical vanilla data root for the running game.
         /// </summary>
         internal static string GetVanillaDataRootDirectory()
         {
-            return GetVanillaDataRootDirectory(Application.persistentDataPath);
+            return GetVanillaDataRootDirectory(
+                Application.persistentDataPath);
         }
 
         /// <summary>
         /// Pure overload used by path tests.
         /// </summary>
-        internal static string GetVanillaDataRootDirectory(string persistentDataRoot)
+        internal static string GetVanillaDataRootDirectory(
+            string persistentDataRoot)
         {
             string normalizedPersistentRoot;
-            if (!TryNormalizeDirectoryPath(persistentDataRoot, out normalizedPersistentRoot))
+            if (!TryNormalizeDirectoryPath(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot))
             {
                 return string.Empty;
             }
 
             return NormalizeDirectoryPathOrEmpty(
-                Path.Combine(normalizedPersistentRoot, GameDataRootFolderName));
+                Path.Combine(
+                    normalizedPersistentRoot,
+                    GameDataRootFolderName));
         }
 
         /// <summary>
@@ -107,16 +96,21 @@ namespace IMDataCore
         /// <summary>
         /// Pure overload used by path tests.
         /// </summary>
-        internal static string GetRootDirectory(string persistentDataRoot)
+        internal static string GetRootDirectory(
+            string persistentDataRoot)
         {
             string normalizedPersistentRoot;
-            if (!TryNormalizeDirectoryPath(persistentDataRoot, out normalizedPersistentRoot))
+            if (!TryNormalizeDirectoryPath(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot))
             {
                 return string.Empty;
             }
 
             return NormalizeDirectoryPathOrEmpty(
-                Path.Combine(normalizedPersistentRoot, DataCoreRootFolderName));
+                Path.Combine(
+                    normalizedPersistentRoot,
+                    DataCoreRootFolderName));
         }
 
         /// <summary>
@@ -263,6 +257,7 @@ namespace IMDataCore
             out string relativeSaveFilePath)
         {
             relativeSaveFilePath = string.Empty;
+
             CoreSaveScope saveScope;
             if (!TryCreateSaveScope(
                     persistentDataRoot,
@@ -321,6 +316,7 @@ namespace IMDataCore
             string candidatePath = Path.Combine(
                 dataRootDirectory,
                 normalizedRelativePath);
+
             if (!TryCreateSaveScope(
                     persistentDataRoot,
                     candidatePath,
@@ -406,7 +402,9 @@ namespace IMDataCore
                 string candidatePath = Path.IsPathRooted(saveFilePath)
                     ? saveFilePath
                     : Path.Combine(dataRootDirectory, saveFilePath);
-                normalizedSaveFilePath = Path.GetFullPath(candidatePath);
+
+                normalizedSaveFilePath =
+                    Path.GetFullPath(candidatePath);
             }
             catch
             {
@@ -420,8 +418,11 @@ namespace IMDataCore
                 return false;
             }
 
-            string relativeSaveFilePath = normalizedSaveFilePath.Substring(
-                BuildDirectoryPrefix(dataRootDirectory).Length);
+            string relativeSaveFilePath =
+                normalizedSaveFilePath.Substring(
+                    BuildDirectoryPrefix(
+                        dataRootDirectory).Length);
+
             string normalizedRelativePath;
             if (!TryNormalizeSupportedRelativeSavePath(
                     relativeSaveFilePath,
@@ -479,6 +480,7 @@ namespace IMDataCore
                 InternalSaveKey = internalSaveKey,
                 IsTransient = false
             };
+
             return true;
         }
 
@@ -486,10 +488,13 @@ namespace IMDataCore
         /// Stores an exact supported save-file hint. Invalid paths, including
         /// global_data.json, are ignored and can never replace the active scope.
         /// </summary>
-        internal static void SetActiveSaveFilePathHint(string saveFilePath)
+        internal static void SetActiveSaveFilePathHint(
+            string saveFilePath)
         {
             CoreSaveScope ignoredSaveScope;
-            TrySetActiveSaveFilePathHint(saveFilePath, out ignoredSaveScope);
+            TrySetActiveSaveFilePathHint(
+                saveFilePath,
+                out ignoredSaveScope);
         }
 
         /// <summary>
@@ -500,14 +505,17 @@ namespace IMDataCore
             out CoreSaveScope saveScope)
         {
             saveScope = null;
-            if (!TryCreateSaveScope(saveFilePath, out saveScope))
+            if (!TryCreateSaveScope(
+                    saveFilePath,
+                    out saveScope))
             {
                 return false;
             }
 
             lock (SaveScopeLock)
             {
-                activeSaveFilePathHint = saveScope.SaveFilePath;
+                activeSaveFilePathHint =
+                    saveScope.SaveFilePath;
             }
 
             return true;
@@ -517,7 +525,8 @@ namespace IMDataCore
         /// Selects a previously resolved ordinary or transient scope. A physical
         /// scope is resolved again instead of trusting mutable path fields.
         /// </summary>
-        internal static bool TryUseSaveScope(CoreSaveScope saveScope)
+        internal static bool TryUseSaveScope(
+            CoreSaveScope saveScope)
         {
             if (saveScope == null)
             {
@@ -526,21 +535,29 @@ namespace IMDataCore
 
             if (saveScope.IsTransient)
             {
-                CoreSaveScope retainedTransientScope = CloneScope(saveScope);
-                retainedTransientScope.SaveFilePath = string.Empty;
-                retainedTransientScope.RelativeSavePath = string.Empty;
-                retainedTransientScope.SidecarFilePath = string.Empty;
+                CoreSaveScope retainedTransientScope =
+                    CloneScope(saveScope);
+                retainedTransientScope.SaveFilePath =
+                    string.Empty;
+                retainedTransientScope.RelativeSavePath =
+                    string.Empty;
+                retainedTransientScope.SidecarFilePath =
+                    string.Empty;
                 retainedTransientScope.IsTransient = true;
-                if (string.IsNullOrEmpty(retainedTransientScope.InternalSaveKey))
+
+                if (string.IsNullOrEmpty(
+                        retainedTransientScope.InternalSaveKey))
                 {
                     retainedTransientScope.InternalSaveKey =
-                        TransientSaveKeyPrefix + Guid.NewGuid().ToString("N");
+                        TransientSaveKeyPrefix +
+                        Guid.NewGuid().ToString("N");
                 }
 
                 lock (SaveScopeLock)
                 {
                     activeSaveFilePathHint = string.Empty;
-                    transientSaveScope = retainedTransientScope;
+                    transientSaveScope =
+                        retainedTransientScope;
                 }
 
                 return true;
@@ -556,7 +573,8 @@ namespace IMDataCore
 
             lock (SaveScopeLock)
             {
-                activeSaveFilePathHint = resolvedSaveScope.SaveFilePath;
+                activeSaveFilePathHint =
+                    resolvedSaveScope.SaveFilePath;
             }
 
             return true;
@@ -565,7 +583,8 @@ namespace IMDataCore
         /// <summary>
         /// Compatibility wrapper for callers that do not need a result.
         /// </summary>
-        internal static void UseSaveScope(CoreSaveScope saveScope)
+        internal static void UseSaveScope(
+            CoreSaveScope saveScope)
         {
             TryUseSaveScope(saveScope);
         }
@@ -574,7 +593,8 @@ namespace IMDataCore
         /// Restores a captured scope after an aborted load without any filesystem
         /// operation.
         /// </summary>
-        internal static void RestoreSaveScope(CoreSaveScope saveScope)
+        internal static void RestoreSaveScope(
+            CoreSaveScope saveScope)
         {
             TryUseSaveScope(saveScope);
         }
@@ -583,10 +603,13 @@ namespace IMDataCore
         /// Returns true only for supported vanilla game-save shapes. Global settings
         /// and arbitrary JSON files can never own a sidecar.
         /// </summary>
-        internal static bool IsSupportedGameSavePath(string saveFilePath)
+        internal static bool IsSupportedGameSavePath(
+            string saveFilePath)
         {
             CoreSaveScope ignoredSaveScope;
-            return TryCreateSaveScope(saveFilePath, out ignoredSaveScope);
+            return TryCreateSaveScope(
+                saveFilePath,
+                out ignoredSaveScope);
         }
 
         /// <summary>
@@ -597,7 +620,8 @@ namespace IMDataCore
             lock (SaveScopeLock)
             {
                 activeSaveFilePathHint = string.Empty;
-                transientSaveScope = CreateTransientSaveScope();
+                transientSaveScope =
+                    CreateTransientSaveScope();
             }
         }
 
@@ -624,7 +648,9 @@ namespace IMDataCore
             if (!string.IsNullOrEmpty(saveFilePath))
             {
                 CoreSaveScope resolvedSaveScope;
-                if (TryCreateSaveScope(saveFilePath, out resolvedSaveScope))
+                if (TryCreateSaveScope(
+                        saveFilePath,
+                        out resolvedSaveScope))
                 {
                     return resolvedSaveScope;
                 }
@@ -645,7 +671,8 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Returns the exact historical file-scoped logical key.
+        /// Compatibility alias retained for internal callers that used the old name.
+        /// The value is the current file-scoped logical save key.
         /// </summary>
         internal static string GetLegacyFileScopedSaveKey()
         {
@@ -671,7 +698,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Pure-root overload used by tests and migration tooling.
+        /// Pure-root overload used by tests and tooling.
         /// </summary>
         internal static bool TryValidateContainedMutationPath(
             string persistentDataRoot,
@@ -682,9 +709,11 @@ namespace IMDataCore
         {
             normalizedPath = string.Empty;
             errorMessage = string.Empty;
+
             if (string.IsNullOrWhiteSpace(candidatePath))
             {
-                errorMessage = "The IM Data Core mutation path is empty.";
+                errorMessage =
+                    "The IM Data Core mutation path is empty.";
                 return false;
             }
 
@@ -697,14 +726,16 @@ namespace IMDataCore
                     out dataRootDirectory,
                     out dataCoreRootDirectory))
             {
-                errorMessage = "The IM Data Core and vanilla data roots are invalid.";
+                errorMessage =
+                    "The IM Data Core and vanilla data roots are invalid.";
                 return false;
             }
 
             string normalizedCandidate;
             try
             {
-                normalizedCandidate = Path.GetFullPath(candidatePath);
+                normalizedCandidate =
+                    Path.GetFullPath(candidatePath);
             }
             catch (Exception exception)
             {
@@ -721,7 +752,9 @@ namespace IMDataCore
                 return false;
             }
 
-            if (IsSameOrContainedPath(dataRootDirectory, normalizedCandidate))
+            if (IsSameOrContainedPath(
+                    dataRootDirectory,
+                    normalizedCandidate))
             {
                 errorMessage =
                     "Refused an IM Data Core mutation beneath the vanilla data root.";
@@ -753,7 +786,8 @@ namespace IMDataCore
         /// Creates the private IMDC root after validating it as the exact sibling of
         /// vanilla data.
         /// </summary>
-        internal static bool TryEnsureRootDirectory(out string errorMessage)
+        internal static bool TryEnsureRootDirectory(
+            out string errorMessage)
         {
             string ignoredRoot;
             return TryEnsureRootDirectory(
@@ -782,7 +816,8 @@ namespace IMDataCore
                     out dataRootDirectory,
                     out dataCoreRootDirectory))
             {
-                errorMessage = "The IM Data Core and vanilla data roots are invalid.";
+                errorMessage =
+                    "The IM Data Core and vanilla data roots are invalid.";
                 return false;
             }
 
@@ -796,7 +831,8 @@ namespace IMDataCore
 
             try
             {
-                Directory.CreateDirectory(dataCoreRootDirectory);
+                Directory.CreateDirectory(
+                    dataCoreRootDirectory);
             }
             catch (Exception exception)
             {
@@ -812,7 +848,8 @@ namespace IMDataCore
                 return false;
             }
 
-            normalizedRootDirectory = dataCoreRootDirectory;
+            normalizedRootDirectory =
+                dataCoreRootDirectory;
             return true;
         }
 
@@ -843,17 +880,22 @@ namespace IMDataCore
         {
             normalizedDirectoryPath = string.Empty;
             errorMessage = string.Empty;
+
             if (string.IsNullOrWhiteSpace(directoryPath))
             {
-                errorMessage = "The IM Data Core directory path is empty.";
+                errorMessage =
+                    "The IM Data Core directory path is empty.";
                 return false;
             }
 
-            string dataCoreRootDirectory = GetRootDirectory(persistentDataRoot);
+            string dataCoreRootDirectory =
+                GetRootDirectory(persistentDataRoot);
+
             string normalizedCandidate;
             try
             {
-                normalizedCandidate = Path.GetFullPath(directoryPath);
+                normalizedCandidate =
+                    Path.GetFullPath(directoryPath);
             }
             catch (Exception exception)
             {
@@ -893,7 +935,8 @@ namespace IMDataCore
 
             try
             {
-                Directory.CreateDirectory(normalizedDirectoryPath);
+                Directory.CreateDirectory(
+                    normalizedDirectoryPath);
             }
             catch (Exception exception)
             {
@@ -931,11 +974,14 @@ namespace IMDataCore
             out string errorMessage)
         {
             errorMessage = string.Empty;
+
             if (saveScope == null ||
                 saveScope.IsTransient ||
-                string.IsNullOrEmpty(saveScope.SidecarFilePath))
+                string.IsNullOrEmpty(
+                    saveScope.SidecarFilePath))
             {
-                errorMessage = "A physical IM Data Core save scope is required.";
+                errorMessage =
+                    "A physical IM Data Core save scope is required.";
                 return false;
             }
 
@@ -950,11 +996,13 @@ namespace IMDataCore
                 return false;
             }
 
-            string parentDirectory = Path.GetDirectoryName(
-                normalizedSidecarPath);
+            string parentDirectory =
+                Path.GetDirectoryName(
+                    normalizedSidecarPath);
             if (string.IsNullOrEmpty(parentDirectory))
             {
-                errorMessage = "The sidecar parent directory is unavailable.";
+                errorMessage =
+                    "The sidecar parent directory is unavailable.";
                 return false;
             }
 
@@ -1001,9 +1049,11 @@ namespace IMDataCore
 
             try
             {
-                if (Directory.Exists(normalizedFilePath))
+                if (Directory.Exists(
+                        normalizedFilePath))
                 {
-                    errorMessage = "Refused to delete a directory through the file API.";
+                    errorMessage =
+                        "Refused to delete a directory through the file API.";
                     return false;
                 }
 
@@ -1059,15 +1109,20 @@ namespace IMDataCore
 
             try
             {
-                if (File.Exists(normalizedDirectoryPath))
+                if (File.Exists(
+                        normalizedDirectoryPath))
                 {
-                    errorMessage = "Refused to delete a file through the directory API.";
+                    errorMessage =
+                        "Refused to delete a file through the directory API.";
                     return false;
                 }
 
-                if (Directory.Exists(normalizedDirectoryPath))
+                if (Directory.Exists(
+                        normalizedDirectoryPath))
                 {
-                    Directory.Delete(normalizedDirectoryPath, recursive);
+                    Directory.Delete(
+                        normalizedDirectoryPath,
+                        recursive);
                 }
 
                 return true;
@@ -1079,170 +1134,6 @@ namespace IMDataCore
             }
         }
 
-        /// <summary>
-        /// Returns plausible logical keys used by immutable legacy stores.
-        /// </summary>
-        internal static List<string> GetPlausibleLegacySaveKeys(
-            CoreSaveScope saveScope)
-        {
-            return GetPlausibleLegacySaveKeys(saveScope, null);
-        }
-
-        /// <summary>
-        /// Returns plausible logical keys using already-deserialized player data.
-        /// </summary>
-        internal static List<string> GetPlausibleLegacySaveKeys(
-            CoreSaveScope saveScope,
-            staticVars._playerData loadedPlayerData)
-        {
-            List<string> saveKeys = new List<string>();
-            if (saveScope != null)
-            {
-                AddUniqueToken(saveKeys, saveScope.InternalSaveKey);
-                if (!saveScope.IsTransient)
-                {
-                    AddUniqueToken(
-                        saveKeys,
-                        BuildLegacyOwnerSaveKey(saveScope));
-                }
-                else
-                {
-                    return saveKeys;
-                }
-            }
-
-            List<string> agencyKeys = GetLegacyAgencySaveKeys(
-                loadedPlayerData);
-            for (int index = 0; index < agencyKeys.Count; index++)
-            {
-                AddUniqueToken(saveKeys, agencyKeys[index]);
-            }
-
-            return saveKeys;
-        }
-
-        /// <summary>
-        /// Returns historical keyed directories as read-only migration candidates.
-        /// This method performs no filesystem mutation.
-        /// </summary>
-        internal static List<string> GetStorageSourceDirectories(string saveKey)
-        {
-            return GetStorageSourceDirectories(
-                Application.persistentDataPath,
-                saveKey,
-                true);
-        }
-
-        /// <summary>
-        /// Returns possible legacy fallback JSON files without opening or changing
-        /// any source. Historical non-JSON persistence formats are intentionally ignored.
-        /// </summary>
-        internal static List<string> GetLegacyStorageFileCandidates(
-            CoreSaveScope saveScope,
-            staticVars._playerData loadedPlayerData)
-        {
-            return GetLegacyStorageFileCandidates(
-                Application.persistentDataPath,
-                saveScope,
-                loadedPlayerData);
-        }
-
-        /// <summary>
-        /// Pure-root overload used by tests and the read-only importer.
-        /// </summary>
-        internal static List<string> GetLegacyStorageFileCandidates(
-            string persistentDataRoot,
-            CoreSaveScope saveScope,
-            staticVars._playerData loadedPlayerData)
-        {
-            List<string> candidates = new List<string>();
-            if (saveScope == null || saveScope.IsTransient)
-            {
-                return candidates;
-            }
-
-            string rootDirectory = GetRootDirectory(persistentDataRoot);
-            string legacyRelativeDirectory =
-                BuildLegacyStorageRelativeDirectory(
-                    saveScope.RelativeSavePath);
-            if (!string.IsNullOrEmpty(rootDirectory) &&
-                !string.IsNullOrEmpty(legacyRelativeDirectory))
-            {
-                AddLegacyJsonFilesFromDirectory(
-                    candidates,
-                    Path.Combine(
-                        rootDirectory,
-                        LegacySavesFolderName,
-                        legacyRelativeDirectory));
-                AddLegacyJsonFilesFromDirectory(
-                    candidates,
-                    Path.Combine(rootDirectory, legacyRelativeDirectory));
-            }
-
-            List<string> saveKeys = GetPlausibleLegacySaveKeys(
-                saveScope,
-                loadedPlayerData);
-            for (int keyIndex = 0; keyIndex < saveKeys.Count; keyIndex++)
-            {
-                List<string> sourceDirectories =
-                    GetStorageSourceDirectories(
-                        persistentDataRoot,
-                        saveKeys[keyIndex],
-                        true);
-                for (
-                    int directoryIndex = 0;
-                    directoryIndex < sourceDirectories.Count;
-                    directoryIndex++)
-                {
-                    AddLegacyJsonFilesFromDirectory(
-                        candidates,
-                        sourceDirectories[directoryIndex]);
-                }
-            }
-
-            return candidates;
-        }
-
-        /// <summary>
-        /// Filters legacy candidates to existing ordinary non-reparse files. Sources
-        /// remain immutable and are never moved or deleted.
-        /// </summary>
-        internal static List<string> GetExistingLegacyStorageFiles(
-            CoreSaveScope saveScope,
-            staticVars._playerData loadedPlayerData)
-        {
-            List<string> candidates = GetLegacyStorageFileCandidates(
-                saveScope,
-                loadedPlayerData);
-            List<string> existingFiles = new List<string>();
-            for (int index = 0; index < candidates.Count; index++)
-            {
-                string candidate = candidates[index];
-                try
-                {
-                    if (!File.Exists(candidate))
-                    {
-                        continue;
-                    }
-
-                    FileAttributes attributes = File.GetAttributes(candidate);
-                    if ((attributes & FileAttributes.Directory) != 0 ||
-                        (attributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        continue;
-                    }
-
-                    AddUniquePath(existingFiles, candidate);
-                }
-                catch
-                {
-                    // Legacy discovery is best-effort and read-only.
-                }
-            }
-
-            return existingFiles;
-        }
-
         private static bool TryResolveSeparatedRoots(
             string persistentDataRoot,
             out string normalizedPersistentRoot,
@@ -1252,6 +1143,7 @@ namespace IMDataCore
             normalizedPersistentRoot = string.Empty;
             dataRootDirectory = string.Empty;
             dataCoreRootDirectory = string.Empty;
+
             if (!TryNormalizeDirectoryPath(
                     persistentDataRoot,
                     out normalizedPersistentRoot))
@@ -1259,16 +1151,22 @@ namespace IMDataCore
                 return false;
             }
 
-            dataRootDirectory = NormalizeDirectoryPathOrEmpty(
-                Path.Combine(
-                    normalizedPersistentRoot,
-                    GameDataRootFolderName));
-            dataCoreRootDirectory = NormalizeDirectoryPathOrEmpty(
-                Path.Combine(
-                    normalizedPersistentRoot,
-                    DataCoreRootFolderName));
-            if (string.IsNullOrEmpty(dataRootDirectory) ||
-                string.IsNullOrEmpty(dataCoreRootDirectory) ||
+            dataRootDirectory =
+                NormalizeDirectoryPathOrEmpty(
+                    Path.Combine(
+                        normalizedPersistentRoot,
+                        GameDataRootFolderName));
+
+            dataCoreRootDirectory =
+                NormalizeDirectoryPathOrEmpty(
+                    Path.Combine(
+                        normalizedPersistentRoot,
+                        DataCoreRootFolderName));
+
+            if (string.IsNullOrEmpty(
+                    dataRootDirectory) ||
+                string.IsNullOrEmpty(
+                    dataCoreRootDirectory) ||
                 string.Equals(
                     dataRootDirectory,
                     dataCoreRootDirectory,
@@ -1291,54 +1189,72 @@ namespace IMDataCore
             out string normalizedRelativePath)
         {
             normalizedRelativePath = string.Empty;
-            if (string.IsNullOrWhiteSpace(relativeSaveFilePath) ||
-                Path.IsPathRooted(relativeSaveFilePath))
+
+            if (string.IsNullOrWhiteSpace(
+                    relativeSaveFilePath) ||
+                Path.IsPathRooted(
+                    relativeSaveFilePath))
             {
                 return false;
             }
 
-            string candidate = relativeSaveFilePath.Replace(
-                Path.AltDirectorySeparatorChar,
-                Path.DirectorySeparatorChar);
+            string candidate =
+                relativeSaveFilePath.Replace(
+                    Path.AltDirectorySeparatorChar,
+                    Path.DirectorySeparatorChar);
+
             candidate = candidate.TrimStart(
                 Path.DirectorySeparatorChar);
-            if (!AreRelativePathSegmentsSafe(candidate))
+
+            if (!AreRelativePathSegmentsSafe(
+                    candidate))
             {
                 return false;
             }
 
-            string[] pathSegments = SplitRelativePath(candidate);
-            if (!IsSupportedVanillaSaveSegments(pathSegments))
+            string[] pathSegments =
+                SplitRelativePath(candidate);
+
+            if (!IsSupportedVanillaSaveSegments(
+                    pathSegments))
             {
                 return false;
             }
 
-            normalizedRelativePath = string.Join(
-                Path.DirectorySeparatorChar.ToString(),
-                pathSegments);
+            normalizedRelativePath =
+                string.Join(
+                    Path.DirectorySeparatorChar
+                        .ToString(),
+                    pathSegments);
+
             return true;
         }
 
         private static bool IsSupportedVanillaSaveSegments(
             string[] pathSegments)
         {
-            if (pathSegments == null || pathSegments.Length == 0)
+            if (pathSegments == null ||
+                pathSegments.Length == 0)
             {
                 return false;
             }
 
-            string fileName = pathSegments[pathSegments.Length - 1];
+            string fileName =
+                pathSegments[
+                    pathSegments.Length - 1];
+
             if (string.Equals(
-                fileName,
-                GlobalDataFileName,
-                StringComparison.OrdinalIgnoreCase))
+                    fileName,
+                    GlobalDataFileName,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
             if (pathSegments.Length == 1)
             {
-                return IsDirectSaveFileName(fileName);
+                return IsDirectSaveFileName(
+                    fileName);
             }
 
             if (pathSegments.Length == 3 &&
@@ -1347,8 +1263,10 @@ namespace IMDataCore
                     ManualSavesFolderName,
                     StringComparison.OrdinalIgnoreCase))
             {
-                return IsOpaquePathSegment(pathSegments[1]) &&
-                    IsSaveJsonFileName(fileName);
+                return IsOpaquePathSegment(
+                        pathSegments[1]) &&
+                    IsSaveJsonFileName(
+                        fileName);
             }
 
             if (!string.Equals(
@@ -1356,14 +1274,16 @@ namespace IMDataCore
                     StoryModeFolderName,
                     StringComparison.OrdinalIgnoreCase) ||
                 pathSegments.Length < 3 ||
-                !IsOpaquePathSegment(pathSegments[1]))
+                !IsOpaquePathSegment(
+                    pathSegments[1]))
             {
                 return false;
             }
 
             if (pathSegments.Length == 3)
             {
-                return IsDirectSaveFileName(fileName);
+                return IsDirectSaveFileName(
+                    fileName);
             }
 
             if (pathSegments.Length == 5 &&
@@ -1372,20 +1292,25 @@ namespace IMDataCore
                     ManualSavesFolderName,
                     StringComparison.OrdinalIgnoreCase))
             {
-                return IsOpaquePathSegment(pathSegments[3]) &&
-                    IsSaveJsonFileName(fileName);
+                return IsOpaquePathSegment(
+                        pathSegments[3]) &&
+                    IsSaveJsonFileName(
+                        fileName);
             }
 
             if (pathSegments.Length == 4 &&
-                IsStoryChapterFolderName(pathSegments[2]))
+                IsStoryChapterFolderName(
+                    pathSegments[2]))
             {
-                return IsSaveJsonFileName(fileName);
+                return IsSaveJsonFileName(
+                    fileName);
             }
 
             return false;
         }
 
-        private static bool IsDirectSaveFileName(string fileName)
+        private static bool IsDirectSaveFileName(
+            string fileName)
         {
             return string.Equals(
                     fileName,
@@ -1397,7 +1322,8 @@ namespace IMDataCore
                     StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsSaveJsonFileName(string fileName)
+        private static bool IsSaveJsonFileName(
+            string fileName)
         {
             return string.Equals(
                 fileName,
@@ -1405,7 +1331,8 @@ namespace IMDataCore
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsStoryChapterFolderName(string folderName)
+        private static bool IsStoryChapterFolderName(
+            string folderName)
         {
             if (string.IsNullOrEmpty(folderName) ||
                 !folderName.StartsWith(
@@ -1422,26 +1349,38 @@ namespace IMDataCore
                     NumberStyles.None,
                     CultureInfo.InvariantCulture,
                     out chapterIndex) &&
-                chapterIndex >= FirstStoryChapterIndex &&
-                chapterIndex <= LastStoryChapterIndex;
+                chapterIndex >=
+                    FirstStoryChapterIndex &&
+                chapterIndex <=
+                    LastStoryChapterIndex;
         }
 
-        private static bool IsOpaquePathSegment(string segment)
+        private static bool IsOpaquePathSegment(
+            string segment)
         {
             return !string.IsNullOrWhiteSpace(segment) &&
-                !string.Equals(segment, ".", StringComparison.Ordinal) &&
-                !string.Equals(segment, "..", StringComparison.Ordinal);
+                !string.Equals(
+                    segment,
+                    ".",
+                    StringComparison.Ordinal) &&
+                !string.Equals(
+                    segment,
+                    "..",
+                    StringComparison.Ordinal);
         }
 
-        private static bool AreRelativePathSegmentsSafe(string relativePath)
+        private static bool AreRelativePathSegmentsSafe(
+            string relativePath)
         {
-            if (string.IsNullOrWhiteSpace(relativePath) ||
+            if (string.IsNullOrWhiteSpace(
+                    relativePath) ||
                 Path.IsPathRooted(relativePath))
             {
                 return false;
             }
 
-            string[] segments = SplitRelativePath(relativePath);
+            string[] segments =
+                SplitRelativePath(relativePath);
             if (segments.Length == 0)
             {
                 return false;
@@ -1449,13 +1388,23 @@ namespace IMDataCore
 
             char[] invalidFileNameCharacters =
                 Path.GetInvalidFileNameChars();
-            for (int index = 0; index < segments.Length; index++)
+
+            for (int index = 0;
+                index < segments.Length;
+                index++)
             {
                 string segment = segments[index];
                 if (string.IsNullOrEmpty(segment) ||
-                    string.Equals(segment, ".", StringComparison.Ordinal) ||
-                    string.Equals(segment, "..", StringComparison.Ordinal) ||
-                    segment.IndexOfAny(invalidFileNameCharacters) >= 0)
+                    string.Equals(
+                        segment,
+                        ".",
+                        StringComparison.Ordinal) ||
+                    string.Equals(
+                        segment,
+                        "..",
+                        StringComparison.Ordinal) ||
+                    segment.IndexOfAny(
+                        invalidFileNameCharacters) >= 0)
                 {
                     return false;
                 }
@@ -1464,7 +1413,8 @@ namespace IMDataCore
             return true;
         }
 
-        private static string[] SplitRelativePath(string relativePath)
+        private static string[] SplitRelativePath(
+            string relativePath)
         {
             return relativePath.Split(
                 new char[]
@@ -1481,19 +1431,22 @@ namespace IMDataCore
             out string errorMessage)
         {
             errorMessage = string.Empty;
+
             string normalizedRoot;
             string normalizedCandidate;
             if (!TryNormalizeDirectoryPath(
                     rootDirectory,
                     out normalizedRoot))
             {
-                errorMessage = "The containment root is invalid.";
+                errorMessage =
+                    "The containment root is invalid.";
                 return false;
             }
 
             try
             {
-                normalizedCandidate = Path.GetFullPath(candidatePath);
+                normalizedCandidate =
+                    Path.GetFullPath(candidatePath);
             }
             catch (Exception exception)
             {
@@ -1505,12 +1458,16 @@ namespace IMDataCore
                     normalizedRoot,
                     normalizedCandidate))
             {
-                errorMessage = "The path is outside its containment root.";
+                errorMessage =
+                    "The path is outside its containment root.";
                 return false;
             }
 
-            string currentPath = normalizedCandidate;
-            while (!string.IsNullOrEmpty(currentPath))
+            string currentPath =
+                normalizedCandidate;
+
+            while (!string.IsNullOrEmpty(
+                currentPath))
             {
                 try
                 {
@@ -1518,8 +1475,11 @@ namespace IMDataCore
                         Directory.Exists(currentPath))
                     {
                         FileAttributes attributes =
-                            File.GetAttributes(currentPath);
-                        if ((attributes & FileAttributes.ReparsePoint) != 0)
+                            File.GetAttributes(
+                                currentPath);
+
+                        if ((attributes &
+                                FileAttributes.ReparsePoint) != 0)
                         {
                             errorMessage =
                                 "Refused a path through a reparse point: " +
@@ -1530,35 +1490,45 @@ namespace IMDataCore
                 }
                 catch (Exception exception)
                 {
-                    errorMessage = exception.Message;
+                    errorMessage =
+                        exception.Message;
                     return false;
                 }
 
                 if (string.Equals(
-                        TrimTrailingDirectorySeparators(currentPath),
+                        TrimTrailingDirectorySeparators(
+                            currentPath),
                         normalizedRoot,
                         StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
 
-                string parentPath = Path.GetDirectoryName(currentPath);
+                string parentPath =
+                    Path.GetDirectoryName(
+                        currentPath);
+
                 if (string.IsNullOrEmpty(parentPath) ||
                     string.Equals(
                         parentPath,
                         currentPath,
                         StringComparison.OrdinalIgnoreCase) ||
-                    !IsSameOrContainedPath(normalizedRoot, parentPath))
+                    !IsSameOrContainedPath(
+                        normalizedRoot,
+                        parentPath))
                 {
                     errorMessage =
                         "The path chain escaped its containment root.";
                     return false;
                 }
 
-                currentPath = TrimTrailingDirectorySeparators(parentPath);
+                currentPath =
+                    TrimTrailingDirectorySeparators(
+                        parentPath);
             }
 
-            errorMessage = "The containment root was not reached.";
+            errorMessage =
+                "The containment root was not reached.";
             return false;
         }
 
@@ -1567,16 +1537,26 @@ namespace IMDataCore
             out string errorMessage)
         {
             errorMessage = string.Empty;
+
             try
             {
-                Stack<string> pendingDirectories = new Stack<string>();
-                pendingDirectories.Push(rootDirectory);
+                Stack<string> pendingDirectories =
+                    new Stack<string>();
+
+                pendingDirectories.Push(
+                    rootDirectory);
+
                 while (pendingDirectories.Count > 0)
                 {
-                    string directoryPath = pendingDirectories.Pop();
+                    string directoryPath =
+                        pendingDirectories.Pop();
+
                     FileAttributes directoryAttributes =
-                        File.GetAttributes(directoryPath);
-                    if ((directoryAttributes & FileAttributes.ReparsePoint) != 0)
+                        File.GetAttributes(
+                            directoryPath);
+
+                    if ((directoryAttributes &
+                            FileAttributes.ReparsePoint) != 0)
                     {
                         errorMessage =
                             "Refused recursive access through a reparse point: " +
@@ -1585,13 +1565,22 @@ namespace IMDataCore
                     }
 
                     string[] entries =
-                        Directory.GetFileSystemEntries(directoryPath);
-                    for (int index = 0; index < entries.Length; index++)
+                        Directory.GetFileSystemEntries(
+                            directoryPath);
+
+                    for (int index = 0;
+                        index < entries.Length;
+                        index++)
                     {
-                        string entryPath = entries[index];
+                        string entryPath =
+                            entries[index];
+
                         FileAttributes entryAttributes =
-                            File.GetAttributes(entryPath);
-                        if ((entryAttributes & FileAttributes.ReparsePoint) != 0)
+                            File.GetAttributes(
+                                entryPath);
+
+                        if ((entryAttributes &
+                                FileAttributes.ReparsePoint) != 0)
                         {
                             errorMessage =
                                 "Refused recursive access through a reparse point: " +
@@ -1599,9 +1588,11 @@ namespace IMDataCore
                             return false;
                         }
 
-                        if ((entryAttributes & FileAttributes.Directory) != 0)
+                        if ((entryAttributes &
+                                FileAttributes.Directory) != 0)
                         {
-                            pendingDirectories.Push(entryPath);
+                            pendingDirectories.Push(
+                                entryPath);
                         }
                     }
                 }
@@ -1610,7 +1601,8 @@ namespace IMDataCore
             }
             catch (Exception exception)
             {
-                errorMessage = exception.Message;
+                errorMessage =
+                    exception.Message;
                 return false;
             }
         }
@@ -1619,16 +1611,23 @@ namespace IMDataCore
             string rootDirectory,
             string candidatePath)
         {
-            string normalizedRoot = TrimTrailingDirectorySeparators(
-                Path.GetFullPath(rootDirectory));
-            string normalizedCandidate = TrimTrailingDirectorySeparators(
-                Path.GetFullPath(candidatePath));
+            string normalizedRoot =
+                TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(
+                        rootDirectory));
+
+            string normalizedCandidate =
+                TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(
+                        candidatePath));
+
             return string.Equals(
                     normalizedRoot,
                     normalizedCandidate,
                     StringComparison.OrdinalIgnoreCase) ||
                 normalizedCandidate.StartsWith(
-                    BuildDirectoryPrefix(normalizedRoot),
+                    BuildDirectoryPrefix(
+                        normalizedRoot),
                     StringComparison.OrdinalIgnoreCase);
         }
 
@@ -1638,12 +1637,19 @@ namespace IMDataCore
         {
             try
             {
-                string normalizedRoot = TrimTrailingDirectorySeparators(
-                    Path.GetFullPath(rootDirectory));
-                string normalizedCandidate = TrimTrailingDirectorySeparators(
-                    Path.GetFullPath(candidatePath));
+                string normalizedRoot =
+                    TrimTrailingDirectorySeparators(
+                        Path.GetFullPath(
+                            rootDirectory));
+
+                string normalizedCandidate =
+                    TrimTrailingDirectorySeparators(
+                        Path.GetFullPath(
+                            candidatePath));
+
                 return normalizedCandidate.StartsWith(
-                    BuildDirectoryPrefix(normalizedRoot),
+                    BuildDirectoryPrefix(
+                        normalizedRoot),
                     StringComparison.OrdinalIgnoreCase);
             }
             catch
@@ -1652,32 +1658,44 @@ namespace IMDataCore
             }
         }
 
-        private static string BuildDirectoryPrefix(string directoryPath)
+        private static string BuildDirectoryPrefix(
+            string directoryPath)
         {
-            string trimmedPath = TrimTrailingDirectorySeparators(
-                directoryPath);
-            return trimmedPath + Path.DirectorySeparatorChar;
+            string trimmedPath =
+                TrimTrailingDirectorySeparators(
+                    directoryPath);
+
+            return trimmedPath +
+                Path.DirectorySeparatorChar;
         }
 
         private static bool TryNormalizeDirectoryPath(
             string directoryPath,
             out string normalizedDirectoryPath)
         {
-            normalizedDirectoryPath = string.Empty;
-            if (string.IsNullOrWhiteSpace(directoryPath))
+            normalizedDirectoryPath =
+                string.Empty;
+
+            if (string.IsNullOrWhiteSpace(
+                    directoryPath))
             {
                 return false;
             }
 
             try
             {
-                normalizedDirectoryPath = TrimTrailingDirectorySeparators(
-                    Path.GetFullPath(directoryPath));
-                return !string.IsNullOrEmpty(normalizedDirectoryPath);
+                normalizedDirectoryPath =
+                    TrimTrailingDirectorySeparators(
+                        Path.GetFullPath(
+                            directoryPath));
+
+                return !string.IsNullOrEmpty(
+                    normalizedDirectoryPath);
             }
             catch
             {
-                normalizedDirectoryPath = string.Empty;
+                normalizedDirectoryPath =
+                    string.Empty;
                 return false;
             }
         }
@@ -1686,6 +1704,7 @@ namespace IMDataCore
             string directoryPath)
         {
             string normalizedDirectoryPath;
+
             return TryNormalizeDirectoryPath(
                     directoryPath,
                     out normalizedDirectoryPath)
@@ -1693,21 +1712,31 @@ namespace IMDataCore
                 : string.Empty;
         }
 
-        private static string TrimTrailingDirectorySeparators(string path)
+        private static string TrimTrailingDirectorySeparators(
+            string path)
         {
             if (string.IsNullOrEmpty(path))
             {
                 return string.Empty;
             }
 
-            string pathRoot = Path.GetPathRoot(path) ?? string.Empty;
-            int minimumLength = pathRoot.Length;
+            string pathRoot =
+                Path.GetPathRoot(path) ??
+                string.Empty;
+
+            int minimumLength =
+                pathRoot.Length;
+
             int endIndex = path.Length;
             while (endIndex > minimumLength)
             {
-                char character = path[endIndex - 1];
-                if (character != Path.DirectorySeparatorChar &&
-                    character != Path.AltDirectorySeparatorChar)
+                char character =
+                    path[endIndex - 1];
+
+                if (character !=
+                        Path.DirectorySeparatorChar &&
+                    character !=
+                        Path.AltDirectorySeparatorChar)
                 {
                     break;
                 }
@@ -1717,7 +1746,9 @@ namespace IMDataCore
 
             return endIndex == path.Length
                 ? path
-                : path.Substring(0, endIndex);
+                : path.Substring(
+                    0,
+                    endIndex);
         }
 
         private static CoreSaveScope CreateTransientSaveScope()
@@ -1728,12 +1759,14 @@ namespace IMDataCore
                 RelativeSavePath = string.Empty,
                 SidecarFilePath = string.Empty,
                 InternalSaveKey =
-                    TransientSaveKeyPrefix + Guid.NewGuid().ToString("N"),
+                    TransientSaveKeyPrefix +
+                    Guid.NewGuid().ToString("N"),
                 IsTransient = true
             };
         }
 
-        private static CoreSaveScope CloneScope(CoreSaveScope source)
+        private static CoreSaveScope CloneScope(
+            CoreSaveScope source)
         {
             if (source == null)
             {
@@ -1742,12 +1775,20 @@ namespace IMDataCore
 
             return new CoreSaveScope
             {
-                SaveFilePath = source.SaveFilePath ?? string.Empty,
+                SaveFilePath =
+                    source.SaveFilePath ??
+                    string.Empty,
                 RelativeSavePath =
-                    source.RelativeSavePath ?? string.Empty,
-                SidecarFilePath = source.SidecarFilePath ?? string.Empty,
-                InternalSaveKey = source.InternalSaveKey ?? DefaultSaveKey,
-                IsTransient = source.IsTransient
+                    source.RelativeSavePath ??
+                    string.Empty,
+                SidecarFilePath =
+                    source.SidecarFilePath ??
+                    string.Empty,
+                InternalSaveKey =
+                    source.InternalSaveKey ??
+                    DefaultSaveKey,
+                IsTransient =
+                    source.IsTransient
             };
         }
 
@@ -1755,73 +1796,112 @@ namespace IMDataCore
             string normalizedPersistentRoot,
             string normalizedSaveFilePath)
         {
-            if (string.IsNullOrEmpty(normalizedPersistentRoot) ||
-                string.IsNullOrEmpty(normalizedSaveFilePath))
+            if (string.IsNullOrEmpty(
+                    normalizedPersistentRoot) ||
+                string.IsNullOrEmpty(
+                    normalizedSaveFilePath))
             {
                 return string.Empty;
             }
 
             string normalizedLowerPath =
-                normalizedSaveFilePath.ToLowerInvariant();
-            string dataRootDirectory = NormalizeDirectoryPathOrEmpty(
-                Path.Combine(
-                    normalizedPersistentRoot,
-                    GameDataRootFolderName));
-            string relativePath = normalizedLowerPath;
-            if (!string.IsNullOrEmpty(dataRootDirectory))
+                normalizedSaveFilePath
+                    .ToLowerInvariant();
+
+            string dataRootDirectory =
+                NormalizeDirectoryPathOrEmpty(
+                    Path.Combine(
+                        normalizedPersistentRoot,
+                        GameDataRootFolderName));
+
+            string relativePath =
+                normalizedLowerPath;
+
+            if (!string.IsNullOrEmpty(
+                    dataRootDirectory))
             {
                 string lowerDataRoot =
-                    dataRootDirectory.ToLowerInvariant();
-                string dataRootPrefix = BuildDirectoryPrefix(lowerDataRoot);
+                    dataRootDirectory
+                        .ToLowerInvariant();
+
+                string dataRootPrefix =
+                    BuildDirectoryPrefix(
+                        lowerDataRoot);
+
                 if (normalizedLowerPath.StartsWith(
-                    dataRootPrefix,
-                    StringComparison.OrdinalIgnoreCase))
+                        dataRootPrefix,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    relativePath = normalizedLowerPath.Substring(
-                        dataRootPrefix.Length);
+                    relativePath =
+                        normalizedLowerPath.Substring(
+                            dataRootPrefix.Length);
                 }
             }
 
-            string pathTokenSource = relativePath
-                .Replace(
-                    Path.DirectorySeparatorChar,
-                    SavePathSeparatorReplacement)
-                .Replace(
-                    Path.AltDirectorySeparatorChar,
-                    SavePathSeparatorReplacement);
-            string pathToken = SanitizeToken(
-                pathTokenSource,
-                SavePathTokenLength);
-            string pathHashToken = SanitizeToken(
-                ComputeStablePathHash(normalizedLowerPath),
-                SaveTokenMaximumLength);
-            string joinedToken = string.Join(
-                SaveKeyJoinSeparator,
-                new string[]
-                {
-                    SaveFileKeyPrefix,
-                    pathToken,
-                    pathHashToken
-                });
-            return SanitizeToken(joinedToken, SaveKeyMaximumLength);
+            string pathTokenSource =
+                relativePath
+                    .Replace(
+                        Path.DirectorySeparatorChar,
+                        SavePathSeparatorReplacement)
+                    .Replace(
+                        Path.AltDirectorySeparatorChar,
+                        SavePathSeparatorReplacement);
+
+            string pathToken =
+                SanitizeToken(
+                    pathTokenSource,
+                    SavePathTokenLength);
+
+            string pathHashToken =
+                SanitizeToken(
+                    ComputeStablePathHash(
+                        normalizedLowerPath),
+                    SaveTokenMaximumLength);
+
+            string joinedToken =
+                string.Join(
+                    SaveKeyJoinSeparator,
+                    new string[]
+                    {
+                        SaveFileKeyPrefix,
+                        pathToken,
+                        pathHashToken
+                    });
+
+            return SanitizeToken(
+                joinedToken,
+                SaveKeyMaximumLength);
         }
 
-        private static string ComputeStablePathHash(string normalizedPath)
+        private static string ComputeStablePathHash(
+            string normalizedPath)
         {
-            if (string.IsNullOrEmpty(normalizedPath))
+            if (string.IsNullOrEmpty(
+                    normalizedPath))
             {
                 return string.Empty;
             }
 
             try
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(normalizedPath);
-                using (SHA256 hash = SHA256.Create())
+                byte[] bytes =
+                    Encoding.UTF8.GetBytes(
+                        normalizedPath);
+
+                using (SHA256 hash =
+                    SHA256.Create())
                 {
-                    byte[] hashBytes = hash.ComputeHash(bytes);
-                    StringBuilder builder = new StringBuilder(
-                        hashBytes.Length * 2);
-                    for (int index = 0; index < hashBytes.Length; index++)
+                    byte[] hashBytes =
+                        hash.ComputeHash(
+                            bytes);
+
+                    StringBuilder builder =
+                        new StringBuilder(
+                            hashBytes.Length * 2);
+
+                    for (int index = 0;
+                        index < hashBytes.Length;
+                        index++)
                     {
                         builder.Append(
                             hashBytes[index].ToString(
@@ -1829,10 +1909,15 @@ namespace IMDataCore
                                 CultureInfo.InvariantCulture));
                     }
 
-                    string hashHex = builder.ToString();
-                    return hashHex.Length <= SavePathHashLength
+                    string hashHex =
+                        builder.ToString();
+
+                    return hashHex.Length <=
+                            SavePathHashLength
                         ? hashHex
-                        : hashHex.Substring(0, SavePathHashLength);
+                        : hashHex.Substring(
+                            0,
+                            SavePathHashLength);
                 }
             }
             catch
@@ -1845,414 +1930,62 @@ namespace IMDataCore
             string rawValue,
             int maximumLength)
         {
-            if (string.IsNullOrEmpty(rawValue) || maximumLength <= 0)
+            if (string.IsNullOrEmpty(
+                    rawValue) ||
+                maximumLength <= 0)
             {
                 return string.Empty;
             }
 
-            int expectedLength = Math.Min(rawValue.Length, maximumLength);
-            char[] output = new char[expectedLength];
+            int expectedLength =
+                Math.Min(
+                    rawValue.Length,
+                    maximumLength);
+
+            char[] output =
+                new char[expectedLength];
+
             int outputLength = 0;
-            for (
-                int index = 0;
-                index < rawValue.Length && outputLength < maximumLength;
+
+            for (int index = 0;
+                index < rawValue.Length &&
+                outputLength < maximumLength;
                 index++)
             {
-                char character = rawValue[index];
+                char character =
+                    rawValue[index];
+
                 bool isAsciiLetter =
-                    (character >= 'a' && character <= 'z') ||
-                    (character >= 'A' && character <= 'Z');
-                bool isDigit = character >= '0' && character <= '9';
+                    (character >= 'a' &&
+                        character <= 'z') ||
+                    (character >= 'A' &&
+                        character <= 'Z');
+
+                bool isDigit =
+                    character >= '0' &&
+                    character <= '9';
+
                 bool isPunctuation =
                     character == '_' ||
                     character == '-' ||
                     character == '.';
-                if (isAsciiLetter || isDigit || isPunctuation)
+
+                if (isAsciiLetter ||
+                    isDigit ||
+                    isPunctuation)
                 {
-                    output[outputLength] = character;
+                    output[outputLength] =
+                        character;
                     outputLength++;
                 }
             }
 
             return outputLength == 0
                 ? string.Empty
-                : new string(output, 0, outputLength);
-        }
-
-        private static string BuildLegacyOwnerSaveKey(
-            CoreSaveScope saveScope)
-        {
-            if (saveScope == null || saveScope.IsTransient)
-            {
-                return string.Empty;
-            }
-
-            string ownerDirectory = Path.GetDirectoryName(
-                saveScope.SaveFilePath);
-            string ownerName = string.IsNullOrEmpty(ownerDirectory)
-                ? string.Empty
-                : Path.GetFileName(
-                    TrimTrailingDirectorySeparators(ownerDirectory));
-            if (saveScope.RelativeSavePath.IndexOf(
-                    Path.DirectorySeparatorChar) < 0)
-            {
-                ownerName = Path.GetFileNameWithoutExtension(
-                    saveScope.SaveFilePath);
-            }
-
-            return SanitizeToken(ownerName, SaveKeyMaximumLength);
-        }
-
-        private static List<string> GetLegacyAgencySaveKeys(
-            staticVars._playerData loadedPlayerData)
-        {
-            List<string> saveKeys = new List<string>();
-            try
-            {
-                staticVars._playerData playerData =
-                    loadedPlayerData ?? staticVars.PlayerData;
-                if (playerData == null)
-                {
-                    return saveKeys;
-                }
-
-                AddUniqueToken(
-                    saveKeys,
-                    SanitizeToken(
-                        playerData.SaveFolderName,
-                        SaveTokenMaximumLength));
-
-                string identityKeySource = string.Join(
-                    SaveKeyJoinSeparator,
-                    new string[]
-                    {
-                        playerData.IsStoryMode
-                            ? SaveModeStory
-                            : SaveModeFreePlay,
-                        playerData.FirstName ?? string.Empty,
-                        playerData.LastName ?? string.Empty,
-                        playerData.GroupName ?? string.Empty,
-                        playerData.Chapter.ToString()
-                    });
-                AddUniqueToken(
-                    saveKeys,
-                    SanitizeToken(
-                        identityKeySource,
-                        SaveKeyMaximumLength));
-            }
-            catch
-            {
-                // Legacy migration discovery is best-effort and read-only.
-            }
-
-            return saveKeys;
-        }
-
-        private static List<string> GetStorageSourceDirectories(
-            string persistentDataRoot,
-            string saveKey,
-            bool includeInstallLocations)
-        {
-            List<string> directories = new List<string>();
-            string normalizedSaveKey = SanitizeToken(
-                saveKey,
-                SaveKeyMaximumLength);
-            if (string.IsNullOrEmpty(normalizedSaveKey))
-            {
-                return directories;
-            }
-
-            string rootDirectory = GetRootDirectory(persistentDataRoot);
-            AddLegacyKeyedDirectories(
-                directories,
-                rootDirectory,
-                normalizedSaveKey);
-
-            string normalizedPersistentRoot;
-            if (TryNormalizeDirectoryPath(
-                    persistentDataRoot,
-                    out normalizedPersistentRoot))
-            {
-                string localModsDirectory = Path.Combine(
-                    normalizedPersistentRoot,
-                    LegacyModsFolderName);
-                AddLegacyKeyedDirectories(
-                    directories,
-                    Path.Combine(
-                        localModsDirectory,
-                        DataCoreRootFolderName),
-                    normalizedSaveKey);
-                AddLegacyKeyedDirectories(
-                    directories,
-                    Path.Combine(
-                        localModsDirectory,
-                        LegacyDisplayModFolderName),
-                    normalizedSaveKey);
-            }
-
-            if (!includeInstallLocations)
-            {
-                return directories;
-            }
-
-            try
-            {
-                string assemblyDirectory = Path.GetDirectoryName(
-                    Assembly.GetExecutingAssembly().Location);
-                AddLegacyKeyedDirectories(
-                    directories,
-                    assemblyDirectory,
-                    normalizedSaveKey);
-            }
-            catch
-            {
-                // Assembly-location probing is read-only and best-effort.
-            }
-
-            AddLoadedModInstallDirectories(
-                directories,
-                normalizedSaveKey);
-            AddKnownWorkshopInstallDirectory(
-                directories,
-                normalizedSaveKey);
-            return directories;
-        }
-
-        private static string BuildLegacyStorageRelativeDirectory(
-            string relativeSaveFilePath)
-        {
-            string normalizedRelativePath;
-            if (!TryNormalizeSupportedRelativeSavePath(
-                    relativeSaveFilePath,
-                    out normalizedRelativePath))
-            {
-                return string.Empty;
-            }
-
-            string fileName = Path.GetFileName(normalizedRelativePath);
-            string ownerDirectory = Path.GetDirectoryName(
-                normalizedRelativePath) ?? string.Empty;
-            if (string.Equals(
-                    fileName,
-                    SaveFileName,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return ownerDirectory;
-            }
-
-            string fileStem = Path.GetFileNameWithoutExtension(fileName);
-            return string.IsNullOrEmpty(ownerDirectory)
-                ? fileStem
-                : Path.Combine(ownerDirectory, fileStem);
-        }
-
-        private static void AddLegacyJsonFilesFromDirectory(
-            List<string> candidates,
-            string directoryPath)
-        {
-            if (string.IsNullOrEmpty(directoryPath))
-            {
-                return;
-            }
-
-            AddUniquePath(
-                candidates,
-                Path.Combine(directoryPath, LegacyFlatFileName));
-            AddUniquePath(
-                candidates,
-                Path.Combine(
-                    directoryPath,
-                    LegacyFlatFileName + LegacyRecoveryBackupSuffix));
-            AddUniquePath(
-                candidates,
-                Path.Combine(
-                    directoryPath,
-                    LegacyFlatFileName + LegacyRecoveryTemporarySuffix));
-        }
-
-        private static void AddLegacyKeyedDirectories(
-            List<string> directories,
-            string installRootDirectory,
-            string saveKey)
-        {
-            if (string.IsNullOrEmpty(installRootDirectory) ||
-                string.IsNullOrEmpty(saveKey))
-            {
-                return;
-            }
-
-            AddUniquePath(
-                directories,
-                Path.Combine(
-                    installRootDirectory,
-                    LegacySavesFolderName,
-                    saveKey));
-            AddUniquePath(
-                directories,
-                Path.Combine(installRootDirectory, saveKey));
-        }
-
-        private static void AddLoadedModInstallDirectories(
-            List<string> directories,
-            string saveKey)
-        {
-            try
-            {
-                if (Mods._Mods == null)
-                {
-                    return;
-                }
-
-                for (int index = 0; index < Mods._Mods.Count; index++)
-                {
-                    Mods._mod loadedMod = Mods._Mods[index];
-                    if (!IsMatchingDataCoreMod(loadedMod))
-                    {
-                        continue;
-                    }
-
-                    AddLegacyKeyedDirectories(
-                        directories,
-                        loadedMod.Path,
-                        saveKey);
-                }
-            }
-            catch
-            {
-                // Loaded-mod discovery is read-only and best-effort.
-            }
-        }
-
-        private static bool IsMatchingDataCoreMod(Mods._mod loadedMod)
-        {
-            if (loadedMod == null || string.IsNullOrEmpty(loadedMod.Path))
-            {
-                return false;
-            }
-
-            if (string.Equals(
-                    loadedMod.ModName,
-                    DataCoreRootFolderName,
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    loadedMod.ModName,
-                    LegacyDisplayModFolderName,
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    loadedMod.Title,
-                    LegacyDisplayModFolderName,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            try
-            {
-                return File.Exists(
-                    Path.Combine(
-                        loadedMod.Path,
-                        DataCoreAssemblyFileName));
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static void AddKnownWorkshopInstallDirectory(
-            List<string> directories,
-            string saveKey)
-        {
-            try
-            {
-                DirectoryInfo currentDirectory = new DirectoryInfo(
-                    Application.dataPath);
-                while (currentDirectory != null &&
-                    !string.Equals(
-                        currentDirectory.Name,
-                        SteamAppsFolderName,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    currentDirectory = currentDirectory.Parent;
-                }
-
-                if (currentDirectory == null)
-                {
-                    return;
-                }
-
-                string workshopInstallDirectory = Path.Combine(
-                    currentDirectory.FullName,
-                    WorkshopFolderName,
-                    WorkshopContentFolderName,
-                    IdolManagerSteamApplicationIdentifier,
-                    LegacyWorkshopItemIdentifier);
-                AddLegacyKeyedDirectories(
-                    directories,
-                    workshopInstallDirectory,
-                    saveKey);
-            }
-            catch
-            {
-                // Known-install discovery is read-only and best-effort.
-            }
-        }
-
-        private static void AddUniqueToken(
-            List<string> tokens,
-            string rawToken)
-        {
-            string token = SanitizeToken(rawToken, SaveKeyMaximumLength);
-            if (string.IsNullOrEmpty(token))
-            {
-                return;
-            }
-
-            for (int index = 0; index < tokens.Count; index++)
-            {
-                if (string.Equals(
-                    tokens[index],
-                    token,
-                    StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-
-            tokens.Add(token);
-        }
-
-        private static void AddUniquePath(
-            List<string> paths,
-            string candidatePath)
-        {
-            if (string.IsNullOrEmpty(candidatePath))
-            {
-                return;
-            }
-
-            string normalizedPath;
-            try
-            {
-                normalizedPath = Path.GetFullPath(candidatePath);
-            }
-            catch
-            {
-                return;
-            }
-
-            for (int index = 0; index < paths.Count; index++)
-            {
-                if (string.Equals(
-                    paths[index],
-                    normalizedPath,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-            }
-
-            paths.Add(normalizedPath);
+                : new string(
+                    output,
+                    0,
+                    outputLength);
         }
     }
 }
