@@ -30,6 +30,7 @@ List of cheats:
     [*] Set every staff skill level to 20
     [*] Add 1k points to every research type
     [*] Unlock all research and set every research level to 10
+    [*] Set Performance and Promotion activities to level 10
     [*] Increase every idol's fame by one level
     [*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
     [*] Reveal idol friend relationships
