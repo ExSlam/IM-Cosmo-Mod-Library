@@ -1266,6 +1266,19 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns a point-in-time persistence diagnostic snapshot without forcing a save.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetPersistenceDiagnostics(
+            out IMDataCorePersistenceDiagnostics diagnostics,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetPersistenceDiagnostics(
+                out diagnostics,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns the currently resolved save key used by IM Data Core.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1466,6 +1479,19 @@ namespace IMDataCore
         public static bool TryFlushNow(out string errorMessage)
         {
             return IMDataCoreController.Instance.TryFlushNow(out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns a point-in-time persistence diagnostic snapshot without forcing a save.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetPersistenceDiagnostics(
+            out IMDataCorePersistenceDiagnostics diagnostics,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetPersistenceDiagnostics(
+                out diagnostics,
+                out errorMessage);
         }
 
         /// <summary>
@@ -1701,7 +1727,7 @@ namespace IMDataCore
                 }
 
                 return storageEngine.TrySetCustomData(
-                    NextCaptureSequenceLocked(),
+                    NextCaptureSequenceLocked,
                     mutationGameDate,
                     registration.NamespaceIdentifier,
                     sanitizedDataKey,
@@ -1792,7 +1818,7 @@ namespace IMDataCore
                 }
 
                 return storageEngine.TryRemoveCustomData(
-                    NextCaptureSequenceLocked(),
+                    NextCaptureSequenceLocked,
                     mutationGameDate,
                     registration.NamespaceIdentifier,
                     sanitizedDataKey,
@@ -2117,6 +2143,31 @@ namespace IMDataCore
             return engineForWrite.TryPersistSnapshot(
                 persistenceSnapshot,
                 out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns point-in-time persistence diagnostics without flushing buffered events.
+        /// </summary>
+        internal bool TryGetPersistenceDiagnostics(
+            out IMDataCorePersistenceDiagnostics diagnostics,
+            out string errorMessage)
+        {
+            diagnostics = null;
+            errorMessage = string.Empty;
+            lock (runtimeLock)
+            {
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    return false;
+                }
+
+                diagnostics = storageEngine.GetPersistenceDiagnostics(
+                    bufferedEvents.Count,
+                    activeSaveScope == null
+                        ? string.Empty
+                        : activeSaveScope.SaveFilePath);
+                return true;
+            }
         }
 
         /// <summary>
@@ -10201,6 +10252,29 @@ namespace IMDataCore
         internal long VocalPointsBefore;
         internal long PlayerPointsBefore;
         internal long DancePointsBefore;
+    }
+
+    /// <summary>
+    /// Point-in-time persistence diagnostics intended for support tooling and
+    /// cooperating mods. Values are informational and do not mutate storage.
+    /// </summary>
+    public sealed class IMDataCorePersistenceDiagnostics
+    {
+        public string PersistenceMode { get; internal set; }
+        public string ActiveSavePath { get; internal set; }
+        public string SidecarPath { get; internal set; }
+        public bool IsPersistenceBlocked { get; internal set; }
+        public string BlockedReason { get; internal set; }
+        public bool RecoveredFromBackup { get; internal set; }
+        public int EventCount { get; internal set; }
+        public int CustomMutationCount { get; internal set; }
+        public int CheckpointCount { get; internal set; }
+        public int DirtyBufferedEventCount { get; internal set; }
+        public long LastIssuedSequence { get; internal set; }
+        public long LastCommittedGeneration { get; internal set; }
+        public long BaseSnapshotBytes { get; internal set; }
+        public long JournalBytes { get; internal set; }
+        public int JournalEntryCount { get; internal set; }
     }
 
     /// <summary>

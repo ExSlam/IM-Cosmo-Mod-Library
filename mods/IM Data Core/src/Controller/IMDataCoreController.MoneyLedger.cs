@@ -698,7 +698,10 @@ namespace IMDataCore
             }
 
             snapshot.BalanceBefore = resources.Get(resources.type.money, false);
-            MoneyLedgerSourceResolver.Resolve(snapshot);
+            if (!MoneyLedgerAmbientContext.TryPopulateKnownSource(snapshot))
+            {
+                MoneyLedgerSourceResolver.Resolve(snapshot);
+            }
             MoneyLedgerCaptureDetails.PopulateSnapshot(snapshot, resourceManager);
 
             return snapshot;

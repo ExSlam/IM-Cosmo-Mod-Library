@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.3.0
+
+- Added a versioned append journal (`.imdc.journal`) tied to the compact v3 base snapshot by SHA-256. Normal append-only saves now persist only the immutable suffix since the last durable generation instead of rewriting complete campaign history.
+- Added periodic journal compaction back into the existing atomic v3 snapshot. Rewinds, destructive branch changes, recovery writes, journal thresholds, and incompatible baselines automatically use a full snapshot.
+- Preserved a matching `.imdc.bak.imdc.journal` whenever a compacted base is replaced, so backup recovery represents the complete previous logical generation rather than only its old base file.
+- Added torn-tail detection and safe snapshot fallback for interrupted journal appends; stale journals are rejected by base-file hash and cannot be replayed onto a different snapshot.
+- Added incremental save snapshots that copy only new immutable records on the journal fast path. Full-list shallow snapshots are now reserved for compaction/destructive boundaries.
+- Cached storage-form event payload/custom SET JSON at record creation/load time, avoiding repeated parsing and built-in payload transforms on every save.
+- Removed per-record `StringBuilder.ToString()` allocations from the streaming sidecar/journal writers by writing reusable character buffers directly.
+- Added O(1) watermark checks that skip complete event/custom/checkpoint trim scans on ordinary forward saves.
+- Indexed active checkpoints by normalized save path so journal snapshots copy only the new checkpoint suffix instead of filtering complete checkpoint history.
+- Fixed filesystem identity on case-sensitive platforms: containment, checkpoint/path identity, generation maps, and save-key hashing now follow the host OS path comparison rules.
+- Save Write Ordering Fix integration now verifies its public interception-health capability before skipping IMDC's standalone `SavedData` clone; merely loading the SWOF assembly is no longer trusted.
+- Same-value custom SETs and missing-key REMOVEs no longer consume otherwise-unused capture sequence numbers.
+- Replaced the global persistence I/O lock with per-sidecar locks and prevented a superseded concurrent snapshot from regressing controller save scope.
+- Added `TryGetPersistenceDiagnostics` to both public API names, reporting persistence mode, counts, snapshot/journal sizes, recovery/block state, dirty buffered events, and generation information without forcing a save.
+- Reduced money-ledger stack walking by using known ambient source contexts for business, singles, shows, theaters, cafes, and concerts, and replaced show-money stack inspection with a scoped Harmony marker. Unknown sources still use the existing stack-based fallback.
+- Sidecar `FormatVersion` remains `3`; existing v1/v2/v3 sidecars remain readable.
+
 ## 3.2.0
 
 - Added `TryReadEventsForIdolPage` to `IMDataCoreApi` and `IMDataCoreAPI`, using an exclusive EventId cursor and `hasMore` so consumers can walk complete idol/global history without raising the existing 1,000-row per-call cap.

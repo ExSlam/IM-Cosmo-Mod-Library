@@ -2,7 +2,7 @@
 
 This document describes the private persisted representation used by IMDC 3.2. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
 
-The release version is 3.2.0, but the sidecar `FormatVersion` remains `3`. Version 3.2 changes query/load implementation only and does not add a persisted field, so older v3 documents remain valid.
+The release version is 3.3.0, while the compact sidecar `FormatVersion` remains `3`. Version 3.3 adds a sibling implementation-detail journal (`IMDataCore.LightweightJournal`, format 1) but does not add a required field to the v3 base document, so older v3 documents remain valid.
 
 ## Root
 

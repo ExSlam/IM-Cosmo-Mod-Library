@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace IMDataCore
 {
     /// <summary>
-    /// Lightweight save/load coordination for IM Data Core 3.2. This partial is
+    /// Lightweight save/load coordination for IM Data Core 3.3. This partial is
     /// deliberately limited to in-memory branch management and explicit sidecar
     /// persistence boundaries.
     /// </summary>
@@ -90,8 +90,10 @@ namespace IMDataCore
                 // The snapshot owns stable list references. Serialize and fsync
                 // outside runtimeLock so long campaign saves do not stall capture
                 // and read APIs for the entire JSON/disk write.
+                bool persistenceSnapshotIsCurrent;
                 if (!engineForWrite.TryPersistSnapshot(
                         persistenceSnapshot,
+                        out persistenceSnapshotIsCurrent,
                         out errorMessage))
                 {
                     CoreLog.Warn(
@@ -102,7 +104,8 @@ namespace IMDataCore
 
                 lock (runtimeLock)
                 {
-                    if (!ReferenceEquals(storageEngine, engineForWrite))
+                    if (!ReferenceEquals(storageEngine, engineForWrite) ||
+                        !persistenceSnapshotIsCurrent)
                     {
                         return;
                     }

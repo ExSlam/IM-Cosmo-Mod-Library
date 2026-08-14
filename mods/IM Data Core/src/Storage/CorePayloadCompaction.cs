@@ -162,6 +162,7 @@ namespace IMDataCore
                 {
                     compacted = CloneEvent(record);
                     compacted.PayloadJson = compactedPayload;
+                    compacted.StoragePayloadJson = string.Empty;
                     sparseMoneyPayloadCount++;
                 }
 
@@ -719,7 +720,8 @@ namespace IMDataCore
                     source.NamespaceIdentifier ?? string.Empty,
                 IdempotencyKey = source.IdempotencyKey ?? string.Empty,
                 PayloadJson =
-                    source.PayloadJson ?? CoreConstants.EmptyJsonObject
+                    source.PayloadJson ?? CoreConstants.EmptyJsonObject,
+                StoragePayloadJson = source.StoragePayloadJson ?? string.Empty
             };
         }
 

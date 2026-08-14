@@ -66,6 +66,14 @@ namespace IMDataCore
     internal static class VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
     {
         private const string DataSaverSaveMethodName = "saveData";
+        private const string SaveWriteOrderingAssemblyName =
+            "com.cosmo.savewriteorderingfix";
+        private const string SaveWriteOrderingApiTypeName =
+            "SaveWriteOrderingFix.SaveWriteOrderingApi";
+        private const string SaveWriteOrderingHealthPropertyName =
+            "SavedDataInterceptionHealthy";
+        private static readonly object SaveWriteOrderingLookupLock = new object();
+        private static PropertyInfo saveWriteOrderingHealthProperty;
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
@@ -218,8 +226,9 @@ namespace IMDataCore
             // Save Write Ordering Fix runs after IMDC's caller transpiler and
             // freezes the exact SavedData payload synchronously. When it is loaded,
             // a second full JsonUtility round-trip here only doubles save-time CPU
-            // and allocation cost for large campaigns.
-            if (IsSaveWriteOrderingFixLoaded())
+            // and allocation cost for large campaigns. Only a positively verified healthy
+            // interception set is trusted; assembly presence alone is insufficient.
+            if (IsSaveWriteOrderingFixInterceptionHealthy())
             {
                 return source;
             }
@@ -238,23 +247,65 @@ namespace IMDataCore
             return snapshot;
         }
 
-        private static bool IsSaveWriteOrderingFixLoaded()
+        private static bool IsSaveWriteOrderingFixInterceptionHealthy()
         {
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int index = 0; index < assemblies.Length; index++)
+            try
             {
-                AssemblyName name = assemblies[index] != null
-                    ? assemblies[index].GetName()
-                    : null;
-                if (name != null && string.Equals(
-                        name.Name,
-                        "com.cosmo.savewriteorderingfix",
-                        StringComparison.OrdinalIgnoreCase))
+                PropertyInfo healthProperty = saveWriteOrderingHealthProperty;
+                if (healthProperty == null)
                 {
-                    return true;
+                    lock (SaveWriteOrderingLookupLock)
+                    {
+                        healthProperty = saveWriteOrderingHealthProperty;
+                        if (healthProperty == null)
+                        {
+                            Assembly[] assemblies =
+                                AppDomain.CurrentDomain.GetAssemblies();
+                            for (int index = 0; index < assemblies.Length; index++)
+                            {
+                                Assembly assembly = assemblies[index];
+                                AssemblyName name = assembly != null
+                                    ? assembly.GetName()
+                                    : null;
+                                if (name == null || !string.Equals(
+                                        name.Name,
+                                        SaveWriteOrderingAssemblyName,
+                                        StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
+
+                                Type apiType = assembly.GetType(
+                                    SaveWriteOrderingApiTypeName,
+                                    false);
+                                healthProperty = apiType != null
+                                    ? apiType.GetProperty(
+                                        SaveWriteOrderingHealthPropertyName,
+                                        BindingFlags.Public | BindingFlags.Static)
+                                    : null;
+                                if (healthProperty != null &&
+                                    healthProperty.PropertyType == typeof(bool) &&
+                                    healthProperty.GetIndexParameters().Length == 0)
+                                {
+                                    saveWriteOrderingHealthProperty = healthProperty;
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
+
+                return healthProperty != null &&
+                    (bool)healthProperty.GetValue(null, null);
             }
-            return false;
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not verify Save Write Ordering Fix health; " +
+                    "using its standalone SavedData snapshot fallback. " +
+                    exception.Message);
+                return false;
+            }
         }
 
         private static bool IsSavedDataWrite(CodeInstruction instruction)

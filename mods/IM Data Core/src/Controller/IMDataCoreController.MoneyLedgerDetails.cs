@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
@@ -171,6 +170,81 @@ namespace IMDataCore
             current = null;
         }
 
+        internal static bool TryPopulateKnownSource(MoneyMutationSnapshot snapshot)
+        {
+            if (snapshot == null || current == null ||
+                string.IsNullOrEmpty(current.ExpectedSourceType))
+            {
+                return false;
+            }
+
+            string sourceType = current.ExpectedSourceType;
+            snapshot.SourceAssembly = MoneyLedgerConstants.AssemblyCSharpName;
+            snapshot.SourceType = sourceType;
+            snapshot.SourceMethod = current.ExpectedSourceMethod ?? string.Empty;
+
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeBusiness,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryContracts;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailBusinessContracts;
+                return true;
+            }
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeSingles,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategorySingles;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailSingleRelease;
+                return true;
+            }
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeShows,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryShows;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailShowEpisode;
+                return true;
+            }
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeTheaters,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryTheaters;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailTheater;
+                return true;
+            }
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeCafes,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryCafes;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailCafe;
+                return true;
+            }
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeConcertPopup,
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeConcertSystem,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryConcerts;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailConcert;
+                return true;
+            }
+
+            return false;
+        }
+
         internal static void RegisterContract(business.active_proposal activeContract, business._proposal proposal)
         {
             if (activeContract == null || proposal == null)
@@ -220,6 +294,8 @@ namespace IMDataCore
     {
         private static bool fansWatchLookupCompleted;
         private static MethodInfo fansWatchBonusMethod;
+        [ThreadStatic]
+        private static int showMoneyScopeDepth;
 
         internal static void PopulateSnapshot(MoneyMutationSnapshot snapshot, resources resourceManager)
         {
@@ -671,31 +747,20 @@ namespace IMDataCore
 
         internal static bool IsShowMoneyCall()
         {
-            StackTrace trace = new StackTrace(false);
-            StackFrame[] frames = trace.GetFrames();
-            if (frames == null)
+            return showMoneyScopeDepth > 0;
+        }
+
+        internal static void EnterShowMoneyScope()
+        {
+            showMoneyScopeDepth++;
+        }
+
+        internal static void ExitShowMoneyScope()
+        {
+            if (showMoneyScopeDepth > 0)
             {
-                return false;
+                showMoneyScopeDepth--;
             }
-
-            for (int frameIndex = CoreConstants.ZeroBasedListStartIndex; frameIndex < frames.Length; frameIndex++)
-            {
-                MethodBase method = frames[frameIndex].GetMethod();
-                Type declaringType = method != null ? method.DeclaringType : null;
-                if (declaringType != typeof(Shows))
-                {
-                    continue;
-                }
-
-                string methodName = method.Name ?? string.Empty;
-                if (methodName.IndexOf(MoneyLedgerDetailConstants.MethodShowRelease, StringComparison.Ordinal) >= CoreConstants.ZeroBasedListStartIndex
-                    || methodName.IndexOf(MoneyLedgerDetailConstants.MethodShowOnNewDay, StringComparison.Ordinal) >= CoreConstants.ZeroBasedListStartIndex)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static void PopulateWeeklyExpenseAllocations(MoneyMutationSnapshot snapshot, resources resourceManager)
@@ -1228,9 +1293,16 @@ namespace IMDataCore
     [HarmonyPatch(typeof(Shows), MoneyLedgerDetailConstants.MethodShowRelease)]
     internal static class Shows_ReleaseShow_IMDataCoreMoneyLedgerContextCleanup_Patch
     {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            MoneyLedgerCaptureDetails.EnterShowMoneyScope();
+        }
+
         [HarmonyFinalizer]
         private static void Finalizer()
         {
+            MoneyLedgerCaptureDetails.ExitShowMoneyScope();
             MoneyLedgerAmbientContext.Clear();
         }
     }
@@ -1238,9 +1310,16 @@ namespace IMDataCore
     [HarmonyPatch(typeof(Shows), MoneyLedgerDetailConstants.MethodShowOnNewDay)]
     internal static class Shows_OnNewDay_IMDataCoreMoneyLedgerContextCleanup_Patch
     {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            MoneyLedgerCaptureDetails.EnterShowMoneyScope();
+        }
+
         [HarmonyFinalizer]
         private static void Finalizer()
         {
+            MoneyLedgerCaptureDetails.ExitShowMoneyScope();
             MoneyLedgerAmbientContext.Clear();
         }
     }

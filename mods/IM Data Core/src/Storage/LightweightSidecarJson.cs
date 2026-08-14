@@ -98,6 +98,7 @@ namespace IMDataCore
             ValidateSerializableDocument(document);
 
             StringBuilder fragment = new StringBuilder(512);
+            char[] fragmentBuffer = new char[1024];
             writer.Write('{');
 
             fragment.Length = 0;
@@ -114,7 +115,7 @@ namespace IMDataCore
             AppendInt64(fragment, document.LastIssuedSequence);
             fragment.Append(',');
             AppendPropertyName(fragment, "Checkpoints");
-            writer.Write(fragment.ToString());
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
 
             writer.Write('[');
             for (int index = 0; index < document.Checkpoints.Count; index++)
@@ -125,14 +126,14 @@ namespace IMDataCore
                 }
                 fragment.Length = 0;
                 AppendCheckpointRecord(fragment, document.Checkpoints[index]);
-                writer.Write(fragment.ToString());
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
             }
             writer.Write(']');
             writer.Write(',');
 
             fragment.Length = 0;
             AppendPropertyName(fragment, "Events");
-            writer.Write(fragment.ToString());
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
             writer.Write('[');
             for (int index = 0; index < document.Events.Count; index++)
             {
@@ -142,14 +143,14 @@ namespace IMDataCore
                 }
                 fragment.Length = 0;
                 AppendEventRecord(fragment, document.Events[index]);
-                writer.Write(fragment.ToString());
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
             }
             writer.Write(']');
             writer.Write(',');
 
             fragment.Length = 0;
             AppendPropertyName(fragment, "CustomMutations");
-            writer.Write(fragment.ToString());
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
             writer.Write('[');
             for (int index = 0; index < document.CustomMutations.Count; index++)
             {
@@ -161,10 +162,223 @@ namespace IMDataCore
                 AppendCustomMutationRecord(
                     fragment,
                     document.CustomMutations[index]);
-                writer.Write(fragment.ToString());
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
             }
             writer.Write(']');
             writer.Write('}');
+        }
+
+        internal static string SerializeJournalHeader(string baseFileHash)
+        {
+            StringBuilder builder = new StringBuilder(192);
+            builder.Append('{');
+            AppendPropertyName(builder, "FormatName");
+            AppendString(builder, LightweightCoreStorageEngine.JournalFormatName);
+            builder.Append(',');
+            AppendPropertyName(builder, "FormatVersion");
+            AppendInt32(builder, LightweightCoreStorageEngine.JournalFormatVersion);
+            builder.Append(',');
+            AppendPropertyName(builder, "BaseFileHash");
+            AppendString(builder, baseFileHash ?? string.Empty);
+            builder.Append('}');
+            return builder.ToString();
+        }
+
+        internal static void SerializeJournalEntryTo(
+            TextWriter writer,
+            LightweightSidecarDocument document,
+            int checkpointStartIndex,
+            int eventStartIndex,
+            int customMutationStartIndex)
+        {
+            if (writer == null)
+            {
+                throw new ArgumentNullException("writer");
+            }
+            ValidateSerializableDocument(document);
+            if (checkpointStartIndex < 0 ||
+                checkpointStartIndex > document.Checkpoints.Count ||
+                eventStartIndex < 0 ||
+                eventStartIndex > document.Events.Count ||
+                customMutationStartIndex < 0 ||
+                customMutationStartIndex > document.CustomMutations.Count)
+            {
+                throw new ArgumentOutOfRangeException(
+                    "A journal start index is outside the document collection.");
+            }
+
+            StringBuilder fragment = new StringBuilder(512);
+            char[] fragmentBuffer = new char[1024];
+            writer.Write('{');
+
+            AppendPropertyName(fragment, "LastIssuedSequence");
+            AppendInt64(fragment, document.LastIssuedSequence);
+            fragment.Append(',');
+            AppendPropertyName(fragment, "Checkpoints");
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
+            writer.Write('[');
+            for (int index = checkpointStartIndex;
+                index < document.Checkpoints.Count;
+                index++)
+            {
+                if (index > checkpointStartIndex)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendCheckpointRecord(fragment, document.Checkpoints[index]);
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+            }
+            writer.Write(']');
+            writer.Write(',');
+
+            fragment.Length = 0;
+            AppendPropertyName(fragment, "Events");
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
+            writer.Write('[');
+            for (int index = eventStartIndex;
+                index < document.Events.Count;
+                index++)
+            {
+                if (index > eventStartIndex)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendEventRecord(fragment, document.Events[index]);
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+            }
+            writer.Write(']');
+            writer.Write(',');
+
+            fragment.Length = 0;
+            AppendPropertyName(fragment, "CustomMutations");
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
+            writer.Write('[');
+            for (int index = customMutationStartIndex;
+                index < document.CustomMutations.Count;
+                index++)
+            {
+                if (index > customMutationStartIndex)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendCustomMutationRecord(
+                    fragment,
+                    document.CustomMutations[index]);
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+            }
+            writer.Write(']');
+            writer.Write('}');
+        }
+
+        internal static bool TryReadJournalHeader(
+            string json,
+            out string baseFileHash,
+            out string errorMessage)
+        {
+            baseFileHash = string.Empty;
+            errorMessage = string.Empty;
+            try
+            {
+                JsonValue rootValue = new JsonParser(json).ParseDocument();
+                Dictionary<string, JsonValue> root = RequireObject(
+                    rootValue,
+                    "The IMDC journal header must be a JSON object.");
+                string formatName = RequireString(root, "FormatName");
+                int formatVersion = RequireInt32(root, "FormatVersion");
+                if (!string.Equals(
+                        formatName,
+                        LightweightCoreStorageEngine.JournalFormatName,
+                        StringComparison.Ordinal) ||
+                    formatVersion != LightweightCoreStorageEngine.JournalFormatVersion)
+                {
+                    errorMessage = "The IMDC journal format is unsupported.";
+                    return false;
+                }
+
+                baseFileHash = RequireString(root, "BaseFileHash");
+                if (string.IsNullOrEmpty(baseFileHash))
+                {
+                    errorMessage = "The IMDC journal base hash is empty.";
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+        }
+
+        internal static void ApplyJournalEntry(
+            string json,
+            LightweightSidecarDocument document)
+        {
+            if (document == null)
+            {
+                throw new ArgumentNullException("document");
+            }
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new FormatException("The IMDC journal entry is empty.");
+            }
+
+            JsonValue rootValue = new JsonParser(json).ParseDocument();
+            Dictionary<string, JsonValue> root = RequireObject(
+                rootValue,
+                "An IMDC journal entry must be a JSON object.");
+            long lastIssuedSequence = RequireInt64(root, "LastIssuedSequence");
+            if (lastIssuedSequence < document.LastIssuedSequence)
+            {
+                throw new FormatException(
+                    "An IMDC journal entry regresses LastIssuedSequence.");
+            }
+
+            List<LightweightCheckpointRecord> checkpoints = ReadCheckpoints(
+                RequireArray(root, "Checkpoints"),
+                document.FormatVersion,
+                document.RelativeSavePath);
+            List<LightweightEventRecord> events = ReadEvents(
+                RequireArray(root, "Events"),
+                document.FormatVersion);
+            List<LightweightCustomMutationRecord> customMutations =
+                ReadCustomMutations(
+                    RequireArray(root, "CustomMutations"),
+                    document.FormatVersion);
+
+            document.Checkpoints.AddRange(checkpoints);
+            document.Events.AddRange(events);
+            document.CustomMutations.AddRange(customMutations);
+            document.LastIssuedSequence = lastIssuedSequence;
+        }
+
+        private static void WriteBuilder(
+            TextWriter writer,
+            StringBuilder builder,
+            ref char[] buffer)
+        {
+            if (builder == null || builder.Length == 0)
+            {
+                return;
+            }
+
+            if (buffer == null || buffer.Length < builder.Length)
+            {
+                int newLength = buffer == null || buffer.Length == 0
+                    ? 1024
+                    : buffer.Length;
+                while (newLength < builder.Length)
+                {
+                    newLength = checked(newLength * 2);
+                }
+                buffer = new char[newLength];
+            }
+
+            builder.CopyTo(0, buffer, 0, builder.Length);
+            writer.Write(buffer, 0, builder.Length);
         }
 
         private static void ValidateSerializableDocument(
@@ -1420,15 +1634,23 @@ namespace IMDataCore
             }
             builder.Append(',');
             AppendPropertyName(builder, "Payload");
-
-            JsonValue payloadValue = ParseJsonForStorage(
-                record.PayloadJson,
-                "An event payload");
-            if (string.IsNullOrEmpty(record.NamespaceIdentifier))
+            string storagePayload = record.StoragePayloadJson;
+            if (string.IsNullOrWhiteSpace(storagePayload))
             {
-                TransformEventPayloadForStorage(payloadValue);
+                string normalizedRuntime;
+                string prepareError;
+                if (!TryNormalizeEventPayloadForStorage(
+                        record.PayloadJson,
+                        !string.IsNullOrEmpty(record.NamespaceIdentifier),
+                        out normalizedRuntime,
+                        out storagePayload,
+                        out prepareError))
+                {
+                    throw new FormatException(
+                        "An event payload is not valid JSON: " + prepareError);
+                }
             }
-            AppendJsonValue(builder, payloadValue);
+            builder.Append(storagePayload);
             builder.Append('}');
         }
 
@@ -1481,11 +1703,23 @@ namespace IMDataCore
             {
                 builder.Append(',');
                 AppendPropertyName(builder, "Value");
-                AppendJsonValue(
-                    builder,
-                    ParseJsonForStorage(
-                        record.ValueJson,
-                        "A custom-data value"));
+                string storageValue = record.StorageValueJson;
+                if (string.IsNullOrWhiteSpace(storageValue))
+                {
+                    string normalizedValue;
+                    string normalizeError;
+                    if (!TryNormalizeJsonDocument(
+                            record.ValueJson,
+                            out normalizedValue,
+                            out normalizeError))
+                    {
+                        throw new FormatException(
+                            "A custom-data value is not valid JSON: " +
+                            normalizeError);
+                    }
+                    storageValue = normalizedValue;
+                }
+                builder.Append(storageValue);
             }
 
             builder.Append('}');
@@ -1564,6 +1798,7 @@ namespace IMDataCore
                 "NamespaceIdentifier");
             int gameDateKey;
             string payloadJson;
+            string storagePayloadJson;
 
             if (formatVersion >= 3)
             {
@@ -1571,6 +1806,7 @@ namespace IMDataCore
                     gameDateTime,
                     "event");
                 JsonValue payloadValue = RequireMember(item, "Payload");
+                storagePayloadJson = SerializeJsonValue(payloadValue);
                 if (string.IsNullOrEmpty(namespaceIdentifier))
                 {
                     TransformEventPayloadForRuntime(payloadValue);
@@ -1597,8 +1833,19 @@ namespace IMDataCore
                         "The legacy lightweight sidecar contains an event " +
                         "GameDateKey that does not match GameDateTime.");
                 }
-
                 payloadJson = RequireString(item, "PayloadJson");
+                string ignoredRuntime;
+                string storageError;
+                if (!TryNormalizeEventPayloadForStorage(
+                        payloadJson,
+                        !string.IsNullOrEmpty(namespaceIdentifier),
+                        out ignoredRuntime,
+                        out storagePayloadJson,
+                        out storageError))
+                {
+                    throw new FormatException(
+                        "The legacy event payload is invalid: " + storageError);
+                }
             }
 
             return new LightweightEventRecord
@@ -1615,7 +1862,8 @@ namespace IMDataCore
                 IdempotencyKey = ReadOptionalString(
                     item,
                     "IdempotencyKey"),
-                PayloadJson = payloadJson
+                PayloadJson = payloadJson,
+                StoragePayloadJson = storagePayloadJson
             };
         }
 
@@ -1648,6 +1896,7 @@ namespace IMDataCore
             string gameDateTime = RequireString(item, "GameDateTime");
             int gameDateKey;
             string valueJson;
+            string storageValueJson = string.Empty;
 
             if (formatVersion >= 3)
             {
@@ -1661,6 +1910,7 @@ namespace IMDataCore
                     StringComparison.Ordinal)
                     ? SerializeJsonValue(RequireMember(item, "Value"))
                     : string.Empty;
+                storageValueJson = valueJson;
             }
             else
             {
@@ -1674,8 +1924,25 @@ namespace IMDataCore
                         "The legacy lightweight sidecar contains a custom-data " +
                         "GameDateKey that does not match GameDateTime.");
                 }
-
                 valueJson = RequireString(item, "ValueJson");
+                if (string.Equals(
+                        operation,
+                        LightweightCoreStorageEngine.CustomOperationSet,
+                        StringComparison.Ordinal))
+                {
+                    string normalizedValue;
+                    string normalizeError;
+                    if (!TryNormalizeJsonDocument(
+                            valueJson,
+                            out normalizedValue,
+                            out normalizeError))
+                    {
+                        throw new FormatException(
+                            "The legacy custom-data value is invalid: " +
+                            normalizeError);
+                    }
+                    storageValueJson = normalizedValue;
+                }
             }
 
             return new LightweightCustomMutationRecord
@@ -1688,8 +1955,46 @@ namespace IMDataCore
                     "NamespaceIdentifier"),
                 DataKey = RequireString(item, "DataKey"),
                 Operation = operation,
-                ValueJson = valueJson
+                ValueJson = valueJson,
+                StorageValueJson = storageValueJson
             };
+        }
+
+        internal static bool TryNormalizeEventPayloadForStorage(
+            string json,
+            bool isNamespacedCustomEvent,
+            out string normalizedRuntimeJson,
+            out string storageJson,
+            out string errorMessage)
+        {
+            normalizedRuntimeJson = string.Empty;
+            storageJson = string.Empty;
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                errorMessage = "The JSON document is empty.";
+                return false;
+            }
+
+            try
+            {
+                JsonValue value = new JsonParser(json).ParseDocument();
+                normalizedRuntimeJson = SerializeJsonValue(value);
+                if (!isNamespacedCustomEvent)
+                {
+                    TransformEventPayloadForStorage(value);
+                }
+                storageJson = SerializeJsonValue(value);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                normalizedRuntimeJson = string.Empty;
+                storageJson = string.Empty;
+                return false;
+            }
         }
 
 

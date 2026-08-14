@@ -50,6 +50,21 @@ namespace IMDataCore
         private const int SavePathHashLength = 16;
         private const char SavePathSeparatorReplacement = '_';
 
+        // Match the path-identity behavior used by .NET/Mono on the platforms IM
+        // targets in practice: Windows paths are case-insensitive; Unix-style paths
+        // are case-sensitive. Keep these centralized so path containment, save keys,
+        // checkpoint identity, and per-path synchronization cannot drift apart.
+        internal static readonly bool IsPathCaseInsensitive =
+            Path.DirectorySeparatorChar == '\\';
+        internal static readonly StringComparer PathComparer =
+            IsPathCaseInsensitive
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal;
+        internal static readonly StringComparison PathComparison =
+            IsPathCaseInsensitive
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
         private static readonly object SaveScopeLock = new object();
         private static string activeSaveFilePathHint = string.Empty;
         private static CoreSaveScope transientSaveScope =
@@ -897,7 +912,7 @@ namespace IMDataCore
             if (string.Equals(
                     normalizedCandidate,
                     dataCoreRootDirectory,
-                    StringComparison.OrdinalIgnoreCase))
+                    PathComparison))
             {
                 return TryEnsureRootDirectory(
                     persistentDataRoot,
@@ -1161,7 +1176,7 @@ namespace IMDataCore
                 string.Equals(
                     dataRootDirectory,
                     dataCoreRootDirectory,
-                    StringComparison.OrdinalIgnoreCase) ||
+                    PathComparison) ||
                 IsStrictlyContainedPath(
                     dataRootDirectory,
                     dataCoreRootDirectory) ||
@@ -1490,7 +1505,7 @@ namespace IMDataCore
                         TrimTrailingDirectorySeparators(
                             currentPath),
                         normalizedRoot,
-                        StringComparison.OrdinalIgnoreCase))
+                        PathComparison))
                 {
                     return true;
                 }
@@ -1503,7 +1518,7 @@ namespace IMDataCore
                     string.Equals(
                         parentPath,
                         currentPath,
-                        StringComparison.OrdinalIgnoreCase) ||
+                        PathComparison) ||
                     !IsSameOrContainedPath(
                         normalizedRoot,
                         parentPath))
@@ -1615,11 +1630,11 @@ namespace IMDataCore
             return string.Equals(
                     normalizedRoot,
                     normalizedCandidate,
-                    StringComparison.OrdinalIgnoreCase) ||
+                    PathComparison) ||
                 normalizedCandidate.StartsWith(
                     BuildDirectoryPrefix(
                         normalizedRoot),
-                    StringComparison.OrdinalIgnoreCase);
+                    PathComparison);
         }
 
         private static bool IsStrictlyContainedPath(
@@ -1641,7 +1656,7 @@ namespace IMDataCore
                 return normalizedCandidate.StartsWith(
                     BuildDirectoryPrefix(
                         normalizedRoot),
-                    StringComparison.OrdinalIgnoreCase);
+                    PathComparison);
             }
             catch
             {
@@ -1795,9 +1810,9 @@ namespace IMDataCore
                 return string.Empty;
             }
 
-            string normalizedLowerPath =
-                normalizedSaveFilePath
-                    .ToLowerInvariant();
+            string identityPath = IsPathCaseInsensitive
+                ? normalizedSaveFilePath.ToUpperInvariant()
+                : normalizedSaveFilePath;
 
             string dataRootDirectory =
                 NormalizeDirectoryPathOrEmpty(
@@ -1805,26 +1820,25 @@ namespace IMDataCore
                         normalizedPersistentRoot,
                         GameDataRootFolderName));
 
-            string relativePath =
-                normalizedLowerPath;
+            string relativePath = identityPath;
 
             if (!string.IsNullOrEmpty(
                     dataRootDirectory))
             {
-                string lowerDataRoot =
-                    dataRootDirectory
-                        .ToLowerInvariant();
+                string identityDataRoot = IsPathCaseInsensitive
+                    ? dataRootDirectory.ToUpperInvariant()
+                    : dataRootDirectory;
 
                 string dataRootPrefix =
                     BuildDirectoryPrefix(
-                        lowerDataRoot);
+                        identityDataRoot);
 
-                if (normalizedLowerPath.StartsWith(
+                if (identityPath.StartsWith(
                         dataRootPrefix,
-                        StringComparison.OrdinalIgnoreCase))
+                        PathComparison))
                 {
                     relativePath =
-                        normalizedLowerPath.Substring(
+                        identityPath.Substring(
                             dataRootPrefix.Length);
                 }
             }
@@ -1846,7 +1860,7 @@ namespace IMDataCore
             string pathHashToken =
                 SanitizeToken(
                     ComputeStablePathHash(
-                        normalizedLowerPath),
+                        identityPath),
                     SaveTokenMaximumLength);
 
             string joinedToken =

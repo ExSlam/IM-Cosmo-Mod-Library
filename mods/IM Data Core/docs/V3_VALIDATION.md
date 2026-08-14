@@ -1,10 +1,10 @@
-# IM Data Core 3.2 validation notes
+# IM Data Core 3.3 validation notes
 
 This revision was checked against the uploaded Cosmo Mod Library and decompiled Idol Manager source. EroEvents is intentionally unchanged and is outside the 3.2 edit set.
 
 ## Static checks completed
 
-- `info.json` and `IM Data Core.csproj` both report **3.2.0**; the persisted sidecar `FormatVersion` intentionally remains **3**.
+- `info.json` and `IM Data Core.csproj` both report **3.3.0**; the persisted sidecar `FormatVersion` intentionally remains **3**.
 - Existing public API methods remain available, and both public API aliases expose `TryReadEventsForIdolPage(...)` alongside the existing recent-event API.
 - Paged idol reads use the same merged idol/global ordering as recent reads, seek both projections with binary search, use an exclusive EventId cursor, and return `hasMore`.
 - A randomized behavioral model completed **5,000 / 5,000** pagination cases without a gap, duplicate, or ordering mismatch, including equal-date events and changing page sizes.
@@ -31,3 +31,32 @@ This revision was checked against the uploaded Cosmo Mod Library and decompiled 
 This packaging environment does not contain `dotnet`, MSBuild, Roslyn `csc`, or Mono `mcs`, so a real .NET Framework 4.6 compile and an in-game Unity runtime test could not be performed here.
 
 The delivery archives therefore omit existing `bin`/`obj` output and stale compiled DLLs rather than presenting them as builds of the modified source. Compile these source packages in the normal Cosmo Mod Library development environment before deployment.
+
+## 3.3 persistence regression focus
+
+Validate these cases in a game-capable build environment:
+
+- two rapid same-path saves completing in opposite worker order;
+- ordinary forward saves use `mode=journal` after the first compact generation;
+- journal compaction produces a v3 base with equivalent logical records;
+- a torn final journal entry is ignored and the next save repairs by compact snapshot;
+- a journal copied beside a different base hash is ignored;
+- `.imdc.bak` plus `.imdc.bak.imdc.journal` restores the previous complete logical generation;
+- rewind/diverge/save forces a full snapshot instead of appending onto the abandoned branch;
+- two case-distinct paths remain distinct on a case-sensitive filesystem;
+- SWOF assembly present with an unhealthy interception flag keeps IMDC's detached `SavedData` clone;
+- same-value SET and missing-key REMOVE do not advance the capture sequence;
+- concurrent stale snapshot completion cannot regress `activeSaveScope`;
+- long-history forward saves copy/serialize only the newly appended suffix until compaction.
+
+The source archive used for this patch does not contain a C# compiler/runtime toolchain, so source-level validation in this package is supplemental to an actual Unity/Mono build and game test.
+
+## Source-only regression checks
+
+In a source checkout, run:
+
+```text
+python3 scripts/Test-PersistenceSource.py
+```
+
+The script requires no Unity assemblies. It checks the path-comparison contract, verified SWOF fallback, journal/hash/torn-tail safeguards, suffix snapshots, checkpoint-path indexing, payload caches, no-op sequence allocation, superseded-scope guard, diagnostics API, show-money scoped classification, and balanced C# delimiters. A real build and in-game matrix are still required before release.

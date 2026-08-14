@@ -1,8 +1,8 @@
-# IM Data Core 3.2
+# IM Data Core 3.3
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-IMDC 3.2 keeps sidecar format version 3. This release adds cursor-based idol timeline pagination, streaming sidecar reads, linear-time checkpoint-identity validation, and lower-cost long-campaign consumers while retaining the 3.1 exact-checkpoint, backup-recovery, and idempotency behavior.
+IMDC 3.3 keeps sidecar format version 3 while changing the persistence transport for long campaigns. Append-only save generations are written to a small SHA-256-bound journal and periodically compacted into the existing atomic v3 snapshot; destructive branch changes still force a complete snapshot.
 
 ## Services
 
@@ -11,6 +11,7 @@ IMDC 3.2 keeps sidecar format version 3. This release adds cursor-based idol tim
 - Exact cash ledger: `TryReadMoneyTransactions`, `TryGetMoneyLedgerCoverageStart`
 - Explicit sidecar persistence: `TryFlushNow`
 - Active physical-save identity: `TryGetActiveSaveKey`
+- Read-only persistence telemetry: `TryGetPersistenceDiagnostics`
 
 Built-in capture covers singles, shows, contracts, groups, tours, elections, concerts, idols, staff, relationships, finance, activities, story/system transitions, and other gameplay events. See `docs/EVENT_CATALOG.md`.
 
@@ -59,7 +60,7 @@ The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members r
 
 A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, and the IMDC sequence watermark.
 
-When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.2 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.3 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
 
@@ -91,30 +92,32 @@ Use occurrence-specific keys. Do not use a permanent key such as `promotion` if 
 
 ## Long-campaign persistence
 
-IMDC keeps complete source history, so sidecar size still grows with genuine event volume. Version 3.2 reduces the avoidable costs around that history:
+IMDC keeps complete source history, so retained disk history still grows with genuine event volume. Version 3.3 avoids reprocessing that complete history on every ordinary save:
 
-- save preparation takes shallow immutable record snapshots instead of deep-cloning every event and mutation;
-- runtime locks are released before JSON serialization and durable disk I/O;
-- JSON is streamed directly to the temporary file instead of building one full sidecar string and then a second full UTF-8 byte array;
-- sidecar loading now reads through a sequential buffered stream and materializes one record tree at a time instead of first loading the complete JSON text and whole-document DOM;
-- v3 event payloads and SET values are not parsed a second time during post-deserialization validation because they already came through the structural JSON parser;
-- checkpoint duplicate validation uses a hash set rather than a quadratic prior-checkpoint scan;
-- event timeline indexes stay sorted as records enter them, allowing both recent and cursor-paged idol/global reads to merge directly without per-read full-list sorting;
-- loaded records and active branch records reuse immutable event objects where safe;
-- persistence logs event count, custom-mutation count, checkpoint count, bytes, and elapsed milliseconds for real campaign profiling;
-- when Save Write Ordering Fix is loaded, IMDC avoids an otherwise redundant full `SavedData` JSON clone because that mod freezes the exact vanilla payload synchronously after IMDC's save hook.
+- a compact v3 sidecar remains the base snapshot;
+- append-only generations are written to `<sidecar>.imdc.journal`, whose header contains the SHA-256 of the exact base file it extends;
+- normal save preparation copies only newly appended immutable records, not every historical event;
+- a journal is compacted when it reaches at least 1 MiB and is at least as large as its base snapshot, or after 1,024 journal entries;
+- rewinds, destructive branch changes, recovery writes, or an incompatible baseline immediately use a full atomic snapshot instead;
+- an interrupted final journal line is treated as a torn tail and excluded; a mismatched journal hash is never replayed onto another base;
+- when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`;
+- event payloads and custom SET values cache their validated storage-form JSON, so old immutable rows are not reparsed on later saves;
+- the streaming writer copies reusable character buffers directly to its `TextWriter`, avoiding a temporary string allocation for every record;
+- forward-save watermarks skip complete history trim scans when no record can lie beyond the checkpoint;
+- runtime locks are released before serialization and durable disk I/O, and different sidecar paths use independent persistence locks;
+- `TryGetPersistenceDiagnostics` exposes counts, base/journal sizes, last persistence mode, recovery/block state, and generation information without performing I/O.
 
-These changes target campaigns with many idols and many years of retained history without changing the full-history semantics.
+Save Write Ordering Fix is an optional optimization. IMDC skips its standalone full `SavedData` JSON clone only when SWOF's public health flag confirms that all five required vanilla write callers were actually intercepted. If verification is unavailable or false, IMDC keeps the defensive clone.
 
 ## Substory completion after load
 
-Vanilla persists its dialogue queue. IMDC 3.2 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
+Vanilla persists its dialogue queue. IMDC 3.3 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
 
 ## V1/V2 sidecar compatibility
 
 Existing lightweight sidecars with format version 1 or 2 are still readable. They are normalized in memory and written as format version 3 at a later successful persistence boundary.
 
-Pre-2.0 database persistence is not imported by the runtime mod. Historical database migration belongs in a separate purpose-built migration utility. IMDC 3.2 does not probe old database files or old fallback locations.
+Pre-2.0 database persistence is not imported by the runtime mod. Historical database migration belongs in a separate purpose-built migration utility. IMDC 3.3 does not probe old database files or old fallback locations.
 
 ## Custom-data behavior
 

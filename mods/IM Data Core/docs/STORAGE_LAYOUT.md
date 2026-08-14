@@ -1,4 +1,4 @@
-# IM Data Core 3.2 storage layout
+# IM Data Core 3.3 storage layout
 
 ## Physical mapping
 
@@ -36,7 +36,7 @@ All IMDC mutation paths are canonicalized and required to remain beneath the pri
 
 ## V3 document identity
 
-IMDC 3.2 still uses sidecar format version 3:
+IMDC 3.3 still uses sidecar format version 3:
 
 ```json
 {
@@ -65,7 +65,7 @@ IMDC 3.2 still uses sidecar format version 3:
 }
 ```
 
-Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.2 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.3 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
 
 ### Event
 
@@ -144,21 +144,28 @@ The sidecar does not persist runtime-derived structures such as:
 
 Those values are derived from source records or are transient runtime bookkeeping.
 
-## Atomic writes, streaming, and backup
+## Atomic snapshots, delta journal, and backup
 
-A persistence boundary first creates a stable shallow snapshot of the active source-record lists. Runtime locks are then released before JSON serialization and durable disk I/O.
+The compact base remains an ordinary v3 sidecar. A normal append-only save may additionally create:
 
-The v3 JSON document is streamed to a validated temporary file using buffered sequential I/O. IMDC does not first allocate one complete JSON string plus a second complete UTF-8 byte array. The temporary file is flushed durably and atomically promoted.
+```text
+<sidecar>.imdc.journal
+```
 
-When replacing an existing healthy sidecar, IMDC retains one sibling:
+The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, journal `FormatVersion = 1`, and the SHA-256 of the exact base sidecar. Each following line is one self-contained JSON journal entry containing the new checkpoints, events, custom mutations, and resulting `LastIssuedSequence`.
+
+The journal writer appends one newline-terminated entry, flushes the buffered writer, then calls `FileStream.Flush(true)`. A non-newline-terminated final entry is treated as a possible crash tail. A journal whose base hash does not equal the current compact sidecar is ignored rather than replayed.
+
+A full boundary streams a stable shallow snapshot to a validated temporary file, durably flushes it, and atomically promotes it. Full boundaries include destructive branch changes, recovery writes, incompatible baselines, and journal compaction thresholds.
+
+When replacing a healthy compact base, IMDC retains:
 
 ```text
 <sidecar>.imdc.bak
+<sidecar>.imdc.bak.imdc.journal   # present when the previous generation used a journal
 ```
 
-as the previous known-good generation.
-
-If the primary is unreadable or invalid, IMDC validates the backup. A valid backup can be loaded for recovery. The damaged primary remains untouched until a later successful save. That save replaces the damaged primary while preserving the recovery backup rather than overwriting it.
+The backup journal is tied to the backup base by its own stored base hash. This keeps the backup equal to the complete previous logical generation. When recovery starts from a damaged primary, the known-good backup pair is preserved until a successful replacement.
 
 ## Missing, unreadable, and unmatched sidecars
 
@@ -173,10 +180,14 @@ A Save As to a different valid physical vanilla save path may establish a new wr
 
 ## Long-campaign characteristics
 
-Complete event history remains complete. File size and full persistence time therefore remain proportional to genuine retained history. IMDC 3.2 removes avoidable deep-copy and whole-document-buffer costs on writes, streams sidecar reads record-by-record, avoids a redundant v3 payload validation parse, keeps query indexes sorted incrementally, and exposes cursor-paged idol timelines for long-history consumers.
+Complete event history remains complete, but an ordinary append-only save no longer walks, copies, or serializes that complete history. Active checkpoints are indexed by normalized save path, and IMDC snapshots only the immutable event, custom-mutation, and checkpoint suffix beyond the durable counts before appending that suffix to the journal. Full O(history) snapshot work is reserved for compaction, recovery, Save As, or destructive branch boundaries.
+
+Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks also avoid complete trim scans when no active record can exceed the checkpoint.
+
+The journal compacts when it is at least 1 MiB and at least as large as its compact base, or after 1,024 entries. These thresholds bound replay depth and ensure the compact base is refreshed periodically.
 
 ## Compatibility
 
 Format versions 1 and 2 of `IMDataCore.LightweightSidecar` remain readable. On a later successful persistence boundary they are written as format version 3.
 
-Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.2 does not discover or import historical databases or flat fallback files.
+Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.3 does not discover or import historical databases or flat fallback files.
