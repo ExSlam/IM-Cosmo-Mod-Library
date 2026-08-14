@@ -18,7 +18,7 @@ namespace IMDataCore
     {
         private const string MoneyTransactionEventType = "money_transaction";
         private const string ShowEpisodeReleasedEventType = "show_episode_released";
-        private const string LegacyShowEpisodeEventType = "show_episode";
+        private const string HistoricalShowEpisodeEventType = "show_episode";
         private const string ShowCastIdListPropertyName = "show_cast_id_list";
         private const string ShowEpisodeCountPropertyName = "show_episode_count";
         private const string ShowEpisodeDatePropertyName = "show_episode_date";
@@ -335,7 +335,7 @@ namespace IMDataCore
                     StringComparison.Ordinal) ||
                 string.Equals(
                     eventType ?? string.Empty,
-                    LegacyShowEpisodeEventType,
+                    HistoricalShowEpisodeEventType,
                     StringComparison.Ordinal);
         }
 
@@ -701,7 +701,6 @@ namespace IMDataCore
             return new LightweightEventRecord
             {
                 Sequence = source.Sequence,
-                EventId = source.EventId,
                 GameDateKey = source.GameDateKey,
                 GameDateTime = source.GameDateTime ?? string.Empty,
                 IdolId = source.IdolId,
@@ -736,7 +735,7 @@ namespace IMDataCore
             int sequenceComparison = left.Sequence.CompareTo(right.Sequence);
             return sequenceComparison != 0
                 ? sequenceComparison
-                : left.EventId.CompareTo(right.EventId);
+                : left.Sequence.CompareTo(right.Sequence);
         }
 
         private static void AppendIdentityPart(

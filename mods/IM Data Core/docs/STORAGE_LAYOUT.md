@@ -1,104 +1,157 @@
-# IM Data Core 2.0 storage layout
+# IM Data Core 3 storage layout
 
-IM Data Core stores its lightweight sidecars below:
+## Physical mapping
+
+IMDC mirrors the supported vanilla save path below the sibling `IMDataCore` root.
+
+If the persistent root is:
 
 ```text
-Application.persistentDataPath/IMDataCore/
+%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager
 ```
 
-This is a sibling of Idol Manager's vanilla `data` directory. Version 2.0 has no required `IMDataCore/saves` layer and uses lightweight JSON sidecars exclusively for runtime persistence.
+then vanilla and IMDC roots are:
 
-## Exact vanilla-to-sidecar mapping
+```text
+data\
+IMDataCore\
+```
 
-IMDC canonicalizes a supported vanilla save beneath the `data` root, removes
-that root, preserves every relative segment, and prepends the `IMDataCore` root.
+Examples:
 
-| Vanilla save | IM Data Core sidecar |
+| Vanilla | IMDC sidecar |
 | --- | --- |
-| `data/auto_save.json` | `IMDataCore/auto_save.json` |
-| `data/manual_save.json` | `IMDataCore/manual_save.json` |
-| `data/manual_saves/1c5ec635/save.json` | `IMDataCore/manual_saves/1c5ec635/save.json` |
-| `data/story_mode/Agency_123/auto_save.json` | `IMDataCore/story_mode/Agency_123/auto_save.json` |
-| `data/story_mode/Agency_123/manual_save.json` | `IMDataCore/story_mode/Agency_123/manual_save.json` |
-| `data/story_mode/Agency_123/manual_saves/A1B2C3D4/save.json` | `IMDataCore/story_mode/Agency_123/manual_saves/A1B2C3D4/save.json` |
-| `data/story_mode/Agency_123/chapter_3/save.json` | `IMDataCore/story_mode/Agency_123/chapter_3/save.json` |
+| `data\auto_save.json` | `IMDataCore\auto_save.json` |
+| `data\manual_save.json` | `IMDataCore\manual_save.json` |
+| `data\manual_saves\<id>\save.json` | `IMDataCore\manual_saves\<id>\save.json` |
+| `data\story_mode\<playthrough>\auto_save.json` | `IMDataCore\story_mode\<playthrough>\auto_save.json` |
+| `data\story_mode\<playthrough>\manual_saves\<id>\save.json` | `IMDataCore\story_mode\<playthrough>\manual_saves\<id>\save.json` |
+| `data\story_mode\<playthrough>\chapter_0..6\save.json` | mirrored equivalent under `IMDataCore` |
 
-Manual-save and playthrough directory names are opaque. IMDC copies them
-verbatim; it does not replace them with a save title, group name, or derived
-identity. The public logical `save_key` remains separate from this physical
-layout for consumer compatibility.
+`data\global_data.json` and arbitrary JSON files are rejected as game-save scopes.
 
-Only vanilla paths matching verified freeplay, Story, manual, autosave, and
-chapter-save shapes are accepted. `data/global_data.json`, traversal paths,
-paths outside `data`, and reparse escapes are rejected.
+## Containment safety
 
-## Sidecar contents
+All IMDC mutations are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before reads/writes/deletes that could escape containment. The private root is required to remain separate from the vanilla `data` root.
 
-The mirrored `.json` is an IMDC document, not a vanilla-save copy. Its envelope
-is:
+## V3 document identity
 
-```text
-FormatName    = IMDataCore.LightweightSidecar
-FormatVersion = 2
+Every sidecar root contains:
+
+```json
+{
+  "FormatName": "IMDataCore.LightweightSidecar",
+  "FormatVersion": 3,
+  "RelativeSavePath": "manual_saves/4060ce4d/save.json",
+  "LastIssuedSequence": 421,
+  "Checkpoints": [],
+  "Events": [],
+  "CustomMutations": []
+}
 ```
 
-It contains only:
+`RelativeSavePath` belongs to the document. Child checkpoints do not repeat it.
 
-- the exact relative vanilla path;
-- the last-issued IMDC mutation sequence;
-- tiny vanilla-stamp-to-sequence checkpoints;
-- IMDC historical/supplemental event records;
-- historical custom JSON `SET`/`REMOVE` mutations;
+## Source records
 
-It does not contain `SaveManager.SavedData`, vanilla entity collections, embedded checkpoint snapshots, or derived runtime indexes.
+### Checkpoint
 
-Multi-idol occurrences are persisted once with `IdolId = -1` and a small,
-event-specific participant list or primitive ranking. The per-idol timeline
-indexes and any tiny per-idol payload projection are rebuilt in memory and are
-never serialized as duplicate rows.
+```json
+{
+  "LastSave": "2026-08-13 18:22:04",
+  "PlaytimeSeconds": 58321,
+  "GameDateTime": "2028-04-17T00:00:00.0000000",
+  "Sequence": 421
+}
+```
 
-## Save, Save As, and rollback
+### Event
 
-At a vanilla save callsite, IMDC writes the current active in-memory branch to
-the exactly mirrored target and adds the actual vanilla checkpoint. Saving to a
-different or overwritten target never merges stale IMDC history already at that
-target.
+```json
+{
+  "Sequence": 419,
+  "GameDateTime": "2028-04-16T00:00:00.0000000",
+  "IdolId": 14,
+  "EntityKind": "single",
+  "EntityId": "32",
+  "EventType": "single_released",
+  "SourcePatch": "SingleRelease",
+  "NamespaceIdentifier": "",
+  "Payload": {
+    "title": "Example",
+    "cast_id_list": [14, 7, 21]
+  }
+}
+```
 
-On load, IMDC reads only the selected sidecar. An exact vanilla stamp activates
-history through its mapped sequence. Without a matching checkpoint, IMDC filters
-its own records through the loaded vanilla game date. This rollback is initially
-in memory: the durable sidecar is not shortened until a later vanilla save or an
-explicit `TryFlushNow` commits the active branch.
+`Sequence` is the stored event identity. Public `EventId` is derived from it. `GameDateKey` is derived from `GameDateTime` and is not serialized.
 
-Sidecar writes use an IMDC-owned temporary file, flush it, and atomically
-replace or move the target. Every write, backup, and cleanup target is validated
-under the private `IMDataCore` root. Vanilla files are never temporary,
-replacement, backup, or cleanup targets.
+Built-in IMDC payloads use native arrays for known comma-delimited ID-list fields. Built-in money `detail_json` is stored as nested `detail` JSON. These transformations are reversed when producing the stable public `PayloadJson` string view.
 
-## Legacy JSON compatibility
+Namespaced custom-event payloads are stored structurally but are otherwise semantically untouched.
 
-Legacy compatibility is limited to supported JSON fallback artifacts from late IM Data Core 1.3.
+### Custom-data SET
 
-Discovery may consider:
+```json
+{
+  "Sequence": 420,
+  "GameDateTime": "2028-04-16T00:00:00.0000000",
+  "NamespaceIdentifier": "com.example.mod",
+  "DataKey": "preferences",
+  "Operation": "SET",
+  "Value": {
+    "enabled": true,
+    "mode": "compact"
+  }
+}
+```
 
-- `im_data_core.fallback.json`
-- `im_data_core.fallback.json.bak`
-- `im_data_core.fallback.json.tmp`
+### Custom-data REMOVE
 
-These may exist in historical keyed or mirrored locations, including old `IMDataCore/saves` layouts, mod installation directories, and the prior Workshop location.
+```json
+{
+  "Sequence": 421,
+  "GameDateTime": "2028-04-16T00:00:00.0000000",
+  "NamespaceIdentifier": "com.example.mod",
+  "DataKey": "preferences",
+  "Operation": "REMOVE"
+}
+```
 
-Automatic import is deliberately narrow:
+## What is intentionally not persisted
 
-- it runs only when the current lightweight sidecar is absent;
-- it accepts only the supported late-1.3 fallback `FormatVersion = 2` format;
-- integrity data must validate;
-- a stored generation must exactly match the already-deserialized vanilla `SavedData`;
-- historical events and supported custom values are imported;
-- redundant legacy projections are omitted;
-- conflicting exact sources are rejected;
-- legacy source files are never modified, moved, renamed, or deleted;
-- after a successful import, normal runtime persistence uses only the current lightweight JSON sidecar.
+The v3 sidecar does not persist:
 
-Early or unversioned fallback JSON files without a safely proven checkpoint mapping are ignored rather than guessed at.
+- vanilla `SaveManager.SavedData`
+- whole vanilla entity collections
+- runtime dictionaries or lookup indexes
+- materialized custom key/value state
+- `EventId` in addition to sequence
+- `GameDateKey`
+- checkpoint-relative path duplication
+- stringified `PayloadJson` / `ValueJson`
+- legacy database or fallback-file state
 
-The importer reproduces the historical vanilla fingerprint only in memory for the one-time compatibility decision. Normal 2.0 save identity and rollback do not hash vanilla save files.
+Those values are either vanilla-owned, derived, or materialized from source records.
+
+## Atomic writes and backup
+
+A sidecar is written to a validated temporary file and atomically promoted. When replacing an existing sidecar, IMDC retains one sibling:
+
+```text
+<sidecar>.imdc.bak
+```
+
+as the previous known-good generation. It is not a second persistence backend and is not part of normal reads.
+
+## Unreadable sidecars
+
+A missing sidecar means an ordinary empty writable IMDC branch.
+
+An existing but corrupt, invalid-scope, or newer-format sidecar is different: IMDC preserves it and blocks writes to that same sidecar path for the session rather than replacing it with empty state. A Save As to a different valid physical save path may establish a new writable branch.
+
+## Compatibility
+
+Format versions 1 and 2 of `IMDataCore.LightweightSidecar` remain readable. On a later successful persistence boundary they are written as format version 3.
+
+Pre-2.0 database persistence is outside the runtime migration path. IMDC 3 does not discover or import historical databases or flat fallback files.

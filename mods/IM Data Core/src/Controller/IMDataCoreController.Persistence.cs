@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace IMDataCore
 {
     /// <summary>
-    /// Lightweight save/load coordination for IM Data Core 2.0. This partial is
+    /// Lightweight save/load coordination for IM Data Core 3.0. This partial is
     /// deliberately limited to in-memory branch management and explicit sidecar
     /// persistence boundaries.
     /// </summary>
@@ -167,15 +167,26 @@ namespace IMDataCore
                 if (!sidecarLoaded)
                 {
                     CoreLog.Warn(loadError);
-                    string emptyError;
-                    if (!loadedEngine.InitializeEmpty(
-                        targetScope,
-                        out emptyError))
+
+                    if (!loadedEngine.IsPersistenceBlocked)
                     {
-                        loadedEngine.Dispose();
-                        CoreLog.Warn(emptyError);
-                        InstallSafeEmptyLoadedState(targetScope);
-                        return;
+                        string emptyError;
+                        if (!loadedEngine.InitializeEmpty(
+                                targetScope,
+                                out emptyError))
+                        {
+                            loadedEngine.Dispose();
+                            CoreLog.Warn(emptyError);
+                            InstallSafeEmptyLoadedState(targetScope);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core will keep supplemental state read-only for " +
+                            "this physical save until a different save path is used. " +
+                            "The unreadable/unsupported sidecar was left untouched.");
                     }
                 }
                 bool checkpointFound = false;
@@ -201,8 +212,10 @@ namespace IMDataCore
                         {
                             CoreLog.Warn(errorMessage);
                         }
-                        loadedEngine.Dispose();
-                        loadedEngine = CreateSafeEmptyEngine(targetScope);
+                        loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                            "The loaded vanilla save could not be matched safely " +
+                            "to this existing IM Data Core sidecar. The sidecar was " +
+                            "left untouched.");
                         sidecarLoaded = false;
                     }
                 }
@@ -248,11 +261,17 @@ namespace IMDataCore
                 new LightweightCoreStorageEngine();
             string ignoredError;
             if (targetScope != null &&
-                !targetScope.IsTransient &&
-                safeEngine.InitializeEmpty(targetScope, out ignoredError))
+                !targetScope.IsTransient)
             {
-                return safeEngine;
+                if (safeEngine.InitializeEmpty(
+                        targetScope,
+                        out ignoredError) ||
+                    safeEngine.IsPersistenceBlocked)
+                {
+                    return safeEngine;
+                }
             }
+
             safeEngine.InitializeTransient();
             return safeEngine;
         }

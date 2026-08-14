@@ -1,8 +1,8 @@
 {
   "Title": "IM Data Core",
-  "Description": "Reusable persistent data and event ledger backend for Idol Manager mods.",
+  "Description": "JSON-native persistent data and event ledger backend for Idol Manager mods.",
   "Author": "Cosmo",
-  "Version": "2.0.8",
+  "Version": "3.0.0",
   "Tags": ["framework", "library", "backend"],
   "HarmonyID": "com.cosmo.imdatacore"
 }

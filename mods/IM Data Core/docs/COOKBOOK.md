@@ -1,4 +1,4 @@
-﻿# IM Data Core Cookbook
+# IM Data Core Cookbook
 
 This cookbook contains practical integration patterns with enough detail to use in production mods.
 
@@ -310,3 +310,5 @@ When an API call fails:
 - `docs/START_HERE.md` for first integration
 - `docs/NAMING_CONVENTIONS.md` for rename safety rules
 - `docs/EVENT_CATALOG.md` for built-in event and payload constants
+- `docs/V3_SIDECAR_SCHEMA.md` for the private v3 disk schema
+- `docs/V3_MIGRATION.md` for lightweight-sidecar upgrade behavior

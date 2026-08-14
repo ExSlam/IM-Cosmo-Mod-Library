@@ -1200,7 +1200,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Forces immediate persistence of all currently queued records.
+        /// Forces immediate persistence of the current in-memory IMDC branch.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool TryFlushNow(out string errorMessage)
@@ -1349,7 +1349,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Forces immediate persistence of all currently queued records.
+        /// Forces immediate persistence of the current in-memory IMDC branch.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool TryFlushNow(out string errorMessage)
@@ -1580,24 +1580,6 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (jsonValue.Length >
-                    CoreConstants.MaximumCustomValueCharacterCount)
-                {
-                    errorMessage =
-                        CoreConstants.MessageJsonValueTooLong;
-                    return false;
-                }
-
-                if (!storageEngine.TryValidateCustomDataMutation(
-                    registration.NamespaceIdentifier,
-                    sanitizedDataKey,
-                    jsonValue,
-                    false,
-                    out errorMessage))
-                {
-                    return false;
-                }
-
                 DateTime mutationGameDate;
                 if (!TryResolvePublicMutationGameDateLocked(
                     out mutationGameDate,
@@ -1767,6 +1749,15 @@ namespace IMDataCore
                     return false;
                 }
 
+                string normalizedPayloadJson;
+                if (!LightweightSidecarJson.TryNormalizeJsonDocument(
+                        payloadJson,
+                        out normalizedPayloadJson,
+                        out errorMessage))
+                {
+                    return false;
+                }
+
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
                     return false;
@@ -1791,7 +1782,7 @@ namespace IMDataCore
                     EventType = sanitizedEventType,
                     SourcePatch = sanitizedSourcePatch,
                     NamespaceIdentifier = registration.NamespaceIdentifier,
-                    PayloadJson = payloadJson
+                    PayloadJson = normalizedPayloadJson
                 };
 
                 bufferedEvents.Add(pendingEvent);
@@ -8015,7 +8006,7 @@ namespace IMDataCore
 
     /// <summary>
     /// JSON payload emitted for a room task after its preparation or training work completes.
-    /// All fields are optional to readers so adding it does not require a database migration.
+    /// All fields are optional to readers so adding a field does not require a payload-schema migration.
     /// </summary>
     [Serializable]
     internal sealed class RoomWorkCompletedEventPayload

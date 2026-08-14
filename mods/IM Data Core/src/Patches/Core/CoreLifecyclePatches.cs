@@ -293,7 +293,7 @@ namespace IMDataCore
 
             try
             {
-                // PersistenceV2 resolves and validates the actual DataSaver target.
+                // The persistence layer resolves and validates the actual DataSaver target.
                 // No vanilla serialization, SHA fingerprint, staging directory, or
                 // asynchronous vanilla-file observation belongs in this hook.
                 IMDataCoreController.Instance.PrepareVanillaSaveWrite(
@@ -314,7 +314,7 @@ namespace IMDataCore
     /// <summary>
     /// Reproduces only the one vanilla manual-load name needed before the bool
     /// LoadData overload resolves/deserializes it. All final validation remains in
-    /// PersistenceV2/CorePaths.
+    /// the persistence layer and CorePaths.
     /// </summary>
     internal static class CoreSaveFilePathResolver
     {
@@ -478,7 +478,7 @@ namespace IMDataCore
             }
             catch (Exception exception)
             {
-                // PersistenceV2 is already fail-soft, but keep Harmony completely
+                // Persistence is already fail-soft, but keep Harmony completely
                 // insulated from any future regression at this boundary.
                 CoreLog.Warn(
                     "IM Data Core pre-LoadEvent restoration failed without blocking vanilla: " +

@@ -86,7 +86,7 @@ namespace IMDataCore
 
         /// <summary>
         /// Returns the sibling IM Data Core root. There is intentionally no required
-        /// "saves" layer in the version-2 layout.
+        /// "saves" layer in the current JSON-sidecar layout.
         /// </summary>
         internal static string GetRootDirectory()
         {
@@ -668,15 +668,6 @@ namespace IMDataCore
         internal static string GetSaveKey()
         {
             return GetSaveScope().InternalSaveKey;
-        }
-
-        /// <summary>
-        /// Compatibility alias retained for internal callers that used the old name.
-        /// The value is the current file-scoped logical save key.
-        /// </summary>
-        internal static string GetLegacyFileScopedSaveKey()
-        {
-            return GetSaveKey();
         }
 
         /// <summary>

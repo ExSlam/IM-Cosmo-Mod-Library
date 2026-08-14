@@ -93,20 +93,60 @@ namespace IMDataCore
                 rootValue,
                 "The lightweight sidecar root must be a JSON object.");
 
-            LightweightSidecarDocument document = new LightweightSidecarDocument
-            {
-                FormatName = RequireString(root, "FormatName"),
-                FormatVersion = RequireInt32(root, "FormatVersion"),
-                RelativeSavePath = RequireString(root, "RelativeSavePath"),
-                LastIssuedSequence = RequireInt64(root, "LastIssuedSequence"),
-                Checkpoints = ReadCheckpoints(RequireArray(root, "Checkpoints")),
-                Events = ReadEvents(RequireArray(root, "Events")),
-                CustomMutations = ReadCustomMutations(
-                    RequireArray(root, "CustomMutations"))
-            };
+            string formatName = RequireString(root, "FormatName");
+            int formatVersion = RequireInt32(root, "FormatVersion");
+            string relativeSavePath = RequireString(root, "RelativeSavePath");
 
-            return document;
+            return new LightweightSidecarDocument
+            {
+                FormatName = formatName,
+                FormatVersion = formatVersion,
+                RelativeSavePath = relativeSavePath,
+                LastIssuedSequence = RequireInt64(root, "LastIssuedSequence"),
+                Checkpoints = ReadCheckpoints(
+                    RequireArray(root, "Checkpoints"),
+                    formatVersion,
+                    relativeSavePath),
+                Events = ReadEvents(
+                    RequireArray(root, "Events"),
+                    formatVersion),
+                CustomMutations = ReadCustomMutations(
+                    RequireArray(root, "CustomMutations"),
+                    formatVersion)
+            };
         }
+
+        /// <summary>
+        /// Validates and normalizes one arbitrary JSON document. The public API
+        /// still exchanges JSON as strings because that is a convenient mod boundary,
+        /// while the v3 sidecar stores the parsed value structurally.
+        /// </summary>
+        internal static bool TryNormalizeJsonDocument(
+            string json,
+            out string normalizedJson,
+            out string errorMessage)
+        {
+            normalizedJson = string.Empty;
+            errorMessage = string.Empty;
+            if (json == null)
+            {
+                errorMessage = "JSON value cannot be null.";
+                return false;
+            }
+
+            try
+            {
+                JsonValue value = new JsonParser(json).ParseDocument();
+                normalizedJson = SerializeJsonValue(value);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = "The value is not valid JSON: " + exception.Message;
+                return false;
+            }
+        }
+
 
         internal static string CompactMoneyTransactionPayload(
             string payloadJson,
@@ -800,18 +840,24 @@ namespace IMDataCore
             {
                 builder.Append('{');
                 bool first = true;
-                foreach (KeyValuePair<string, JsonValue> pair
-                    in value.ObjectValue)
+                List<string> propertyNames = value.ObjectValue == null
+                    ? new List<string>()
+                    : new List<string>(value.ObjectValue.Keys);
+                propertyNames.Sort(StringComparer.Ordinal);
+
+                for (int index = 0; index < propertyNames.Count; index++)
                 {
+                    string propertyName = propertyNames[index];
+                    JsonValue propertyValue = value.ObjectValue[propertyName];
                     if (!first)
                     {
                         builder.Append(',');
                     }
 
                     first = false;
-                    AppendString(builder, pair.Key);
+                    AppendString(builder, propertyName);
                     builder.Append(':');
-                    AppendJsonValue(builder, pair.Value);
+                    AppendJsonValue(builder, propertyValue);
                 }
 
                 builder.Append('}');
@@ -893,31 +939,23 @@ namespace IMDataCore
                 }
 
                 builder.Append('{');
-
-                AppendPropertyName(builder, "RelativeSavePath");
-                AppendString(builder, record.RelativeSavePath ?? string.Empty);
-                builder.Append(',');
-
                 AppendPropertyName(builder, "LastSave");
                 AppendString(builder, record.LastSave ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "PlaytimeSeconds");
                 AppendInt64(builder, record.PlaytimeSeconds);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "GameDateTime");
                 AppendString(builder, record.GameDateTime ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "Sequence");
                 AppendInt64(builder, record.Sequence);
-
                 builder.Append('}');
             }
 
             builder.Append(']');
         }
+
 
         private static void AppendEvents(
             StringBuilder builder,
@@ -939,55 +977,46 @@ namespace IMDataCore
                 }
 
                 builder.Append('{');
-
                 AppendPropertyName(builder, "Sequence");
                 AppendInt64(builder, record.Sequence);
                 builder.Append(',');
-
-                AppendPropertyName(builder, "EventId");
-                AppendInt64(builder, record.EventId);
-                builder.Append(',');
-
-                AppendPropertyName(builder, "GameDateKey");
-                AppendInt32(builder, record.GameDateKey);
-                builder.Append(',');
-
                 AppendPropertyName(builder, "GameDateTime");
                 AppendString(builder, record.GameDateTime ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "IdolId");
                 AppendInt32(builder, record.IdolId);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "EntityKind");
                 AppendString(builder, record.EntityKind ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "EntityId");
                 AppendString(builder, record.EntityId ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "EventType");
                 AppendString(builder, record.EventType ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "SourcePatch");
                 AppendString(builder, record.SourcePatch ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "NamespaceIdentifier");
                 AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
                 builder.Append(',');
+                AppendPropertyName(builder, "Payload");
 
-                AppendPropertyName(builder, "PayloadJson");
-                AppendString(builder, record.PayloadJson ?? string.Empty);
-
+                JsonValue payloadValue = ParseJsonForStorage(
+                    record.PayloadJson,
+                    "An event payload");
+                if (string.IsNullOrEmpty(record.NamespaceIdentifier))
+                {
+                    TransformEventPayloadForStorage(payloadValue);
+                }
+                AppendJsonValue(builder, payloadValue);
                 builder.Append('}');
             }
 
             builder.Append(']');
         }
+
 
         private static void AppendCustomMutations(
             StringBuilder builder,
@@ -1009,33 +1038,34 @@ namespace IMDataCore
                 }
 
                 builder.Append('{');
-
                 AppendPropertyName(builder, "Sequence");
                 AppendInt64(builder, record.Sequence);
                 builder.Append(',');
-
-                AppendPropertyName(builder, "GameDateKey");
-                AppendInt32(builder, record.GameDateKey);
-                builder.Append(',');
-
                 AppendPropertyName(builder, "GameDateTime");
                 AppendString(builder, record.GameDateTime ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "NamespaceIdentifier");
                 AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "DataKey");
                 AppendString(builder, record.DataKey ?? string.Empty);
                 builder.Append(',');
-
                 AppendPropertyName(builder, "Operation");
                 AppendString(builder, record.Operation ?? string.Empty);
-                builder.Append(',');
 
-                AppendPropertyName(builder, "ValueJson");
-                AppendString(builder, record.ValueJson ?? string.Empty);
+                if (string.Equals(
+                        record.Operation,
+                        LightweightCoreStorageEngine.CustomOperationSet,
+                        StringComparison.Ordinal))
+                {
+                    builder.Append(',');
+                    AppendPropertyName(builder, "Value");
+                    AppendJsonValue(
+                        builder,
+                        ParseJsonForStorage(
+                            record.ValueJson,
+                            "A custom-data value"));
+                }
 
                 builder.Append('}');
             }
@@ -1043,8 +1073,11 @@ namespace IMDataCore
             builder.Append(']');
         }
 
+
         private static List<LightweightCheckpointRecord> ReadCheckpoints(
-            List<JsonValue> values)
+            List<JsonValue> values,
+            int formatVersion,
+            string documentRelativeSavePath)
         {
             List<LightweightCheckpointRecord> records =
                 new List<LightweightCheckpointRecord>(values.Count);
@@ -1058,16 +1091,12 @@ namespace IMDataCore
                 records.Add(
                     new LightweightCheckpointRecord
                     {
-                        RelativeSavePath = RequireString(
-                            item,
-                            "RelativeSavePath"),
+                        RelativeSavePath = formatVersion >= 3
+                            ? documentRelativeSavePath ?? string.Empty
+                            : RequireString(item, "RelativeSavePath"),
                         LastSave = RequireString(item, "LastSave"),
-                        PlaytimeSeconds = RequireInt64(
-                            item,
-                            "PlaytimeSeconds"),
-                        GameDateTime = RequireString(
-                            item,
-                            "GameDateTime"),
+                        PlaytimeSeconds = RequireInt64(item, "PlaytimeSeconds"),
+                        GameDateTime = RequireString(item, "GameDateTime"),
                         Sequence = RequireInt64(item, "Sequence")
                     });
             }
@@ -1075,8 +1104,10 @@ namespace IMDataCore
             return records;
         }
 
+
         private static List<LightweightEventRecord> ReadEvents(
-            List<JsonValue> values)
+            List<JsonValue> values,
+            int formatVersion)
         {
             List<LightweightEventRecord> records =
                 new List<LightweightEventRecord>(values.Count);
@@ -1087,30 +1118,74 @@ namespace IMDataCore
                     values[index],
                     "An event entry must be a JSON object.");
 
+                long sequence = RequireInt64(item, "Sequence");
+                string gameDateTime = RequireString(item, "GameDateTime");
+                string namespaceIdentifier = RequireString(
+                    item,
+                    "NamespaceIdentifier");
+                int gameDateKey;
+                string payloadJson;
+
+                if (formatVersion >= 3)
+                {
+                    gameDateKey = BuildGameDateKeyFromRoundTrip(
+                        gameDateTime,
+                        "event");
+                    JsonValue payloadValue = RequireMember(item, "Payload");
+                    if (string.IsNullOrEmpty(namespaceIdentifier))
+                    {
+                        TransformEventPayloadForRuntime(payloadValue);
+                    }
+                    payloadJson = SerializeJsonValue(payloadValue);
+                }
+                else
+                {
+                    long storedEventId = RequireInt64(item, "EventId");
+                    if (storedEventId != sequence)
+                    {
+                        throw new FormatException(
+                            "The legacy lightweight sidecar contains an event " +
+                            "identifier that does not match its sequence.");
+                    }
+
+                    int storedGameDateKey = RequireInt32(item, "GameDateKey");
+                    gameDateKey = BuildGameDateKeyFromRoundTrip(
+                        gameDateTime,
+                        "event");
+                    if (storedGameDateKey != gameDateKey)
+                    {
+                        throw new FormatException(
+                            "The legacy lightweight sidecar contains an event " +
+                            "GameDateKey that does not match GameDateTime.");
+                    }
+
+                    payloadJson = RequireString(item, "PayloadJson");
+                }
+
                 records.Add(
                     new LightweightEventRecord
                     {
-                        Sequence = RequireInt64(item, "Sequence"),
-                        EventId = RequireInt64(item, "EventId"),
-                        GameDateKey = RequireInt32(item, "GameDateKey"),
-                        GameDateTime = RequireString(item, "GameDateTime"),
+                        Sequence = sequence,
+                        GameDateKey = gameDateKey,
+                        GameDateTime = gameDateTime,
                         IdolId = RequireInt32(item, "IdolId"),
                         EntityKind = RequireString(item, "EntityKind"),
                         EntityId = RequireString(item, "EntityId"),
                         EventType = RequireString(item, "EventType"),
                         SourcePatch = RequireString(item, "SourcePatch"),
-                        NamespaceIdentifier = RequireString(
-                            item,
-                            "NamespaceIdentifier"),
-                        PayloadJson = RequireString(item, "PayloadJson")
+                        NamespaceIdentifier = namespaceIdentifier,
+                        PayloadJson = payloadJson
                     });
             }
 
             return records;
         }
 
+
+
         private static List<LightweightCustomMutationRecord> ReadCustomMutations(
-            List<JsonValue> values)
+            List<JsonValue> values,
+            int formatVersion)
         {
             List<LightweightCustomMutationRecord> records =
                 new List<LightweightCustomMutationRecord>(values.Count);
@@ -1121,22 +1196,383 @@ namespace IMDataCore
                     values[index],
                     "A custom mutation entry must be a JSON object.");
 
+                string operation = RequireString(item, "Operation");
+                string gameDateTime = RequireString(item, "GameDateTime");
+                int gameDateKey;
+                string valueJson;
+
+                if (formatVersion >= 3)
+                {
+                    gameDateKey = BuildGameDateKeyFromRoundTrip(
+                        gameDateTime,
+                        "custom-data mutation");
+
+                    valueJson = string.Equals(
+                        operation,
+                        LightweightCoreStorageEngine.CustomOperationSet,
+                        StringComparison.Ordinal)
+                        ? SerializeJsonValue(RequireMember(item, "Value"))
+                        : string.Empty;
+                }
+                else
+                {
+                    int storedGameDateKey = RequireInt32(item, "GameDateKey");
+                    gameDateKey = BuildGameDateKeyFromRoundTrip(
+                        gameDateTime,
+                        "custom-data mutation");
+                    if (storedGameDateKey != gameDateKey)
+                    {
+                        throw new FormatException(
+                            "The legacy lightweight sidecar contains a custom-data " +
+                            "GameDateKey that does not match GameDateTime.");
+                    }
+
+                    valueJson = RequireString(item, "ValueJson");
+                }
+
                 records.Add(
                     new LightweightCustomMutationRecord
                     {
                         Sequence = RequireInt64(item, "Sequence"),
-                        GameDateKey = RequireInt32(item, "GameDateKey"),
-                        GameDateTime = RequireString(item, "GameDateTime"),
+                        GameDateKey = gameDateKey,
+                        GameDateTime = gameDateTime,
                         NamespaceIdentifier = RequireString(
                             item,
                             "NamespaceIdentifier"),
                         DataKey = RequireString(item, "DataKey"),
-                        Operation = RequireString(item, "Operation"),
-                        ValueJson = RequireString(item, "ValueJson")
+                        Operation = operation,
+                        ValueJson = valueJson
                     });
             }
 
             return records;
+        }
+
+
+        private static JsonValue ParseJsonForStorage(
+            string json,
+            string description)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new FormatException(
+                    (description ?? "A JSON value") + " is empty.");
+            }
+
+            try
+            {
+                return new JsonParser(json).ParseDocument();
+            }
+            catch (Exception exception)
+            {
+                throw new FormatException(
+                    (description ?? "A JSON value") +
+                    " is not valid JSON: " +
+                    exception.Message,
+                    exception);
+            }
+        }
+
+        private static int BuildGameDateKeyFromRoundTrip(
+            string gameDateTime,
+            string recordKind)
+        {
+            DateTime parsed;
+            if (!DateTime.TryParseExact(
+                    gameDateTime ?? string.Empty,
+                    CoreConstants.RoundTripDateFormat,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out parsed))
+            {
+                throw new FormatException(
+                    "The lightweight sidecar " +
+                    (recordKind ?? "record") +
+                    " has an invalid GameDateTime.");
+            }
+
+            return CoreDateTimeUtility.BuildGameDateKey(parsed);
+        }
+
+        /// <summary>
+        /// Makes built-in event payloads document-native on disk while keeping the
+        /// established string-based public payload contract. Only built-in IMDC event payloads are rewritten; namespaced custom-event JSON is left untouched.
+        /// </summary>
+        private static void TransformEventPayloadForStorage(JsonValue value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Array)
+            {
+                for (int index = 0;
+                    value.ArrayValue != null && index < value.ArrayValue.Count;
+                    index++)
+                {
+                    TransformEventPayloadForStorage(value.ArrayValue[index]);
+                }
+                return;
+            }
+
+            if (value.Kind != JsonValueKind.Object ||
+                value.ObjectValue == null)
+            {
+                return;
+            }
+
+            JsonValue detailJson;
+            if (value.ObjectValue.TryGetValue("detail_json", out detailJson) &&
+                detailJson != null &&
+                detailJson.Kind == JsonValueKind.String)
+            {
+                if (string.IsNullOrWhiteSpace(detailJson.StringValue))
+                {
+                    value.ObjectValue.Remove("detail_json");
+                }
+                else
+                {
+                    try
+                    {
+                        JsonValue detailValue =
+                            new JsonParser(detailJson.StringValue).ParseDocument();
+                        value.ObjectValue.Remove("detail_json");
+                        value.ObjectValue["detail"] = detailValue;
+                    }
+                    catch
+                    {
+                        // A malformed historical detail payload is left untouched.
+                    }
+                }
+            }
+
+            List<string> propertyNames =
+                new List<string>(value.ObjectValue.Keys);
+            for (int index = 0; index < propertyNames.Count; index++)
+            {
+                string propertyName = propertyNames[index];
+                JsonValue member;
+                if (!value.ObjectValue.TryGetValue(propertyName, out member) ||
+                    member == null)
+                {
+                    continue;
+                }
+
+                if (member.Kind == JsonValueKind.String &&
+                    IsDelimitedListProperty(propertyName))
+                {
+                    value.ObjectValue[propertyName] =
+                        ParseDelimitedListForStorage(
+                            propertyName,
+                            member.StringValue);
+                    continue;
+                }
+
+                TransformEventPayloadForStorage(member);
+            }
+        }
+
+        /// <summary>
+        /// Reconstructs the stable public/runtime payload shape from the native v3
+        /// disk representation. This keeps existing Cosmo consumers source-compatible
+        /// without storing JSON or identifier arrays as quoted strings.
+        /// </summary>
+        private static void TransformEventPayloadForRuntime(JsonValue value)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            if (value.Kind == JsonValueKind.Array)
+            {
+                for (int index = 0;
+                    value.ArrayValue != null && index < value.ArrayValue.Count;
+                    index++)
+                {
+                    TransformEventPayloadForRuntime(value.ArrayValue[index]);
+                }
+                return;
+            }
+
+            if (value.Kind != JsonValueKind.Object ||
+                value.ObjectValue == null)
+            {
+                return;
+            }
+
+            JsonValue detail;
+            if (value.ObjectValue.TryGetValue("detail", out detail) &&
+                detail != null &&
+                !value.ObjectValue.ContainsKey("detail_json"))
+            {
+                // Restore any JSON-native list fields inside the detail object
+                // before re-encoding the established public detail_json view.
+                TransformEventPayloadForRuntime(detail);
+                value.ObjectValue.Remove("detail");
+                value.ObjectValue["detail_json"] = new JsonValue
+                {
+                    Kind = JsonValueKind.String,
+                    StringValue = SerializeJsonValue(detail)
+                };
+            }
+
+            List<string> propertyNames =
+                new List<string>(value.ObjectValue.Keys);
+            for (int index = 0; index < propertyNames.Count; index++)
+            {
+                string propertyName = propertyNames[index];
+                JsonValue member;
+                if (!value.ObjectValue.TryGetValue(propertyName, out member) ||
+                    member == null)
+                {
+                    continue;
+                }
+
+                if (member.Kind == JsonValueKind.Array &&
+                    IsDelimitedListProperty(propertyName))
+                {
+                    value.ObjectValue[propertyName] = new JsonValue
+                    {
+                        Kind = JsonValueKind.String,
+                        StringValue = SerializeDelimitedListForRuntime(
+                            member.ArrayValue)
+                    };
+                    continue;
+                }
+
+                TransformEventPayloadForRuntime(member);
+            }
+        }
+
+        private static bool IsDelimitedListProperty(string propertyName)
+        {
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                return false;
+            }
+
+            string normalized = propertyName
+                .Replace("_", string.Empty)
+                .ToLowerInvariant();
+
+            return normalized.IndexOf(
+                    "idlist",
+                    StringComparison.Ordinal) >= 0 ||
+                string.Equals(
+                    normalized,
+                    "removedtaskcustomlist",
+                    StringComparison.Ordinal);
+        }
+
+        private static JsonValue ParseDelimitedListForStorage(
+            string propertyName,
+            string rawValue)
+        {
+            JsonValue array = new JsonValue
+            {
+                Kind = JsonValueKind.Array,
+                ArrayValue = new List<JsonValue>()
+            };
+
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return array;
+            }
+
+            bool identifierList =
+                (propertyName ?? string.Empty)
+                    .Replace("_", string.Empty)
+                    .ToLowerInvariant()
+                    .IndexOf(
+                        "idlist",
+                        StringComparison.Ordinal) >= 0;
+
+            string[] tokens = rawValue.Split(',');
+            for (int index = 0; index < tokens.Length; index++)
+            {
+                string token = tokens[index].Trim();
+                if (string.IsNullOrEmpty(token))
+                {
+                    continue;
+                }
+
+                long identifier;
+                if (identifierList &&
+                    long.TryParse(
+                        token,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out identifier))
+                {
+                    array.ArrayValue.Add(
+                        new JsonValue
+                        {
+                            Kind = JsonValueKind.Number,
+                            NumberValue = identifier.ToString(
+                                CultureInfo.InvariantCulture)
+                        });
+                }
+                else
+                {
+                    array.ArrayValue.Add(
+                        new JsonValue
+                        {
+                            Kind = JsonValueKind.String,
+                            StringValue = token
+                        });
+                }
+            }
+
+            return array;
+        }
+
+        private static string SerializeDelimitedListForRuntime(
+            List<JsonValue> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < values.Count; index++)
+            {
+                JsonValue value = values[index];
+                if (value == null)
+                {
+                    continue;
+                }
+
+                string token;
+                if (value.Kind == JsonValueKind.Number)
+                {
+                    token = value.NumberValue ?? string.Empty;
+                }
+                else if (value.Kind == JsonValueKind.String)
+                {
+                    token = value.StringValue ?? string.Empty;
+                }
+                else
+                {
+                    token = SerializeJsonValue(value);
+                }
+
+                if (string.IsNullOrEmpty(token))
+                {
+                    continue;
+                }
+
+                if (builder.Length > 0)
+                {
+                    builder.Append(',');
+                }
+
+                builder.Append(token);
+            }
+
+            return builder.ToString();
         }
 
         private static Dictionary<string, JsonValue> RequireObject(
