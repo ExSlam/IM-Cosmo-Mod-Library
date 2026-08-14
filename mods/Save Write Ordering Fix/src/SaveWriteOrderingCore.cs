@@ -33,7 +33,18 @@ namespace SaveWriteOrderingFix
     /// </summary>
     public static class SaveWriteOrderingApi
     {
-        public const string Version = "1.1.0";
+        public const string Version = "1.2.0";
+
+        /// <summary>
+        /// True only after every known vanilla SavedData write caller has been
+        /// inspected and exactly one DataSaver.saveData&lt;SavedData&gt; call in each
+        /// caller was replaced by the ordered writer. Merely loading this assembly is
+        /// intentionally not enough to make this property true.
+        /// </summary>
+        public static bool SavedDataInterceptionHealthy
+        {
+            get { return SaveWriteOrderingPatchHealth.IsSavedDataInterceptionHealthy; }
+        }
 
         public static bool HasPendingWrites(string absoluteSavePath)
         {
@@ -122,6 +133,64 @@ namespace SaveWriteOrderingFix
         {
             return timeoutMilliseconds == Timeout.Infinite ||
                    timeoutMilliseconds >= 0;
+        }
+    }
+
+    /// <summary>
+    /// Records the result of caller-level transpilation so cooperating mods can
+    /// distinguish "assembly loaded" from "all required save callers patched".
+    /// </summary>
+    internal static class SaveWriteOrderingPatchHealth
+    {
+        private const int ExpectedSavedDataWriteCallerCount = 5;
+        private static readonly object SyncRoot = new object();
+        private static readonly HashSet<string> SuccessfulCallers =
+            new HashSet<string>(StringComparer.Ordinal);
+        private static bool sawFailure;
+
+        internal static bool IsSavedDataInterceptionHealthy
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return !sawFailure &&
+                        SuccessfulCallers.Count == ExpectedSavedDataWriteCallerCount;
+                }
+            }
+        }
+
+        internal static void ReportSavedDataWriteCaller(
+            System.Reflection.MethodBase method,
+            bool success)
+        {
+            string identity = BuildMethodIdentity(method);
+            lock (SyncRoot)
+            {
+                if (!success)
+                {
+                    sawFailure = true;
+                    return;
+                }
+
+                SuccessfulCallers.Add(identity);
+            }
+        }
+
+        private static string BuildMethodIdentity(System.Reflection.MethodBase method)
+        {
+            if (method == null)
+            {
+                return "<unknown>";
+            }
+
+            Type declaringType = method.DeclaringType;
+            return string.Concat(
+                declaringType != null ? declaringType.FullName : "<global>",
+                "::",
+                method.Name,
+                "::",
+                method.MetadataToken.ToString(CultureInfo.InvariantCulture));
         }
     }
 

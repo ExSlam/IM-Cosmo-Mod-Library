@@ -53,6 +53,9 @@ namespace SaveWriteOrderingFix
 
         [HarmonyTranspiler]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter(
+            SaveWriteOrderingConstants.IMDataCoreHarmonyId,
+            SaveWriteOrderingConstants.GraduationDetailsHarmonyId)]
         private static IEnumerable<CodeInstruction> Transpiler(
             IEnumerable<CodeInstruction> instructions,
             MethodBase __originalMethod)
@@ -70,6 +73,9 @@ namespace SaveWriteOrderingFix
 
             if (replacement == null)
             {
+                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                    __originalMethod,
+                    false);
                 Debug.LogWarning(
                     SaveWriteOrderingConstants.LogPrefix +
                     "Could not resolve the ordered save replacement. " +
@@ -99,6 +105,9 @@ namespace SaveWriteOrderingFix
 
             if (replacedCount != 1)
             {
+                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                    __originalMethod,
+                    false);
                 Debug.LogWarning(
                     SaveWriteOrderingConstants.LogPrefix +
                     "Expected exactly one vanilla SavedData write in " +
@@ -109,6 +118,12 @@ namespace SaveWriteOrderingFix
                     (replacedCount == 0
                         ? "without a Save Write Ordering replacement."
                         : "with every matching SavedData call ordered."));
+            }
+            else
+            {
+                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                    __originalMethod,
+                    true);
             }
 
             return result;

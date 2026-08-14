@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Added `SaveWriteOrderingApi.SavedDataInterceptionHealthy`, which becomes true only after all five required vanilla `SavedData` write callers were successfully transpiled exactly once.
+- Explicitly added the documented `HarmonyAfter` ordering for IM Data Core and Graduation Details alongside `Priority.Last`.
+- Cooperating mods can now distinguish "assembly loaded" from "write interception is actually healthy" and retain their defensive fallback if a game/mod update prevents one caller patch.
+- The ordered writer, per-path FIFO behavior, load-side coordination, and public exclusive-file APIs are otherwise unchanged from 1.1.0.
+
 ## 1.1.0
 
 - Rebuilt the mod around Idol Manager's concrete vanilla save/load callers.

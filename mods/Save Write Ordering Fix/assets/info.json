@@ -1,14 +1,12 @@
 {
   "Title": "Save Write Ordering Fix",
-  "Description": "Prevents older save attempts from overwriting newer ones when saving to the same slot in quick succession.",
+  "Description": "Prevents older same-slot saves from overwriting newer requests and exposes verified caller-interception health for cooperating persistence mods.",
   "Author": "Cosmo",
-  "Version": "1.1.0",
+  "Version": "1.2.0",
   "Tags": [
-    "gameplay",
     "fix",
     "patch",
-    "bugfix",
-    "compatibility"
+    "bugfix"
   ],
   "HarmonyID": "com.cosmo.savewriteorderingfix"
 }

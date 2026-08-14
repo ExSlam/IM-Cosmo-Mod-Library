@@ -1,18 +1,18 @@
 # Save Write Ordering Fix
 
-**Version 1.1.0**
+**Version 1.2.0**
 
 Fixes a vanilla bug where rapidly saving to the same slot can let an older save finish later and overwrite the newer save.
 
-## Important: 1.1.0 replaces the 1.0.x implementation
+## Important: 1.2.0 retains the Mono-safe 1.1 architecture
 
 Do not use 1.0.0 or 1.0.1.
 
 Those versions Harmony-patched constructed `DataSaver<T>` methods. That is unsafe on Idol Manager's Mono runtime because reference-type generic instantiations may share runtime code. In practice, a `SavedData` patch can interfere with other `DataSaver<T>` uses such as `GlobalData`.
 
-Version 1.1.0 contains **no Harmony patch on `DataSaver<T>`**.
+Version 1.2.0 contains **no Harmony patch on `DataSaver<T>`**.
 
-## How 1.1.0 works
+## How 1.2.0 works
 
 Idol Manager has five concrete vanilla places that write `SaveManager.SavedData`:
 
@@ -45,6 +45,16 @@ Both current mods patch the same concrete save callers and leave the final vanil
 
 No IM Data Core API or assembly reference is required.
 
+### Verified interception health
+
+Cooperating persistence mods can query:
+
+```csharp
+bool healthy = SaveWriteOrderingFix.SaveWriteOrderingApi.SavedDataInterceptionHealthy;
+```
+
+The value is true only after all five required write callers were successfully rewritten exactly once. It is intentionally stricter than checking whether the SWOF assembly is merely loaded. IM Data Core 3.3 uses this signal before omitting its own defensive `SavedData` clone.
+
 ## Load-side coordination
 
 Idol Manager also reads `SavedData` directly while:
@@ -54,7 +64,7 @@ Idol Manager also reads `SavedData` directly while:
 - building manual save lists,
 - building story save/playthrough lists.
 
-Version 1.1.0 replaces the concrete `DataSaver.loadData<SaveManager.SavedData>` instructions at all known vanilla caller sites with a wrapper that waits for an ordered write to the same physical file to finish, then calls vanilla `DataSaver.loadData<SaveManager.SavedData>`.
+Version 1.2.0 replaces the concrete `DataSaver.loadData<SaveManager.SavedData>` instructions at all known vanilla caller sites with a wrapper that waits for an ordered write to the same physical file to finish, then calls vanilla `DataSaver.loadData<SaveManager.SavedData>`.
 
 Again, `DataSaver<T>` itself is not Harmony-patched.
 
