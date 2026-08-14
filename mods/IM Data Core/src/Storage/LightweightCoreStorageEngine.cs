@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace IMDataCore
 {
@@ -181,9 +182,168 @@ namespace IMDataCore
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
-        internal const int JournalFormatVersion = 1;
+        internal const int LegacyJournalFormatVersion = 1;
+        internal const int JournalFormatVersion = 2;
         private const long MinimumJournalCompactionBytes = 1024L * 1024L;
-        private const int MaximumJournalEntriesBeforeCompaction = 1024;
+        private const long MaximumJournalCompactionBytes = 16L * 1024L * 1024L;
+        private const int MaximumJournalEntriesBeforeCompaction = 256;
+
+        private sealed class HashingReadStream : Stream
+        {
+            private readonly Stream inner;
+            private readonly HashAlgorithm hash;
+            private bool finalized;
+
+            internal HashingReadStream(Stream innerStream)
+            {
+                inner = innerStream ?? throw new ArgumentNullException("innerStream");
+                hash = SHA256.Create();
+            }
+
+            internal string GetHashHex()
+            {
+                FinalizeHash();
+                return ToLowerHex(hash.Hash);
+            }
+
+            private void FinalizeHash()
+            {
+                if (!finalized)
+                {
+                    hash.TransformFinalBlock(new byte[0], 0, 0);
+                    finalized = true;
+                }
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                int read = inner.Read(buffer, offset, count);
+                if (read > 0)
+                {
+                    hash.TransformBlock(buffer, offset, read, buffer, offset);
+                }
+                else
+                {
+                    FinalizeHash();
+                }
+                return read;
+            }
+
+            public override bool CanRead { get { return inner.CanRead; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanWrite { get { return false; } }
+            public override long Length { get { return inner.Length; } }
+            public override long Position
+            {
+                get { return inner.Position; }
+                set { throw new NotSupportedException(); }
+            }
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin)
+            {
+                throw new NotSupportedException();
+            }
+            public override void SetLength(long value)
+            {
+                throw new NotSupportedException();
+            }
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                throw new NotSupportedException();
+            }
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    hash.Dispose();
+                }
+                base.Dispose(disposing);
+            }
+        }
+
+        private sealed class HashingWriteStream : Stream
+        {
+            private readonly Stream inner;
+            private readonly HashAlgorithm hash;
+            private bool finalized;
+
+            internal HashingWriteStream(Stream innerStream)
+            {
+                inner = innerStream ?? throw new ArgumentNullException("innerStream");
+                hash = SHA256.Create();
+            }
+
+            internal string CompleteAndGetHashHex()
+            {
+                if (!finalized)
+                {
+                    hash.TransformFinalBlock(new byte[0], 0, 0);
+                    finalized = true;
+                }
+                return ToLowerHex(hash.Hash);
+            }
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                if (finalized)
+                {
+                    throw new InvalidOperationException(
+                        "The hashing write stream has already been finalized.");
+                }
+                if (count > 0)
+                {
+                    hash.TransformBlock(buffer, offset, count, buffer, offset);
+                    inner.Write(buffer, offset, count);
+                }
+            }
+
+            public override bool CanRead { get { return false; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanWrite { get { return inner.CanWrite; } }
+            public override long Length { get { return inner.Length; } }
+            public override long Position
+            {
+                get { return inner.Position; }
+                set { throw new NotSupportedException(); }
+            }
+            public override void Flush() { inner.Flush(); }
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                throw new NotSupportedException();
+            }
+            public override long Seek(long offset, SeekOrigin origin)
+            {
+                throw new NotSupportedException();
+            }
+            public override void SetLength(long value)
+            {
+                throw new NotSupportedException();
+            }
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    hash.Dispose();
+                }
+                base.Dispose(disposing);
+            }
+        }
+
+        private static string ToLowerHex(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                return string.Empty;
+            }
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                builder.Append(bytes[index].ToString(
+                    "x2",
+                    CultureInfo.InvariantCulture));
+            }
+            return builder.ToString();
+        }
 
         private sealed class CommittedPathState
         {
@@ -196,6 +356,13 @@ namespace IMDataCore
             internal int CheckpointCount;
             internal long LastIssuedSequence;
             internal long StateRevision;
+        }
+
+        private sealed class TourRuntimeState
+        {
+            internal long Sequence;
+            internal List<int> ParticipantIdolIdentifiers = new List<int>();
+            internal string StartDate = string.Empty;
         }
 
         private sealed class MaterializedCustomValue
@@ -222,6 +389,14 @@ namespace IMDataCore
             activeCheckpointsByRelativePath =
                 new Dictionary<string, List<LightweightCheckpointRecord>>(
                     CorePaths.PathComparer);
+        private readonly Dictionary<CheckpointIdentity, LightweightCheckpointRecord>
+            activeCheckpointsByIdentity =
+                new Dictionary<CheckpointIdentity, LightweightCheckpointRecord>();
+        private readonly Dictionary<CheckpointIdentity, LightweightCheckpointRecord>
+            durableCheckpointsByIdentity =
+                new Dictionary<CheckpointIdentity, LightweightCheckpointRecord>();
+        private readonly HashSet<string> backgroundCompactionsInFlight =
+            new HashSet<string>(CorePaths.PathComparer);
         private readonly Dictionary<string, MaterializedCustomValue> customValues =
             new Dictionary<string, MaterializedCustomValue>(StringComparer.Ordinal);
         private readonly Dictionary<string, NamespaceUsage> customUsageByNamespace =
@@ -241,6 +416,10 @@ namespace IMDataCore
             moneyTransactionsByDateKey =
                 new SortedDictionary<int, List<LightweightEventRecord>>();
         private LightweightEventRecord moneyLedgerCoverageStartEvent;
+        private readonly Dictionary<int, List<int>> latestSingleCastBySingleId =
+            new Dictionary<int, List<int>>();
+        private readonly Dictionary<int, TourRuntimeState> latestTourStateByTourId =
+            new Dictionary<int, TourRuntimeState>();
 
         private List<LightweightEventRecord> durableEvents =
             new List<LightweightEventRecord>();
@@ -411,7 +590,9 @@ namespace IMDataCore
                         out primaryLoadInfo,
                         out primaryError))
                 {
-                    LoadDocumentLocked(document);
+                    bool loadRequiresFullSnapshot = LoadDocumentLocked(document);
+                    primaryLoadInfo.ForceFullSnapshot |=
+                        loadRequiresFullSnapshot;
                     RegisterLoadedPathStateLocked(
                         currentSidecarPath,
                         document,
@@ -1166,47 +1347,14 @@ namespace IMDataCore
             lock (storageLock)
             {
                 ThrowIfDisposed();
-                string entityId = singleId.ToString(CultureInfo.InvariantCulture);
-                long newestSequence = long.MinValue;
-                for (int eventIndex = CoreConstants.ZeroBasedListStartIndex;
-                    eventIndex < activeEvents.Count;
-                    eventIndex++)
+                List<int> cached;
+                if (!latestSingleCastBySingleId.TryGetValue(singleId, out cached))
                 {
-                    LightweightEventRecord record = activeEvents[eventIndex];
-                    if (record == null ||
-                        record.Sequence <= newestSequence ||
-                        !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
-                        !string.Equals(
-                            record.EntityKind,
-                            CoreConstants.EventEntityKindSingle,
-                            StringComparison.Ordinal) ||
-                        !string.Equals(
-                            record.EntityId,
-                            entityId,
-                            StringComparison.Ordinal) ||
-                        !string.Equals(
-                            record.EventType,
-                            CoreConstants.EventTypeSingleReleased,
-                            StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    List<int> candidateSlotIdolIdentifiers;
-                    if (!SharedTimelineParticipants.TryReadSingleCastSlotIds(
-                            record.PayloadJson,
-                            out candidateSlotIdolIdentifiers) ||
-                        !ContainsValidIdolIdentifier(
-                            candidateSlotIdolIdentifiers))
-                    {
-                        continue;
-                    }
-
-                    newestSequence = record.Sequence;
-                    slotIdolIdentifiers = candidateSlotIdolIdentifiers;
+                    return false;
                 }
 
-                return newestSequence != long.MinValue;
+                slotIdolIdentifiers = new List<int>(cached);
+                return true;
             }
         }
 
@@ -1224,47 +1372,17 @@ namespace IMDataCore
             lock (storageLock)
             {
                 ThrowIfDisposed();
-                string entityId = tourId.ToString(CultureInfo.InvariantCulture);
-                long newestSequence = long.MinValue;
-                for (int eventIndex = CoreConstants.ZeroBasedListStartIndex;
-                    eventIndex < activeEvents.Count;
-                    eventIndex++)
+                TourRuntimeState cached;
+                if (!latestTourStateByTourId.TryGetValue(tourId, out cached) ||
+                    cached == null)
                 {
-                    LightweightEventRecord record = activeEvents[eventIndex];
-                    if (record == null ||
-                        record.Sequence <= newestSequence ||
-                        !string.IsNullOrEmpty(record.NamespaceIdentifier) ||
-                        !string.Equals(record.EntityKind,
-                            CoreConstants.EventEntityKindTour,
-                            StringComparison.Ordinal) ||
-                        !string.Equals(record.EntityId, entityId,
-                            StringComparison.Ordinal) ||
-                        !string.Equals(record.EventType,
-                            CoreConstants.EventTypeTourStarted,
-                            StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    List<int> candidateParticipants;
-                    if (!SharedTimelineParticipants.TryReadTourParticipantIds(
-                            record.PayloadJson,
-                            out candidateParticipants))
-                    {
-                        continue;
-                    }
-
-                    string candidateStartDate;
-                    LightweightSidecarJson.TryReadStringProperty(
-                        record.PayloadJson,
-                        CoreConstants.JsonFieldTourStartDate,
-                        out candidateStartDate);
-                    newestSequence = record.Sequence;
-                    participantIdolIdentifiers = candidateParticipants;
-                    startDate = candidateStartDate ?? string.Empty;
+                    return false;
                 }
 
-                return newestSequence != long.MinValue;
+                participantIdolIdentifiers =
+                    new List<int>(cached.ParticipantIdolIdentifiers);
+                startDate = cached.StartDate ?? string.Empty;
+                return true;
             }
         }
 
@@ -1395,26 +1513,11 @@ namespace IMDataCore
                 try
                 {
                     ThrowIfDisposed();
-                    LightweightCheckpointRecord matchingCheckpoint = null;
-                    for (int index = 0; index < durableCheckpoints.Count; index++)
-                    {
-                        LightweightCheckpointRecord candidate = durableCheckpoints[index];
-                        if (!stamp.Matches(candidate))
-                        {
-                            continue;
-                        }
-
-                        if (matchingCheckpoint != null)
-                        {
-                            errorMessage =
-                                "The sidecar contains ambiguous duplicate checkpoint identities.";
-                            return false;
-                        }
-
-                        matchingCheckpoint = candidate;
-                    }
-
-                    if (matchingCheckpoint == null)
+                    LightweightCheckpointRecord matchingCheckpoint;
+                    if (!durableCheckpointsByIdentity.TryGetValue(
+                            CheckpointIdentity.From(stamp),
+                            out matchingCheckpoint) ||
+                        matchingCheckpoint == null)
                     {
                         return true;
                     }
@@ -1433,9 +1536,18 @@ namespace IMDataCore
                         return false;
                     }
 
-                    ActivateThroughSequenceLocked(
-                        matchingCheckpoint.Sequence,
-                        checkpointGameDate);
+                    // The normal load case already has exactly the tip state in
+                    // active lists. Avoid rebuilding/sorting every history list
+                    // unless this checkpoint actually selects an older branch.
+                    if (!ActiveStateFitsCheckpointLocked(
+                            matchingCheckpoint.Sequence,
+                            checkpointGameDate))
+                    {
+                        ActivateThroughSequenceLocked(
+                            matchingCheckpoint.Sequence,
+                            checkpointGameDate);
+                    }
+
                     checkpointFound = true;
                     activatedSequence = matchingCheckpoint.Sequence;
                     return true;
@@ -1488,18 +1600,15 @@ namespace IMDataCore
                         sequence,
                         checkpointGameDate);
 
-                    bool replacedCheckpoint = false;
-                    for (int index = activeCheckpoints.Count - 1; index >= 0; index--)
+                    CheckpointIdentity checkpointIdentity =
+                        CheckpointIdentity.From(stamp);
+                    LightweightCheckpointRecord existingCheckpoint;
+                    if (activeCheckpointsByIdentity.TryGetValue(
+                            checkpointIdentity,
+                            out existingCheckpoint) &&
+                        existingCheckpoint != null)
                     {
-                        if (stamp.Matches(activeCheckpoints[index]))
-                        {
-                            activeCheckpoints.RemoveAt(index);
-                            replacedCheckpoint = true;
-                        }
-                    }
-
-                    if (replacedCheckpoint)
-                    {
+                        activeCheckpoints.Remove(existingCheckpoint);
                         activeStateRevision++;
                         RecomputeCheckpointWatermarkLocked();
                     }
@@ -1839,6 +1948,7 @@ namespace IMDataCore
                 }
                 stopwatch.Stop();
 
+                bool scheduleBackgroundCompaction = false;
                 lock (storageLock)
                 {
                     long committedForPath;
@@ -1851,7 +1961,7 @@ namespace IMDataCore
                             snapshot.TargetPath] = snapshot.Generation;
                     }
 
-                    committedPathStates[snapshot.TargetPath] =
+                    CommittedPathState committedState =
                         new CommittedPathState
                         {
                             BaseFileHash = baseFileHash ?? string.Empty,
@@ -1865,6 +1975,13 @@ namespace IMDataCore
                             LastIssuedSequence = snapshot.Document.LastIssuedSequence,
                             StateRevision = snapshot.StateRevision
                         };
+                    committedPathStates[snapshot.TargetPath] = committedState;
+                    scheduleBackgroundCompaction =
+                        string.Equals(
+                            persistenceMode,
+                            "journal",
+                            StringComparison.Ordinal) &&
+                        ShouldCompactJournal(committedState);
 
                     lastPersistenceMode = persistenceMode;
                     lastBaseSnapshotBytes = baseBytes;
@@ -1902,6 +2019,7 @@ namespace IMDataCore
                             durableCheckpoints =
                                 new List<LightweightCheckpointRecord>(
                                     snapshot.Document.Checkpoints);
+                            RebuildDurableCheckpointIdentityIndexLocked();
 
                             // A full Save As snapshot filters checkpoints to its target.
                             activeCheckpoints =
@@ -1910,6 +2028,14 @@ namespace IMDataCore
                             RecomputeCheckpointWatermarkLocked();
                         }
                     }
+                }
+
+                if (scheduleBackgroundCompaction)
+                {
+                    QueueBackgroundCompaction(
+                        snapshot.TargetPath,
+                        snapshot.RelativeSavePath,
+                        snapshot.Generation);
                 }
 
                 CoreLog.Info(
@@ -1927,6 +2053,197 @@ namespace IMDataCore
                     stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture) +
                     ".");
                 return true;
+            }
+        }
+
+        private static bool ShouldCompactJournal(CommittedPathState state)
+        {
+            if (state == null)
+            {
+                return false;
+            }
+
+            long proportionalThreshold = state.BaseFileBytes > 0L
+                ? state.BaseFileBytes / 4L
+                : MinimumJournalCompactionBytes;
+            long byteThreshold = Math.Max(
+                MinimumJournalCompactionBytes,
+                Math.Min(
+                    MaximumJournalCompactionBytes,
+                    proportionalThreshold));
+            return state.JournalBytes >= byteThreshold ||
+                state.JournalEntryCount >= MaximumJournalEntriesBeforeCompaction;
+        }
+
+        private void QueueBackgroundCompaction(
+            string targetPath,
+            string relativeSavePath,
+            long generation)
+        {
+            lock (storageLock)
+            {
+                if (disposed ||
+                    !backgroundCompactionsInFlight.Add(targetPath))
+                {
+                    return;
+                }
+            }
+
+            ThreadPool.QueueUserWorkItem(
+                delegate
+                {
+                    try
+                    {
+                        RunBackgroundCompaction(
+                            targetPath,
+                            relativeSavePath,
+                            generation);
+                    }
+                    catch (Exception exception)
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core background compaction failed: " +
+                            exception.Message);
+                    }
+                    finally
+                    {
+                        lock (storageLock)
+                        {
+                            backgroundCompactionsInFlight.Remove(targetPath);
+                        }
+                    }
+                });
+        }
+
+        private void RunBackgroundCompaction(
+            string targetPath,
+            string relativeSavePath,
+            long generation)
+        {
+            object pathIoLock = GetPersistenceIoLock(targetPath);
+            lock (pathIoLock)
+            {
+                CommittedPathState expectedState;
+                lock (storageLock)
+                {
+                    long latestGeneration;
+                    if (disposed ||
+                        !latestCommittedPersistenceGenerationByPath.TryGetValue(
+                            targetPath,
+                            out latestGeneration) ||
+                        latestGeneration != generation ||
+                        !committedPathStates.TryGetValue(
+                            targetPath,
+                            out expectedState) ||
+                        !ShouldCompactJournal(expectedState))
+                    {
+                        return;
+                    }
+                }
+
+                LightweightSidecarDocument document;
+                LightweightLoadedPersistenceInfo loadedInfo;
+                string loadError;
+                if (!TryLoadValidatedDocumentFromPathLocked(
+                        targetPath,
+                        relativeSavePath,
+                        out document,
+                        out loadedInfo,
+                        out loadError))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core skipped background compaction because the " +
+                        "durable journal could not be materialized: " + loadError);
+                    return;
+                }
+
+                if (!string.Equals(
+                        loadedInfo.BaseFileHash,
+                        expectedState.BaseFileHash,
+                        StringComparison.Ordinal) ||
+                    document.Events.Count != expectedState.EventCount ||
+                    document.CustomMutations.Count !=
+                        expectedState.CustomMutationCount ||
+                    document.Checkpoints.Count != expectedState.CheckpointCount ||
+                    document.LastIssuedSequence != expectedState.LastIssuedSequence)
+                {
+                    return;
+                }
+
+                LightweightPersistenceSnapshot compactSnapshot =
+                    new LightweightPersistenceSnapshot
+                    {
+                        TargetPath = targetPath,
+                        RelativeSavePath = relativeSavePath,
+                        Generation = generation,
+                        PreserveExistingBackup = false,
+                        StateRevision = expectedState.StateRevision,
+                        IsIncremental = false,
+                        BaseEventCount = 0,
+                        BaseCustomMutationCount = 0,
+                        BaseCheckpointCount = 0,
+                        TotalEventCount = document.Events.Count,
+                        TotalCustomMutationCount = document.CustomMutations.Count,
+                        TotalCheckpointCount = document.Checkpoints.Count,
+                        Document = document
+                    };
+
+                long baseBytes;
+                string baseHash;
+                string writeError;
+                if (!TryWriteFullSnapshotFile(
+                        compactSnapshot,
+                        null,
+                        0,
+                        0,
+                        0,
+                        out baseBytes,
+                        out baseHash,
+                        out writeError))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core background compaction could not commit: " +
+                        writeError);
+                    return;
+                }
+
+                lock (storageLock)
+                {
+                    long latestGeneration;
+                    CommittedPathState currentState;
+                    if (disposed ||
+                        !latestCommittedPersistenceGenerationByPath.TryGetValue(
+                            targetPath,
+                            out latestGeneration) ||
+                        latestGeneration != generation ||
+                        !committedPathStates.TryGetValue(
+                            targetPath,
+                            out currentState) ||
+                        currentState.EventCount != expectedState.EventCount ||
+                        currentState.CustomMutationCount !=
+                            expectedState.CustomMutationCount ||
+                        currentState.CheckpointCount !=
+                            expectedState.CheckpointCount ||
+                        currentState.LastIssuedSequence !=
+                            expectedState.LastIssuedSequence ||
+                        currentState.StateRevision != expectedState.StateRevision)
+                    {
+                        return;
+                    }
+
+                    currentState.BaseFileHash = baseHash ?? string.Empty;
+                    currentState.BaseFileBytes = baseBytes;
+                    currentState.JournalBytes = 0L;
+                    currentState.JournalEntryCount = 0;
+                    lastPersistenceMode = "background_compaction";
+                    lastBaseSnapshotBytes = baseBytes;
+                    lastJournalBytes = 0L;
+                    lastJournalEntryCount = 0;
+                }
+
+                CoreLog.Info(
+                    "IM Data Core compacted its journal in the background: base_bytes=" +
+                    baseBytes.ToString(CultureInfo.InvariantCulture) + ".");
             }
         }
 
@@ -1960,11 +2277,31 @@ namespace IMDataCore
                 return false;
             }
 
-            if (document.Events.Count != baselineState.EventCount ||
-                document.CustomMutations.Count !=
-                    baselineState.CustomMutationCount ||
-                document.Checkpoints.Count != baselineState.CheckpointCount ||
-                document.LastIssuedSequence != baselineState.LastIssuedSequence)
+            bool durableStateIsBaseline =
+                document.Events.Count == baselineState.EventCount &&
+                document.CustomMutations.Count ==
+                    baselineState.CustomMutationCount &&
+                document.Checkpoints.Count == baselineState.CheckpointCount &&
+                document.LastIssuedSequence == baselineState.LastIssuedSequence;
+            bool durableStateAlreadyMatchesSnapshot =
+                document.Events.Count == snapshot.TotalEventCount &&
+                document.CustomMutations.Count ==
+                    snapshot.TotalCustomMutationCount &&
+                document.Checkpoints.Count == snapshot.TotalCheckpointCount &&
+                document.LastIssuedSequence == snapshot.Document.LastIssuedSequence;
+
+            if (durableStateAlreadyMatchesSnapshot)
+            {
+                // A journal append can become fully readable before Flush(true)
+                // reports an I/O failure. Treat that as an already-applied delta
+                // for fallback compaction instead of appending the suffix twice.
+                return TryValidateDocumentLocked(
+                    document,
+                    snapshot.RelativeSavePath,
+                    out errorMessage);
+            }
+
+            if (!durableStateIsBaseline)
             {
                 errorMessage =
                     "The durable IMDC journal state changed while materializing an incremental snapshot.";
@@ -2076,6 +2413,8 @@ namespace IMDataCore
                     snapshot.TargetPath,
                     documentToWrite,
                     snapshot.PreserveExistingBackup,
+                    out baseBytes,
+                    out baseFileHash,
                     out errorMessage))
             {
                 return false;
@@ -2110,19 +2449,6 @@ namespace IMDataCore
                         "IM Data Core could not remove a stale backup journal: " +
                         backupJournalError);
                 }
-            }
-
-            try
-            {
-                baseBytes = new FileInfo(snapshot.TargetPath).Length;
-                baseFileHash = ComputeFileSha256(snapshot.TargetPath);
-            }
-            catch (Exception exception)
-            {
-                errorMessage =
-                    "The IMDC snapshot was written but could not be fingerprinted: " +
-                    exception.Message;
-                return false;
             }
 
             string cleanupError;
@@ -2175,11 +2501,25 @@ namespace IMDataCore
             }
 
             bool createJournal = !File.Exists(normalizedJournalPath);
+            if (createJournal &&
+                (baselineState.JournalBytes != 0L ||
+                 baselineState.JournalEntryCount != 0))
+            {
+                errorMessage =
+                    "The durable IMDC journal disappeared after its state was committed.";
+                return false;
+            }
             if (!createJournal)
             {
                 try
                 {
                     long existingLength = new FileInfo(normalizedJournalPath).Length;
+                    if (existingLength != baselineState.JournalBytes)
+                    {
+                        errorMessage =
+                            "The durable IMDC journal length changed unexpectedly.";
+                        return false;
+                    }
                     if (existingLength <= 0L ||
                         !FileEndsWithNewline(normalizedJournalPath))
                     {
@@ -2203,10 +2543,12 @@ namespace IMDataCore
                         false))
                     {
                         string existingBaseHash;
+                        int existingJournalVersion;
                         string headerError;
                         if (!LightweightSidecarJson.TryReadJournalHeader(
                                 reader.ReadLine(),
                                 out existingBaseHash,
+                                out existingJournalVersion,
                                 out headerError) ||
                             !string.Equals(
                                 existingBaseHash,
@@ -2216,6 +2558,12 @@ namespace IMDataCore
                             errorMessage =
                                 "The existing IMDC journal does not match its base snapshot. " +
                                 headerError;
+                            return false;
+                        }
+                        if (existingJournalVersion != JournalFormatVersion)
+                        {
+                            errorMessage =
+                                "The existing IMDC journal uses the legacy v1 entry format and must be compacted before appending.";
                             return false;
                         }
                     }
@@ -2253,13 +2601,15 @@ namespace IMDataCore
                         writer.Write('\n');
                     }
 
-                    LightweightSidecarJson.SerializeJournalEntryTo(
+                    LightweightSidecarJson.SerializeJournalTransactionTo(
                         writer,
                         document,
                         checkpointStartIndex,
                         eventStartIndex,
-                        customMutationStartIndex);
-                    writer.Write('\n');
+                        customMutationStartIndex,
+                        baselineState.CheckpointCount,
+                        baselineState.EventCount,
+                        baselineState.CustomMutationCount);
                     writer.Flush();
                     stream.Flush(true);
                 }
@@ -2498,14 +2848,21 @@ namespace IMDataCore
                     FileShare.Read,
                     64 * 1024,
                     FileOptions.SequentialScan))
+                using (HashingReadStream hashingStream =
+                    new HashingReadStream(stream))
                 using (StreamReader reader = new StreamReader(
-                    stream,
+                    hashingStream,
                     Encoding.UTF8,
                     true,
                     64 * 1024,
                     false))
                 {
                     document = LightweightSidecarJson.DeserializeFrom(reader);
+                    // DeserializeFrom stops at the end of the JSON document. Drain
+                    // legal trailing whitespace so the fingerprint covers every byte.
+                    reader.ReadToEnd();
+                    persistenceInfo.BaseFileBytes = stream.Length;
+                    persistenceInfo.BaseFileHash = hashingStream.GetHashHex();
                 }
 
                 if (!TryValidateDocumentLocked(
@@ -2516,9 +2873,6 @@ namespace IMDataCore
                     document = null;
                     return false;
                 }
-
-                persistenceInfo.BaseFileBytes = new FileInfo(path).Length;
-                persistenceInfo.BaseFileHash = ComputeFileSha256(path);
 
                 if (!TryReplayJournalLocked(
                         path,
@@ -2531,7 +2885,8 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (!TryValidateDocumentLocked(
+                if (persistenceInfo.JournalEntryCount > 0 &&
+                    !TryValidateDocumentLocked(
                         document,
                         expectedRelativeSavePath,
                         out errorMessage))
@@ -2611,10 +2966,12 @@ namespace IMDataCore
             {
                 string headerLine = reader.ReadLine();
                 string journalBaseHash;
+                int journalFormatVersion;
                 string headerError;
                 if (!LightweightSidecarJson.TryReadJournalHeader(
                         headerLine,
                         out journalBaseHash,
+                        out journalFormatVersion,
                         out headerError))
                 {
                     if (!endsWithNewline && reader.Peek() < 0)
@@ -2642,36 +2999,63 @@ namespace IMDataCore
                     return true;
                 }
 
-                while (true)
+                if (journalFormatVersion == JournalFormatVersion)
                 {
-                    string entryLine = reader.ReadLine();
-                    if (entryLine == null)
+                    int replayedEntryCount;
+                    bool forceFullSnapshot;
+                    string replayError;
+                    if (!LightweightSidecarJson.TryReplayJournalTransactions(
+                            reader,
+                            endsWithNewline,
+                            document,
+                            out replayedEntryCount,
+                            out forceFullSnapshot,
+                            out replayError))
                     {
-                        break;
+                        errorMessage =
+                            "The IMDC journal contains an invalid v2 transaction: " +
+                            replayError;
+                        return false;
                     }
 
-                    try
+                    persistenceInfo.JournalEntryCount += replayedEntryCount;
+                    persistenceInfo.ForceFullSnapshot |= forceFullSnapshot;
+                }
+                else
+                {
+                    while (true)
                     {
-                        LightweightSidecarJson.ApplyJournalEntry(
-                            entryLine,
-                            document);
-                        persistenceInfo.JournalEntryCount++;
-                    }
-                    catch (Exception exception)
-                    {
-                        if (!endsWithNewline && reader.Peek() < 0)
+                        string entryLine = reader.ReadLine();
+                        if (entryLine == null)
                         {
-                            // Append+Flush(true) makes complete lines durable. A
-                            // non-newline-terminated final line is the only shape we
-                            // accept as a torn crash tail and it is safely ignored.
-                            persistenceInfo.ForceFullSnapshot = true;
                             break;
                         }
 
-                        errorMessage = "The IMDC journal contains an invalid entry: " +
-                            exception.Message;
-                        return false;
+                        try
+                        {
+                            LightweightSidecarJson.ApplyJournalEntry(
+                                entryLine,
+                                document);
+                            persistenceInfo.JournalEntryCount++;
+                        }
+                        catch (Exception exception)
+                        {
+                            if (!endsWithNewline && reader.Peek() < 0)
+                            {
+                                persistenceInfo.ForceFullSnapshot = true;
+                                break;
+                            }
+
+                            errorMessage =
+                                "The IMDC legacy journal contains an invalid entry: " +
+                                exception.Message;
+                            return false;
+                        }
                     }
+
+                    // Read old v1 journals for compatibility, but compact them at
+                    // the next save so all new appends use transactional v2 rows.
+                    persistenceInfo.ForceFullSnapshot = true;
                 }
             }
 
@@ -2700,9 +3084,13 @@ namespace IMDataCore
                 CustomMutationCount = activeCustomMutations.Count,
                 CheckpointCount = activeCheckpoints.Count,
                 LastIssuedSequence = lastIssuedSequence,
-                // Force the first post-load save to compact. Loading may retire or
-                // compact historical rows, and activation may select an older branch.
-                StateRevision = activeStateRevision - 1L
+                // Preserve the loaded base as an incremental baseline unless
+                // replay/retention/format cleanup actually changed its durable
+                // representation. A real rollback increments activeStateRevision
+                // during checkpoint activation and invalidates this baseline later.
+                StateRevision = persistenceInfo.ForceFullSnapshot
+                    ? activeStateRevision - 1L
+                    : activeStateRevision
             };
             lastPersistenceMode = persistenceInfo.JournalEntryCount > 0
                 ? "journal_loaded"
@@ -2710,27 +3098,6 @@ namespace IMDataCore
             lastBaseSnapshotBytes = persistenceInfo.BaseFileBytes;
             lastJournalBytes = persistenceInfo.JournalBytes;
             lastJournalEntryCount = persistenceInfo.JournalEntryCount;
-        }
-
-        private static string ComputeFileSha256(string path)
-        {
-            using (SHA256 sha256 = SHA256.Create())
-            using (FileStream stream = new FileStream(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                64 * 1024,
-                FileOptions.SequentialScan))
-            {
-                byte[] hash = sha256.ComputeHash(stream);
-                StringBuilder builder = new StringBuilder(hash.Length * 2);
-                for (int index = 0; index < hash.Length; index++)
-                {
-                    builder.Append(hash[index].ToString("x2", CultureInfo.InvariantCulture));
-                }
-                return builder.ToString();
-            }
         }
 
         private bool TryValidateDocumentLocked(
@@ -2962,7 +3329,7 @@ namespace IMDataCore
         }
 
 
-        private void LoadDocumentLocked(LightweightSidecarDocument document)
+        private bool LoadDocumentLocked(LightweightSidecarDocument document)
         {
             int retiredTechnicalEventCount;
             List<LightweightEventRecord> retainedEvents =
@@ -3009,6 +3376,7 @@ namespace IMDataCore
                     document.CustomMutations);
             durableCheckpoints =
                 new List<LightweightCheckpointRecord>(document.Checkpoints);
+            RebuildDurableCheckpointIdentityIndexLocked();
             activeEvents = new List<LightweightEventRecord>(durableEvents);
             activeCustomMutations =
                 new List<LightweightCustomMutationRecord>(
@@ -3017,6 +3385,9 @@ namespace IMDataCore
                 new List<LightweightCheckpointRecord>(durableCheckpoints);
             lastIssuedSequence = document.LastIssuedSequence;
             RebuildRuntimeIndexesLocked();
+            return retiredTechnicalEventCount > 0 ||
+                sparseMoneyPayloadCount > 0 ||
+                sharedParticipantRowsRemoved > 0;
         }
 
         private void ActivateThroughSequenceLocked(
@@ -3160,6 +3531,8 @@ namespace IMDataCore
             globalTimelineEvents.Clear();
             moneyTransactionsByDateKey.Clear();
             moneyLedgerCoverageStartEvent = null;
+            latestSingleCastBySingleId.Clear();
+            latestTourStateByTourId.Clear();
             ResetActiveWatermarksLocked();
 
             activeEvents.Sort(CompareEventsBySequenceAscending);
@@ -3230,6 +3603,7 @@ namespace IMDataCore
             maxActiveCustomMutationGameDate = DateTime.MinValue;
             maxActiveCheckpointGameDate = DateTime.MinValue;
             activeCheckpointsByRelativePath.Clear();
+            activeCheckpointsByIdentity.Clear();
         }
 
         private void UpdateEventWatermarkLocked(LightweightEventRecord record)
@@ -3312,11 +3686,38 @@ namespace IMDataCore
             }
         }
 
+        private bool ActiveStateFitsCheckpointLocked(
+            long sequence,
+            DateTime cutoffGameDate)
+        {
+            return maxActiveEventSequence <= sequence &&
+                maxActiveCustomMutationSequence <= sequence &&
+                maxActiveCheckpointSequence <= sequence &&
+                maxActiveEventGameDate <= cutoffGameDate &&
+                maxActiveCustomMutationGameDate <= cutoffGameDate &&
+                maxActiveCheckpointGameDate <= cutoffGameDate;
+        }
+
+        private void RebuildDurableCheckpointIdentityIndexLocked()
+        {
+            durableCheckpointsByIdentity.Clear();
+            for (int index = 0; index < durableCheckpoints.Count; index++)
+            {
+                LightweightCheckpointRecord checkpoint = durableCheckpoints[index];
+                if (checkpoint != null)
+                {
+                    durableCheckpointsByIdentity[CheckpointIdentity.From(checkpoint)] =
+                        checkpoint;
+                }
+            }
+        }
+
         private void RecomputeCheckpointWatermarkLocked()
         {
             maxActiveCheckpointSequence = 0L;
             maxActiveCheckpointGameDate = DateTime.MinValue;
             activeCheckpointsByRelativePath.Clear();
+            activeCheckpointsByIdentity.Clear();
             for (int index = 0; index < activeCheckpoints.Count; index++)
             {
                 LightweightCheckpointRecord checkpoint = activeCheckpoints[index];
@@ -3333,6 +3734,8 @@ namespace IMDataCore
                 return;
             }
 
+            activeCheckpointsByIdentity[CheckpointIdentity.From(checkpoint)] =
+                checkpoint;
             string relativePath = VanillaSaveStamp.NormalizeRelativePath(
                 checkpoint.RelativeSavePath);
             List<LightweightCheckpointRecord> pathRows;
@@ -3373,12 +3776,93 @@ namespace IMDataCore
         }
 
 
+        private void IndexLatestBuiltInStateLocked(
+            LightweightEventRecord record)
+        {
+            if (record == null ||
+                !string.IsNullOrEmpty(record.NamespaceIdentifier))
+            {
+                return;
+            }
+
+            bool isSingleRelease =
+                string.Equals(
+                    record.EntityKind,
+                    CoreConstants.EventEntityKindSingle,
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    record.EventType,
+                    CoreConstants.EventTypeSingleReleased,
+                    StringComparison.Ordinal);
+            bool isTourStart =
+                string.Equals(
+                    record.EntityKind,
+                    CoreConstants.EventEntityKindTour,
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    record.EventType,
+                    CoreConstants.EventTypeTourStarted,
+                    StringComparison.Ordinal);
+            if (!isSingleRelease && !isTourStart)
+            {
+                return;
+            }
+
+            int entityIdentifier;
+            if (!int.TryParse(
+                    record.EntityId,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out entityIdentifier))
+            {
+                return;
+            }
+
+            if (isSingleRelease)
+            {
+                List<int> slotIds;
+                if (SharedTimelineParticipants.TryReadSingleCastSlotIds(
+                        record.PayloadJson,
+                        out slotIds) &&
+                    ContainsValidIdolIdentifier(slotIds))
+                {
+                    latestSingleCastBySingleId[entityIdentifier] =
+                        new List<int>(slotIds);
+                }
+                return;
+            }
+
+            List<int> participantIds;
+            if (!SharedTimelineParticipants.TryReadTourParticipantIds(
+                    record.PayloadJson,
+                    out participantIds))
+            {
+                return;
+            }
+
+            string startDate;
+            LightweightSidecarJson.TryReadStringProperty(
+                record.PayloadJson,
+                CoreConstants.JsonFieldTourStartDate,
+                out startDate);
+            latestTourStateByTourId[entityIdentifier] =
+                new TourRuntimeState
+                {
+                    Sequence = record.Sequence,
+                    ParticipantIdolIdentifiers =
+                        new List<int>(participantIds),
+                    StartDate = startDate ?? string.Empty
+                };
+        }
+
         private void IndexEventLocked(LightweightEventRecord record)
         {
             if (record == null)
             {
                 return;
             }
+
+            IndexLatestBuiltInStateLocked(record);
 
             if (!string.IsNullOrEmpty(record.NamespaceIdentifier) &&
                 !string.IsNullOrEmpty(record.IdempotencyKey))
@@ -3589,48 +4073,38 @@ namespace IMDataCore
 
             if (canUseIncrementalSnapshot)
             {
-                bool journalNeedsCompaction =
-                    baselineState.JournalBytes >= Math.Max(
-                        MinimumJournalCompactionBytes,
-                        baselineState.BaseFileBytes) ||
-                    baselineState.JournalEntryCount >=
-                        MaximumJournalEntriesBeforeCompaction;
-
-                if (!journalNeedsCompaction)
+                return new LightweightPersistenceSnapshot
                 {
-                    return new LightweightPersistenceSnapshot
+                    TargetPath = normalizedTargetPath,
+                    RelativeSavePath = normalizedRelativePath,
+                    Generation = generation,
+                    PreserveExistingBackup = false,
+                    StateRevision = activeStateRevision,
+                    IsIncremental = true,
+                    BaseEventCount = baselineState.EventCount,
+                    BaseCustomMutationCount =
+                        baselineState.CustomMutationCount,
+                    BaseCheckpointCount = baselineState.CheckpointCount,
+                    TotalEventCount = activeEvents.Count,
+                    TotalCustomMutationCount = activeCustomMutations.Count,
+                    TotalCheckpointCount = pathCheckpointRows.Count,
+                    Document = new LightweightSidecarDocument
                     {
-                        TargetPath = normalizedTargetPath,
+                        FormatName = SidecarFormatName,
+                        FormatVersion = SidecarFormatVersion,
                         RelativeSavePath = normalizedRelativePath,
-                        Generation = generation,
-                        PreserveExistingBackup = false,
-                        StateRevision = activeStateRevision,
-                        IsIncremental = true,
-                        BaseEventCount = baselineState.EventCount,
-                        BaseCustomMutationCount =
-                            baselineState.CustomMutationCount,
-                        BaseCheckpointCount = baselineState.CheckpointCount,
-                        TotalEventCount = activeEvents.Count,
-                        TotalCustomMutationCount = activeCustomMutations.Count,
-                        TotalCheckpointCount = pathCheckpointRows.Count,
-                        Document = new LightweightSidecarDocument
-                        {
-                            FormatName = SidecarFormatName,
-                            FormatVersion = SidecarFormatVersion,
-                            RelativeSavePath = normalizedRelativePath,
-                            LastIssuedSequence = lastIssuedSequence,
-                            Events = CopySuffix(
-                                activeEvents,
-                                baselineState.EventCount),
-                            CustomMutations = CopySuffix(
-                                activeCustomMutations,
-                                baselineState.CustomMutationCount),
-                            Checkpoints = CopySuffix(
-                                pathCheckpointRows,
-                                baselineState.CheckpointCount)
-                        }
-                    };
-                }
+                        LastIssuedSequence = lastIssuedSequence,
+                        Events = CopySuffix(
+                            activeEvents,
+                            baselineState.EventCount),
+                        CustomMutations = CopySuffix(
+                            activeCustomMutations,
+                            baselineState.CustomMutationCount),
+                        Checkpoints = CopySuffix(
+                            pathCheckpointRows,
+                            baselineState.CheckpointCount)
+                    }
+                };
             }
 
             LightweightSidecarDocument fullDocument =
@@ -3707,8 +4181,12 @@ namespace IMDataCore
             string targetPath,
             LightweightSidecarDocument document,
             bool preserveExistingBackup,
+            out long committedBytes,
+            out string committedHash,
             out string errorMessage)
         {
+            committedBytes = 0L;
+            committedHash = string.Empty;
             errorMessage = string.Empty;
             string targetDirectory = Path.GetDirectoryName(targetPath);
             string normalizedDirectoryPath;
@@ -3748,17 +4226,28 @@ namespace IMDataCore
                     FileShare.None,
                     65536,
                     FileOptions.SequentialScan))
-                using (StreamWriter writer = new StreamWriter(
-                    stream,
-                    new System.Text.UTF8Encoding(false),
-                    65536,
-                    true))
+                using (HashingWriteStream hashingStream =
+                    new HashingWriteStream(stream))
                 {
-                    LightweightSidecarJson.SerializeTo(writer, document);
-                    writer.Flush();
+                    using (StreamWriter writer = new StreamWriter(
+                        hashingStream,
+                        new System.Text.UTF8Encoding(false),
+                        65536,
+                        true))
+                    {
+                        LightweightSidecarJson.SerializeTo(writer, document);
+                    }
+
+                    // Finalize only after StreamWriter.Dispose has flushed its
+                    // encoder. No later text write can escape the fingerprint.
+                    committedHash = hashingStream.CompleteAndGetHashHex();
                     stream.Flush(true);
+                    committedBytes = stream.Length;
                 }
 
+                // The complete fingerprint is known before the physical commit.
+                // No post-replace failure can leave memory describing the old base
+                // while disk already contains the new generation.
                 if (File.Exists(targetPath))
                 {
                     if (preserveExistingBackup)
@@ -3814,6 +4303,7 @@ namespace IMDataCore
                 new List<LightweightCustomMutationRecord>(activeCustomMutations);
             durableCheckpoints =
                 new List<LightweightCheckpointRecord>(activeCheckpoints);
+            RebuildDurableCheckpointIdentityIndexLocked();
         }
 
         private void BlockPersistenceForCurrentScopeLocked(string reason)
@@ -3845,6 +4335,9 @@ namespace IMDataCore
             activeCustomMutations =
                 new List<LightweightCustomMutationRecord>();
             activeCheckpoints = new List<LightweightCheckpointRecord>();
+            activeCheckpointsByIdentity.Clear();
+            durableCheckpointsByIdentity.Clear();
+            backgroundCompactionsInFlight.Clear();
             customValues.Clear();
             customUsageByNamespace.Clear();
             activeMutationSequences.Clear();
@@ -3853,6 +4346,8 @@ namespace IMDataCore
             globalTimelineEvents.Clear();
             moneyTransactionsByDateKey.Clear();
             moneyLedgerCoverageStartEvent = null;
+            latestSingleCastBySingleId.Clear();
+            latestTourStateByTourId.Clear();
             currentSidecarPath = string.Empty;
             currentRelativeSavePath = string.Empty;
             blockedPersistencePath = string.Empty;
@@ -4010,6 +4505,18 @@ namespace IMDataCore
                 this.lastSave = lastSave ?? string.Empty;
                 this.playtimeSeconds = playtimeSeconds;
                 this.gameDateTime = gameDateTime ?? string.Empty;
+            }
+
+            internal static CheckpointIdentity From(VanillaSaveStamp stamp)
+            {
+                return new CheckpointIdentity(
+                    stamp != null
+                        ? VanillaSaveStamp.NormalizeRelativePath(
+                            stamp.RelativeSavePath)
+                        : string.Empty,
+                    stamp != null ? stamp.LastSave : string.Empty,
+                    stamp != null ? stamp.PlaytimeSeconds : 0L,
+                    stamp != null ? stamp.GameDateTime : string.Empty);
             }
 
             internal static CheckpointIdentity From(

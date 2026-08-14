@@ -152,11 +152,11 @@ The compact base remains an ordinary v3 sidecar. A normal append-only save may a
 <sidecar>.imdc.journal
 ```
 
-The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, journal `FormatVersion = 1`, and the SHA-256 of the exact base sidecar. Each following line is one self-contained JSON journal entry containing the new checkpoints, events, custom mutations, and resulting `LastIssuedSequence`.
+The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, the journal format version, and the SHA-256 of the exact base sidecar. Journal format 2 writes each save delta as a bounded NDJSON transaction: a `BEGIN` row declares base/target counts, record rows carry individual checkpoints/events/custom mutations, and a `COMMIT` row makes the transaction logically visible. This keeps replay memory proportional to an individual record instead of one potentially enormous save delta. Legacy format-1 journals remain readable and are compacted before another append.
 
-The journal writer appends one newline-terminated entry, flushes the buffered writer, then calls `FileStream.Flush(true)`. A non-newline-terminated final entry is treated as a possible crash tail. A journal whose base hash does not equal the current compact sidecar is ignored rather than replayed.
+The journal writer flushes its buffered writer and then calls `FileStream.Flush(true)`. Replay ignores any v2 transaction that does not reach a valid `COMMIT`, even if some complete record rows reached disk. Base/target counts also make a completely written retry idempotent. A journal whose base hash does not equal the current compact sidecar is ignored rather than replayed.
 
-A full boundary streams a stable shallow snapshot to a validated temporary file, durably flushes it, and atomically promotes it. Full boundaries include destructive branch changes, recovery writes, incompatible baselines, and journal compaction thresholds.
+A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then atomically promotes it. Destructive branch changes, recovery writes, Save As, and incompatible baselines use a synchronous full boundary. Routine journal-size compaction is queued after the triggering delta is durable so the vanilla save boundary does not pay the O(history) rewrite cost.
 
 When replacing a healthy compact base, IMDC retains:
 
@@ -184,7 +184,7 @@ Complete event history remains complete, but an ordinary append-only save no lon
 
 Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks also avoid complete trim scans when no active record can exceed the checkpoint.
 
-The journal compacts when it is at least 1 MiB and at least as large as its compact base, or after 1,024 entries. These thresholds bound replay depth and ensure the compact base is refreshed periodically.
+Background journal compaction is requested after 256 committed transactions or when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. These limits keep replay depth predictable without allowing a very large base to imply an equally large journal.
 
 ## Compatibility
 

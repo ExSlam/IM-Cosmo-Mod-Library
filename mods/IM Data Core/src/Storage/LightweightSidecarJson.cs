@@ -276,9 +276,11 @@ namespace IMDataCore
         internal static bool TryReadJournalHeader(
             string json,
             out string baseFileHash,
+            out int formatVersion,
             out string errorMessage)
         {
             baseFileHash = string.Empty;
+            formatVersion = 0;
             errorMessage = string.Empty;
             try
             {
@@ -287,12 +289,15 @@ namespace IMDataCore
                     rootValue,
                     "The IMDC journal header must be a JSON object.");
                 string formatName = RequireString(root, "FormatName");
-                int formatVersion = RequireInt32(root, "FormatVersion");
+                formatVersion = RequireInt32(root, "FormatVersion");
                 if (!string.Equals(
                         formatName,
                         LightweightCoreStorageEngine.JournalFormatName,
                         StringComparison.Ordinal) ||
-                    formatVersion != LightweightCoreStorageEngine.JournalFormatVersion)
+                    (formatVersion !=
+                        LightweightCoreStorageEngine.LegacyJournalFormatVersion &&
+                     formatVersion !=
+                        LightweightCoreStorageEngine.JournalFormatVersion))
                 {
                     errorMessage = "The IMDC journal format is unsupported.";
                     return false;
@@ -353,6 +358,423 @@ namespace IMDataCore
             document.Events.AddRange(events);
             document.CustomMutations.AddRange(customMutations);
             document.LastIssuedSequence = lastIssuedSequence;
+        }
+
+        /// <summary>
+        /// Writes one v2 journal transaction as bounded NDJSON records. A commit
+        /// marker is the logical durability boundary, so replay can ignore a
+        /// partially written transaction without ever materializing one giant
+        /// save-delta string.
+        /// </summary>
+        internal static void SerializeJournalTransactionTo(
+            TextWriter writer,
+            LightweightSidecarDocument document,
+            int checkpointStartIndex,
+            int eventStartIndex,
+            int customMutationStartIndex,
+            int baseCheckpointCount,
+            int baseEventCount,
+            int baseCustomMutationCount)
+        {
+            if (writer == null)
+            {
+                throw new ArgumentNullException("writer");
+            }
+            ValidateSerializableDocument(document);
+            if (checkpointStartIndex < 0 ||
+                checkpointStartIndex > document.Checkpoints.Count ||
+                eventStartIndex < 0 ||
+                eventStartIndex > document.Events.Count ||
+                customMutationStartIndex < 0 ||
+                customMutationStartIndex > document.CustomMutations.Count ||
+                baseCheckpointCount < 0 ||
+                baseEventCount < 0 ||
+                baseCustomMutationCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    "A journal transaction count or start index is invalid.");
+            }
+
+            int targetCheckpointCount = checked(
+                baseCheckpointCount +
+                document.Checkpoints.Count - checkpointStartIndex);
+            int targetEventCount = checked(
+                baseEventCount + document.Events.Count - eventStartIndex);
+            int targetCustomMutationCount = checked(
+                baseCustomMutationCount +
+                document.CustomMutations.Count - customMutationStartIndex);
+
+            StringBuilder fragment = new StringBuilder(512);
+            char[] fragmentBuffer = new char[1024];
+            AppendJournalTransactionBoundary(
+                fragment,
+                "BEGIN",
+                baseCheckpointCount,
+                baseEventCount,
+                baseCustomMutationCount,
+                targetCheckpointCount,
+                targetEventCount,
+                targetCustomMutationCount,
+                document.LastIssuedSequence,
+                true);
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
+            writer.Write('\n');
+
+            for (int index = checkpointStartIndex;
+                index < document.Checkpoints.Count;
+                index++)
+            {
+                fragment.Length = 0;
+                fragment.Append('{');
+                AppendPropertyName(fragment, "Kind");
+                AppendString(fragment, "CHECKPOINT");
+                fragment.Append(',');
+                AppendPropertyName(fragment, "Record");
+                AppendCheckpointRecord(fragment, document.Checkpoints[index]);
+                fragment.Append('}');
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+                writer.Write('\n');
+            }
+
+            for (int index = eventStartIndex;
+                index < document.Events.Count;
+                index++)
+            {
+                fragment.Length = 0;
+                fragment.Append('{');
+                AppendPropertyName(fragment, "Kind");
+                AppendString(fragment, "EVENT");
+                fragment.Append(',');
+                AppendPropertyName(fragment, "Record");
+                AppendEventRecord(fragment, document.Events[index]);
+                fragment.Append('}');
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+                writer.Write('\n');
+            }
+
+            for (int index = customMutationStartIndex;
+                index < document.CustomMutations.Count;
+                index++)
+            {
+                fragment.Length = 0;
+                fragment.Append('{');
+                AppendPropertyName(fragment, "Kind");
+                AppendString(fragment, "CUSTOM_MUTATION");
+                fragment.Append(',');
+                AppendPropertyName(fragment, "Record");
+                AppendCustomMutationRecord(
+                    fragment,
+                    document.CustomMutations[index]);
+                fragment.Append('}');
+                WriteBuilder(writer, fragment, ref fragmentBuffer);
+                writer.Write('\n');
+            }
+
+            fragment.Length = 0;
+            AppendJournalTransactionBoundary(
+                fragment,
+                "COMMIT",
+                baseCheckpointCount,
+                baseEventCount,
+                baseCustomMutationCount,
+                targetCheckpointCount,
+                targetEventCount,
+                targetCustomMutationCount,
+                document.LastIssuedSequence,
+                false);
+            WriteBuilder(writer, fragment, ref fragmentBuffer);
+            writer.Write('\n');
+        }
+
+        internal static bool TryReplayJournalTransactions(
+            TextReader reader,
+            bool journalEndsWithNewline,
+            LightweightSidecarDocument document,
+            out int journalEntryCount,
+            out bool forceFullSnapshot,
+            out string errorMessage)
+        {
+            journalEntryCount = 0;
+            forceFullSnapshot = false;
+            errorMessage = string.Empty;
+            if (reader == null || document == null)
+            {
+                errorMessage = "The IMDC journal replay input is invalid.";
+                return false;
+            }
+
+            bool transactionOpen = false;
+            bool applyTransaction = false;
+            int baseCheckpointCount = 0;
+            int baseEventCount = 0;
+            int baseCustomMutationCount = 0;
+            int targetCheckpointCount = 0;
+            int targetEventCount = 0;
+            int targetCustomMutationCount = 0;
+            long targetLastIssuedSequence = 0L;
+            int observedCheckpointCount = 0;
+            int observedEventCount = 0;
+            int observedCustomMutationCount = 0;
+            List<LightweightCheckpointRecord> pendingCheckpoints = null;
+            List<LightweightEventRecord> pendingEvents = null;
+            List<LightweightCustomMutationRecord> pendingCustomMutations = null;
+
+            while (true)
+            {
+                string line = reader.ReadLine();
+                if (line == null)
+                {
+                    break;
+                }
+
+                bool isPhysicalTail = reader.Peek() < 0;
+                try
+                {
+                    JsonValue rootValue = new JsonParser(line).ParseDocument();
+                    Dictionary<string, JsonValue> root = RequireObject(
+                        rootValue,
+                        "An IMDC journal v2 row must be a JSON object.");
+                    string kind = RequireString(root, "Kind");
+
+                    if (!transactionOpen)
+                    {
+                        if (!string.Equals(kind, "BEGIN", StringComparison.Ordinal))
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction must begin with BEGIN.");
+                        }
+
+                        baseCheckpointCount = RequireInt32(
+                            root,
+                            "BaseCheckpointCount");
+                        baseEventCount = RequireInt32(root, "BaseEventCount");
+                        baseCustomMutationCount = RequireInt32(
+                            root,
+                            "BaseCustomMutationCount");
+                        targetCheckpointCount = RequireInt32(
+                            root,
+                            "TargetCheckpointCount");
+                        targetEventCount = RequireInt32(
+                            root,
+                            "TargetEventCount");
+                        targetCustomMutationCount = RequireInt32(
+                            root,
+                            "TargetCustomMutationCount");
+                        targetLastIssuedSequence = RequireInt64(
+                            root,
+                            "LastIssuedSequence");
+
+                        if (baseCheckpointCount < 0 || baseEventCount < 0 ||
+                            baseCustomMutationCount < 0 ||
+                            targetCheckpointCount < baseCheckpointCount ||
+                            targetEventCount < baseEventCount ||
+                            targetCustomMutationCount < baseCustomMutationCount ||
+                            targetLastIssuedSequence < document.LastIssuedSequence)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction has invalid count or sequence bounds.");
+                        }
+
+                        bool startsAtCurrentState =
+                            document.Checkpoints.Count == baseCheckpointCount &&
+                            document.Events.Count == baseEventCount &&
+                            document.CustomMutations.Count == baseCustomMutationCount;
+                        bool isAlreadyApplied =
+                            document.Checkpoints.Count == targetCheckpointCount &&
+                            document.Events.Count == targetEventCount &&
+                            document.CustomMutations.Count == targetCustomMutationCount &&
+                            document.LastIssuedSequence == targetLastIssuedSequence;
+                        if (!startsAtCurrentState && !isAlreadyApplied)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction does not continue the current durable state.");
+                        }
+
+                        applyTransaction = startsAtCurrentState;
+                        observedCheckpointCount = 0;
+                        observedEventCount = 0;
+                        observedCustomMutationCount = 0;
+                        pendingCheckpoints = applyTransaction
+                            ? new List<LightweightCheckpointRecord>()
+                            : null;
+                        pendingEvents = applyTransaction
+                            ? new List<LightweightEventRecord>()
+                            : null;
+                        pendingCustomMutations = applyTransaction
+                            ? new List<LightweightCustomMutationRecord>()
+                            : null;
+                        transactionOpen = true;
+                        continue;
+                    }
+
+                    if (string.Equals(kind, "CHECKPOINT", StringComparison.Ordinal))
+                    {
+                        observedCheckpointCount++;
+                        if (observedCheckpointCount >
+                            targetCheckpointCount - baseCheckpointCount)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction contains too many checkpoint rows.");
+                        }
+                        if (applyTransaction)
+                        {
+                            pendingCheckpoints.Add(ReadCheckpoint(
+                                RequireMember(root, "Record"),
+                                document.FormatVersion,
+                                document.RelativeSavePath));
+                        }
+                    }
+                    else if (string.Equals(kind, "EVENT", StringComparison.Ordinal))
+                    {
+                        observedEventCount++;
+                        if (observedEventCount > targetEventCount - baseEventCount)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction contains too many event rows.");
+                        }
+                        if (applyTransaction)
+                        {
+                            pendingEvents.Add(ReadEvent(
+                                RequireMember(root, "Record"),
+                                document.FormatVersion));
+                        }
+                    }
+                    else if (string.Equals(
+                        kind,
+                        "CUSTOM_MUTATION",
+                        StringComparison.Ordinal))
+                    {
+                        observedCustomMutationCount++;
+                        if (observedCustomMutationCount >
+                            targetCustomMutationCount - baseCustomMutationCount)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction contains too many custom mutation rows.");
+                        }
+                        if (applyTransaction)
+                        {
+                            pendingCustomMutations.Add(ReadCustomMutation(
+                                RequireMember(root, "Record"),
+                                document.FormatVersion));
+                        }
+                    }
+                    else if (string.Equals(kind, "COMMIT", StringComparison.Ordinal))
+                    {
+                        int committedTargetCheckpointCount = RequireInt32(
+                            root,
+                            "TargetCheckpointCount");
+                        int committedTargetEventCount = RequireInt32(
+                            root,
+                            "TargetEventCount");
+                        int committedTargetCustomMutationCount = RequireInt32(
+                            root,
+                            "TargetCustomMutationCount");
+                        long committedLastIssuedSequence = RequireInt64(
+                            root,
+                            "LastIssuedSequence");
+
+                        if (committedTargetCheckpointCount != targetCheckpointCount ||
+                            committedTargetEventCount != targetEventCount ||
+                            committedTargetCustomMutationCount !=
+                                targetCustomMutationCount ||
+                            committedLastIssuedSequence != targetLastIssuedSequence ||
+                            observedCheckpointCount !=
+                                targetCheckpointCount - baseCheckpointCount ||
+                            observedEventCount != targetEventCount - baseEventCount ||
+                            observedCustomMutationCount !=
+                                targetCustomMutationCount - baseCustomMutationCount)
+                        {
+                            throw new FormatException(
+                                "An IMDC journal v2 transaction commit does not match its BEGIN boundary.");
+                        }
+
+                        if (applyTransaction)
+                        {
+                            document.Checkpoints.AddRange(pendingCheckpoints);
+                            document.Events.AddRange(pendingEvents);
+                            document.CustomMutations.AddRange(
+                                pendingCustomMutations);
+                            document.LastIssuedSequence =
+                                targetLastIssuedSequence;
+                        }
+
+                        journalEntryCount++;
+                        transactionOpen = false;
+                        applyTransaction = false;
+                        pendingCheckpoints = null;
+                        pendingEvents = null;
+                        pendingCustomMutations = null;
+                    }
+                    else
+                    {
+                        throw new FormatException(
+                            "An IMDC journal v2 transaction contains an unknown row kind.");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    if (isPhysicalTail && !journalEndsWithNewline)
+                    {
+                        forceFullSnapshot = true;
+                        return true;
+                    }
+
+                    errorMessage = exception.Message;
+                    return false;
+                }
+            }
+
+            if (transactionOpen)
+            {
+                // A transaction without COMMIT is never visible, even if its last
+                // complete row happened to reach disk before the process stopped.
+                forceFullSnapshot = true;
+            }
+
+            return true;
+        }
+
+        private static void AppendJournalTransactionBoundary(
+            StringBuilder builder,
+            string kind,
+            int baseCheckpointCount,
+            int baseEventCount,
+            int baseCustomMutationCount,
+            int targetCheckpointCount,
+            int targetEventCount,
+            int targetCustomMutationCount,
+            long lastIssuedSequence,
+            bool includeBaseCounts)
+        {
+            builder.Length = 0;
+            builder.Append('{');
+            AppendPropertyName(builder, "Kind");
+            AppendString(builder, kind);
+            if (includeBaseCounts)
+            {
+                builder.Append(',');
+                AppendPropertyName(builder, "BaseCheckpointCount");
+                AppendInt32(builder, baseCheckpointCount);
+                builder.Append(',');
+                AppendPropertyName(builder, "BaseEventCount");
+                AppendInt32(builder, baseEventCount);
+                builder.Append(',');
+                AppendPropertyName(builder, "BaseCustomMutationCount");
+                AppendInt32(builder, baseCustomMutationCount);
+            }
+            builder.Append(',');
+            AppendPropertyName(builder, "TargetCheckpointCount");
+            AppendInt32(builder, targetCheckpointCount);
+            builder.Append(',');
+            AppendPropertyName(builder, "TargetEventCount");
+            AppendInt32(builder, targetEventCount);
+            builder.Append(',');
+            AppendPropertyName(builder, "TargetCustomMutationCount");
+            AppendInt32(builder, targetCustomMutationCount);
+            builder.Append(',');
+            AppendPropertyName(builder, "LastIssuedSequence");
+            AppendInt64(builder, lastIssuedSequence);
+            builder.Append('}');
         }
 
         private static void WriteBuilder(

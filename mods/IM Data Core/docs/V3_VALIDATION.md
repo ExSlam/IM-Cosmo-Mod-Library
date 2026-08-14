@@ -4,7 +4,7 @@ This revision was checked against the uploaded Cosmo Mod Library and decompiled 
 
 ## Static checks completed
 
-- `info.json` and `IM Data Core.csproj` both report **3.3.0**; the persisted sidecar `FormatVersion` intentionally remains **3**.
+- `info.json` and `IM Data Core.csproj` both report **3.3.0**; the persisted sidecar `FormatVersion` intentionally remains **3**. New implementation-detail journals use transactional format **2** while format-1 journals remain readable.
 - Existing public API methods remain available, and both public API aliases expose `TryReadEventsForIdolPage(...)` alongside the existing recent-event API.
 - Paged idol reads use the same merged idol/global ordering as recent reads, seek both projections with binary search, use an exclusive EventId cursor, and return `hasMore`.
 - A randomized behavioral model completed **5,000 / 5,000** pagination cases without a gap, duplicate, or ordering mismatch, including equal-date events and changing page sizes.
@@ -36,18 +36,22 @@ The delivery archives therefore omit existing `bin`/`obj` output and stale compi
 
 Validate these cases in a game-capable build environment:
 
-- two rapid same-path saves completing in opposite worker order;
-- ordinary forward saves use `mode=journal` after the first compact generation;
-- journal compaction produces a v3 base with equivalent logical records;
-- a torn final journal entry is ignored and the next save repairs by compact snapshot;
+- ordinary forward saves use `mode=journal` after the first compact generation, including the first save after a clean tip load;
+- routine journal thresholds queue `background_compaction` only after the triggering journal transaction is durable;
+- background compaction produces a v3 base with exactly equivalent logical records and aborts harmlessly if a newer generation wins the path lock first;
+- fault injection after temp-file fingerprinting but before/at `File.Replace` never commits stale in-memory base metadata;
+- fault injection after a complete journal transaction write but during `Flush(true)` falls back without duplicating the transaction;
+- a v2 journal transaction without `COMMIT` is ignored and forces repair compaction; a completely repeated committed transaction is idempotently skipped;
 - a journal copied beside a different base hash is ignored;
+- a tracked journal that disappears or changes byte length between saves is never silently recreated/appended as though prior deltas still existed;
 - `.imdc.bak` plus `.imdc.bak.imdc.journal` restores the previous complete logical generation;
 - rewind/diverge/save forces a full snapshot instead of appending onto the abandoned branch;
 - two case-distinct paths remain distinct on a case-sensitive filesystem;
 - SWOF assembly present with an unhealthy interception flag keeps IMDC's detached `SavedData` clone;
 - same-value SET and missing-key REMOVE do not advance the capture sequence;
 - concurrent stale snapshot completion cannot regress `activeSaveScope`;
-- long-history forward saves copy/serialize only the newly appended suffix until compaction.
+- long-history forward saves copy/serialize only the newly appended suffix; latest single/tour restore queries and checkpoint identity lookup remain O(1) after index rebuild.
+- capture bursts periodically flush into the in-memory storage engine at 256 buffered events without causing disk persistence.
 
 The source archive used for this patch does not contain a C# compiler/runtime toolchain, so source-level validation in this package is supplemental to an actual Unity/Mono build and game test.
 
@@ -59,4 +63,4 @@ In a source checkout, run:
 python3 scripts/Test-PersistenceSource.py
 ```
 
-The script requires no Unity assemblies. It checks the path-comparison contract, verified SWOF fallback, journal/hash/torn-tail safeguards, suffix snapshots, checkpoint-path indexing, payload caches, no-op sequence allocation, superseded-scope guard, diagnostics API, show-money scoped classification, and balanced C# delimiters. A real build and in-game matrix are still required before release.
+The script requires no Unity assemblies. It checks the transactional journal contract, pre-commit hashing order, uncertain-append fallback, bounded/background compaction, conditional post-load full snapshots, checkpoint/latest-state indexes, thresholded in-memory capture flushing, verified SWOF fallback, and balanced C# delimiters. A real build and in-game matrix are still required before release.

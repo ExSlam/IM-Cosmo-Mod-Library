@@ -9,6 +9,7 @@ namespace IMDataCore
     /// </summary>
     internal sealed partial class IMDataCoreController
     {
+        private const int BufferedEventFlushThreshold = 256;
         /// <summary>
         /// Captures vanilla's already-populated SavedData stamp and writes the
         /// current logical IMDC branch to the exact mirrored target. Exceptions
@@ -453,9 +454,11 @@ namespace IMDataCore
             }
         }
         /// <summary>
-        /// Moves captured events into the in-memory branch. A non-forced call is
-        /// intentionally a no-op; it exists for compatibility with capture sites
-        /// that previously triggered periodic/threshold persistence checks.
+        /// Moves captured events into the in-memory branch. Non-forced capture
+        /// calls flush at a bounded threshold so payload normalization/indexing is
+        /// amortized during play instead of accumulating entirely at save/read time.
+        /// This remains memory-only; disk persistence still occurs only at explicit
+        /// save/flush boundaries.
         /// </summary>
         private bool FlushLocked(bool forceFlush, out string errorMessage)
         {
@@ -465,7 +468,8 @@ namespace IMDataCore
                 errorMessage = CoreConstants.MessageStorageUnavailable;
                 return false;
             }
-            if (!forceFlush)
+            if (!forceFlush &&
+                bufferedEvents.Count < BufferedEventFlushThreshold)
             {
                 return true;
             }

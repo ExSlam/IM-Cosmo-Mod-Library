@@ -97,14 +97,15 @@ IMDC keeps complete source history, so retained disk history still grows with ge
 - a compact v3 sidecar remains the base snapshot;
 - append-only generations are written to `<sidecar>.imdc.journal`, whose header contains the SHA-256 of the exact base file it extends;
 - normal save preparation copies only newly appended immutable records, not every historical event;
-- a journal is compacted when it reaches at least 1 MiB and is at least as large as its base snapshot, or after 1,024 journal entries;
-- rewinds, destructive branch changes, recovery writes, or an incompatible baseline immediately use a full atomic snapshot instead;
-- an interrupted final journal line is treated as a torn tail and excluded; a mismatched journal hash is never replayed onto another base;
+- new journals use transactional format 2: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; legacy format-1 journals remain readable and are compacted before another append;
+- routine compaction is queued after 256 transactions or a 1-16 MiB bounded byte threshold, after the triggering delta is already durable;
+- rewinds, destructive branch changes, recovery writes, Save As, or an incompatible baseline immediately use a full atomic snapshot instead;
+- an incomplete v2 transaction is ignored, a completely written retry is idempotent by declared counts, and a mismatched journal hash is never replayed onto another base;
 - when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`;
 - event payloads and custom SET values cache their validated storage-form JSON, so old immutable rows are not reparsed on later saves;
 - the streaming writer copies reusable character buffers directly to its `TextWriter`, avoiding a temporary string allocation for every record;
 - forward-save watermarks skip complete history trim scans when no record can lie beyond the checkpoint;
-- runtime locks are released before serialization and durable disk I/O, and different sidecar paths use independent persistence locks;
+- runtime locks are released before serialization and durable disk I/O, different sidecar paths use independent persistence locks, and routine full compaction runs on the thread pool after the journal commit;
 - `TryGetPersistenceDiagnostics` exposes counts, base/journal sizes, last persistence mode, recovery/block state, and generation information without performing I/O.
 
 Save Write Ordering Fix is an optional optimization. IMDC skips its standalone full `SavedData` JSON clone only when SWOF's public health flag confirms that all five required vanilla write callers were actually intercepted. If verification is unavailable or false, IMDC keeps the defensive clone.
