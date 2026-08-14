@@ -96,6 +96,38 @@ namespace IMDataCore.TemplateMod
         }
 
         /// <summary>
+        /// Appends one logical occurrence at most once on the active branch.
+        /// The caller owns the occurrence key design.
+        /// </summary>
+        internal static bool AppendSampleEventOnce(int idolId, string occurrenceKey)
+        {
+            if (sharedSession == null)
+            {
+                return false;
+            }
+
+            string idempotencyKey = "template." + idolId + "." + occurrenceKey;
+            string payloadJson = "{\"note\":\"template idempotent flow\"}";
+            string errorMessage;
+            if (!IMDataCoreApi.TryAppendCustomEventOnce(
+                sharedSession,
+                idempotencyKey,
+                idolId,
+                SampleEntityKind,
+                idolId.ToString(),
+                SampleEventType,
+                payloadJson,
+                SampleEventSource,
+                out errorMessage))
+            {
+                Debug.LogWarning("[TemplateMod] TryAppendCustomEventOnce failed: " + errorMessage);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Reads one sample JSON value. Returns false when key is missing or request fails.
         /// </summary>
         internal static bool TryLoadSampleState(out string json)

@@ -1,13 +1,13 @@
-# IM Data Core 3
+# IM Data Core 3.1
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-Version 3 makes the sidecar format document-native JSON while preserving the public API used by existing Cosmo mods.
+IMDC 3.1 keeps sidecar format version 3. The release adds exact-checkpoint fail-closed loading, backup recovery, branch-aware custom-event idempotency, corrected mixed idol/global timeline reads, and lower-memory long-campaign persistence.
 
 ## Services
 
 - Namespaced custom JSON: `TrySetCustomJson`, `TryGetCustomJson`, `TryRemoveCustomJson`
-- Timeline events: `TryAppendCustomEvent`, `TryReadRecentEventsForIdol`
+- Timeline events: `TryAppendCustomEvent`, `TryAppendCustomEventOnce`, `TryReadRecentEventsForIdol`
 - Exact cash ledger: `TryReadMoneyTransactions`, `TryGetMoneyLedgerCoverageStart`
 - Explicit sidecar persistence: `TryFlushNow`
 - Active physical-save identity: `TryGetActiveSaveKey`
@@ -26,12 +26,12 @@ Each physical vanilla save owns one mirrored IMDC sidecar beneath the sibling `I
 
 ## Version 3 sidecar
 
-The current private disk format is:
+The current private disk format remains:
 
 - `FormatName`: `IMDataCore.LightweightSidecar`
 - `FormatVersion`: `3`
 
-V3 stores actual JSON values rather than JSON encoded inside strings. For example:
+V3 stores actual JSON values rather than JSON encoded inside strings. A built-in event can look like:
 
 ```json
 {
@@ -51,65 +51,67 @@ V3 stores actual JSON values rather than JSON encoded inside strings. For exampl
 }
 ```
 
-Custom SET mutations likewise store `Value` as an object, array, number, string, boolean, or null. REMOVE mutations omit `Value`.
+A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Older v3 sidecars do not need this field and remain valid.
 
-The disk format no longer stores:
+The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v3 document so consumers do not need to understand the private sidecar schema.
 
-- `PayloadJson` as an escaped JSON string
-- custom `ValueJson` as an escaped JSON string
-- `detail_json` as nested encoded JSON for built-in money payloads
-- comma-delimited built-in ID lists where an array is appropriate
-- duplicated event `EventId` when it is identical to `Sequence`
-- derived `GameDateKey`
-- checkpoint `RelativeSavePath` repeated on every checkpoint
+## Exact checkpoint loading
 
-The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v3 document so existing Cosmo consumers do not need to understand the private sidecar schema.
+A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, and the IMDC sequence watermark.
+
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.1 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+
+This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
+
+## Backup recovery
+
+Atomic replacement retains one sibling:
+
+```text
+<sidecar>.imdc.bak
+```
+
+If the primary sidecar is unreadable or invalid, IMDC validates the backup. A valid backup can be used as the recovery source for the session. The damaged primary is left untouched during recovery, and the known-good backup is preserved when a later successful save replaces the damaged primary.
+
+The recovered document still has to contain an exact checkpoint for the vanilla save being loaded. Backup recovery never weakens checkpoint matching.
+
+## Custom event idempotency
+
+`TryAppendCustomEvent` is intentionally append-only. Repeating the call creates another event because two identical payloads can represent two real occurrences.
+
+`TryAppendCustomEventOnce` is for callbacks that may replay, such as load reconstruction, retry paths, or duplicate hooks. The caller supplies an `idempotencyKey` that identifies one logical occurrence. The identity is:
+
+```text
+caller namespace + idempotency key
+```
+
+If that identity already exists on the active branch, the API returns success without adding another event. The key is stored with the event, so deduplication survives saving and reloading. If the player rewinds to an exact checkpoint before that event existed, the key is no longer active and the occurrence can legitimately be recorded again.
+
+Use occurrence-specific keys. Do not use a permanent key such as `promotion` if promotions can happen more than once.
+
+## Long-campaign persistence
+
+IMDC keeps complete source history, so sidecar size still grows with genuine event volume. Version 3.1 reduces the avoidable costs around that history:
+
+- save preparation takes shallow immutable record snapshots instead of deep-cloning every event and mutation;
+- runtime locks are released before JSON serialization and durable disk I/O;
+- JSON is streamed directly to the temporary file instead of building one full sidecar string and then a second full UTF-8 byte array;
+- event timeline indexes stay sorted as records enter them, allowing recent idol/global reads to merge directly without per-read full-list sorting;
+- loaded records and active branch records reuse immutable event objects where safe;
+- persistence logs event count, custom-mutation count, checkpoint count, bytes, and elapsed milliseconds for real campaign profiling;
+- when Save Write Ordering Fix is loaded, IMDC avoids an otherwise redundant full `SavedData` JSON clone because that mod freezes the exact vanilla payload synchronously after IMDC's save hook.
+
+These changes target campaigns with many idols and many years of retained history without changing the full-history semantics.
+
+## Substory completion after load
+
+Vanilla persists its dialogue queue. IMDC 3.1 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
 
 ## V1/V2 sidecar compatibility
 
-Existing lightweight sidecars with format version 1 or 2 are still readable. They are normalized in memory and are written as format version 3 at a later successful persistence boundary.
+Existing lightweight sidecars with format version 1 or 2 are still readable. They are normalized in memory and written as format version 3 at a later successful persistence boundary.
 
-Pre-2.0 database persistence is **not** imported by the runtime mod. Historical database migration belongs in a separate purpose-built migration utility. IMDC 3 does not probe old database files or old fallback locations.
-
-## Corrupt or newer sidecars
-
-An existing sidecar that cannot be safely read is never silently treated as a normal writable empty sidecar.
-
-If the file is corrupt, invalid for the current physical save, or uses a newer unsupported format, IMDC protects that path from overwrite and exposes safe empty supplemental state for the session. Saving to a different physical path can still establish a new writable branch.
-
-Atomic replacement retains one sibling `.imdc.bak` generation as a last-known-good recovery aid.
-
-## Memory-first persistence
-
-Event capture and custom-data mutation happen in memory. The sidecar is serialized at a real vanilla save boundary or when a consumer calls `TryFlushNow`.
-
-There is no persistence polling loop, timer, queue-size flush threshold, SQL transaction pump, or alternate runtime backend.
-
-The sidecar is an event-sourced document containing:
-
-- checkpoints
-- source events
-- ordered custom-data mutations
-
-Runtime indexes and materialized custom values are rebuilt from those records.
-
-## Vanilla save alignment
-
-Idol Manager serializes vanilla saves on a worker thread. IM Data Core's save hooks use a detached `SaveManager.SavedData` snapshot at the concrete vanilla save call sites so the checkpoint stamp and the object handed to vanilla `DataSaver` describe the same save request.
-
-The mod does not add private fields to `SavedData` and does not Harmony-patch constructed `DataSaver<T>` generic methods.
-
-## Checkpoints and rollback
-
-A checkpoint identifies a vanilla save by:
-
-- document-owned relative vanilla save path
-- `LastSave`
-- playtime seconds
-- game date/time
-- IMDC sequence watermark
-
-The active branch is fenced by both sequence and game date. Future-dated history cannot become visible merely because its sequence is below an older checkpoint watermark.
+Pre-2.0 database persistence is not imported by the runtime mod. Historical database migration belongs in a separate purpose-built migration utility. IMDC 3.1 does not probe old database files or old fallback locations.
 
 ## Custom-data behavior
 
@@ -121,15 +123,11 @@ Current quotas:
 - maximum 65,536 characters per individual normalized value
 - maximum 5 MiB normalized JSON character budget per namespace
 
-Quota accounting is maintained incrementally rather than rescanning the entire namespace on each SET.
-
-A SET to the already-materialized value and a REMOVE of a missing key are logical no-ops and do not grow mutation history.
+Quota accounting is maintained incrementally rather than rescanning the entire namespace on each SET. A SET to the already-materialized value and a REMOVE of a missing key are logical no-ops and do not grow mutation history.
 
 ## Public API
 
-Preferred type: `IMDataCoreApi`.
-
-The compatibility alias `IMDataCoreAPI` remains available.
+Preferred type: `IMDataCoreApi`. The compatibility alias `IMDataCoreAPI` remains available.
 
 ```csharp
 bool IMDataCoreApi.IsReady();
@@ -165,6 +163,17 @@ bool IMDataCoreApi.TryAppendCustomEvent(
     string payloadJson,
     string sourcePatch,
     out string errorMessage);
+
+bool IMDataCoreApi.TryAppendCustomEventOnce(
+    IMDataCoreSession session,
+    string idempotencyKey,
+    int idolId,
+    string entityKind,
+    string entityId,
+    string eventType,
+    string payloadJson,
+    string sourcePatch,
+    out string errorMessage);
 ```
 
 See `docs/START_HERE.md`, `docs/COOKBOOK.md`, and `templates/IMDataCore.TemplateMod` for integration examples.
@@ -180,14 +189,6 @@ IM Data Core/
 │   ├── info.json
 │   └── steam description.txt
 ├── docs/
-│   ├── START_HERE.md
-│   ├── COOKBOOK.md
-│   ├── EVENT_CATALOG.md
-│   ├── NAMING_CONVENTIONS.md
-│   ├── STORAGE_LAYOUT.md
-│   ├── V3_IMPLEMENTATION_NOTES.md
-│   ├── V3_MIGRATION.md
-│   └── V3_SIDECAR_SCHEMA.md
 ├── scripts/
 ├── src/
 └── templates/

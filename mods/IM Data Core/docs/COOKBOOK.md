@@ -180,7 +180,51 @@ internal static void RecordPromotionAndUpdateCache(int idolId, int fanGain, stri
 }
 ```
 
-## Recipe 6: Read recent events for UI timeline
+## Recipe 6: Idempotent event append for load/retry callbacks
+
+Use caller-controlled idempotency when one logical occurrence can be observed more than once. Do not deduplicate by payload equality.
+
+```csharp
+internal static void RecordSceneCompletionOnce(
+    int idolId,
+    string sceneId,
+    long occurrenceTicks)
+{
+    if (DataCoreState.Session == null)
+    {
+        return;
+    }
+
+    string idempotencyKey =
+        "scene." + idolId + "." + sceneId + "." + occurrenceTicks;
+    string payloadJson = "{\"scene_id\":\"" + sceneId + "\"}";
+    string error;
+
+    if (!IMDataCoreApi.TryAppendCustomEventOnce(
+        DataCoreState.Session,
+        idempotencyKey,
+        idolId,
+        "substory",
+        sceneId,
+        "scene_completed",
+        payloadJson,
+        "mod.com.example.your_mod.ScenePatch.Postfix",
+        out error))
+    {
+        UnityEngine.Debug.LogWarning(
+            "[YourMod] Idempotent event append failed: " + error);
+    }
+}
+```
+
+Semantics:
+- identity is registered namespace + `idempotencyKey`;
+- a repeated key on the active branch is a successful no-op;
+- the key is persisted with the event, so dedupe survives reload;
+- rewinding to an exact checkpoint before the event removes it from active history, so the occurrence can happen again after the rewind;
+- use only letters, digits, `_`, `-`, and `.` in the key, with a maximum of 192 characters.
+
+## Recipe 7: Read recent events for UI timeline
 
 ```csharp
 using System.Collections.Generic;
@@ -204,7 +248,7 @@ internal static List<IMDataCoreEvent> GetTimelineRows(int idolId)
 Ordering note:
 - API returns newest-first ordering scoped to idol + global relevant events.
 
-## Recipe 7: Flush before irreversible transitions
+## Recipe 8: Flush before irreversible transitions
 
 Use when a physical vanilla save scope already exists and you need the current
 IMDC branch on disk before the next vanilla save:
@@ -226,7 +270,7 @@ internal static void FlushWithLog()
 This writes only IMDC's sidecar. It neither invokes nor modifies vanilla save
 handling, and it fails cleanly before the first real vanilla save.
 
-## Recipe 8: Defensive shutdown
+## Recipe 9: Defensive shutdown
 
 ```csharp
 internal static void DisposeDataCoreSession()
@@ -247,7 +291,7 @@ internal static void DisposeDataCoreSession()
 }
 ```
 
-## Recipe 9: Retry-on-ready helper
+## Recipe 10: Retry-on-ready helper
 
 If your mod loads before IM Data Core is ready, call a polling helper from update/tick hooks until session exists.
 
@@ -263,7 +307,7 @@ internal static void EnsureDataCoreReady()
 }
 ```
 
-## Recipe 10: Event naming conventions for long-term maintainability
+## Recipe 11: Event naming conventions for long-term maintainability
 
 Use predictable naming:
 - `entityKind`: object type (`idol`, `contract`, `show`, `tour`)
@@ -275,7 +319,7 @@ Benefits:
 - Better debugging
 - Safer cross-mod reasoning
 
-## Recipe 11: JSON schema migration strategy
+## Recipe 12: JSON schema migration strategy
 
 For custom JSON snapshots:
 1. Store schema version in payload (`"schema":2`)
@@ -284,7 +328,7 @@ For custom JSON snapshots:
 
 This avoids breaking old save histories when your mod evolves.
 
-## Recipe 12: Error triage checklist
+## Recipe 13: Error triage checklist
 
 When an API call fails:
 1. Verify `Session` is not null

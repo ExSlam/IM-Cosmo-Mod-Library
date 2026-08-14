@@ -1,6 +1,8 @@
 # IM Data Core v3 sidecar schema
 
-This document describes the private persisted representation. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
+This document describes the private persisted representation used by IMDC 3.1. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
+
+The release version is 3.1.0, but the sidecar `FormatVersion` remains `3` because the only new event member is optional and older v3 documents remain valid.
 
 ## Root
 
@@ -18,17 +20,35 @@ This document describes the private persisted representation. Consumer mods shou
 
 Required fields: `LastSave`, `PlaytimeSeconds`, `GameDateTime`, `Sequence`.
 
-The checkpoint inherits `RelativeSavePath` from its enclosing document.
+The checkpoint inherits `RelativeSavePath` from its enclosing document. Activation requires an exact vanilla-save stamp match. Current IMDC does not activate an existing sidecar through a date-only fallback when no checkpoint matches.
 
 ## Event
 
 Required fields: `Sequence`, `GameDateTime`, `IdolId`, `EntityKind`, `EntityId`, `EventType`, `SourcePatch`, `NamespaceIdentifier`, `Payload`.
+
+Optional field:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `IdempotencyKey` | string | Caller-supplied identity for `TryAppendCustomEventOnce`. Valid only on namespaced custom events. |
 
 `Payload` may be any valid JSON value. Built-in IMDC events normally use an object. Namespaced custom events retain consumer payload semantics.
 
 `EventId` is not stored: public `EventId` equals `Sequence`.
 
 `GameDateKey` is not stored: it is derived from `GameDateTime`.
+
+### Idempotency invariant
+
+For events carrying `IdempotencyKey`, the pair:
+
+```text
+NamespaceIdentifier + IdempotencyKey
+```
+
+must be unique in the active persisted event set. Reusing the same pair through `TryAppendCustomEventOnce` is an idempotent success and does not append another row.
+
+Because the lookup is rebuilt from the active branch, rewinding to an exact checkpoint before the event existed removes that occurrence from active history and allows it to be recorded again later.
 
 ## Custom mutation
 
@@ -48,4 +68,5 @@ For `REMOVE`, `Value` is omitted.
 - event/custom `GameDateTime` must parse using the round-trip format;
 - event payloads and SET values must be valid JSON;
 - custom operations must be `SET` or `REMOVE`;
-- token and quota rules are enforced by the storage/API layers.
+- nonempty event `IdempotencyKey` values must satisfy token rules, belong to a nonempty namespace, and be unique by namespace/key pair;
+- custom-data token and quota rules are enforced by the storage/API layers.

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace IMDataCore
 {
     /// <summary>
-    /// Lightweight save/load coordination for IM Data Core 3.0. This partial is
+    /// Lightweight save/load coordination for IM Data Core 3.1. This partial is
     /// deliberately limited to in-memory branch management and explicit sidecar
     /// persistence boundaries.
     /// </summary>
@@ -24,40 +24,45 @@ namespace IMDataCore
             {
                 string resolvedVanillaPath;
                 if (!CorePaths.TryResolveDataSaverPath(
-                    dataFileName,
-                    isJson,
-                    fullPath,
-                    out resolvedVanillaPath))
+                        dataFileName,
+                        isJson,
+                        fullPath,
+                        out resolvedVanillaPath))
                 {
                     CoreLog.Warn(
                         "IM Data Core rejected an unsupported vanilla save target.");
                     return;
                 }
+
                 CoreSaveScope targetScope;
                 if (!CorePaths.TryResolveSaveScope(
-                    resolvedVanillaPath,
-                    out targetScope))
+                        resolvedVanillaPath,
+                        out targetScope))
                 {
                     CoreLog.Warn(
                         "IM Data Core could not resolve the vanilla save scope.");
                     return;
                 }
-                // Final safety net for direct field writes or third-party patches
-                // that bypass a known show mutation method. Observe only the
-                // settled runtime state that will accompany this vanilla save.
+
+                // Final safety nets for direct field writes or third-party patches
+                // that bypass known capture methods.
                 ReconcileAllPostModShows(
                     CorePayloadCompaction.CanonicalShowCastSourcePrefix +
                         "save_boundary");
                 CaptureResolvedSingleChartPositionsBeforeSave();
+
+                LightweightCoreStorageEngine engineForWrite;
+                LightweightPersistenceSnapshot persistenceSnapshot;
+                string errorMessage;
                 lock (runtimeLock)
                 {
-                    string errorMessage;
                     if (!EnsureInitializedLocked(out errorMessage) ||
                         !FlushLocked(true, out errorMessage))
                     {
                         CoreLog.Warn(errorMessage);
                         return;
                     }
+
                     VanillaSaveStamp stamp;
                     if (!VanillaSaveStamp.TryCreate(
                             savedData,
@@ -68,15 +73,40 @@ namespace IMDataCore
                             stamp,
                             captureSequence,
                             out errorMessage) ||
-                        !storageEngine.TryPersistForScope(
+                        !storageEngine.TryCreatePersistenceSnapshot(
                             targetScope,
+                            out persistenceSnapshot,
                             out errorMessage))
                     {
                         CoreLog.Warn(
-                            "IM Data Core could not persist its sidecar: " +
+                            "IM Data Core could not prepare its sidecar: " +
                             errorMessage);
                         return;
                     }
+
+                    engineForWrite = storageEngine;
+                }
+
+                // The snapshot owns stable list references. Serialize and fsync
+                // outside runtimeLock so long campaign saves do not stall capture
+                // and read APIs for the entire JSON/disk write.
+                if (!engineForWrite.TryPersistSnapshot(
+                        persistenceSnapshot,
+                        out errorMessage))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not persist its sidecar: " +
+                        errorMessage);
+                    return;
+                }
+
+                lock (runtimeLock)
+                {
+                    if (!ReferenceEquals(storageEngine, engineForWrite))
+                    {
+                        return;
+                    }
+
                     activeSaveScope = targetScope;
                     activeSaveKey = NormalizeSaveKey(
                         targetScope.InternalSaveKey);
@@ -164,6 +194,10 @@ namespace IMDataCore
                 bool sidecarLoaded = loadedEngine.Initialize(
                     targetScope,
                     out loadError);
+                if (sidecarLoaded && !string.IsNullOrEmpty(loadError))
+                {
+                    CoreLog.Warn(loadError);
+                }
                 if (!sidecarLoaded)
                 {
                     CoreLog.Warn(loadError);
@@ -191,7 +225,9 @@ namespace IMDataCore
                 }
                 bool checkpointFound = false;
                 long activatedSequence = 0L;
-                if (sidecarLoaded &&
+                bool hasExistingSidecarDocument =
+                    sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
+                if (hasExistingSidecarDocument &&
                     !loadedEngine.TryActivateCheckpoint(
                         stamp,
                         out checkpointFound,
@@ -200,24 +236,17 @@ namespace IMDataCore
                 {
                     CoreLog.Warn(errorMessage);
                 }
-                if (sidecarLoaded && !checkpointFound)
+                if (hasExistingSidecarDocument && !checkpointFound)
                 {
-                    if (loadedGameDate == DateTime.MinValue ||
-                        !loadedEngine.TryActivateThroughGameDate(
-                            loadedGameDate,
-                            out activatedSequence,
-                            out errorMessage))
-                    {
-                        if (!string.IsNullOrEmpty(errorMessage))
-                        {
-                            CoreLog.Warn(errorMessage);
-                        }
-                        loadedEngine.EnterReadOnlyEmptyForCurrentScope(
-                            "The loaded vanilla save could not be matched safely " +
-                            "to this existing IM Data Core sidecar. The sidecar was " +
-                            "left untouched.");
-                        sidecarLoaded = false;
-                    }
+                    // Existing sidecars are branch/checkpoint ledgers. A date-only
+                    // cutoff cannot distinguish two histories that share the same
+                    // in-game date, so an unmatched document must fail closed. A
+                    // genuinely new physical save with no sidecar remains writable.
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        "The loaded vanilla save has no exact IM Data Core checkpoint " +
+                        "in this existing sidecar. Supplemental state was detached " +
+                        "read-only and the sidecar was left untouched.");
+                    sidecarLoaded = false;
                 }
                 InstallLoadedEngine(
                     loadedEngine,
@@ -356,14 +385,15 @@ namespace IMDataCore
                 try
                 {
                     SeedResolvedSingleChartPositionsFromVanillaLocked();
+                    SeedPendingSubstoryCompletionsFromVanillaLocked();
                 }
                 catch (Exception exception)
                 {
-                    // A supplemental post-load backfill must never escape from a
-                    // Harmony postfix and interrupt vanilla scene/game progression.
+                    // Supplemental post-load index rebuilding must never escape from
+                    // a Harmony postfix and interrupt vanilla scene/game progression.
                     CoreLog.Warn(
-                        "IM Data Core post-load chart-position seeding failed " +
-                        "without blocking vanilla: " +
+                        "IM Data Core post-load runtime seeding failed without " +
+                        "blocking vanilla: " +
                         exception.Message);
                 }
             }
@@ -444,6 +474,7 @@ namespace IMDataCore
             }
 
             bufferedEvents.Clear();
+            pendingCustomEventIdempotencyKeys.Clear();
             storageEngine.SetLastIssuedSequence(captureSequence);
             return true;
         }
@@ -512,9 +543,51 @@ namespace IMDataCore
             concertEditBaselineByConcertId.Clear();
             resolvedSingleChartPositionBySingleId.Clear();
             pendingSubstoryCompletionCountByDialogueId.Clear();
+            pendingCustomEventIdempotencyKeys.Clear();
             idempotencyKeysForCurrentDate.Clear();
             idempotencyDateKey = CoreConstants.UninitializedDateKey;
         }
+        /// <summary>
+        /// Rebuilds deferred dialogue-completion tokens from vanilla's restored
+        /// queue. The queue itself is canonical save data; this method only restores
+        /// IMDC's transient completion bookkeeping and emits nothing.
+        /// </summary>
+        private void SeedPendingSubstoryCompletionsFromVanillaLocked()
+        {
+            pendingSubstoryCompletionCountByDialogueId.Clear();
+            if (Substories_Manager.dialogueQueue == null)
+            {
+                return;
+            }
+
+            for (int index = CoreConstants.ZeroBasedListStartIndex;
+                index < Substories_Manager.dialogueQueue.Count;
+                index++)
+            {
+                Substories_Manager._dialogueQueue queued =
+                    Substories_Manager.dialogueQueue[index];
+                data_dialogues._dialogue dialogue =
+                    queued != null ? queued.dialogue : null;
+                if (dialogue == null ||
+                    dialogue.type != data_dialogues._dialogue._type.dialogue ||
+                    string.IsNullOrEmpty(dialogue.id))
+                {
+                    continue;
+                }
+
+                int count;
+                if (!pendingSubstoryCompletionCountByDialogueId.TryGetValue(
+                        dialogue.id,
+                        out count))
+                {
+                    count = CoreConstants.ZeroBasedListStartIndex;
+                }
+
+                pendingSubstoryCompletionCountByDialogueId[dialogue.id] =
+                    count + 1;
+            }
+        }
+
         /// <summary>
         /// LoadEvent has now rebuilt vanilla's canonical singles. Seed only the
         /// transient duplicate-suppression index; do not emit or persist a second

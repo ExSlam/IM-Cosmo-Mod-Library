@@ -1,8 +1,8 @@
-# IM Data Core 3 storage layout
+# IM Data Core 3.1 storage layout
 
 ## Physical mapping
 
-IMDC mirrors the supported vanilla save path below the sibling `IMDataCore` root.
+IMDC mirrors each supported vanilla save path below the sibling `IMDataCore` root.
 
 If the persistent root is:
 
@@ -32,11 +32,11 @@ Examples:
 
 ## Containment safety
 
-All IMDC mutations are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before reads/writes/deletes that could escape containment. The private root is required to remain separate from the vanilla `data` root.
+All IMDC mutation paths are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before reads, writes, or deletes that could escape containment. The private root is required to remain separate from the vanilla `data` root.
 
 ## V3 document identity
 
-Every sidecar root contains:
+IMDC 3.1 still uses sidecar format version 3:
 
 ```json
 {
@@ -65,7 +65,11 @@ Every sidecar root contains:
 }
 ```
 
+Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.1 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+
 ### Event
+
+A normal event:
 
 ```json
 {
@@ -84,11 +88,17 @@ Every sidecar root contains:
 }
 ```
 
+A custom event written through `TryAppendCustomEventOnce` may also contain:
+
+```json
+"IdempotencyKey": "promotion.14.2031-05-03.2"
+```
+
+`IdempotencyKey` is optional and only meaningful for namespaced custom events. Older v3 documents without it remain valid.
+
 `Sequence` is the stored event identity. Public `EventId` is derived from it. `GameDateKey` is derived from `GameDateTime` and is not serialized.
 
-Built-in IMDC payloads use native arrays for known comma-delimited ID-list fields. Built-in money `detail_json` is stored as nested `detail` JSON. These transformations are reversed when producing the stable public `PayloadJson` string view.
-
-Namespaced custom-event payloads are stored structurally but are otherwise semantically untouched.
+Built-in IMDC payloads use native arrays for known ID-list fields. Built-in money `detail_json` is stored as nested `detail` JSON. These transformations are reversed when producing the stable public `PayloadJson` view. Namespaced custom-event payloads are stored structurally but are otherwise semantically untouched.
 
 ### Custom-data SET
 
@@ -97,11 +107,11 @@ Namespaced custom-event payloads are stored structurally but are otherwise seman
   "Sequence": 420,
   "GameDateTime": "2028-04-16T00:00:00.0000000",
   "NamespaceIdentifier": "com.example.mod",
-  "DataKey": "preferences",
+  "DataKey": "idol_14_state",
   "Operation": "SET",
   "Value": {
-    "enabled": true,
-    "mode": "compact"
+    "tier": 3,
+    "flags": ["a", "b"]
   }
 }
 ```
@@ -111,47 +121,62 @@ Namespaced custom-event payloads are stored structurally but are otherwise seman
 ```json
 {
   "Sequence": 421,
-  "GameDateTime": "2028-04-16T00:00:00.0000000",
+  "GameDateTime": "2028-04-17T00:00:00.0000000",
   "NamespaceIdentifier": "com.example.mod",
-  "DataKey": "preferences",
+  "DataKey": "idol_14_state",
   "Operation": "REMOVE"
 }
 ```
 
 ## What is intentionally not persisted
 
-The v3 sidecar does not persist:
+The sidecar does not persist runtime-derived structures such as:
 
-- vanilla `SaveManager.SavedData`
-- whole vanilla entity collections
-- runtime dictionaries or lookup indexes
-- materialized custom key/value state
-- `EventId` in addition to sequence
+- timeline indexes by idol
+- global timeline index
+- custom-data materialized dictionary
+- per-namespace quota counters
+- custom-event idempotency lookup sets
+- active mutation-sequence set
 - `GameDateKey`
-- checkpoint-relative path duplication
-- stringified `PayloadJson` / `ValueJson`
+- duplicated public `EventId`
 - legacy database or fallback-file state
 
-Those values are either vanilla-owned, derived, or materialized from source records.
+Those values are derived from source records or are transient runtime bookkeeping.
 
-## Atomic writes and backup
+## Atomic writes, streaming, and backup
 
-A sidecar is written to a validated temporary file and atomically promoted. When replacing an existing sidecar, IMDC retains one sibling:
+A persistence boundary first creates a stable shallow snapshot of the active source-record lists. Runtime locks are then released before JSON serialization and durable disk I/O.
+
+The v3 JSON document is streamed to a validated temporary file using buffered sequential I/O. IMDC does not first allocate one complete JSON string plus a second complete UTF-8 byte array. The temporary file is flushed durably and atomically promoted.
+
+When replacing an existing healthy sidecar, IMDC retains one sibling:
 
 ```text
 <sidecar>.imdc.bak
 ```
 
-as the previous known-good generation. It is not a second persistence backend and is not part of normal reads.
+as the previous known-good generation.
 
-## Unreadable sidecars
+If the primary is unreadable or invalid, IMDC validates the backup. A valid backup can be loaded for recovery. The damaged primary remains untouched until a later successful save. That save replaces the damaged primary while preserving the recovery backup rather than overwriting it.
 
-A missing sidecar means an ordinary empty writable IMDC branch.
+## Missing, unreadable, and unmatched sidecars
 
-An existing but corrupt, invalid-scope, or newer-format sidecar is different: IMDC preserves it and blocks writes to that same sidecar path for the session rather than replacing it with empty state. A Save As to a different valid physical save path may establish a new writable branch.
+These states deliberately differ:
+
+- **Missing sidecar:** ordinary empty writable IMDC branch.
+- **Unreadable/invalid/newer primary with valid backup:** recover from backup, then still require an exact vanilla checkpoint.
+- **Unreadable/invalid/newer primary and unusable backup:** expose safe empty supplemental state and block writes to that physical sidecar path.
+- **Valid existing sidecar with no exact checkpoint for the loaded vanilla save:** fail closed, expose detached supplemental state, and protect the sidecar from overwrite.
+
+A Save As to a different valid physical vanilla save path may establish a new writable branch.
+
+## Long-campaign characteristics
+
+Complete event history remains complete. File size and full persistence time therefore remain proportional to genuine retained history. IMDC 3.1 removes avoidable deep-copy and whole-document-buffer costs, keeps query indexes sorted incrementally, and logs write counts/bytes/timing so very long campaigns can be profiled from real data.
 
 ## Compatibility
 
 Format versions 1 and 2 of `IMDataCore.LightweightSidecar` remain readable. On a later successful persistence boundary they are written as format version 3.
 
-Pre-2.0 database persistence is outside the runtime migration path. IMDC 3 does not discover or import historical databases or flat fallback files.
+Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.1 does not discover or import historical databases or flat fallback files.

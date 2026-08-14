@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.1.0
+
+- Fixed recent-idol timeline reads to perform a true newest-first merge of idol-specific and global event indexes.
+- Rebuild pending substory completion bookkeeping from vanilla's restored dialogue queue after load.
+- Fail closed when an existing sidecar has no exact checkpoint for the loaded vanilla save; removed date-only activation fallback.
+- Added `TryAppendCustomEventOnce(session, idempotencyKey, ...)` with persistent, namespace-scoped, active-branch idempotency.
+- Added optional v3 event `IdempotencyKey` storage without changing sidecar `FormatVersion`.
+- Added automatic validation/recovery from `.imdc.bak` when the primary sidecar is unreadable or invalid, while preserving the damaged primary until a later successful save.
+- Reduced long-campaign save memory pressure with shallow persistence snapshots and streaming JSON output.
+- Moved JSON serialization and fsync outside the controller runtime lock while preserving exact vanilla-save checkpoint preparation.
+- Added persistence telemetry for source-record counts, file bytes, and write elapsed time.
+- Reused immutable loaded records where safe and maintained sorted timeline indexes incrementally.
+- Avoided a redundant full vanilla `SavedData` JSON clone when Save Write Ordering Fix is loaded.
+- Fixed namespaced custom events that reuse a built-in money event type from being indexed as internal money-ledger rows.
+- Removed the obsolete `LegacyFlatFileImporter.cs` stub and marked v2 migration notes as historical.
+
 ## 3.0.0
 
 - Introduced JSON-native sidecar format version 3.

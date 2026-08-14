@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace IMDataCore
@@ -79,6 +80,115 @@ namespace IMDataCore
 
             builder.Append('}');
             return builder.ToString();
+        }
+
+        /// <summary>
+        /// Streams one sidecar directly to a writer. This keeps peak save-time
+        /// memory proportional to the largest individual record instead of the
+        /// complete campaign history.
+        /// </summary>
+        internal static void SerializeTo(
+            TextWriter writer,
+            LightweightSidecarDocument document)
+        {
+            if (writer == null)
+            {
+                throw new ArgumentNullException("writer");
+            }
+            ValidateSerializableDocument(document);
+
+            StringBuilder fragment = new StringBuilder(512);
+            writer.Write('{');
+
+            fragment.Length = 0;
+            AppendPropertyName(fragment, "FormatName");
+            AppendString(fragment, document.FormatName ?? string.Empty);
+            fragment.Append(',');
+            AppendPropertyName(fragment, "FormatVersion");
+            AppendInt32(fragment, document.FormatVersion);
+            fragment.Append(',');
+            AppendPropertyName(fragment, "RelativeSavePath");
+            AppendString(fragment, document.RelativeSavePath ?? string.Empty);
+            fragment.Append(',');
+            AppendPropertyName(fragment, "LastIssuedSequence");
+            AppendInt64(fragment, document.LastIssuedSequence);
+            fragment.Append(',');
+            AppendPropertyName(fragment, "Checkpoints");
+            writer.Write(fragment.ToString());
+
+            writer.Write('[');
+            for (int index = 0; index < document.Checkpoints.Count; index++)
+            {
+                if (index > 0)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendCheckpointRecord(fragment, document.Checkpoints[index]);
+                writer.Write(fragment.ToString());
+            }
+            writer.Write(']');
+            writer.Write(',');
+
+            fragment.Length = 0;
+            AppendPropertyName(fragment, "Events");
+            writer.Write(fragment.ToString());
+            writer.Write('[');
+            for (int index = 0; index < document.Events.Count; index++)
+            {
+                if (index > 0)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendEventRecord(fragment, document.Events[index]);
+                writer.Write(fragment.ToString());
+            }
+            writer.Write(']');
+            writer.Write(',');
+
+            fragment.Length = 0;
+            AppendPropertyName(fragment, "CustomMutations");
+            writer.Write(fragment.ToString());
+            writer.Write('[');
+            for (int index = 0; index < document.CustomMutations.Count; index++)
+            {
+                if (index > 0)
+                {
+                    writer.Write(',');
+                }
+                fragment.Length = 0;
+                AppendCustomMutationRecord(
+                    fragment,
+                    document.CustomMutations[index]);
+                writer.Write(fragment.ToString());
+            }
+            writer.Write(']');
+            writer.Write('}');
+        }
+
+        private static void ValidateSerializableDocument(
+            LightweightSidecarDocument document)
+        {
+            if (document == null)
+            {
+                throw new ArgumentNullException("document");
+            }
+            if (document.Checkpoints == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar Checkpoints collection is null.");
+            }
+            if (document.Events == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar Events collection is null.");
+            }
+            if (document.CustomMutations == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar CustomMutations collection is null.");
+            }
         }
 
         internal static LightweightSidecarDocument Deserialize(string json)
@@ -930,32 +1040,35 @@ namespace IMDataCore
                 {
                     builder.Append(',');
                 }
-
-                LightweightCheckpointRecord record = records[index];
-                if (record == null)
-                {
-                    throw new InvalidOperationException(
-                        "The lightweight sidecar contains a null checkpoint record.");
-                }
-
-                builder.Append('{');
-                AppendPropertyName(builder, "LastSave");
-                AppendString(builder, record.LastSave ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "PlaytimeSeconds");
-                AppendInt64(builder, record.PlaytimeSeconds);
-                builder.Append(',');
-                AppendPropertyName(builder, "GameDateTime");
-                AppendString(builder, record.GameDateTime ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "Sequence");
-                AppendInt64(builder, record.Sequence);
-                builder.Append('}');
+                AppendCheckpointRecord(builder, records[index]);
             }
-
             builder.Append(']');
         }
 
+        private static void AppendCheckpointRecord(
+            StringBuilder builder,
+            LightweightCheckpointRecord record)
+        {
+            if (record == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar contains a null checkpoint record.");
+            }
+
+            builder.Append('{');
+            AppendPropertyName(builder, "LastSave");
+            AppendString(builder, record.LastSave ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "PlaytimeSeconds");
+            AppendInt64(builder, record.PlaytimeSeconds);
+            builder.Append(',');
+            AppendPropertyName(builder, "GameDateTime");
+            AppendString(builder, record.GameDateTime ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "Sequence");
+            AppendInt64(builder, record.Sequence);
+            builder.Append('}');
+        }
 
         private static void AppendEvents(
             StringBuilder builder,
@@ -968,55 +1081,64 @@ namespace IMDataCore
                 {
                     builder.Append(',');
                 }
-
-                LightweightEventRecord record = records[index];
-                if (record == null)
-                {
-                    throw new InvalidOperationException(
-                        "The lightweight sidecar contains a null event record.");
-                }
-
-                builder.Append('{');
-                AppendPropertyName(builder, "Sequence");
-                AppendInt64(builder, record.Sequence);
-                builder.Append(',');
-                AppendPropertyName(builder, "GameDateTime");
-                AppendString(builder, record.GameDateTime ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "IdolId");
-                AppendInt32(builder, record.IdolId);
-                builder.Append(',');
-                AppendPropertyName(builder, "EntityKind");
-                AppendString(builder, record.EntityKind ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "EntityId");
-                AppendString(builder, record.EntityId ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "EventType");
-                AppendString(builder, record.EventType ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "SourcePatch");
-                AppendString(builder, record.SourcePatch ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "NamespaceIdentifier");
-                AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "Payload");
-
-                JsonValue payloadValue = ParseJsonForStorage(
-                    record.PayloadJson,
-                    "An event payload");
-                if (string.IsNullOrEmpty(record.NamespaceIdentifier))
-                {
-                    TransformEventPayloadForStorage(payloadValue);
-                }
-                AppendJsonValue(builder, payloadValue);
-                builder.Append('}');
+                AppendEventRecord(builder, records[index]);
             }
-
             builder.Append(']');
         }
 
+        private static void AppendEventRecord(
+            StringBuilder builder,
+            LightweightEventRecord record)
+        {
+            if (record == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar contains a null event record.");
+            }
+
+            builder.Append('{');
+            AppendPropertyName(builder, "Sequence");
+            AppendInt64(builder, record.Sequence);
+            builder.Append(',');
+            AppendPropertyName(builder, "GameDateTime");
+            AppendString(builder, record.GameDateTime ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "IdolId");
+            AppendInt32(builder, record.IdolId);
+            builder.Append(',');
+            AppendPropertyName(builder, "EntityKind");
+            AppendString(builder, record.EntityKind ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "EntityId");
+            AppendString(builder, record.EntityId ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "EventType");
+            AppendString(builder, record.EventType ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "SourcePatch");
+            AppendString(builder, record.SourcePatch ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "NamespaceIdentifier");
+            AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
+            if (!string.IsNullOrEmpty(record.IdempotencyKey))
+            {
+                builder.Append(',');
+                AppendPropertyName(builder, "IdempotencyKey");
+                AppendString(builder, record.IdempotencyKey);
+            }
+            builder.Append(',');
+            AppendPropertyName(builder, "Payload");
+
+            JsonValue payloadValue = ParseJsonForStorage(
+                record.PayloadJson,
+                "An event payload");
+            if (string.IsNullOrEmpty(record.NamespaceIdentifier))
+            {
+                TransformEventPayloadForStorage(payloadValue);
+            }
+            AppendJsonValue(builder, payloadValue);
+            builder.Append('}');
+        }
 
         private static void AppendCustomMutations(
             StringBuilder builder,
@@ -1029,48 +1151,52 @@ namespace IMDataCore
                 {
                     builder.Append(',');
                 }
+                AppendCustomMutationRecord(builder, records[index]);
+            }
+            builder.Append(']');
+        }
 
-                LightweightCustomMutationRecord record = records[index];
-                if (record == null)
-                {
-                    throw new InvalidOperationException(
-                        "The lightweight sidecar contains a null custom mutation.");
-                }
-
-                builder.Append('{');
-                AppendPropertyName(builder, "Sequence");
-                AppendInt64(builder, record.Sequence);
-                builder.Append(',');
-                AppendPropertyName(builder, "GameDateTime");
-                AppendString(builder, record.GameDateTime ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "NamespaceIdentifier");
-                AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "DataKey");
-                AppendString(builder, record.DataKey ?? string.Empty);
-                builder.Append(',');
-                AppendPropertyName(builder, "Operation");
-                AppendString(builder, record.Operation ?? string.Empty);
-
-                if (string.Equals(
-                        record.Operation,
-                        LightweightCoreStorageEngine.CustomOperationSet,
-                        StringComparison.Ordinal))
-                {
-                    builder.Append(',');
-                    AppendPropertyName(builder, "Value");
-                    AppendJsonValue(
-                        builder,
-                        ParseJsonForStorage(
-                            record.ValueJson,
-                            "A custom-data value"));
-                }
-
-                builder.Append('}');
+        private static void AppendCustomMutationRecord(
+            StringBuilder builder,
+            LightweightCustomMutationRecord record)
+        {
+            if (record == null)
+            {
+                throw new InvalidOperationException(
+                    "The lightweight sidecar contains a null custom mutation.");
             }
 
-            builder.Append(']');
+            builder.Append('{');
+            AppendPropertyName(builder, "Sequence");
+            AppendInt64(builder, record.Sequence);
+            builder.Append(',');
+            AppendPropertyName(builder, "GameDateTime");
+            AppendString(builder, record.GameDateTime ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "NamespaceIdentifier");
+            AppendString(builder, record.NamespaceIdentifier ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "DataKey");
+            AppendString(builder, record.DataKey ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "Operation");
+            AppendString(builder, record.Operation ?? string.Empty);
+
+            if (string.Equals(
+                    record.Operation,
+                    LightweightCoreStorageEngine.CustomOperationSet,
+                    StringComparison.Ordinal))
+            {
+                builder.Append(',');
+                AppendPropertyName(builder, "Value");
+                AppendJsonValue(
+                    builder,
+                    ParseJsonForStorage(
+                        record.ValueJson,
+                        "A custom-data value"));
+            }
+
+            builder.Append('}');
         }
 
 
@@ -1174,6 +1300,9 @@ namespace IMDataCore
                         EventType = RequireString(item, "EventType"),
                         SourcePatch = RequireString(item, "SourcePatch"),
                         NamespaceIdentifier = namespaceIdentifier,
+                        IdempotencyKey = ReadOptionalString(
+                            item,
+                            "IdempotencyKey"),
                         PayloadJson = payloadJson
                     });
             }
@@ -1600,6 +1729,26 @@ namespace IMDataCore
             }
 
             return value.ArrayValue;
+        }
+
+        private static string ReadOptionalString(
+            Dictionary<string, JsonValue> source,
+            string propertyName)
+        {
+            JsonValue value;
+            if (source == null ||
+                !source.TryGetValue(propertyName, out value))
+            {
+                return string.Empty;
+            }
+
+            if (value == null || value.Kind != JsonValueKind.String)
+            {
+                throw new FormatException(
+                    "JSON property '" + propertyName + "' must be a string when present.");
+            }
+
+            return value.StringValue ?? string.Empty;
         }
 
         private static string RequireString(

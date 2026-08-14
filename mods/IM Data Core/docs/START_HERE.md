@@ -190,6 +190,43 @@ internal static void AppendPromotionEvent(int idolId, int fanGain)
 When to use this:
 - You care about historical sequence, not only latest state.
 
+### Step 6A: Make replay-prone callbacks idempotent
+
+Use `TryAppendCustomEventOnce` when the same logical occurrence might be observed more than once because of load reconstruction, retries, or overlapping hooks. Supply a stable occurrence key containing only letters, digits, `_`, `-`, or `.` and no more than 192 characters.
+
+```csharp
+internal static void AppendPromotionEventOnce(int idolId, long promotionOccurrenceId, int fanGain)
+{
+    if (DataCoreBridge.Session == null)
+    {
+        return;
+    }
+
+    string idempotencyKey =
+        "promotion." + idolId + "." + promotionOccurrenceId;
+    string payload = "{\"fan_gain\":" + fanGain + "}";
+    string error;
+    if (!IMDataCoreApi.TryAppendCustomEventOnce(
+        DataCoreBridge.Session,
+        idempotencyKey,
+        idolId,
+        "idol",
+        idolId.ToString(),
+        "promotion_bonus_applied",
+        payload,
+        "mod.com.example.your_mod.PromotionPatch.Postfix",
+        out error))
+    {
+        UnityEngine.Debug.LogWarning(
+            "[YourMod] TryAppendCustomEventOnce failed: " + error);
+    }
+}
+```
+
+The key is scoped to your registered namespace and persisted with the event. Repeating the same key on the same active branch returns success without another row. Loading an exact checkpoint from before that event rewinds the key along with the event, so a later legitimate occurrence can be recorded.
+
+Choose a key for one occurrence, not one event type. `promotion` is too broad if promotions can happen more than once.
+
 ## Step 7: Read recent events
 
 ```csharp

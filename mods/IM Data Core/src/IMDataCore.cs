@@ -28,6 +28,8 @@ namespace IMDataCore
         internal const int NamespaceMinimumLength = 3;
         internal const int DataKeyMaximumLength = 128;
         internal const int DataKeyMinimumLength = 1;
+        internal const int IdempotencyKeyMaximumLength = 192;
+        internal const int IdempotencyKeyMinimumLength = 1;
 
         internal const int OneKilobyteCharacterCount = 1024;
         internal const int NamespaceBudgetMegabytes = 5;
@@ -577,6 +579,7 @@ namespace IMDataCore
         internal const string MessageDataKeyInvalid = "Data key must contain only safe token characters and meet minimum length.";
         internal const string MessageEntityKindInvalid = "Entity kind must contain only safe token characters and meet minimum length.";
         internal const string MessageEventTypeInvalid = "Event type must contain only safe token characters and meet minimum length.";
+        internal const string MessageIdempotencyKeyInvalid = "Idempotency key must contain only safe token characters and meet minimum length.";
         internal const string MessagePayloadNull = "Payload JSON cannot be null.";
         internal const string MessageStorageUnavailable = "Storage engine is not available.";
         internal const string MessageIdolInvalid = "Idol id must be non-negative.";
@@ -1161,6 +1164,37 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Appends a custom event at most once for the caller namespace and active
+        /// branch. Reusing the same idempotency key is treated as successful and
+        /// does not create another event row.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAppendCustomEventOnce(
+            IMDataCoreSession session,
+            string idempotencyKey,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryAppendCustomEventOnce(
+                session,
+                callingAssembly,
+                idempotencyKey,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns recent events for one idol from the active save scope.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1310,6 +1344,37 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Appends a custom event at most once for the caller namespace and active
+        /// branch. Reusing the same idempotency key is treated as successful and
+        /// does not create another event row.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAppendCustomEventOnce(
+            IMDataCoreSession session,
+            string idempotencyKey,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryAppendCustomEventOnce(
+                session,
+                callingAssembly,
+                idempotencyKey,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns recent events for one idol from the active save scope.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1383,6 +1448,7 @@ namespace IMDataCore
         private readonly Dictionary<int, int> resolvedSingleChartPositionBySingleId = new Dictionary<int, int>();
         private readonly Dictionary<string, int> pendingSubstoryCompletionCountByDialogueId = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly HashSet<string> idempotencyKeysForCurrentDate = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> pendingCustomEventIdempotencyKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, NamespaceSessionRegistration> namespaceRegistrations =
             new Dictionary<string, NamespaceSessionRegistration>(StringComparer.Ordinal);
 
@@ -1702,12 +1768,82 @@ namespace IMDataCore
             string sourcePatch,
             out string errorMessage)
         {
+            return TryAppendCustomEventInternal(
+                session,
+                callingAssembly,
+                string.Empty,
+                false,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Appends a custom event once per namespace/idempotency-key pair on the
+        /// active branch. An already-recorded key is an idempotent success.
+        /// </summary>
+        internal bool TryAppendCustomEventOnce(
+            IMDataCoreSession session,
+            Assembly callingAssembly,
+            string idempotencyKey,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
+            return TryAppendCustomEventInternal(
+                session,
+                callingAssembly,
+                idempotencyKey,
+                true,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
+        private bool TryAppendCustomEventInternal(
+            IMDataCoreSession session,
+            Assembly callingAssembly,
+            string idempotencyKey,
+            bool appendOnce,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
             errorMessage = string.Empty;
 
             lock (runtimeLock)
             {
                 NamespaceSessionRegistration registration;
                 if (!TryValidateSessionLocked(session, callingAssembly, out registration, out errorMessage))
+                {
+                    return false;
+                }
+
+                string sanitizedIdempotencyKey = string.Empty;
+                if (appendOnce &&
+                    !TrySanitizeStrictToken(
+                        idempotencyKey,
+                        CoreConstants.IdempotencyKeyMaximumLength,
+                        CoreConstants.IdempotencyKeyMinimumLength,
+                        CoreConstants.MessageIdempotencyKeyInvalid,
+                        out sanitizedIdempotencyKey,
+                        out errorMessage))
                 {
                     return false;
                 }
@@ -1763,6 +1899,21 @@ namespace IMDataCore
                     return false;
                 }
 
+                string compositeIdempotencyKey = string.Empty;
+                if (appendOnce)
+                {
+                    compositeIdempotencyKey = BuildCustomEventIdempotencyCompositeKey(
+                        registration.NamespaceIdentifier,
+                        sanitizedIdempotencyKey);
+                    if (pendingCustomEventIdempotencyKeys.Contains(compositeIdempotencyKey) ||
+                        storageEngine.ContainsCustomEventIdempotencyKey(
+                            registration.NamespaceIdentifier,
+                            sanitizedIdempotencyKey))
+                    {
+                        return true;
+                    }
+                }
+
                 DateTime gameDate;
                 if (!TryResolvePublicMutationGameDateLocked(
                     out gameDate,
@@ -1782,12 +1933,28 @@ namespace IMDataCore
                     EventType = sanitizedEventType,
                     SourcePatch = sanitizedSourcePatch,
                     NamespaceIdentifier = registration.NamespaceIdentifier,
+                    IdempotencyKey = sanitizedIdempotencyKey,
                     PayloadJson = normalizedPayloadJson
                 };
 
                 bufferedEvents.Add(pendingEvent);
+                if (appendOnce)
+                {
+                    pendingCustomEventIdempotencyKeys.Add(compositeIdempotencyKey);
+                }
+
                 return FlushLocked(false, out errorMessage);
             }
+        }
+
+        private static string BuildCustomEventIdempotencyCompositeKey(
+            string namespaceIdentifier,
+            string idempotencyKey)
+        {
+            return string.Concat(
+                namespaceIdentifier ?? string.Empty,
+                "\n",
+                idempotencyKey ?? string.Empty);
         }
 
         /// <summary>
@@ -1835,21 +2002,29 @@ namespace IMDataCore
         internal bool TryFlushNow(out string errorMessage)
         {
             errorMessage = string.Empty;
+            LightweightCoreStorageEngine engineForWrite;
+            LightweightPersistenceSnapshot persistenceSnapshot;
 
             lock (runtimeLock)
             {
-                if (!EnsureInitializedLocked(out errorMessage))
+                if (!EnsureInitializedLocked(out errorMessage) ||
+                    !FlushLocked(true, out errorMessage))
                 {
                     return false;
                 }
 
-                if (!FlushLocked(true, out errorMessage))
+                engineForWrite = storageEngine;
+                if (!engineForWrite.TryCreateCurrentPersistenceSnapshot(
+                        out persistenceSnapshot,
+                        out errorMessage))
                 {
                     return false;
                 }
-
-                return storageEngine.TryPersistCurrent(out errorMessage);
             }
+
+            return engineForWrite.TryPersistSnapshot(
+                persistenceSnapshot,
+                out errorMessage);
         }
 
         /// <summary>
@@ -9136,6 +9311,7 @@ namespace IMDataCore
         internal string EventType = string.Empty;
         internal string SourcePatch = string.Empty;
         internal string NamespaceIdentifier = string.Empty;
+        internal string IdempotencyKey = string.Empty;
         internal string PayloadJson = string.Empty;
     }
 
@@ -9950,6 +10126,7 @@ namespace IMDataCore
         public string SourcePatch { get; internal set; }
         public string PayloadJson { get; internal set; }
         public string NamespaceId { get; internal set; }
+        public string IdempotencyKey { get; internal set; }
     }
 
     /// <summary>

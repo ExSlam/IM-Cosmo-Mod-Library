@@ -1,4 +1,4 @@
-# IMDataCore 3 Template Mod
+# IMDataCore 3.1 Template Mod
 
 Minimal example mod project that integrates with IM Data Core 3. The public API remains string-JSON based; values and event payloads must be valid JSON documents.
 
@@ -8,6 +8,7 @@ Minimal example mod project that integrates with IM Data Core 3. The public API 
 - Namespace registration.
 - Custom JSON set/get.
 - Custom event append.
+- Idempotent custom event append with caller-owned occurrence keys.
 - Optional unregister on shutdown.
 
 ## Setup
@@ -59,3 +60,7 @@ This template uses `[HarmonyPostfix]`, so callback method names can be changed s
 If you remove that attribute, the method name must be exactly `Postfix`.
 
 Full naming guide: `..\..\docs\NAMING_CONVENTIONS.md`
+
+## Idempotent events
+
+Use `TryAppendCustomEventOnce` for callbacks that may replay. The caller supplies a stable occurrence key, and IMDC stores the namespace/key identity with the event. Repeating that identity on the active branch succeeds without appending a duplicate. Do not use one permanent key for an event that can legitimately happen multiple times.

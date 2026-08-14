@@ -164,9 +164,11 @@ namespace IMDataCore
                     dataFileNameLocal);
                 yield return new CodeInstruction(OpCodes.Stloc, dataToSaveLocal);
 
-                // Vanilla DataSaver serializes on a worker thread. Freeze one
-                // detached snapshot now and pass that same object to IMDC and
+                // Vanilla DataSaver serializes on a worker thread. Resolve one
+                // stable save object now and pass that same object to IMDC and
                 // DataSaver so their checkpoint/file identities cannot diverge.
+                // CreateStableSaveSnapshot can reuse the object when Save Write
+                // Ordering Fix will synchronously freeze the exact payload next.
                 yield return new CodeInstruction(OpCodes.Ldloc, dataToSaveLocal);
                 yield return new CodeInstruction(
                     OpCodes.Call,
@@ -213,9 +215,17 @@ namespace IMDataCore
                 return null;
             }
 
-            // DataSaver ultimately uses Unity's JSON serializer as well. Cloning
-            // through the same representation gives the worker thread an object
-            // graph that is no longer shared with SaveManager.Data.
+            // Save Write Ordering Fix runs after IMDC's caller transpiler and
+            // freezes the exact SavedData payload synchronously. When it is loaded,
+            // a second full JsonUtility round-trip here only doubles save-time CPU
+            // and allocation cost for large campaigns.
+            if (IsSaveWriteOrderingFixLoaded())
+            {
+                return source;
+            }
+
+            // Standalone IMDC still protects vanilla's worker-thread serializer from
+            // later mutations by detaching the graph before checkpointing it.
             string json = UnityEngine.JsonUtility.ToJson(source, false);
             SaveManager.SavedData snapshot =
                 UnityEngine.JsonUtility.FromJson<SaveManager.SavedData>(json);
@@ -226,6 +236,25 @@ namespace IMDataCore
             }
 
             return snapshot;
+        }
+
+        private static bool IsSaveWriteOrderingFixLoaded()
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int index = 0; index < assemblies.Length; index++)
+            {
+                AssemblyName name = assemblies[index] != null
+                    ? assemblies[index].GetName()
+                    : null;
+                if (name != null && string.Equals(
+                        name.Name,
+                        "com.cosmo.savewriteorderingfix",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool IsSavedDataWrite(CodeInstruction instruction)

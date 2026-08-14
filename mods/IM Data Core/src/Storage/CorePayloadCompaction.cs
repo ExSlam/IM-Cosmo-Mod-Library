@@ -151,15 +151,17 @@ namespace IMDataCore
                     continue;
                 }
 
-                LightweightEventRecord compacted = CloneEvent(record);
                 bool payloadChanged;
-                compacted.PayloadJson = CompactPayload(
-                    compacted.NamespaceIdentifier,
-                    compacted.EventType,
-                    compacted.PayloadJson,
+                string compactedPayload = CompactPayload(
+                    record.NamespaceIdentifier,
+                    record.EventType,
+                    record.PayloadJson,
                     out payloadChanged);
+                LightweightEventRecord compacted = record;
                 if (payloadChanged)
                 {
+                    compacted = CloneEvent(record);
+                    compacted.PayloadJson = compactedPayload;
                     sparseMoneyPayloadCount++;
                 }
 
@@ -178,6 +180,10 @@ namespace IMDataCore
                         compacted.PayloadJson,
                         out episodeIdentity))
                 {
+                    if (ReferenceEquals(compacted, record))
+                    {
+                        compacted = CloneEvent(record);
+                    }
                     compacted.IdolId = CoreConstants.InvalidIdValue;
                     AddGrouped(episodeGroups, episodeIdentity, compacted);
                     continue;
@@ -690,6 +696,7 @@ namespace IMDataCore
                 SourcePatch = source.SourcePatch ?? string.Empty,
                 NamespaceIdentifier =
                     source.NamespaceIdentifier ?? string.Empty,
+                IdempotencyKey = source.IdempotencyKey ?? string.Empty,
                 PayloadJson =
                     source.PayloadJson ?? CoreConstants.EmptyJsonObject
             };
@@ -710,6 +717,7 @@ namespace IMDataCore
                 SourcePatch = source.SourcePatch ?? string.Empty,
                 NamespaceIdentifier =
                     source.NamespaceIdentifier ?? string.Empty,
+                IdempotencyKey = source.IdempotencyKey ?? string.Empty,
                 PayloadJson =
                     source.PayloadJson ?? CoreConstants.EmptyJsonObject
             };
