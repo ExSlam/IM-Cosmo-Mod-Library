@@ -1,8 +1,8 @@
 {
   "Title": "Idol Career Diary",
-  "Description": "Profile-integrated career timeline UI powered by IM Data Core 2.0+ and IM UI Framework.",
+  "Description": "Profile-integrated career timeline UI powered by IM Data Core 3.2+ and IM UI Framework.",
   "Author": "Cosmo",
-  "Version": "1.1.3",
+  "Version": "1.2.0",
   "Tags": ["ui", "career", "im-data-core"],
   "HarmonyID": "com.cosmo.idolcareerdiary"
 }

@@ -1204,6 +1204,29 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns one newest-to-oldest page of events for one idol. Pass
+        /// beforeEventIdExclusive <= 0 for the newest page; for the next page,
+        /// pass the EventId of the last (oldest) row returned by the previous page.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadEventsForIdolPage(
+            int idolId,
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadEventsForIdolPage(
+                idolId,
+                beforeEventIdExclusive,
+                maxCount,
+                out events,
+                out hasMore,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns exact cash mutations inside a half-open game-date range.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1381,6 +1404,29 @@ namespace IMDataCore
         public static bool TryReadRecentEventsForIdol(int idolId, int maxCount, out List<IMDataCoreEvent> events, out string errorMessage)
         {
             return IMDataCoreController.Instance.TryReadRecentEventsForIdol(idolId, maxCount, out events, out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns one newest-to-oldest page of events for one idol. Pass
+        /// beforeEventIdExclusive <= 0 for the newest page; for the next page,
+        /// pass the EventId of the last (oldest) row returned by the previous page.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadEventsForIdolPage(
+            int idolId,
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadEventsForIdolPage(
+                idolId,
+                beforeEventIdExclusive,
+                maxCount,
+                out events,
+                out hasMore,
+                out errorMessage);
         }
 
         /// <summary>
@@ -1992,6 +2038,52 @@ namespace IMDataCore
                     idolId,
                     clampedMaxCount,
                     out events,
+                    out errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Reads one newest-to-oldest timeline page for an idol. The cursor is the
+        /// oldest EventId returned by the previous page, or a non-positive value for
+        /// the newest page.
+        /// </summary>
+        internal bool TryReadEventsForIdolPage(
+            int idolId,
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            events = new List<IMDataCoreEvent>();
+            hasMore = false;
+            errorMessage = string.Empty;
+
+            if (idolId < CoreConstants.MinimumValidIdolIdentifier)
+            {
+                errorMessage = CoreConstants.MessageIdolInvalid;
+                return false;
+            }
+
+            lock (runtimeLock)
+            {
+                if (!EnsureInitializedLocked(out errorMessage) ||
+                    !FlushLocked(true, out errorMessage))
+                {
+                    return false;
+                }
+
+                int clampedMaxCount = Mathf.Clamp(
+                    maxCount,
+                    CoreConstants.MinimumRecentEventRequestCount,
+                    CoreConstants.MaximumRecentEventRequestCount);
+
+                return storageEngine.TryReadEventsForIdolPage(
+                    idolId,
+                    beforeEventIdExclusive,
+                    clampedMaxCount,
+                    out events,
+                    out hasMore,
                     out errorMessage);
             }
         }

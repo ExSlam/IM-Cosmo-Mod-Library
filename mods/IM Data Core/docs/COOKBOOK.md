@@ -245,6 +245,8 @@ internal static List<IMDataCoreEvent> GetTimelineRows(int idolId)
 }
 ```
 
+For a complete career/history browser, prefer `TryReadEventsForIdolPage` and pass `page[page.Count - 1].EventId` as the exclusive cursor for the next page. This avoids a hard dependency on any single recent-event request size while preserving newest-to-oldest ordering.
+
 Ordering note:
 - API returns newest-first ordering scoped to idol + global relevant events.
 

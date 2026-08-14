@@ -1,8 +1,8 @@
-# IM Data Core 3.1 implementation notes
+# IM Data Core 3.2 implementation notes
 
 ## Goals
 
-IMDC 3.1 preserves the JSON-native, memory-first, exact-save-scoped architecture while tightening branch correctness and reducing the memory/lock cost of large histories.
+IMDC 3.2 preserves the JSON-native, memory-first, exact-save-scoped architecture while tightening branch correctness and reducing the memory/lock cost of large histories.
 
 The sidecar remains a source document rather than a serialized database projection. Derived indexes are rebuilt at load and are not written to disk.
 
@@ -10,7 +10,7 @@ The sidecar remains a source document rather than a serialized database projecti
 
 `LightweightCoreStorageEngine.SidecarFormatVersion` remains `3`.
 
-V3 writes native JSON event payloads and custom SET values. IMDC 3.1 adds only one optional event member, `IdempotencyKey`, for namespaced events created through the idempotent custom-event API. No sidecar format bump is required.
+V3 writes native JSON event payloads and custom SET values. IMDC 3.2 adds only one optional event member, `IdempotencyKey`, for namespaced events created through the idempotent custom-event API. No sidecar format bump is required.
 
 V3 still does not write duplicate `EventId`, derived `GameDateKey`, checkpoint path repetition, `PayloadJson`, or `ValueJson` string wrappers.
 
@@ -24,7 +24,7 @@ This is a lightweight-sidecar migration, not a migration from pre-2.0 database p
 
 Existing sidecars are branch/checkpoint ledgers. Loading by game date alone is ambiguous because different save branches can share the same in-game date.
 
-IMDC 3.1 therefore requires `TryActivateCheckpoint` to find the exact vanilla save stamp. If it does not, the engine enters read-only empty supplemental state for that physical sidecar and protects the existing file from overwrite. The former date-only activation fallback is removed.
+IMDC 3.2 therefore requires `TryActivateCheckpoint` to find the exact vanilla save stamp. If it does not, the engine enters read-only empty supplemental state for that physical sidecar and protects the existing file from overwrite. The former date-only activation fallback is removed.
 
 ## Runtime indexes
 
@@ -38,7 +38,7 @@ Derived state rebuilt after load includes:
 - per-namespace custom-data quota usage
 - namespace/idempotency-key set for custom events
 
-Timeline indexes are kept sorted as records enter them. `TryReadRecentEventsForIdol` performs a newest-first two-way merge of the idol-specific and global lists, so a newer global row cannot be pushed out merely because the idol-specific list reaches the requested limit first.
+Timeline indexes are kept sorted as records enter them. `TryReadRecentEventsForIdol` and `TryReadEventsForIdolPage` perform a newest-first two-way merge of the idol-specific and global lists, so a newer global row cannot be pushed out merely because the idol-specific list reaches the requested limit first.
 
 ## Custom-event idempotency
 
@@ -52,7 +52,7 @@ An existing namespace/key pair returns success without allocating another sequen
 
 Vanilla persists `Substories_Manager.dialogueQueue`. IMDC's pending completion counters are transient and previously disappeared across load.
 
-After vanilla load reconstruction completes, IMDC 3.1 seeds those counters from the restored dialogue queue without emitting events. A queued dialogue can then emit its matching `substory_completed` event when it later closes.
+After vanilla load reconstruction completes, IMDC 3.2 seeds those counters from the restored dialogue queue without emitting events. A queued dialogue can then emit its matching `substory_completed` event when it later closes.
 
 ## Custom-data quota accounting
 
@@ -62,6 +62,20 @@ The mutation layer suppresses two no-op records:
 
 - SET where normalized JSON equals the current value
 - REMOVE where the key does not exist
+
+## Paged timeline reads
+
+`TryReadEventsForIdolPage` takes an exclusive EventId cursor. A non-positive cursor requests the newest page; subsequent calls pass the EventId of the last (oldest) row from the previous page. The storage engine resolves that EventId back to its active record, binary-searches the idol and global timeline indexes by the record's `(GameDateKey, Sequence)` sort key, and continues the same newest-first two-way merge used by recent reads.
+
+Each page remains capped by the existing per-call maximum. `hasMore` reports whether an older idol/global row remains. The API does not change retention policy and does not copy or persist any new timeline structure.
+
+## Streaming load and validation
+
+Sidecar reads now use a buffered sequential `TextReader`. For the normal writer-produced property order, collection records are parsed and converted one at a time, avoiding a complete sidecar string and complete campaign JSON DOM in memory. Out-of-order legacy-compatible top-level fields remain accepted; only an unusually early collection must be temporarily materialized until format metadata is known.
+
+For format v3, event payloads and custom SET values are already guaranteed to be syntactically valid JSON by structural deserialization, so validation no longer parses those serialized payload strings a second time. V1/V2 compatibility retains normalization because those formats store JSON in strings.
+
+Checkpoint duplicate detection now uses a `HashSet` over normalized relative save path, vanilla `LastSave`, playtime seconds, and game date/time, replacing the previous pairwise scan.
 
 ## Backup recovery and failure policy
 
@@ -76,7 +90,7 @@ A later successful persistence after backup recovery replaces the damaged primar
 
 ## Long-campaign persistence
 
-The source history is intentionally complete, so serialization work remains O(number of retained source records). IMDC 3.1 reduces avoidable multipliers around that work:
+The source history is intentionally complete, so serialization work remains O(number of retained source records). IMDC 3.2 reduces avoidable multipliers around that work:
 
 1. Persistence snapshots shallow-copy record lists rather than deep-cloning every immutable event and mutation.
 2. The controller captures/flushed/checkpoints under `runtimeLock`, takes the stable storage snapshot, then releases `runtimeLock` before serialization and fsync.
@@ -87,7 +101,7 @@ The source history is intentionally complete, so serialization work remains O(nu
 7. If Save Write Ordering Fix is loaded, the save lifecycle skips IMDC's redundant full `SavedData` JSON clone because that mod freezes the exact vanilla payload synchronously after IMDC's hook. Standalone IMDC retains its own detached snapshot path.
 8. Per-path persistence generations prevent an older snapshot from overwriting a newer already-committed snapshot for the same physical sidecar.
 
-This does not impose retention limits or silently discard history. Campaign owners can therefore retain decades of event history while avoiding the previous whole-document memory duplication during saves.
+This does not impose retention limits or silently discard history. Campaign owners can therefore retain decades of event history while avoiding the previous whole-document memory duplication on both save output and normal sidecar load input.
 
 ## Internal money indexing guard
 
@@ -95,6 +109,6 @@ Built-in money-ledger classification now also requires an empty namespace. A con
 
 ## Public API compatibility
 
-IMDC 3.1 adds `TryAppendCustomEventOnce` to both `IMDataCoreApi` and compatibility alias `IMDataCoreAPI`. Existing public methods remain intact.
+IMDC 3.2 retains `TryAppendCustomEventOnce` on both public API aliases and adds `TryReadEventsForIdolPage` without removing the existing recent-event or custom-data methods.
 
 The public string-JSON interface is retained so consumers can continue using their preferred JSON library rather than depending on IMDC's private AST implementation.

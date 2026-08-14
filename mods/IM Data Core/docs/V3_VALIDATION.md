@@ -1,38 +1,33 @@
-# IM Data Core 3.1 validation notes
+# IM Data Core 3.2 validation notes
 
-The patched source package was checked against the uploaded Cosmo Mod Library, decompiled Idol Manager source, and EroEvents source used for this revision.
+This revision was checked against the uploaded Cosmo Mod Library and decompiled Idol Manager source. EroEvents is intentionally unchanged and is outside the 3.2 edit set.
 
 ## Static checks completed
 
-- 27 C# runtime source files are present after removing the obsolete `LegacyFlatFileImporter.cs` stub.
-- Existing public API methods remain present and `TryAppendCustomEventOnce` is added to both `IMDataCoreApi` and compatibility alias `IMDataCoreAPI`.
-- `info.json` reports `3.1.0`, the IM Data Core project reports `3.1.0`, and the sidecar format intentionally remains version `3`.
-- Edited metadata/example JSON files parse as strict JSON.
-- IM Data Core, template, and EroEvents `.csproj` files parse as XML.
-- 45 C# source files across the patched IMDC and EroEvents packages pass string/comment-aware delimiter-balance scanning.
-- Runtime IMDC source contains no SQLite/SQL-provider path and no `TryActivateThroughGameDate` fallback.
-- The unmatched-checkpoint load path explicitly enters protected read-only supplemental state only when an existing sidecar document was actually loaded; a new physical save with no sidecar remains writable.
-- Pending substory completion reconstruction reads vanilla's restored `Substories_Manager.dialogueQueue`.
-- Recent idol timeline code contains the two-way idol/global merge and incrementally sorted timeline insertion path.
-- `TryAppendCustomEventOnce` persists optional `IdempotencyKey`, validates namespace/key uniqueness, and rebuilds the active idempotency lookup from branch events.
-- Sidecar loading contains primary-to-`.imdc.bak` recovery and still applies exact-checkpoint activation after recovery.
-- Persistence uses the streaming `SerializeTo(TextWriter, ...)` path and performs JSON/fsync work outside the controller runtime lock after creating a stable persistence snapshot. Same-path generations suppress only snapshots older than a newer already-durable write.
-- Normal forward saves no longer rebuild and re-sort every derived event/custom-data index when checkpoint trimming removes no active mutations.
-- Save lifecycle contains the conditional Save Write Ordering Fix fast path that avoids a redundant IMDC `SavedData` JSON clone when that assembly is present.
-- Namespaced custom events are excluded from internal money-ledger classification even when their event type text resembles a built-in money event.
-- EroEvents metadata/project versions agree on `1.0.1`.
-- All 26 EroEvents career-diary metadata entries match only `substory_completed`.
-- The EroEvents bridge resolves `TryAppendCustomEventOnce` when available and retains the older append API fallback.
-- Source diffs pass `git diff --check` for whitespace errors.
+- `info.json` and `IM Data Core.csproj` both report **3.2.0**; the persisted sidecar `FormatVersion` intentionally remains **3**.
+- Existing public API methods remain available, and both public API aliases expose `TryReadEventsForIdolPage(...)` alongside the existing recent-event API.
+- Paged idol reads use the same merged idol/global ordering as recent reads, seek both projections with binary search, use an exclusive EventId cursor, and return `hasMore`.
+- A randomized behavioral model completed **5,000 / 5,000** pagination cases without a gap, duplicate, or ordering mismatch, including equal-date events and changing page sizes.
+- Normal v3 sidecar loads use a buffered `FileStream` with `FileOptions.SequentialScan` and a forward-only parser instead of first materializing the complete sidecar as a `string`.
+- Normal writer-order v3 event/checkpoint/custom-data arrays are converted record-by-record. Unusual but valid top-level property order remains compatible through a deferred structural-value fallback.
+- Structurally parsed v3 event payloads and custom SET values are not reparsed solely for JSON normalization during document validation. Legacy v1/v2 JSON-string payloads retain their validation/normalization path.
+- Checkpoint duplicate validation uses a `HashSet<CheckpointIdentity>` with the same identity fields and path comparison semantics as the former pairwise scan.
+- Primary-to-`.imdc.bak` recovery, exact-checkpoint activation, branch rollback, idempotent custom-event keys, and save-boundary persistence semantics remain in place.
+- A string/comment-aware delimiter scan over the edited IM Data Core and Idol Career Diary runtime C# sources reports no unbalanced delimiters or unterminated literals/comments.
+- Edited `info.json` files parse as strict JSON and edited `.csproj` files parse as XML.
+- No EroEvents source, asset, project, metadata, or diary-definition file is modified by this revision.
 
-## Existing EroEvents relaxed JSON assets
+## Idol Career Diary integration checks
 
-Several pre-existing EroEvents gameplay asset files are not strict RFC-style JSON when parsed by Python's standard `json` module. Those files were byte-for-byte unchanged by this patch and are outside the diary/IMDC edits. The edited EroEvents `info.json` and career-diary JSON both pass strict JSON parsing.
+- Idol Career Diary requires IM Data Core **3.2+** and resolves the paged timeline API through the existing reflection bridge.
+- Initial diary opening requests only the newest raw page. Older pages are fetched on demand for result expansion or cooperatively across frames while a non-empty search needs complete-history coverage.
+- Timeline search caches a query-independent corpus per loaded EventId, avoiding repeated presentation/payload/election-name expansion on subsequent searches.
+- The diary continues to use the cloned vanilla profile panel as its single scroll owner. Search controls use a vertically sized block with a full-width TMP input and a separate flexible-width action row, avoiding a nested ScrollRect and reducing narrow-width overlap risk.
+- Rendered result GameObjects remain bounded by the existing result window (`300`, then `+100` through Show More); pagination expands the model history without instantiating the entire career at once.
+- Custom diary-rule lookup is deterministic: exact ID rules outrank prefixes, longer prefixes outrank shorter prefixes, and otherwise equal rules use stable source-mod/file/index tie-breaking rather than filesystem enumeration order.
 
-The final cleaned-package static validation pass completed 84 checks with 84 passes.
+## Compiler and runtime note
 
-## Compiler note
+This packaging environment does not contain `dotnet`, MSBuild, Roslyn `csc`, or Mono `mcs`, so a real .NET Framework 4.6 compile and an in-game Unity runtime test could not be performed here.
 
-This packaging environment does not contain `dotnet`, MSBuild, Roslyn `csc`, Mono `mcs`, or the Idol Manager reference DLL set, so a real .NET Framework 4.6 compilation could not be executed here.
-
-Stale `bin` and `obj` output from the uploaded source trees is omitted from the delivery archives rather than being presented as a build of the patched source. Build in the Cosmo Mod Library / EroEvents development environment as the final compiler and in-game runtime gate.
+The delivery archives therefore omit existing `bin`/`obj` output and stale compiled DLLs rather than presenting them as builds of the modified source. Compile these source packages in the normal Cosmo Mod Library development environment before deployment.

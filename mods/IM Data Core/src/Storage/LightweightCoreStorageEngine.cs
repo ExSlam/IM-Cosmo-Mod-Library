@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text;
 
 namespace IMDataCore
 {
@@ -143,7 +144,7 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// The sole normal-runtime persistence implementation for IM Data Core 3.1.
+    /// The sole normal-runtime persistence implementation for IM Data Core 3.2.
     /// Mutations update memory only; callers explicitly persist at vanilla save
     /// boundaries or through TryFlushNow.
     /// </summary>
@@ -881,7 +882,33 @@ namespace IMDataCore
             out List<IMDataCoreEvent> events,
             out string errorMessage)
         {
+            bool ignoredHasMore;
+            return TryReadEventsForIdolPage(
+                idolId,
+                0L,
+                maxCount,
+                out events,
+                out ignoredHasMore,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Reads one newest-to-oldest page from the derived per-idol timeline.
+        /// The cursor is an event sequence from the previous page. The underlying
+        /// idol/global lists are binary-searched by the cursor's timeline sort key,
+        /// so walking a long history stays O(pageCount * pageSize + pageCount * log N)
+        /// rather than rescanning from the newest event for every page.
+        /// </summary>
+        internal bool TryReadEventsForIdolPage(
+            int idolId,
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
             events = new List<IMDataCoreEvent>();
+            hasMore = false;
             errorMessage = string.Empty;
             lock (storageLock)
             {
@@ -893,13 +920,28 @@ namespace IMDataCore
                         return true;
                     }
 
+                    LightweightEventRecord cursor = null;
+                    if (beforeEventIdExclusive > 0L)
+                    {
+                        cursor = FindActiveEventBySequenceLocked(
+                            beforeEventIdExclusive);
+                        if (cursor == null)
+                        {
+                            errorMessage =
+                                "The requested timeline page cursor is no longer present in the active branch.";
+                            return false;
+                        }
+                    }
+
                     List<LightweightEventRecord> idolEvents;
                     timelineEventsByIdolId.TryGetValue(idolId, out idolEvents);
 
-                    int idolIndex = idolEvents != null
-                        ? idolEvents.Count - 1
-                        : -1;
-                    int globalIndex = globalTimelineEvents.Count - 1;
+                    int idolIndex = FindLastEventBeforeCursor(
+                        idolEvents,
+                        cursor);
+                    int globalIndex = FindLastEventBeforeCursor(
+                        globalTimelineEvents,
+                        cursor);
 
                     while (events.Count < maxCount &&
                         (idolIndex >= 0 || globalIndex >= 0))
@@ -939,9 +981,11 @@ namespace IMDataCore
                                     next,
                                     idolId);
                         }
+
                         events.Add(publicEvent);
                     }
 
+                    hasMore = idolIndex >= 0 || globalIndex >= 0;
                     return true;
                 }
                 catch (Exception exception)
@@ -951,6 +995,68 @@ namespace IMDataCore
                     return false;
                 }
             }
+        }
+
+        private LightweightEventRecord FindActiveEventBySequenceLocked(
+            long sequence)
+        {
+            int low = 0;
+            int high = activeEvents.Count - 1;
+            while (low <= high)
+            {
+                int middle = low + ((high - low) / 2);
+                LightweightEventRecord candidate = activeEvents[middle];
+                long candidateSequence = candidate != null
+                    ? candidate.Sequence
+                    : long.MinValue;
+                if (candidateSequence == sequence)
+                {
+                    return candidate;
+                }
+
+                if (candidateSequence < sequence)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle - 1;
+                }
+            }
+
+            return null;
+        }
+
+        private static int FindLastEventBeforeCursor(
+            List<LightweightEventRecord> rows,
+            LightweightEventRecord cursor)
+        {
+            if (rows == null || rows.Count == 0)
+            {
+                return -1;
+            }
+
+            if (cursor == null)
+            {
+                return rows.Count - 1;
+            }
+
+            int low = 0;
+            int high = rows.Count;
+            while (low < high)
+            {
+                int middle = low + ((high - low) / 2);
+                if (CompareEventsAscending(rows[middle], cursor) < 0)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+
+            return low - 1;
         }
 
         /// <summary>
@@ -1576,8 +1682,23 @@ namespace IMDataCore
             errorMessage = string.Empty;
             try
             {
-                string rawJson = File.ReadAllText(path);
-                document = LightweightSidecarJson.Deserialize(rawJson);
+                using (FileStream stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    64 * 1024,
+                    FileOptions.SequentialScan))
+                using (StreamReader reader = new StreamReader(
+                    stream,
+                    Encoding.UTF8,
+                    true,
+                    64 * 1024,
+                    false))
+                {
+                    document = LightweightSidecarJson.DeserializeFrom(reader);
+                }
+
                 if (!TryValidateDocumentLocked(document, out errorMessage))
                 {
                     document = null;
@@ -1641,8 +1762,8 @@ namespace IMDataCore
             HashSet<long> sequences = new HashSet<long>();
             HashSet<string> eventIdempotencyKeys =
                 new HashSet<string>(StringComparer.Ordinal);
-            List<LightweightCheckpointRecord> validatedCheckpoints =
-                new List<LightweightCheckpointRecord>();
+            HashSet<CheckpointIdentity> validatedCheckpointIdentities =
+                new HashSet<CheckpointIdentity>();
             long maximumSequence = 0L;
 
             for (int index = 0; index < document.Events.Count; index++)
@@ -1681,20 +1802,30 @@ namespace IMDataCore
                     }
                 }
 
-                string normalizedPayload;
-                string jsonError;
-                if (!LightweightSidecarJson.TryNormalizeJsonDocument(
-                        record.PayloadJson,
-                        out normalizedPayload,
-                        out jsonError))
+                if (document.FormatVersion < 3)
+                {
+                    string normalizedPayload;
+                    string jsonError;
+                    if (!LightweightSidecarJson.TryNormalizeJsonDocument(
+                            record.PayloadJson,
+                            out normalizedPayload,
+                            out jsonError))
+                    {
+                        errorMessage =
+                            "The sidecar contains an invalid event payload: " +
+                            jsonError;
+                        return false;
+                    }
+
+                    record.PayloadJson = normalizedPayload;
+                }
+                else if (record.PayloadJson == null)
                 {
                     errorMessage =
-                        "The sidecar contains an invalid event payload: " +
-                        jsonError;
+                        "The sidecar contains an invalid event payload.";
                     return false;
                 }
 
-                record.PayloadJson = normalizedPayload;
                 maximumSequence = Math.Max(
                     maximumSequence,
                     record.Sequence);
@@ -1728,20 +1859,29 @@ namespace IMDataCore
 
                 if (operationIsSet)
                 {
-                    string normalizedValue;
-                    string jsonError;
-                    if (!LightweightSidecarJson.TryNormalizeJsonDocument(
-                            mutation.ValueJson,
-                            out normalizedValue,
-                            out jsonError))
+                    if (document.FormatVersion < 3)
+                    {
+                        string normalizedValue;
+                        string jsonError;
+                        if (!LightweightSidecarJson.TryNormalizeJsonDocument(
+                                mutation.ValueJson,
+                                out normalizedValue,
+                                out jsonError))
+                        {
+                            errorMessage =
+                                "The sidecar contains an invalid custom-data value: " +
+                                jsonError;
+                            return false;
+                        }
+
+                        mutation.ValueJson = normalizedValue;
+                    }
+                    else if (mutation.ValueJson == null)
                     {
                         errorMessage =
-                            "The sidecar contains an invalid custom-data value: " +
-                            jsonError;
+                            "The sidecar contains an invalid custom-data value.";
                         return false;
                     }
-
-                    mutation.ValueJson = normalizedValue;
                 }
                 else
                 {
@@ -1772,21 +1912,13 @@ namespace IMDataCore
                     return false;
                 }
 
-                for (int priorIndex = 0;
-                    priorIndex < validatedCheckpoints.Count;
-                    priorIndex++)
+                if (!validatedCheckpointIdentities.Add(
+                        CheckpointIdentity.From(checkpoint)))
                 {
-                    if (CheckpointsHaveSameIdentity(
-                        checkpoint,
-                        validatedCheckpoints[priorIndex]))
-                    {
-                        errorMessage =
-                            "The sidecar contains duplicate checkpoint identities.";
-                        return false;
-                    }
+                    errorMessage =
+                        "The sidecar contains duplicate checkpoint identities.";
+                    return false;
                 }
-
-                validatedCheckpoints.Add(checkpoint);
             }
 
             if (document.LastIssuedSequence < maximumSequence)
@@ -2508,6 +2640,78 @@ namespace IMDataCore
             catch
             {
                 return false;
+            }
+        }
+
+        private struct CheckpointIdentity : IEquatable<CheckpointIdentity>
+        {
+            private readonly string relativeSavePath;
+            private readonly string lastSave;
+            private readonly long playtimeSeconds;
+            private readonly string gameDateTime;
+
+            private CheckpointIdentity(
+                string relativeSavePath,
+                string lastSave,
+                long playtimeSeconds,
+                string gameDateTime)
+            {
+                this.relativeSavePath = relativeSavePath ?? string.Empty;
+                this.lastSave = lastSave ?? string.Empty;
+                this.playtimeSeconds = playtimeSeconds;
+                this.gameDateTime = gameDateTime ?? string.Empty;
+            }
+
+            internal static CheckpointIdentity From(
+                LightweightCheckpointRecord checkpoint)
+            {
+                return new CheckpointIdentity(
+                    checkpoint != null
+                        ? VanillaSaveStamp.NormalizeRelativePath(
+                            checkpoint.RelativeSavePath)
+                        : string.Empty,
+                    checkpoint != null ? checkpoint.LastSave : string.Empty,
+                    checkpoint != null ? checkpoint.PlaytimeSeconds : 0L,
+                    checkpoint != null ? checkpoint.GameDateTime : string.Empty);
+            }
+
+            public bool Equals(CheckpointIdentity other)
+            {
+                return StringComparer.OrdinalIgnoreCase.Equals(
+                        relativeSavePath,
+                        other.relativeSavePath) &&
+                    StringComparer.Ordinal.Equals(
+                        lastSave,
+                        other.lastSave) &&
+                    playtimeSeconds == other.playtimeSeconds &&
+                    StringComparer.Ordinal.Equals(
+                        gameDateTime,
+                        other.gameDateTime);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is CheckpointIdentity &&
+                    Equals((CheckpointIdentity)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = 17;
+                    hash = (hash * 31) +
+                        StringComparer.OrdinalIgnoreCase.GetHashCode(
+                            relativeSavePath ?? string.Empty);
+                    hash = (hash * 31) +
+                        StringComparer.Ordinal.GetHashCode(
+                            lastSave ?? string.Empty);
+                    hash = (hash * 31) + playtimeSeconds.GetHashCode();
+                    hash = (hash * 31) +
+                        StringComparer.Ordinal.GetHashCode(
+                            gameDateTime ?? string.Empty);
+                    return hash;
+                }
             }
         }
 

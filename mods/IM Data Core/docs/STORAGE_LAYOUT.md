@@ -1,4 +1,4 @@
-# IM Data Core 3.1 storage layout
+# IM Data Core 3.2 storage layout
 
 ## Physical mapping
 
@@ -36,7 +36,7 @@ All IMDC mutation paths are canonicalized and required to remain beneath the pri
 
 ## V3 document identity
 
-IMDC 3.1 still uses sidecar format version 3:
+IMDC 3.2 still uses sidecar format version 3:
 
 ```json
 {
@@ -65,7 +65,7 @@ IMDC 3.1 still uses sidecar format version 3:
 }
 ```
 
-Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.1 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.2 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
 
 ### Event
 
@@ -173,10 +173,10 @@ A Save As to a different valid physical vanilla save path may establish a new wr
 
 ## Long-campaign characteristics
 
-Complete event history remains complete. File size and full persistence time therefore remain proportional to genuine retained history. IMDC 3.1 removes avoidable deep-copy and whole-document-buffer costs, keeps query indexes sorted incrementally, and logs write counts/bytes/timing so very long campaigns can be profiled from real data.
+Complete event history remains complete. File size and full persistence time therefore remain proportional to genuine retained history. IMDC 3.2 removes avoidable deep-copy and whole-document-buffer costs on writes, streams sidecar reads record-by-record, avoids a redundant v3 payload validation parse, keeps query indexes sorted incrementally, and exposes cursor-paged idol timelines for long-history consumers.
 
 ## Compatibility
 
 Format versions 1 and 2 of `IMDataCore.LightweightSidecar` remain readable. On a later successful persistence boundary they are written as format version 3.
 
-Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.1 does not discover or import historical databases or flat fallback files.
+Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.2 does not discover or import historical databases or flat fallback files.

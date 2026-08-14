@@ -8,7 +8,7 @@ How to use this file:
 - Use **Field Constant** names when mapping payload JSON fields to strongly typed code.
 
 Who this is for:
-- Mod authors who consume `IMDataCoreApi.TryReadRecentEventsForIdol(...)`
+- Mod authors who consume `IMDataCoreApi.TryReadRecentEventsForIdol(...)` or `IMDataCoreApi.TryReadEventsForIdolPage(...)`
 - Tooling authors building analytics/exporters for IM Data Core data
 
 What this file is not:

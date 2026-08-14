@@ -1,8 +1,8 @@
 # IM Data Core v3 sidecar schema
 
-This document describes the private persisted representation used by IMDC 3.1. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
+This document describes the private persisted representation used by IMDC 3.2. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
 
-The release version is 3.1.0, but the sidecar `FormatVersion` remains `3` because the only new event member is optional and older v3 documents remain valid.
+The release version is 3.2.0, but the sidecar `FormatVersion` remains `3`. Version 3.2 changes query/load implementation only and does not add a persisted field, so older v3 documents remain valid.
 
 ## Root
 

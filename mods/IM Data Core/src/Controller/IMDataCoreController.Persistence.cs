@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace IMDataCore
 {
     /// <summary>
-    /// Lightweight save/load coordination for IM Data Core 3.1. This partial is
+    /// Lightweight save/load coordination for IM Data Core 3.2. This partial is
     /// deliberately limited to in-memory branch management and explicit sidecar
     /// persistence boundaries.
     /// </summary>

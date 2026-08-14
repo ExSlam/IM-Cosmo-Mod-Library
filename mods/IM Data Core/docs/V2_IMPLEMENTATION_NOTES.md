@@ -1,6 +1,6 @@
 # IM Data Core 2.0 implementation notes
 
-> Historical document only. It records decisions and abandoned migration ideas from the 2.0 development cycle. It is not a description of IM Data Core 3.1 runtime behavior. Current IMDC uses the v3 JSON sidecar only and contains no SQL/database runtime path or pre-2.0 flat-file importer.
+> Historical document only. It records decisions and abandoned migration ideas from the 2.0 development cycle. It is not a description of IM Data Core 3.2 runtime behavior. Current IMDC uses the v3 JSON sidecar only and contains no SQL/database runtime path or pre-2.0 flat-file importer.
 
 This file is the durable implementation contract and progress log for the
 lightweight persistence refactor. It records decisions that must remain stable

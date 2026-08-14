@@ -248,6 +248,50 @@ internal static List<IMDataCoreEvent> ReadRecentEvents(int idolId, int maxCount)
 }
 ```
 
+### Read complete history in pages
+
+For UI or analysis that must reach beyond the recent-event cap, walk the paged API. The returned list is newest-to-oldest.
+
+```csharp
+internal static List<IMDataCoreEvent> ReadAllEvents(int idolId)
+{
+    List<IMDataCoreEvent> all = new List<IMDataCoreEvent>();
+    long before = 0L;
+    bool hasMore;
+
+    do
+    {
+        List<IMDataCoreEvent> page;
+        string error;
+        if (!IMDataCoreApi.TryReadEventsForIdolPage(
+                idolId,
+                before,
+                500,
+                out page,
+                out hasMore,
+                out error))
+        {
+            UnityEngine.Debug.LogWarning(
+                "[YourMod] TryReadEventsForIdolPage failed: " + error);
+            break;
+        }
+
+        if (page.Count == 0)
+        {
+            break;
+        }
+
+        all.AddRange(page);
+        before = page[page.Count - 1].EventId;
+    }
+    while (hasMore);
+
+    return all;
+}
+```
+
+Do not use the numerically smallest EventId as a cursor. Pass the EventId of the **last row returned**, because timeline ordering is `(GameDateKey, Sequence)` rather than EventId alone.
+
 ## Step 8: Optional explicit flush
 
 If your mod needs its current IMDC branch persisted before the next vanilla

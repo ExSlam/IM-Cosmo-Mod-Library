@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.0
+
+- Added `TryReadEventsForIdolPage` to `IMDataCoreApi` and `IMDataCoreAPI`, using an exclusive EventId cursor and `hasMore` so consumers can walk complete idol/global history without raising the existing 1,000-row per-call cap.
+- Added binary-search cursor positioning over the already-sorted idol/global timeline indexes, keeping page traversal proportional to page size plus logarithmic seek work.
+- Changed sidecar loading to a buffered sequential `TextReader` path that materializes one v3 record tree at a time instead of reading the entire file into a string and whole-document JSON tree first.
+- Removed the redundant second JSON parse/normalization pass for v3 event payloads and custom SET values after structural deserialization.
+- Replaced quadratic checkpoint-identity duplicate validation with a `HashSet` keyed by the exact checkpoint identity fields.
+- Sidecar format remains version `3`; no persisted schema migration is required.
+
 ## 3.1.0
 
 - Fixed recent-idol timeline reads to perform a true newest-first merge of idol-specific and global event indexes.

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -22,8 +23,8 @@ namespace IdolCareerDiary
     {
         internal const string HarmonyId = "com.cosmo.idolcareerdiary";
         internal const string HarmonyIdImDataCore = "com.cosmo.imdatacore";
-        internal const string MinimumImDataCoreDisplayVersion = "2.0.0";
-        internal const string MinimumImDataCoreAssemblyVersionText = "2.0.0.0";
+        internal const string MinimumImDataCoreDisplayVersion = "3.2.0";
+        internal const string MinimumImDataCoreAssemblyVersionText = "3.2.0.0";
         internal static readonly Version MinimumImDataCoreAssemblyVersion = new Version(MinimumImDataCoreAssemblyVersionText);
         internal const string HarmonyIdImUiFramework = "com.cosmo.imuiframework";
         internal const string HarmonyIdGraduationRebalances = "com.cosmo.graduationrebalances";
@@ -130,6 +131,7 @@ namespace IdolCareerDiary
         internal static string LabelClearFilters { get { return ModLocalization.Get("LabelClearFilters", "Clear Filters"); } }
         internal static string LabelNoEventsAfterFilters { get { return ModLocalization.Get("LabelNoEventsAfterFilters", "No timeline entries match current filter toggles."); } }
         internal static string LabelNoEventsAfterSearch { get { return ModLocalization.Get("LabelNoEventsAfterSearch", "No timeline entries match the current search."); } }
+        internal static string LabelSearchingTimelineHistory { get { return ModLocalization.Get("LabelSearchingTimelineHistory", "Searching older career history..."); } }
         internal static string LabelTimelineSearchPlaceholder { get { return ModLocalization.Get("LabelTimelineSearchPlaceholder", "Search timeline entries"); } }
         internal static string LabelSearchTimeline { get { return ModLocalization.Get("LabelSearchTimeline", "Search"); } }
         internal static string LabelClearTimelineSearch { get { return ModLocalization.Get("LabelClearTimelineSearch", "Clear Search"); } }
@@ -268,7 +270,8 @@ namespace IdolCareerDiary
         internal const int InvalidId = -1;
         internal const long InvalidEventId = -1L;
 
-        internal const int MaxEventsRequest = 1000;
+        internal const int TimelinePageSize = 500;
+        internal const int TimelineSearchIndexWarmBatchSize = 200;
         internal const int MaxEventsRender = 300;
         internal const int MaxFilterControlButtons = 12;
         internal const int TimelineActionButtonsPerRow = 2;
@@ -874,6 +877,7 @@ namespace IdolCareerDiary
         internal const string MemberNameTrySetCustomJson = "TrySetCustomJson";
         internal const string MemberNameTryAppendCustomEvent = "TryAppendCustomEvent";
         internal const string MemberNameTryReadRecentEventsForIdol = "TryReadRecentEventsForIdol";
+        internal const string MemberNameTryReadEventsForIdolPage = "TryReadEventsForIdolPage";
         internal static string TextImDataCoreApiMethodSignatureMismatch { get { return ModLocalization.Get("TextImDataCoreApiMethodSignatureMismatch", "IM Data Core API method signature mismatch."); } }
         internal static string TextImDataCoreAppendCustomEventMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreAppendCustomEventMethodIsUnavailable", "IM Data Core append-custom-event method is unavailable."); } }
         internal static string TextBirthdayEventAppendFailedPrefix { get { return ModLocalization.Get("TextBirthdayEventAppendFailedPrefix", "Failed to append birthday event: "); } }
@@ -2157,6 +2161,7 @@ namespace IdolCareerDiary
         internal const int ImDataCoreCustomJsonMethodParameterCount = 4;
         internal const int ImDataCoreAppendCustomEventMethodParameterCount = 8;
         internal const int ImDataCoreRecentEventsMethodParameterCount = 4;
+        internal const int ImDataCorePagedEventsMethodParameterCount = 6;
         internal const int ShowCastSummaryMaxNames = 4;
         internal const int RelationshipMetadataMinimumFieldCount = 4;
         internal const long LongZero = 0L;
@@ -2310,6 +2315,7 @@ namespace IdolCareerDiary
         private static MethodInfo methodTrySetCustomJson;
         private static MethodInfo methodTryAppendCustomEvent;
         private static MethodInfo methodTryReadRecentEventsForIdol;
+        private static MethodInfo methodTryReadEventsForIdolPage;
 
         private static PropertyInfo propertyEventId;
         private static PropertyInfo propertyGameDateKey;
@@ -2549,6 +2555,70 @@ namespace IdolCareerDiary
             return true;
         }
 
+        internal static bool TryReadEventsForIdolPage(
+            int idolId,
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            events = new List<IMDataCoreEvent>();
+            hasMore = false;
+            errorMessage = string.Empty;
+
+            if (!TryEnsureBridgeReady(out errorMessage))
+            {
+                return false;
+            }
+
+            object[] args = new object[]
+            {
+                idolId,
+                beforeEventIdExclusive,
+                maxCount,
+                null,
+                false,
+                string.Empty
+            };
+            object invokeResult;
+            if (!TryInvokeBool(
+                    methodTryReadEventsForIdolPage,
+                    args,
+                    out invokeResult,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            bool success = invokeResult is bool && (bool)invokeResult;
+            if (!success)
+            {
+                errorMessage = CoalesceOutString(
+                    args,
+                    args.Length - C.LastFromCount,
+                    errorMessage);
+                return false;
+            }
+
+            IEnumerable<object> mapped = EnumerateObjects(args[3]);
+            foreach (object rawEvent in mapped)
+            {
+                IMDataCoreEvent mappedEvent = MapEvent(rawEvent);
+                if (mappedEvent != null)
+                {
+                    events.Add(mappedEvent);
+                }
+            }
+
+            hasMore = args[4] is bool && (bool)args[4];
+            errorMessage = CoalesceOutString(
+                args,
+                args.Length - C.LastFromCount,
+                string.Empty);
+            return true;
+        }
+
         private static bool TryEnsureBridgeReady(out string errorMessage)
         {
             lock (Sync)
@@ -2649,12 +2719,14 @@ namespace IdolCareerDiary
             methodTrySetCustomJson = FindMethod(apiType, C.MemberNameTrySetCustomJson, C.ImDataCoreCustomJsonMethodParameterCount);
             methodTryAppendCustomEvent = FindMethod(apiType, C.MemberNameTryAppendCustomEvent, C.ImDataCoreAppendCustomEventMethodParameterCount);
             methodTryReadRecentEventsForIdol = FindMethod(apiType, C.MemberNameTryReadRecentEventsForIdol, C.ImDataCoreRecentEventsMethodParameterCount);
+            methodTryReadEventsForIdolPage = FindMethod(apiType, C.MemberNameTryReadEventsForIdolPage, C.ImDataCorePagedEventsMethodParameterCount);
 
             if (methodIsReady == null ||
                 methodTryRegisterNamespace == null ||
                 methodTryGetCustomJson == null ||
                 methodTrySetCustomJson == null ||
-                methodTryReadRecentEventsForIdol == null)
+                methodTryReadRecentEventsForIdol == null ||
+                methodTryReadEventsForIdolPage == null)
             {
                 errorMessage = C.TextImDataCoreApiMethodSignatureMismatch;
                 return false;
@@ -3957,43 +4029,118 @@ namespace IdolCareerDiary
         internal string WithWhom = string.Empty;
         internal string Description = string.Empty;
         internal string SourceModTitle = string.Empty;
+        internal string SourceFilePath = string.Empty;
+        internal int SourceEntryIndex = C.InvalidId;
         internal readonly List<string> OutcomeLines = new List<string>();
 
-        internal bool Matches(IMDataCoreEvent ev, JSONNode payload)
+        internal long GetMatchSpecificity(IMDataCoreEvent ev, JSONNode payload)
         {
             if (ev == null)
             {
-                return false;
+                return C.InvalidId;
             }
 
-            if (EventTypes.Count > C.ZeroIndex && !ContainsOrdinal(EventTypes, ev.EventType ?? string.Empty))
+            if (EventTypes.Count > C.ZeroIndex &&
+                !ContainsOrdinal(EventTypes, ev.EventType ?? string.Empty))
             {
-                return false;
+                return C.InvalidId;
             }
 
-            if (!string.IsNullOrEmpty(EntityKind) && !string.Equals(EntityKind, ev.EntityKind ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(EntityKind) &&
+                !string.Equals(
+                    EntityKind,
+                    ev.EntityKind ?? string.Empty,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                return false;
+                return C.InvalidId;
             }
 
-            if (EntityIds.Count == C.ZeroIndex && SubstoryIdPrefixes.Count == C.ZeroIndex)
+            long specificity = C.ZeroIndex;
+            if (EventTypes.Count > C.ZeroIndex)
             {
-                return true;
+                // A constrained event type is more specific than a generic rule;
+                // among otherwise identical rules, fewer accepted types win.
+                specificity += 20000 +
+                    Math.Max(C.ZeroIndex, 1000 - EventTypes.Count);
             }
 
-            if (ContainsOrdinal(EntityIds, ev.EntityId ?? string.Empty))
+            if (!string.IsNullOrEmpty(EntityKind))
             {
-                return true;
+                specificity += 10000;
             }
 
-            string substoryId = payload != null ? ReadJsonField(payload, C.KeySubstoryId) : string.Empty;
-            if (ContainsOrdinal(EntityIds, substoryId))
+            if (EntityIds.Count == C.ZeroIndex &&
+                SubstoryIdPrefixes.Count == C.ZeroIndex)
             {
-                return true;
+                return specificity;
             }
 
-            return StartsWithAny(SubstoryIdPrefixes, ev.EntityId ?? string.Empty)
-                || StartsWithAny(SubstoryIdPrefixes, substoryId);
+            string eventEntityId = ev.EntityId ?? string.Empty;
+            string substoryId = payload != null
+                ? ReadJsonField(payload, C.KeySubstoryId)
+                : string.Empty;
+
+            int exactLength = Math.Max(
+                FindExactMatchLength(EntityIds, eventEntityId),
+                FindExactMatchLength(EntityIds, substoryId));
+            if (exactLength >= C.ZeroIndex)
+            {
+                return 2000000000000L + ((long)exactLength * 1000000L) + specificity;
+            }
+
+            int prefixLength = Math.Max(
+                FindLongestPrefixLength(SubstoryIdPrefixes, eventEntityId),
+                FindLongestPrefixLength(SubstoryIdPrefixes, substoryId));
+            if (prefixLength >= C.ZeroIndex)
+            {
+                return 1000000000000L + ((long)prefixLength * 1000000L) + specificity;
+            }
+
+            return C.InvalidId;
+        }
+
+        private static int FindExactMatchLength(
+            List<string> values,
+            string candidate)
+        {
+            if (values == null || string.IsNullOrEmpty(candidate))
+            {
+                return C.InvalidId;
+            }
+
+            for (int i = C.ZeroIndex; i < values.Count; i++)
+            {
+                string value = values[i];
+                if (string.Equals(value, candidate, StringComparison.Ordinal))
+                {
+                    return value != null ? value.Length : C.ZeroIndex;
+                }
+            }
+
+            return C.InvalidId;
+        }
+
+        private static int FindLongestPrefixLength(
+            List<string> values,
+            string candidate)
+        {
+            if (values == null || string.IsNullOrEmpty(candidate))
+            {
+                return C.InvalidId;
+            }
+
+            int longest = C.InvalidId;
+            for (int i = C.ZeroIndex; i < values.Count; i++)
+            {
+                string prefix = values[i];
+                if (!string.IsNullOrEmpty(prefix) &&
+                    candidate.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    longest = Math.Max(longest, prefix.Length);
+                }
+            }
+
+            return longest;
         }
 
         private static string ReadJsonField(JSONNode payload, string field)
@@ -4723,18 +4870,45 @@ namespace IdolCareerDiary
             }
         }
 
-        internal static bool TryFind(IMDataCoreEvent ev, JSONNode payload, out CustomDiaryEntry entry)
+        internal static bool TryFind(
+            IMDataCoreEvent ev,
+            JSONNode payload,
+            out CustomDiaryEntry entry)
         {
             EnsureLoaded();
             lock (Sync)
             {
+                CustomDiaryEntry best = null;
+                long bestSpecificity = C.InvalidId;
                 for (int i = C.ZeroIndex; i < Entries.Count; i++)
                 {
-                    if (Entries[i].Matches(ev, payload))
+                    CustomDiaryEntry candidate = Entries[i];
+                    if (candidate == null)
                     {
-                        entry = Entries[i];
-                        return true;
+                        continue;
                     }
+
+                    long specificity =
+                        candidate.GetMatchSpecificity(ev, payload);
+                    if (specificity < C.ZeroIndex)
+                    {
+                        continue;
+                    }
+
+                    if (best == null ||
+                        specificity > bestSpecificity ||
+                        (specificity == bestSpecificity &&
+                            CompareDeterministicSource(candidate, best) < C.ZeroIndex))
+                    {
+                        best = candidate;
+                        bestSpecificity = specificity;
+                    }
+                }
+
+                if (best != null)
+                {
+                    entry = best;
+                    return true;
                 }
             }
 
@@ -4742,10 +4916,40 @@ namespace IdolCareerDiary
             return false;
         }
 
+        private static int CompareDeterministicSource(
+            CustomDiaryEntry left,
+            CustomDiaryEntry right)
+        {
+            int comparison = StringComparer.OrdinalIgnoreCase.Compare(
+                left != null ? left.SourceModTitle ?? string.Empty : string.Empty,
+                right != null ? right.SourceModTitle ?? string.Empty : string.Empty);
+            if (comparison != C.ZeroIndex)
+            {
+                return comparison;
+            }
+
+            comparison = StringComparer.OrdinalIgnoreCase.Compare(
+                left != null ? left.SourceFilePath ?? string.Empty : string.Empty,
+                right != null ? right.SourceFilePath ?? string.Empty : string.Empty);
+            if (comparison != C.ZeroIndex)
+            {
+                return comparison;
+            }
+
+            int leftIndex = left != null
+                ? left.SourceEntryIndex
+                : C.InvalidId;
+            int rightIndex = right != null
+                ? right.SourceEntryIndex
+                : C.InvalidId;
+            return leftIndex.CompareTo(rightIndex);
+        }
+
         private static void LoadUnsafe()
         {
             HashSet<string> scannedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<string> modRoots = ModInfoCatalog.GetCandidateModRoots();
+            modRoots.Sort(StringComparer.OrdinalIgnoreCase);
             for (int i = C.ZeroIndex; i < modRoots.Count; i++)
             {
                 LoadFromModRootUnsafe(modRoots[i], scannedFolders);
@@ -4825,6 +5029,7 @@ namespace IdolCareerDiary
             try
             {
                 files = Directory.GetFiles(fullPath, "*.json", SearchOption.TopDirectoryOnly);
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
             }
             catch (Exception exception)
             {
@@ -4860,6 +5065,8 @@ namespace IdolCareerDiary
                     if (entry != null)
                     {
                         entry.SourceModTitle = sourceModTitle ?? string.Empty;
+                        entry.SourceFilePath = path ?? string.Empty;
+                        entry.SourceEntryIndex = i;
                         Entries.Add(entry);
                     }
                 }
@@ -5115,6 +5322,10 @@ namespace IdolCareerDiary
         private bool diaryVisible;
         private bool injectionInProgress;
 
+        private readonly List<IMDataCoreEvent> loadedSourceEvents = new List<IMDataCoreEvent>();
+        private readonly HashSet<long> loadedSourceEventIds = new HashSet<long>();
+        private readonly Dictionary<long, string> timelineSearchDocumentByEventId =
+            new Dictionary<long, string>();
         private readonly List<IMDataCoreEvent> cachedEvents = new List<IMDataCoreEvent>();
         private readonly List<IMDataCoreEvent> relatedConcertDetailEvents = new List<IMDataCoreEvent>();
         private readonly HashSet<string> selectedFilterEventTypes = new HashSet<string>(StringComparer.Ordinal);
@@ -5124,6 +5335,11 @@ namespace IdolCareerDiary
         private string timelineSearchQuery = string.Empty;
         private string timelineSearchDraft = string.Empty;
         private Transform timelineResultsRoot;
+        private bool hasMoreTimelinePages;
+        private long nextTimelineBeforeEventId = C.InvalidEventId;
+        private bool timelineSearchLoadInProgress;
+        private int timelineLoadGeneration;
+        private int timelineSearchLoadToken;
 
         private string loadWarning = string.Empty;
         private string interactionMessage = string.Empty;
@@ -5634,6 +5850,8 @@ namespace IdolCareerDiary
                 diaryDetailPopupObject.SetActive(false);
             }
 
+            timelineSearchLoadToken++;
+            timelineSearchLoadInProgress = false;
             diaryVisible = false;
             UpdateDiaryButtonColor(false);
         }
@@ -5652,8 +5870,16 @@ namespace IdolCareerDiary
         /// </summary>
         private void LoadEvents()
         {
+            timelineLoadGeneration++;
+            timelineSearchLoadToken++;
+            timelineSearchLoadInProgress = false;
+            loadedSourceEvents.Clear();
+            loadedSourceEventIds.Clear();
+            timelineSearchDocumentByEventId.Clear();
             cachedEvents.Clear();
             relatedConcertDetailEvents.Clear();
+            hasMoreTimelinePages = false;
+            nextTimelineBeforeEventId = C.InvalidEventId;
             loadWarning = string.Empty;
 
             if (idol == null || idol.id < C.MinId)
@@ -5662,22 +5888,122 @@ namespace IdolCareerDiary
                 return;
             }
 
-            List<IMDataCoreEvent> events;
             string error;
-            if (!IMDataCoreApi.TryReadRecentEventsForIdol(idol.id, C.MaxEventsRequest, out events, out error))
+            if (!TryLoadNextTimelinePage(out error))
             {
-                loadWarning = string.IsNullOrEmpty(error) ? C.TextTimelineQueryFailed : error;
+                loadWarning = string.IsNullOrEmpty(error)
+                    ? C.TextTimelineQueryFailed
+                    : error;
                 return;
             }
 
+            RebuildCachedEventsFromLoadedSource();
+            RestoreSelectedEventAfterTimelineLoad();
+        }
+
+        /// <summary>
+        /// Appends one IMDC timeline page. The cursor is always the oldest row
+        /// returned by the previous page, making page traversal stable even when
+        /// several events share the same game date.
+        /// </summary>
+        private bool TryLoadNextTimelinePage(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (idol == null || idol.id < C.MinId)
+            {
+                errorMessage = C.TextActiveIdolContextUnavailable;
+                return false;
+            }
+
+            long beforeEventIdExclusive =
+                nextTimelineBeforeEventId > C.InvalidEventId
+                    ? nextTimelineBeforeEventId
+                    : C.LongZero;
+
+            List<IMDataCoreEvent> page;
+            bool pageHasMore;
+            if (!IMDataCoreApi.TryReadEventsForIdolPage(
+                    idol.id,
+                    beforeEventIdExclusive,
+                    C.TimelinePageSize,
+                    out page,
+                    out pageHasMore,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            if (page == null)
+            {
+                page = new List<IMDataCoreEvent>();
+            }
+
+            IMDataCoreEvent oldestMappedEvent = null;
+            for (int index = C.ZeroIndex; index < page.Count; index++)
+            {
+                IMDataCoreEvent ev = page[index];
+                if (ev == null)
+                {
+                    continue;
+                }
+
+                if (ev.EventId <= C.InvalidEventId)
+                {
+                    errorMessage =
+                        "IM Data Core returned a paged timeline event without a valid EventId.";
+                    return false;
+                }
+
+                oldestMappedEvent = ev;
+                if (loadedSourceEventIds.Add(ev.EventId))
+                {
+                    loadedSourceEvents.Add(ev);
+                }
+            }
+
+            if (pageHasMore && oldestMappedEvent == null)
+            {
+                errorMessage =
+                    "IM Data Core returned an empty paged timeline while reporting more history.";
+                return false;
+            }
+
+            nextTimelineBeforeEventId = oldestMappedEvent != null
+                ? oldestMappedEvent.EventId
+                : C.InvalidEventId;
+            hasMoreTimelinePages = pageHasMore;
+            return true;
+        }
+
+        /// <summary>
+        /// Rebuilds the player-facing cache from all pages loaded so far. Rebuilding
+        /// as one set preserves the diary's cross-event duplicate suppression and
+        /// aggregate concert/election attachment rules across page boundaries.
+        /// </summary>
+        private void RebuildCachedEventsFromLoadedSource()
+        {
+            cachedEvents.Clear();
+            relatedConcertDetailEvents.Clear();
+
+            List<IMDataCoreEvent> events = loadedSourceEvents;
             if (events != null)
             {
-                HashSet<string> relevantConcertEntityIds = ResolveRelevantConcertEntityIds(events);
-                HashSet<string> supersedingEventKeys = BuildSupersedingEventKeys(events);
-                HashSet<string> singleReleaseIdentityKeys = new HashSet<string>(StringComparer.Ordinal);
-                HashSet<string> showCancelledIdentityKeys = new HashSet<string>(StringComparer.Ordinal);
-                HashSet<string> idolDatingStartMomentKeys = BuildIdolDatingLifecycleMomentKeys(events, C.EventIdolDatingStarted);
-                HashSet<string> idolDatingEndMomentKeys = BuildIdolDatingLifecycleMomentKeys(events, C.EventIdolDatingEnded);
+                HashSet<string> relevantConcertEntityIds =
+                    ResolveRelevantConcertEntityIds(events);
+                HashSet<string> supersedingEventKeys =
+                    BuildSupersedingEventKeys(events);
+                HashSet<string> singleReleaseIdentityKeys =
+                    new HashSet<string>(StringComparer.Ordinal);
+                HashSet<string> showCancelledIdentityKeys =
+                    new HashSet<string>(StringComparer.Ordinal);
+                HashSet<string> idolDatingStartMomentKeys =
+                    BuildIdolDatingLifecycleMomentKeys(
+                        events,
+                        C.EventIdolDatingStarted);
+                HashSet<string> idolDatingEndMomentKeys =
+                    BuildIdolDatingLifecycleMomentKeys(
+                        events,
+                        C.EventIdolDatingEnded);
                 HashSet<int> attachedElectionSingleIds;
                 HashSet<int> attachedElectionConcertIds;
                 ResolveRelevantElectionAttachmentIdentifiers(
@@ -5686,8 +6012,10 @@ namespace IdolCareerDiary
                     out attachedElectionConcertIds);
                 foreach (int attachedConcertId in attachedElectionConcertIds)
                 {
-                    relevantConcertEntityIds.Add(attachedConcertId.ToString(CultureInfo.InvariantCulture));
+                    relevantConcertEntityIds.Add(
+                        attachedConcertId.ToString(CultureInfo.InvariantCulture));
                 }
+
                 for (int i = C.ZeroIndex; i < events.Count; i++)
                 {
                     IMDataCoreEvent ev = events[i];
@@ -5697,40 +6025,57 @@ namespace IdolCareerDiary
                     }
 
                     bool isRelatedConcertDetail =
-                        string.Equals(ev.EntityKind, C.KindConcert, StringComparison.Ordinal) &&
-                        relevantConcertEntityIds.Contains(ev.EntityId ?? string.Empty);
+                        string.Equals(
+                            ev.EntityKind,
+                            C.KindConcert,
+                            StringComparison.Ordinal) &&
+                        relevantConcertEntityIds.Contains(
+                            ev.EntityId ?? string.Empty);
                     if (isRelatedConcertDetail)
                     {
                         relatedConcertDetailEvents.Add(ev);
                     }
 
-                    if (IsSuppressedSetStatusEvent(ev) || IsSuppressedTimelineNoiseEvent(ev))
+                    if (IsSuppressedSetStatusEvent(ev) ||
+                        IsSuppressedTimelineNoiseEvent(ev))
                     {
                         continue;
                     }
 
                     if (!IsRelevantToCurrentIdol(ev) &&
-                        !IsAttachedElectionTimelineEvent(ev, attachedElectionSingleIds, attachedElectionConcertIds))
+                        !IsAttachedElectionTimelineEvent(
+                            ev,
+                            attachedElectionSingleIds,
+                            attachedElectionConcertIds))
                     {
                         continue;
                     }
 
-                    if (IsSuppressedIdolDatingStatusStub(ev, idolDatingStartMomentKeys, idolDatingEndMomentKeys))
+                    if (IsSuppressedIdolDatingStatusStub(
+                        ev,
+                        idolDatingStartMomentKeys,
+                        idolDatingEndMomentKeys))
                     {
                         continue;
                     }
 
-                    if (IsSupersededDuplicateEvent(ev, supersedingEventKeys))
+                    if (IsSupersededDuplicateEvent(
+                        ev,
+                        supersedingEventKeys))
                     {
                         continue;
                     }
 
-                    if (IsDuplicateSingleReleaseEvent(ev, singleReleaseIdentityKeys))
+                    if (IsDuplicateSingleReleaseEvent(
+                        ev,
+                        singleReleaseIdentityKeys))
                     {
                         continue;
                     }
 
-                    if (IsDuplicateShowCancelledEvent(ev, showCancelledIdentityKeys))
+                    if (IsDuplicateShowCancelledEvent(
+                        ev,
+                        showCancelledIdentityKeys))
                     {
                         continue;
                     }
@@ -5740,6 +6085,14 @@ namespace IdolCareerDiary
             }
 
             SortEventsForTimeline(cachedEvents);
+        }
+
+        private void RestoreSelectedEventAfterTimelineLoad()
+        {
+            if (idol == null)
+            {
+                return;
+            }
 
             if (selectedEventId <= C.InvalidEventId)
             {
@@ -5750,10 +6103,94 @@ namespace IdolCareerDiary
                 }
             }
 
-            if (!ContainsEventId(selectedEventId) && cachedEvents.Count > C.MinId)
+            if (cachedEvents.Count <= C.MinId)
+            {
+                return;
+            }
+
+            if (selectedEventId <= C.InvalidEventId)
+            {
+                selectedEventId = cachedEvents[C.ZeroIndex].EventId;
+                return;
+            }
+
+            if (!ContainsEventId(selectedEventId) &&
+                !hasMoreTimelinePages)
             {
                 selectedEventId = cachedEvents[C.ZeroIndex].EventId;
             }
+        }
+
+        /// <summary>
+        /// Loads all remaining pages only when a committed search actually needs
+        /// them. Yielding between pages keeps Unity's profile popup responsive on
+        /// very long campaigns while short saves stay a one-page fast path.
+        /// </summary>
+        private IEnumerator LoadRemainingTimelineForSearch(
+            int expectedTimelineGeneration,
+            int searchLoadToken,
+            int expectedIdolId)
+        {
+            yield return null;
+
+            while (hasMoreTimelinePages &&
+                expectedTimelineGeneration == timelineLoadGeneration &&
+                searchLoadToken == timelineSearchLoadToken &&
+                idol != null &&
+                idol.id == expectedIdolId &&
+                !string.IsNullOrEmpty(timelineSearchQuery))
+            {
+                string error;
+                if (!TryLoadNextTimelinePage(out error))
+                {
+                    loadWarning = string.IsNullOrEmpty(error)
+                        ? C.TextTimelineQueryFailed
+                        : error;
+                    break;
+                }
+
+                yield return null;
+            }
+
+            if (expectedTimelineGeneration != timelineLoadGeneration ||
+                searchLoadToken != timelineSearchLoadToken ||
+                idol == null ||
+                idol.id != expectedIdolId)
+            {
+                yield break;
+            }
+
+            RebuildCachedEventsFromLoadedSource();
+            RestoreSelectedEventAfterTimelineLoad();
+
+            for (int eventIndex = C.ZeroIndex;
+                eventIndex < cachedEvents.Count;
+                eventIndex++)
+            {
+                if (expectedTimelineGeneration != timelineLoadGeneration ||
+                    searchLoadToken != timelineSearchLoadToken ||
+                    string.IsNullOrEmpty(timelineSearchQuery))
+                {
+                    timelineSearchLoadInProgress = false;
+                    yield break;
+                }
+
+                GetTimelineSearchDocument(cachedEvents[eventIndex]);
+                if ((eventIndex + C.LastFromCount) %
+                        C.TimelineSearchIndexWarmBatchSize ==
+                    C.ZeroIndex)
+                {
+                    yield return null;
+                }
+            }
+
+            timelineSearchLoadInProgress = false;
+            if (diaryVisible && diaryContentRoot != null)
+            {
+                RenderDiary();
+            }
+
+            yield break;
         }
 
         /// <summary>
@@ -8038,12 +8475,15 @@ namespace IdolCareerDiary
             AddTitle(C.TitleDiary);
             AddTitle(C.TitleOverview);
             AddText(C.LabelIdolPrefix + ResolveIdolName(idol));
-            AddText(C.LabelEventCountPrefix + cachedEvents.Count.ToString(CultureInfo.InvariantCulture));
+            string loadedEventCountText =
+                cachedEvents.Count.ToString(CultureInfo.InvariantCulture) +
+                (hasMoreTimelinePages ? "+" : string.Empty);
+            AddText(C.LabelEventCountPrefix + loadedEventCountText);
             AddText(
                 C.LabelEventsShownPrefix +
                 visibleEvents.Count.ToString(CultureInfo.InvariantCulture) +
                 C.SeparatorSpaceSlashSpace +
-                cachedEvents.Count.ToString(CultureInfo.InvariantCulture));
+                loadedEventCountText);
 
             if (!string.IsNullOrEmpty(loadWarning))
             {
@@ -8095,6 +8535,26 @@ namespace IdolCareerDiary
                 delegate
                 {
                     maxEventsRenderCurrent += C.EventsRenderStep;
+                    List<IMDataCoreEvent> currentlyVisible =
+                        BuildVisibleTimelineEvents();
+                    if (hasMoreTimelinePages &&
+                        !timelineSearchLoadInProgress &&
+                        currentlyVisible.Count <= maxEventsRenderCurrent)
+                    {
+                        string pageError;
+                        if (TryLoadNextTimelinePage(out pageError))
+                        {
+                            RebuildCachedEventsFromLoadedSource();
+                            RestoreSelectedEventAfterTimelineLoad();
+                        }
+                        else
+                        {
+                            loadWarning = string.IsNullOrEmpty(pageError)
+                                ? C.TextTimelineQueryFailed
+                                : pageError;
+                        }
+                    }
+
                     RenderDiary();
                 },
                 false,
@@ -8315,16 +8775,27 @@ namespace IdolCareerDiary
         /// </summary>
         private void RenderTimelineSearchBar()
         {
-            GameObject searchRow = CreateUiObject(C.UiNameCareerDiaryTimelineSearchRow, diaryContentRoot);
-            HorizontalLayoutGroup searchRowLayout = searchRow.AddComponent<HorizontalLayoutGroup>();
-            searchRowLayout.childControlWidth = true;
-            searchRowLayout.childControlHeight = true;
-            searchRowLayout.childForceExpandWidth = false;
-            searchRowLayout.childForceExpandHeight = false;
-            searchRowLayout.spacing = C.ActionSpacing;
+            GameObject searchBlock = CreateUiObject(
+                C.UiNameCareerDiaryTimelineSearchRow,
+                diaryContentRoot);
+            VerticalLayoutGroup searchBlockLayout =
+                searchBlock.AddComponent<VerticalLayoutGroup>();
+            searchBlockLayout.childControlWidth = true;
+            searchBlockLayout.childControlHeight = true;
+            searchBlockLayout.childForceExpandWidth = true;
+            searchBlockLayout.childForceExpandHeight = false;
+            searchBlockLayout.spacing = C.ActionSpacing;
+
+            ContentSizeFitter searchBlockFitter =
+                searchBlock.AddComponent<ContentSizeFitter>();
+            searchBlockFitter.horizontalFit =
+                ContentSizeFitter.FitMode.Unconstrained;
+            searchBlockFitter.verticalFit =
+                ContentSizeFitter.FitMode.PreferredSize;
 
             TMP_InputField input;
-            GameObject searchObject = CreateTimelineSearchInput(searchRow.transform, out input);
+            GameObject searchObject =
+                CreateTimelineSearchInput(searchBlock.transform, out input);
             if (searchObject == null || input == null)
             {
                 return;
@@ -8333,7 +8804,8 @@ namespace IdolCareerDiary
             searchObject.name = C.UiNameCareerDiaryTimelineSearch;
             input.text = timelineSearchDraft ?? string.Empty;
             input.contentType = TMP_InputField.ContentType.Standard;
-            TextMeshProUGUI placeholder = input.placeholder as TextMeshProUGUI;
+            TextMeshProUGUI placeholder =
+                input.placeholder as TextMeshProUGUI;
             if (placeholder != null)
             {
                 placeholder.text = C.LabelTimelineSearchPlaceholder;
@@ -8349,14 +8821,32 @@ namespace IdolCareerDiary
             input.onEndEdit.AddListener(delegate (string query)
             {
                 timelineSearchDraft = query ?? string.Empty;
-                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+                if (Input.GetKeyDown(KeyCode.Return) ||
+                    Input.GetKeyDown(KeyCode.KeypadEnter))
                 {
                     ApplyTimelineSearch(input);
                 }
             });
 
+            GameObject actionRow = CreateUiObject(
+                C.UiNameCareerDiaryTimelineSearchRow + C.UiSuffixTimeline,
+                searchBlock.transform);
+            HorizontalLayoutGroup actionLayout =
+                actionRow.AddComponent<HorizontalLayoutGroup>();
+            actionLayout.childControlWidth = true;
+            actionLayout.childControlHeight = true;
+            actionLayout.childForceExpandWidth = false;
+            actionLayout.childForceExpandHeight = false;
+            actionLayout.spacing = C.ActionSpacing;
+
+            LayoutElement actionRowLayout =
+                actionRow.AddComponent<LayoutElement>();
+            actionRowLayout.minHeight = C.ActionButtonHeight;
+            actionRowLayout.preferredHeight = C.ActionButtonHeight;
+            actionRowLayout.flexibleWidth = C.FloatOne;
+
             Button searchButton = CreateStyledButton(
-                searchRow.transform,
+                actionRow.transform,
                 C.UiNameCareerDiaryTimelineSearchApply,
                 C.LabelSearchTimeline,
                 delegate
@@ -8368,13 +8858,16 @@ namespace IdolCareerDiary
                 C.LabelSearchTimeline,
                 C.TimelineSearchButtonMinimumWidth,
                 C.TimelineSearchButtonMaximumWidth);
+            ConfigureSearchActionButtonForNarrowWidth(searchButton);
 
             Button clearButton = CreateStyledButton(
-                searchRow.transform,
+                actionRow.transform,
                 C.UiNameCareerDiaryTimelineSearchClear,
                 C.LabelClearTimelineSearch,
                 delegate
                 {
+                    timelineSearchLoadToken++;
+                    timelineSearchLoadInProgress = false;
                     timelineSearchDraft = string.Empty;
                     timelineSearchQuery = string.Empty;
                     input.text = string.Empty;
@@ -8386,6 +8879,50 @@ namespace IdolCareerDiary
                 C.LabelClearTimelineSearch,
                 C.TimelineSearchButtonMinimumWidth,
                 C.TimelineSearchButtonMaximumWidth);
+            ConfigureSearchActionButtonForNarrowWidth(clearButton);
+        }
+
+        private static void ConfigureSearchActionButtonForNarrowWidth(
+            Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            LayoutElement layout = button.GetComponent<LayoutElement>();
+            if (layout == null)
+            {
+                layout = button.gameObject.AddComponent<LayoutElement>();
+            }
+
+            layout.minWidth = C.FloatZero;
+            layout.flexibleWidth = C.FloatOne;
+
+            TextMeshProUGUI[] tmps =
+                button.GetComponentsInChildren<TextMeshProUGUI>(true);
+            for (int index = C.ZeroIndex; index < tmps.Length; index++)
+            {
+                if (tmps[index] != null)
+                {
+                    tmps[index].overflowMode = TextOverflowModes.Ellipsis;
+                }
+            }
+
+            Text[] texts = button.GetComponentsInChildren<Text>(true);
+            for (int index = C.ZeroIndex; index < texts.Length; index++)
+            {
+                Text text = texts[index];
+                if (text == null)
+                {
+                    continue;
+                }
+
+                text.resizeTextForBestFit = true;
+                text.resizeTextMinSize = 10;
+                text.resizeTextMaxSize =
+                    C.TimelineToolbarButtonFontSize;
+            }
         }
 
         /// <summary>
@@ -8393,13 +8930,39 @@ namespace IdolCareerDiary
         /// </summary>
         private void ApplyTimelineSearch(TMP_InputField input)
         {
-            timelineSearchDraft = input != null ? input.text ?? string.Empty : timelineSearchDraft ?? string.Empty;
+            timelineSearchDraft = input != null
+                ? input.text ?? string.Empty
+                : timelineSearchDraft ?? string.Empty;
             timelineSearchQuery = timelineSearchDraft.Trim();
+
+            timelineSearchLoadToken++;
+            bool shouldLoadOlderHistory =
+                !string.IsNullOrEmpty(timelineSearchQuery) &&
+                hasMoreTimelinePages &&
+                idol != null &&
+                idol.id >= C.MinId;
+            timelineSearchLoadInProgress = shouldLoadOlderHistory;
+
+            // Refresh immediately from the already-loaded page so short saves and
+            // common recent matches feel instantaneous. A small status line makes
+            // it explicit when older pages are still being scanned.
             RefreshTimelineSearchResults();
+
+            if (shouldLoadOlderHistory)
+            {
+                StartCoroutine(
+                    LoadRemainingTimelineForSearch(
+                        timelineLoadGeneration,
+                        timelineSearchLoadToken,
+                        idol.id));
+            }
+
             if (input != null)
             {
                 input.ActivateInputField();
-                input.caretPosition = input.text != null ? input.text.Length : C.ZeroIndex;
+                input.caretPosition = input.text != null
+                    ? input.text.Length
+                    : C.ZeroIndex;
             }
         }
 
@@ -8544,8 +9107,21 @@ namespace IdolCareerDiary
         private void RenderTimeline(List<IMDataCoreEvent> timelineEvents, Transform resultsRoot)
         {
             Transform parent = resultsRoot != null ? resultsRoot : diaryContentRoot;
+            bool searchingOlderHistory =
+                timelineSearchLoadInProgress &&
+                !string.IsNullOrEmpty(timelineSearchQuery);
+            if (searchingOlderHistory)
+            {
+                AddText(parent, C.LabelSearchingTimelineHistory);
+            }
+
             if (timelineEvents == null || timelineEvents.Count == C.ZeroIndex)
             {
+                if (searchingOlderHistory)
+                {
+                    return;
+                }
+
                 string emptyMessage = !string.IsNullOrEmpty(timelineSearchQuery)
                     ? C.LabelNoEventsAfterSearch
                     : (selectedFilterEventTypes.Count > C.ZeroIndex ? C.LabelNoEventsAfterFilters : C.LabelNoEvents);
@@ -8878,40 +9454,91 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            Presentation presentation = BuildPresentation(ev);
-            StringBuilder searchable = new StringBuilder();
-            searchable.Append(ev.EventType ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(HumanizeCode(ev.EventType ?? string.Empty)).Append(C.SeparatorSpace);
-            searchable.Append(ev.EntityKind ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(ev.EntityId ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(ev.GameDateTime ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.Date ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.Title ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.WithWhom ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.Outcome ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.Source ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(presentation.ModSource ?? string.Empty).Append(C.SeparatorSpace);
-            searchable.Append(ev.PayloadJson ?? string.Empty);
-
-            JSONNode payload = ParsePayload(ev.PayloadJson);
-            List<ElectionRankingRow> electionRows = ResolveElectionRankingRows(ev, payload);
-            for (int rowIndex = C.ZeroIndex; rowIndex < electionRows.Count; rowIndex++)
+            string document = GetTimelineSearchDocument(ev);
+            string[] keywords = normalizedQuery.Split(
+                (char[])null,
+                StringSplitOptions.RemoveEmptyEntries);
+            for (int keywordIndex = C.ZeroIndex;
+                keywordIndex < keywords.Length;
+                keywordIndex++)
             {
-                ElectionRankingRow row = electionRows[rowIndex];
-                searchable.Append(C.SeparatorSpace).Append(ResolveIdolNameById(row.IdolId));
-            }
-
-            string document = searchable.ToString();
-            string[] keywords = normalizedQuery.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
-            for (int keywordIndex = C.ZeroIndex; keywordIndex < keywords.Length; keywordIndex++)
-            {
-                if (document.IndexOf(keywords[keywordIndex], StringComparison.OrdinalIgnoreCase) < C.ZeroIndex)
+                if (document.IndexOf(
+                        keywords[keywordIndex],
+                        StringComparison.OrdinalIgnoreCase) < C.ZeroIndex)
                 {
                     return false;
                 }
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Builds the query-independent searchable text once per event. Long-save
+        /// searches warm this cache cooperatively across frames, while repeated
+        /// searches reuse it without rebuilding presentations and election names.
+        /// </summary>
+        private string GetTimelineSearchDocument(IMDataCoreEvent ev)
+        {
+            if (ev == null)
+            {
+                return string.Empty;
+            }
+
+            string cachedDocument;
+            if (ev.EventId > C.InvalidEventId &&
+                timelineSearchDocumentByEventId.TryGetValue(
+                    ev.EventId,
+                    out cachedDocument))
+            {
+                return cachedDocument ?? string.Empty;
+            }
+
+            Presentation presentation = BuildPresentation(ev);
+            StringBuilder searchable = new StringBuilder();
+            searchable.Append(ev.EventType ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(HumanizeCode(ev.EventType ?? string.Empty))
+                .Append(C.SeparatorSpace);
+            searchable.Append(ev.EntityKind ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(ev.EntityId ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(ev.GameDateTime ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.Date ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.Title ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.WithWhom ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.Outcome ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.Source ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(presentation.ModSource ?? string.Empty)
+                .Append(C.SeparatorSpace);
+            searchable.Append(ev.PayloadJson ?? string.Empty);
+
+            JSONNode payload = ParsePayload(ev.PayloadJson);
+            List<ElectionRankingRow> electionRows =
+                ResolveElectionRankingRows(ev, payload);
+            for (int rowIndex = C.ZeroIndex;
+                rowIndex < electionRows.Count;
+                rowIndex++)
+            {
+                ElectionRankingRow row = electionRows[rowIndex];
+                searchable.Append(C.SeparatorSpace)
+                    .Append(ResolveIdolNameById(row.IdolId));
+            }
+
+            string document = searchable.ToString();
+            if (ev.EventId > C.InvalidEventId)
+            {
+                timelineSearchDocumentByEventId[ev.EventId] = document;
+            }
+
+            return document;
         }
 
         /// <summary>
