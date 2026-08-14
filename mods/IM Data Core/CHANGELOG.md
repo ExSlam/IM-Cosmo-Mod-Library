@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.4.0
+
+- Fixed New Save -> later Overwrite Save checkpoint persistence by keeping the active multi-path checkpoint ledger intact after a full New Save snapshot.
+- Replaced engine-local sidecar I/O locks with process-wide per-path locks and made load replacement hold the same lease through old-engine disposal/new-engine installation, eliminating stale background-compaction races.
+- Made standalone `SavedData` defensive cloning fail open so an IMDC clone failure can never prevent vanilla from attempting its save.
+- Changed journal compaction policy to use byte/base-ratio thresholds with a scaled 2,048-32,768 transaction replay ceiling instead of rewriting large bases after only 256 tiny saves.
+- Reworked background compaction to shallow-copy the committed immutable in-memory prefix and stream it, avoiding a second full object graph produced by deserializing base+journal on the worker.
+- Added a physical base SHA-256/journal-length generation check immediately before background compaction commits.
+- Reused first-pass validation state to validate only journal-appended suffix rows after replay, removing a redundant second full-history validation pass.
+- Avoided unconditional history sorting by checking sequence monotonicity before sorting.
+- Replaced save-boundary full-history single chart scans with a transient unresolved-single set seeded on load/release and cleared as chart positions resolve.
+- Reused scratch collections in post-mod show reconciliation to eliminate per-save `HashSet`/`List` allocations.
+- Hardened backup recovery: if compaction dies before the backup-journal copy completes, recovery can pair `.imdc.bak` with the still-present primary journal when its base hash matches; a failed backup-journal copy no longer deletes that only matching journal.
+- Current-format only: this build accepts v3 sidecars and transactional v2 journals and intentionally drops older persistence-format compatibility.
+
 ## 3.3.0
 
 - Added a versioned append journal (`.imdc.journal`) tied to the compact v3 base snapshot by SHA-256. Normal append-only saves now persist only the immutable suffix since the last durable generation instead of rewriting complete campaign history.

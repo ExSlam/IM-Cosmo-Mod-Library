@@ -1,8 +1,10 @@
-# IM Data Core 3.3
+# IM Data Core 3.4
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-IMDC 3.3 keeps sidecar format version 3 while changing the persistence transport for long campaigns. Append-only save generations are written to a small SHA-256-bound journal and periodically compacted into the existing atomic v3 snapshot; destructive branch changes still force a complete snapshot.
+Version 3.4 intentionally supports only the current v3 sidecar and transactional v2 journal representation. Older sidecar/journal formats are not migrated or replayed by this build.
+
+IMDC 3.4 keeps sidecar format version 3 while tightening persistence for long campaigns. Append-only save generations are written to a small SHA-256-bound transactional journal and periodically compacted into the atomic v3 snapshot; destructive branch changes still force a complete snapshot.
 
 ## Services
 
@@ -60,7 +62,7 @@ The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members r
 
 A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, and the IMDC sequence watermark.
 
-When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.3 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
 
@@ -92,33 +94,36 @@ Use occurrence-specific keys. Do not use a permanent key such as `promotion` if 
 
 ## Long-campaign persistence
 
-IMDC keeps complete source history, so retained disk history still grows with genuine event volume. Version 3.3 avoids reprocessing that complete history on every ordinary save:
+IMDC keeps complete source history, so retained disk history still grows with genuine event volume. Version 3.4 avoids reprocessing that complete history on every ordinary save:
 
 - a compact v3 sidecar remains the base snapshot;
 - append-only generations are written to `<sidecar>.imdc.journal`, whose header contains the SHA-256 of the exact base file it extends;
 - normal save preparation copies only newly appended immutable records, not every historical event;
-- new journals use transactional format 2: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; legacy format-1 journals remain readable and are compacted before another append;
-- routine compaction is queued after 256 transactions or a 1-16 MiB bounded byte threshold, after the triggering delta is already durable;
-- rewinds, destructive branch changes, recovery writes, Save As, or an incompatible baseline immediately use a full atomic snapshot instead;
+- journals use transactional format 2: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; older journal formats are intentionally rejected;
+- routine compaction is queued when journal bytes reach a 1-16 MiB bounded base-relative threshold; a size-scaled 2,048-32,768 transaction ceiling exists only to bound pathological replay depth;
+- rewinds, destructive branch changes, recovery writes, New Save, or an incompatible baseline immediately use a full atomic snapshot instead;
 - an incomplete v2 transaction is ignored, a completely written retry is idempotent by declared counts, and a mismatched journal hash is never replayed onto another base;
-- when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`;
+- when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`; if that copy is interrupted or fails, recovery can pair the backup base with the still-present current journal when its stored base hash matches;
 - event payloads and custom SET values cache their validated storage-form JSON, so old immutable rows are not reparsed on later saves;
 - the streaming writer copies reusable character buffers directly to its `TextWriter`, avoiding a temporary string allocation for every record;
 - forward-save watermarks skip complete history trim scans when no record can lie beyond the checkpoint;
-- runtime locks are released before serialization and durable disk I/O, different sidecar paths use independent persistence locks, and routine full compaction runs on the thread pool after the journal commit;
+- background compaction snapshots immutable persisted prefixes from the already-loaded engine and verifies the physical base hash/journal length before replacement, avoiding a second full deserialized history graph;
+- base history is validated once and committed journal suffixes are validated incrementally; already-monotonic current-format event/mutation lists skip redundant sorting;
+- save-boundary single chart reconciliation tracks only unresolved released singles instead of rescanning every historical single;
+- runtime locks are released before serialization and durable disk I/O; physical sidecar locks are process-wide per canonical path so replacement engines and old background compactors cannot race the same files;
 - `TryGetPersistenceDiagnostics` exposes counts, base/journal sizes, last persistence mode, recovery/block state, and generation information without performing I/O.
 
 Save Write Ordering Fix is an optional optimization. IMDC skips its standalone full `SavedData` JSON clone only when SWOF's public health flag confirms that all five required vanilla write callers were actually intercepted. If verification is unavailable or false, IMDC keeps the defensive clone.
 
 ## Substory completion after load
 
-Vanilla persists its dialogue queue. IMDC 3.3 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
+Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
 
-## V1/V2 sidecar compatibility
+## Current-format-only persistence
 
-Existing lightweight sidecars with format version 1 or 2 are still readable. They are normalized in memory and written as format version 3 at a later successful persistence boundary.
+IMDC 3.4 reads only sidecar format 3 and transactional journal format 2. Older lightweight sidecars and journals are intentionally rejected rather than migrated at runtime.
 
-Pre-2.0 database persistence is not imported by the runtime mod. Historical database migration belongs in a separate purpose-built migration utility. IMDC 3.3 does not probe old database files or old fallback locations.
+Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
 
 ## Custom-data behavior
 

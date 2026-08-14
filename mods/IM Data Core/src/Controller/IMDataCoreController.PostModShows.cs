@@ -18,6 +18,10 @@ namespace IMDataCore
         private readonly Dictionary<int, PostModShowConfigurationSnapshot>
             postModShowConfigurationByShowId =
                 new Dictionary<int, PostModShowConfigurationSnapshot>();
+        private readonly HashSet<int> livePostModShowIdsScratch =
+            new HashSet<int>();
+        private readonly List<int> stalePostModShowIdsScratch =
+            new List<int>();
         private int postModShowSettlementDepth;
 
         internal void ResetPostModShowObservation()
@@ -25,6 +29,8 @@ namespace IMDataCore
             lock (runtimeLock)
             {
                 postModShowConfigurationByShowId.Clear();
+                livePostModShowIdsScratch.Clear();
+                stalePostModShowIdsScratch.Clear();
                 postModShowSettlementDepth = 0;
             }
         }
@@ -81,7 +87,8 @@ namespace IMDataCore
                     return;
                 }
 
-                HashSet<int> liveShowIds = new HashSet<int>();
+                livePostModShowIdsScratch.Clear();
+                stalePostModShowIdsScratch.Clear();
                 for (int index = 0; index < Shows.shows.Count; index++)
                 {
                     Shows._show show = Shows.shows[index];
@@ -90,21 +97,23 @@ namespace IMDataCore
                         continue;
                     }
 
-                    liveShowIds.Add(show.id);
+                    livePostModShowIdsScratch.Add(show.id);
                     ReconcilePostModShowLocked(show, sourcePatch);
                 }
 
-                List<int> staleIds = new List<int>();
                 foreach (int showId in postModShowConfigurationByShowId.Keys)
                 {
-                    if (!liveShowIds.Contains(showId))
+                    if (!livePostModShowIdsScratch.Contains(showId))
                     {
-                        staleIds.Add(showId);
+                        stalePostModShowIdsScratch.Add(showId);
                     }
                 }
-                for (int index = 0; index < staleIds.Count; index++)
+                for (int index = 0;
+                    index < stalePostModShowIdsScratch.Count;
+                    index++)
                 {
-                    postModShowConfigurationByShowId.Remove(staleIds[index]);
+                    postModShowConfigurationByShowId.Remove(
+                        stalePostModShowIdsScratch[index]);
                 }
             }
         }

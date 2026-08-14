@@ -234,17 +234,30 @@ namespace IMDataCore
             }
 
             // Standalone IMDC still protects vanilla's worker-thread serializer from
-            // later mutations by detaching the graph before checkpointing it.
-            string json = UnityEngine.JsonUtility.ToJson(source, false);
-            SaveManager.SavedData snapshot =
-                UnityEngine.JsonUtility.FromJson<SaveManager.SavedData>(json);
-            if (snapshot == null)
+            // later mutations by detaching the graph before checkpointing it. This is
+            // strictly a defensive optimization/correctness aid, so it must fail open:
+            // IMDC is never allowed to prevent vanilla from attempting its own save.
+            try
             {
-                throw new InvalidOperationException(
-                    "Unity JsonUtility returned a null SavedData snapshot.");
-            }
+                string json = UnityEngine.JsonUtility.ToJson(source, false);
+                SaveManager.SavedData snapshot =
+                    UnityEngine.JsonUtility.FromJson<SaveManager.SavedData>(json);
+                if (snapshot == null)
+                {
+                    throw new InvalidOperationException(
+                        "Unity JsonUtility returned a null SavedData snapshot.");
+                }
 
-            return snapshot;
+                return snapshot;
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not create its standalone stable SavedData " +
+                    "snapshot; vanilla saving will continue with the original object: " +
+                    exception.Message);
+                return source;
+            }
         }
 
         private static bool IsSaveWriteOrderingFixInterceptionHealthy()

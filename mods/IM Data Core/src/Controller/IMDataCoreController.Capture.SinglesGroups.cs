@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -165,6 +165,21 @@ namespace IMDataCore
                 string singleFanSegmentNewFansSummary = BuildSingleFanSegmentNewFansSummary(releasedSingle);
                 string singleSenbatsuStatsSnapshot = BuildSingleSenbatsuStatsSnapshot(releasedSingle);
                 int chartPosition = ResolveChartPosition(releasedSingle);
+                if (chartPosition > CoreConstants.ZeroBasedListStartIndex)
+                {
+                    resolvedSingleChartPositionBySingleId[releasedSingle.id] =
+                        chartPosition;
+                    pendingSingleChartResolutionBySingleId.Remove(
+                        releasedSingle.id);
+                }
+                else
+                {
+                    // Chart resolution happens later than release. Track only these
+                    // unresolved releases so save boundaries never rescan the complete
+                    // historical singles collection.
+                    pendingSingleChartResolutionBySingleId[releasedSingle.id] =
+                        releasedSingle;
+                }
 
                 SingleParticipationPayload payload = new SingleParticipationPayload
                 {
@@ -249,6 +264,8 @@ namespace IMDataCore
                 if (resolvedSingleChartPositionBySingleId.TryGetValue(releasedSingle.id, out knownChartPosition)
                     && knownChartPosition == chartPosition)
                 {
+                    pendingSingleChartResolutionBySingleId.Remove(
+                        releasedSingle.id);
                     return;
                 }
 
@@ -272,6 +289,8 @@ namespace IMDataCore
             {
                 resolvedSingleChartPositionBySingleId[releasedSingle.id] =
                     chartPosition;
+                pendingSingleChartResolutionBySingleId.Remove(
+                    releasedSingle.id);
             }
         }
 

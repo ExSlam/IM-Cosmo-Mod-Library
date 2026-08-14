@@ -294,10 +294,8 @@ namespace IMDataCore
                         formatName,
                         LightweightCoreStorageEngine.JournalFormatName,
                         StringComparison.Ordinal) ||
-                    (formatVersion !=
-                        LightweightCoreStorageEngine.LegacyJournalFormatVersion &&
-                     formatVersion !=
-                        LightweightCoreStorageEngine.JournalFormatVersion))
+                    formatVersion !=
+                        LightweightCoreStorageEngine.JournalFormatVersion)
                 {
                     errorMessage = "The IMDC journal format is unsupported.";
                     return false;
@@ -841,6 +839,11 @@ namespace IMDataCore
 
             string formatName = RequireString(root, "FormatName");
             int formatVersion = RequireInt32(root, "FormatVersion");
+            if (formatVersion != LightweightCoreStorageEngine.SidecarFormatVersion)
+            {
+                throw new FormatException(
+                    "The lightweight sidecar format is unsupported by this IM Data Core version.");
+            }
             string relativeSavePath = RequireString(root, "RelativeSavePath");
 
             return new LightweightSidecarDocument
@@ -924,6 +927,12 @@ namespace IMDataCore
                         case "FormatVersion":
                             document.FormatVersion =
                                 parser.ParseRequiredInt32(propertyName);
+                            if (document.FormatVersion !=
+                                LightweightCoreStorageEngine.SidecarFormatVersion)
+                            {
+                                throw new FormatException(
+                                    "The lightweight sidecar format is unsupported by this IM Data Core version.");
+                            }
                             hasFormatVersion = true;
                             break;
 

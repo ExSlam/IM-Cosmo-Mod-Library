@@ -1,4 +1,4 @@
-# IM Data Core 3.3 storage layout
+# IM Data Core 3.4 storage layout
 
 ## Physical mapping
 
@@ -36,7 +36,7 @@ All IMDC mutation paths are canonicalized and required to remain beneath the pri
 
 ## V3 document identity
 
-IMDC 3.3 still uses sidecar format version 3:
+IMDC 3.4 uses sidecar format version 3:
 
 ```json
 {
@@ -65,7 +65,7 @@ IMDC 3.3 still uses sidecar format version 3:
 }
 ```
 
-Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.3 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.4 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
 
 ### Event
 
@@ -152,11 +152,11 @@ The compact base remains an ordinary v3 sidecar. A normal append-only save may a
 <sidecar>.imdc.journal
 ```
 
-The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, the journal format version, and the SHA-256 of the exact base sidecar. Journal format 2 writes each save delta as a bounded NDJSON transaction: a `BEGIN` row declares base/target counts, record rows carry individual checkpoints/events/custom mutations, and a `COMMIT` row makes the transaction logically visible. This keeps replay memory proportional to an individual record instead of one potentially enormous save delta. Legacy format-1 journals remain readable and are compacted before another append.
+The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, the journal format version, and the SHA-256 of the exact base sidecar. Journal format 2 writes each save delta as a bounded NDJSON transaction: a `BEGIN` row declares base/target counts, record rows carry individual checkpoints/events/custom mutations, and a `COMMIT` row makes the transaction logically visible. This keeps replay memory proportional to an individual record instead of one potentially enormous save delta. Only transactional journal format 2 is accepted by this build.
 
 The journal writer flushes its buffered writer and then calls `FileStream.Flush(true)`. Replay ignores any v2 transaction that does not reach a valid `COMMIT`, even if some complete record rows reached disk. Base/target counts also make a completely written retry idempotent. A journal whose base hash does not equal the current compact sidecar is ignored rather than replayed.
 
-A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then atomically promotes it. Destructive branch changes, recovery writes, Save As, and incompatible baselines use a synchronous full boundary. Routine journal-size compaction is queued after the triggering delta is durable so the vanilla save boundary does not pay the O(history) rewrite cost.
+A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then atomically promotes it. Destructive branch changes, recovery writes, New Save, and incompatible baselines use a synchronous full boundary. Routine journal-size compaction is queued after the triggering delta is durable so the vanilla save boundary does not pay the O(history) rewrite cost. The worker shallow-copies already-loaded immutable persisted prefixes rather than deserializing the complete base+journal into a second object graph, then verifies the physical base hash and journal length before replacement.
 
 When replacing a healthy compact base, IMDC retains:
 
@@ -165,7 +165,7 @@ When replacing a healthy compact base, IMDC retains:
 <sidecar>.imdc.bak.imdc.journal   # present when the previous generation used a journal
 ```
 
-The backup journal is tied to the backup base by its own stored base hash. This keeps the backup equal to the complete previous logical generation. When recovery starts from a damaged primary, the known-good backup pair is preserved until a successful replacement.
+The backup journal is tied to the backup base by its own stored base hash. This keeps the backup equal to the complete previous logical generation. If backup-journal publication is interrupted, recovery may also test the still-present current journal against the backup base hash before falling back to the normal backup-journal name. When recovery starts from a damaged primary, the known-good backup generation is preserved until a successful replacement.
 
 ## Missing, unreadable, and unmatched sidecars
 
@@ -176,18 +176,18 @@ These states deliberately differ:
 - **Unreadable/invalid/newer primary and unusable backup:** expose safe empty supplemental state and block writes to that physical sidecar path.
 - **Valid existing sidecar with no exact checkpoint for the loaded vanilla save:** fail closed, expose detached supplemental state, and protect the sidecar from overwrite.
 
-A Save As to a different valid physical vanilla save path may establish a new writable branch.
+A New Save to a different valid physical vanilla save path may establish a new writable branch.
 
 ## Long-campaign characteristics
 
-Complete event history remains complete, but an ordinary append-only save no longer walks, copies, or serializes that complete history. Active checkpoints are indexed by normalized save path, and IMDC snapshots only the immutable event, custom-mutation, and checkpoint suffix beyond the durable counts before appending that suffix to the journal. Full O(history) snapshot work is reserved for compaction, recovery, Save As, or destructive branch boundaries.
+Complete event history remains complete, but an ordinary append-only save no longer walks, copies, or serializes that complete history. Active checkpoints are indexed by normalized save path, and IMDC snapshots only the immutable event, custom-mutation, and checkpoint suffix beyond the durable counts before appending that suffix to the journal. Full O(history) snapshot work is reserved for compaction, recovery, New Save, or destructive branch boundaries.
 
 Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks also avoid complete trim scans when no active record can exceed the checkpoint.
 
-Background journal compaction is requested after 256 committed transactions or when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. These limits keep replay depth predictable without allowing a very large base to imply an equally large journal.
+Background journal compaction is normally requested when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. Transaction count is only a replay-depth ceiling and scales with base size from 2,048 to 32,768 committed transactions, avoiding full-history rewrites merely because a large sidecar accumulated a few hundred tiny checkpoint-only saves.
 
-## Compatibility
+## Persistence format policy
 
-Format versions 1 and 2 of `IMDataCore.LightweightSidecar` remain readable. On a later successful persistence boundary they are written as format version 3.
+This build accepts only `IMDataCore.LightweightSidecar` format version 3 and transactional journal format 2. Older sidecar/journal formats are intentionally not migrated or replayed by the runtime.
 
-Pre-2.0 database persistence is outside the runtime migration path. IMDC 3.3 does not discover or import historical databases or flat fallback files.
+Pre-2.0 database persistence is also outside the runtime migration path. IMDC 3.4 does not discover or import historical databases or flat fallback files.

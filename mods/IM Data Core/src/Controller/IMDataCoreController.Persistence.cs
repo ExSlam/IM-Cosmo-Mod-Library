@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace IMDataCore
 {
     /// <summary>
-    /// Lightweight save/load coordination for IM Data Core 3.3. This partial is
+    /// Lightweight save/load coordination for IM Data Core 3.4. This partial is
     /// deliberately limited to in-memory branch management and explicit sidecar
     /// persistence boundaries.
     /// </summary>
@@ -193,70 +193,80 @@ namespace IMDataCore
                         "IM Data Core could not parse the loaded game date: " +
                         exception.Message);
                 }
-                loadedEngine = new LightweightCoreStorageEngine();
-                string loadError;
-                bool sidecarLoaded = loadedEngine.Initialize(
-                    targetScope,
-                    out loadError);
-                if (sidecarLoaded && !string.IsNullOrEmpty(loadError))
+                // Loading the same physical sidecar must be one atomic handoff with
+                // respect to every old/new engine I/O operation on that path. Without
+                // this process-wide lease, an old queued compactor can replace the base
+                // or delete a journal after the replacement engine has already loaded it.
+                object sidecarIoLock =
+                    LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
+                        targetScope.SidecarFilePath);
+                lock (sidecarIoLock)
                 {
-                    CoreLog.Warn(loadError);
-                }
-                if (!sidecarLoaded)
-                {
-                    CoreLog.Warn(loadError);
-
-                    if (!loadedEngine.IsPersistenceBlocked)
+                    loadedEngine = new LightweightCoreStorageEngine();
+                    string loadError;
+                    bool sidecarLoaded = loadedEngine.Initialize(
+                        targetScope,
+                        out loadError);
+                    if (sidecarLoaded && !string.IsNullOrEmpty(loadError))
                     {
-                        string emptyError;
-                        if (!loadedEngine.InitializeEmpty(
-                                targetScope,
-                                out emptyError))
+                        CoreLog.Warn(loadError);
+                    }
+                    if (!sidecarLoaded)
+                    {
+                        CoreLog.Warn(loadError);
+
+                        if (!loadedEngine.IsPersistenceBlocked)
                         {
-                            loadedEngine.Dispose();
-                            CoreLog.Warn(emptyError);
-                            InstallSafeEmptyLoadedState(targetScope);
-                            return;
+                            string emptyError;
+                            if (!loadedEngine.InitializeEmpty(
+                                    targetScope,
+                                    out emptyError))
+                            {
+                                loadedEngine.Dispose();
+                                CoreLog.Warn(emptyError);
+                                InstallSafeEmptyLoadedState(targetScope);
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            CoreLog.Warn(
+                                "IM Data Core will keep supplemental state read-only for " +
+                                "this physical save until a different save path is used. " +
+                                "The unreadable/unsupported sidecar was left untouched.");
                         }
                     }
-                    else
+                    bool checkpointFound = false;
+                    long activatedSequence = 0L;
+                    bool hasExistingSidecarDocument =
+                        sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
+                    if (hasExistingSidecarDocument &&
+                        !loadedEngine.TryActivateCheckpoint(
+                            stamp,
+                            out checkpointFound,
+                            out activatedSequence,
+                            out errorMessage))
                     {
-                        CoreLog.Warn(
-                            "IM Data Core will keep supplemental state read-only for " +
-                            "this physical save until a different save path is used. " +
-                            "The unreadable/unsupported sidecar was left untouched.");
+                        CoreLog.Warn(errorMessage);
                     }
+                    if (hasExistingSidecarDocument && !checkpointFound)
+                    {
+                        // Existing sidecars are branch/checkpoint ledgers. A date-only
+                        // cutoff cannot distinguish two histories that share the same
+                        // in-game date, so an unmatched document must fail closed. A
+                        // genuinely new physical save with no sidecar remains writable.
+                        loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                            "The loaded vanilla save has no exact IM Data Core checkpoint " +
+                            "in this existing sidecar. Supplemental state was detached " +
+                            "read-only and the sidecar was left untouched.");
+                        sidecarLoaded = false;
+                    }
+                    InstallLoadedEngine(
+                        loadedEngine,
+                        targetScope,
+                        loadedGameDate);
+                    engineInstalled = true;
                 }
-                bool checkpointFound = false;
-                long activatedSequence = 0L;
-                bool hasExistingSidecarDocument =
-                    sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
-                if (hasExistingSidecarDocument &&
-                    !loadedEngine.TryActivateCheckpoint(
-                        stamp,
-                        out checkpointFound,
-                        out activatedSequence,
-                        out errorMessage))
-                {
-                    CoreLog.Warn(errorMessage);
-                }
-                if (hasExistingSidecarDocument && !checkpointFound)
-                {
-                    // Existing sidecars are branch/checkpoint ledgers. A date-only
-                    // cutoff cannot distinguish two histories that share the same
-                    // in-game date, so an unmatched document must fail closed. A
-                    // genuinely new physical save with no sidecar remains writable.
-                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
-                        "The loaded vanilla save has no exact IM Data Core checkpoint " +
-                        "in this existing sidecar. Supplemental state was detached " +
-                        "read-only and the sidecar was left untouched.");
-                    sidecarLoaded = false;
-                }
-                InstallLoadedEngine(
-                    loadedEngine,
-                    targetScope,
-                    loadedGameDate);
-                engineInstalled = true;
             }
             catch (Exception exception)
             {
@@ -273,6 +283,23 @@ namespace IMDataCore
             }
         }
         private void InstallSafeEmptyLoadedState(CoreSaveScope targetScope)
+        {
+            if (targetScope != null && !targetScope.IsTransient)
+            {
+                object sidecarIoLock =
+                    LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
+                        targetScope.SidecarFilePath);
+                lock (sidecarIoLock)
+                {
+                    InstallSafeEmptyLoadedStateCore(targetScope);
+                }
+                return;
+            }
+
+            InstallSafeEmptyLoadedStateCore(targetScope);
+        }
+
+        private void InstallSafeEmptyLoadedStateCore(CoreSaveScope targetScope)
         {
             LightweightCoreStorageEngine safeEngine =
                 CreateSafeEmptyEngine(targetScope);
@@ -501,39 +528,66 @@ namespace IMDataCore
                     return;
                 }
 
-                if (singles.Singles == null ||
-                    singles.Singles.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+                if (pendingSingleChartResolutionBySingleId.Count == 0)
                 {
                     return;
                 }
-                for (int index = 0; index < singles.Singles.Count; index++)
+
+                List<int> stalePendingIds = null;
+                foreach (KeyValuePair<int, singles._single> pendingEntry in
+                    pendingSingleChartResolutionBySingleId)
                 {
-                    singles._single releasedSingle = singles.Singles[index];
+                    singles._single releasedSingle = pendingEntry.Value;
                     if (releasedSingle == null ||
-                        releasedSingle.id < CoreConstants.MinimumValidIdolIdentifier ||
+                        releasedSingle.id != pendingEntry.Key ||
                         releasedSingle.status != singles._single._status.released)
                     {
+                        if (stalePendingIds == null)
+                        {
+                            stalePendingIds = new List<int>();
+                        }
+                        stalePendingIds.Add(pendingEntry.Key);
                         continue;
                     }
+
                     int chartPosition = ResolveChartPosition(releasedSingle);
-                    if (chartPosition <= 0)
+                    if (chartPosition <= CoreConstants.ZeroBasedListStartIndex)
                     {
                         continue;
                     }
+
                     int knownChartPosition;
                     if (resolvedSingleChartPositionBySingleId.TryGetValue(
                             releasedSingle.id,
                             out knownChartPosition) &&
                         knownChartPosition == chartPosition)
                     {
+                        if (stalePendingIds == null)
+                        {
+                            stalePendingIds = new List<int>();
+                        }
+                        stalePendingIds.Add(releasedSingle.id);
                         continue;
                     }
+
                     pendingChartUpdates.Add(
                         new KeyValuePair<singles._single, int>(
                             releasedSingle,
                             chartPosition));
                 }
+
+                if (stalePendingIds != null)
+                {
+                    for (int index = 0;
+                        index < stalePendingIds.Count;
+                        index++)
+                    {
+                        pendingSingleChartResolutionBySingleId.Remove(
+                            stalePendingIds[index]);
+                    }
+                }
             }
+
             for (int index = 0; index < pendingChartUpdates.Count; index++)
             {
                 KeyValuePair<singles._single, int> update =
@@ -544,11 +598,13 @@ namespace IMDataCore
                     CoreConstants.EventSourceSingleChartBackfillPatch);
             }
         }
+
         private void ResetRuntimeCaptureStateLocked()
         {
             tourRuntimeStateByTourId.Clear();
             concertEditBaselineByConcertId.Clear();
             resolvedSingleChartPositionBySingleId.Clear();
+            pendingSingleChartResolutionBySingleId.Clear();
             pendingSubstoryCompletionCountByDialogueId.Clear();
             pendingCustomEventIdempotencyKeys.Clear();
             idempotencyKeysForCurrentDate.Clear();
@@ -603,6 +659,7 @@ namespace IMDataCore
         private void SeedResolvedSingleChartPositionsFromVanillaLocked()
         {
             resolvedSingleChartPositionBySingleId.Clear();
+            pendingSingleChartResolutionBySingleId.Clear();
             if (singles.Singles == null)
             {
                 return;
@@ -621,6 +678,11 @@ namespace IMDataCore
                 {
                     resolvedSingleChartPositionBySingleId[releasedSingle.id] =
                         chartPosition;
+                }
+                else
+                {
+                    pendingSingleChartResolutionBySingleId[releasedSingle.id] =
+                        releasedSingle;
                 }
             }
         }

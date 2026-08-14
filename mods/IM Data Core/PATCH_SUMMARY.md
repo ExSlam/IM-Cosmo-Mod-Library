@@ -1,31 +1,26 @@
-# IM Data Core 3.3.0 patch summary
+# IM Data Core 3.4.0 patch summary
 
-This revision focuses on persistence correctness, crash recovery, and long-campaign save cost while keeping the public v3 sidecar schema compatible.
+This revision focuses on persistence correctness under New Save/Overwrite Save branching, cross-engine compaction safety, and long-campaign save/load cost.
 
 ## Applied changes
 
-1. **Delta-journal persistence:** ordinary append-only saves copy and write only records added since the durable generation. The journal is bound to the exact compact base by SHA-256.
-2. **Safe compaction:** journals compact back into the existing atomic v3 snapshot at size/entry thresholds or whenever the active branch changes destructively.
-3. **Complete backup generations:** compact replacement preserves the previous base plus its matching journal, so `.imdc.bak` recovery does not discard journal-only generations.
-4. **Torn/stale journal handling:** incomplete tails are ignored safely; a journal with the wrong base hash is never replayed; append failure can reconstruct the frozen logical state and compact it.
-5. **Incremental frozen snapshots:** the common journal path shallow-copies only new immutable record references instead of all retained events and mutations.
-6. **Cached storage JSON:** immutable event payload/custom-value structural JSON is prepared once and reused on later persistence.
-7. **Lower allocation streaming:** record fragments are copied from reusable `StringBuilder` buffers directly to the writer rather than calling `ToString()` once per record.
-8. **Forward-save trim fast path:** maintained sequence/date watermarks avoid O(history) trim scans when the checkpoint is provably at or beyond active state.
-9. **Checkpoint path index:** active checkpoints are keyed by normalized save path so journal snapshots copy only the new checkpoint suffix.
-10. **Filesystem correctness:** physical path comparison and file-scoped identity follow Windows case-insensitivity only on Windows and remain case-sensitive on case-sensitive hosts.
-11. **Verified SWOF interoperability:** IMDC trusts Save Write Ordering Fix only when its health API says all required write-call interceptions succeeded.
-12. **Mutation sequence cleanliness:** custom SET/REMOVE no-ops allocate no sequence.
-13. **Concurrent persistence hardening:** I/O serialization is per physical sidecar and superseded snapshots cannot move the controller back to an older scope.
-14. **Persistence diagnostics API:** `TryGetPersistenceDiagnostics` reports logical counts, bytes, journal depth, blocking/recovery state, buffered events, and generations.
-15. **Money-ledger hot-path reduction:** known ambient sources bypass stack walking and show-money detection uses an explicit scoped marker; unknown callers retain the stack fallback.
+1. **New Save checkpoint correctness:** a full New Save snapshot no longer prunes checkpoints belonging to other physical save paths from the active ledger, preserving incremental-prefix validity when a later Overwrite Save returns to an older path.
+2. **Process-wide path serialization:** sidecar I/O locks are shared across engine instances, and same-path load replacement holds that lease through old-engine disposal and new-engine installation.
+3. **Fail-open vanilla protection:** standalone `SavedData` snapshot cloning logs and returns the original object if Unity serialization fails, so IMDC cannot abort vanilla saving.
+4. **Scaled compaction policy:** byte/base-ratio thresholds are primary; transaction count is only a scaled 2,048-32,768 replay-cost ceiling.
+5. **Low-allocation compaction:** background compaction uses a shallow immutable-prefix snapshot of loaded records rather than deserializing the complete base+journal into duplicate event/mutation objects.
+6. **Compaction generation verification:** the worker rechecks the physical base SHA-256 and journal length before committing.
+7. **Incremental journal validation:** the base is fully validated once; replayed journal suffix rows reuse the same sequence/idempotency/checkpoint sets instead of validating the whole history again.
+8. **Conditional sorting:** runtime index rebuilds sort only if a linear monotonicity check finds disorder.
+9. **Dirty chart backfill:** save boundaries revisit only unresolved released singles, not the full historical singles list.
+10. **Lower reconciliation allocation:** post-mod show scans reuse scratch `HashSet`/`List` instances.
+11. **Backup crash-window recovery:** `.imdc.bak` can recover with the still-present primary journal when it matches the backup base, and a failed journal-copy attempt keeps that source journal.
+12. **Current-format persistence only:** sidecar format 3 and transactional journal format 2 are accepted; older persistence formats are intentionally unsupported.
 
 ## Compatibility
 
+- Public IM Data Core API surface remains unchanged.
 - Sidecar `FormatVersion` remains **3**.
-- Journal `FormatVersion` is **1** and is an implementation-detail sibling of the v3 base.
-- V1/V2/v3 sidecars remain readable.
-- Public API compatibility is retained; diagnostics are additive.
-- Project/mod version is **3.3.0**.
-
-See `docs/STORAGE_LAYOUT.md` and `docs/V3_VALIDATION.md` for persistence/recovery details.
+- Journal `FormatVersion` is **2**.
+- Older sidecar/journal formats are intentionally not supported.
+- Project/mod version is **3.4.0**.

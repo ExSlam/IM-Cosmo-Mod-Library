@@ -171,7 +171,7 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// The sole normal-runtime persistence implementation for IM Data Core 3.3.
+    /// The sole normal-runtime persistence implementation for IM Data Core 3.4.
     /// Mutations update memory only; callers explicitly persist at vanilla save
     /// boundaries or through TryFlushNow.
     /// </summary>
@@ -182,11 +182,19 @@ namespace IMDataCore
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
-        internal const int LegacyJournalFormatVersion = 1;
         internal const int JournalFormatVersion = 2;
         private const long MinimumJournalCompactionBytes = 1024L * 1024L;
         private const long MaximumJournalCompactionBytes = 16L * 1024L * 1024L;
-        private const int MaximumJournalEntriesBeforeCompaction = 256;
+        private const int MinimumJournalTransactionsBeforeCompaction = 2048;
+        private const int MaximumJournalTransactionsBeforeCompaction = 32768;
+        private const int JournalTransactionsPerBaseMiB = 64;
+
+        // Physical sidecars outlive individual engine instances while background
+        // compaction is queued. The lock therefore belongs to the process/path,
+        // not to one LightweightCoreStorageEngine object.
+        private static readonly object PersistenceIoRegistryLock = new object();
+        private static readonly Dictionary<string, object> PersistenceIoLocksByPath =
+            new Dictionary<string, object>(CorePaths.PathComparer);
 
         private sealed class HashingReadStream : Stream
         {
@@ -358,6 +366,18 @@ namespace IMDataCore
             internal long StateRevision;
         }
 
+        private sealed class DocumentValidationState
+        {
+            internal readonly HashSet<long> Sequences = new HashSet<long>();
+            internal readonly HashSet<string> EventIdempotencyKeys =
+                new HashSet<string>(StringComparer.Ordinal);
+            internal readonly HashSet<CheckpointIdentity> CheckpointIdentities =
+                new HashSet<CheckpointIdentity>();
+            internal long MaximumSequence;
+            internal long LastEventSequence;
+            internal long LastCustomMutationSequence;
+        }
+
         private sealed class TourRuntimeState
         {
             internal long Sequence;
@@ -381,8 +401,6 @@ namespace IMDataCore
         private readonly object storageLock = new object();
         private readonly Dictionary<string, long> latestCommittedPersistenceGenerationByPath =
             new Dictionary<string, long>(CorePaths.PathComparer);
-        private readonly Dictionary<string, object> persistenceIoLocksByPath =
-            new Dictionary<string, object>(CorePaths.PathComparer);
         private readonly Dictionary<string, CommittedPathState> committedPathStates =
             new Dictionary<string, CommittedPathState>(CorePaths.PathComparer);
         private readonly Dictionary<string, List<LightweightCheckpointRecord>>
@@ -615,6 +633,8 @@ namespace IMDataCore
                     LightweightLoadedPersistenceInfo backupLoadInfo;
                     if (TryLoadValidatedDocumentFromPathLocked(
                             normalizedBackupPath,
+                            currentRelativeSavePath,
+                            currentSidecarPath + ".imdc.journal",
                             out document,
                             out backupLoadInfo,
                             out backupError))
@@ -1675,7 +1695,7 @@ namespace IMDataCore
                     if (IsPersistenceBlockedForPathLocked(candidatePath))
                     {
                         errorMessage = blockedPersistenceReason +
-                            " Save As to a different vanilla path is allowed.";
+                            " New Save to a different vanilla path is allowed.";
                         return false;
                     }
 
@@ -2021,21 +2041,17 @@ namespace IMDataCore
                                     snapshot.Document.Checkpoints);
                             RebuildDurableCheckpointIdentityIndexLocked();
 
-                            // A full Save As snapshot filters checkpoints to its target.
-                            activeCheckpoints =
-                                new List<LightweightCheckpointRecord>(
-                                    snapshot.Document.Checkpoints);
-                            RecomputeCheckpointWatermarkLocked();
+                            // A New Save writes only checkpoints belonging to its target
+                            // path, but it must not prune the active multi-path checkpoint
+                            // ledger. Doing so destroys the prefix invariant used by a
+                            // later Overwrite Save back to an older physical path.
                         }
                     }
                 }
 
                 if (scheduleBackgroundCompaction)
                 {
-                    QueueBackgroundCompaction(
-                        snapshot.TargetPath,
-                        snapshot.RelativeSavePath,
-                        snapshot.Generation);
+                    QueueBackgroundCompaction(snapshot);
                 }
 
                 CoreLog.Info(
@@ -2071,15 +2087,35 @@ namespace IMDataCore
                 Math.Min(
                     MaximumJournalCompactionBytes,
                     proportionalThreshold));
+            long baseMiB = Math.Max(
+                0L,
+                state.BaseFileBytes / (1024L * 1024L));
+            long scaledTransactionThreshold =
+                MinimumJournalTransactionsBeforeCompaction +
+                Math.Min(
+                    (long)MaximumJournalTransactionsBeforeCompaction -
+                        MinimumJournalTransactionsBeforeCompaction,
+                    baseMiB * JournalTransactionsPerBaseMiB);
+            int transactionThreshold = (int)Math.Min(
+                MaximumJournalTransactionsBeforeCompaction,
+                scaledTransactionThreshold);
+
+            // Bytes/ratio are the normal trigger. The transaction count is only a
+            // high replay-cost safety ceiling, so a large base is never rewritten
+            // merely because a few hundred tiny checkpoint-only saves accumulated.
             return state.JournalBytes >= byteThreshold ||
-                state.JournalEntryCount >= MaximumJournalEntriesBeforeCompaction;
+                state.JournalEntryCount >= transactionThreshold;
         }
 
         private void QueueBackgroundCompaction(
-            string targetPath,
-            string relativeSavePath,
-            long generation)
+            LightweightPersistenceSnapshot persistenceSnapshot)
         {
+            if (persistenceSnapshot == null)
+            {
+                return;
+            }
+
+            string targetPath = persistenceSnapshot.TargetPath;
             lock (storageLock)
             {
                 if (disposed ||
@@ -2094,10 +2130,7 @@ namespace IMDataCore
                 {
                     try
                     {
-                        RunBackgroundCompaction(
-                            targetPath,
-                            relativeSavePath,
-                            generation);
+                        RunBackgroundCompaction(persistenceSnapshot);
                     }
                     catch (Exception exception)
                     {
@@ -2116,10 +2149,16 @@ namespace IMDataCore
         }
 
         private void RunBackgroundCompaction(
-            string targetPath,
-            string relativeSavePath,
-            long generation)
+            LightweightPersistenceSnapshot persistenceSnapshot)
         {
+            if (persistenceSnapshot == null)
+            {
+                return;
+            }
+
+            string targetPath = persistenceSnapshot.TargetPath;
+            string relativeSavePath = persistenceSnapshot.RelativeSavePath;
+            long generation = persistenceSnapshot.Generation;
             object pathIoLock = GetPersistenceIoLock(targetPath);
             lock (pathIoLock)
             {
@@ -2141,32 +2180,37 @@ namespace IMDataCore
                     }
                 }
 
-                LightweightSidecarDocument document;
-                LightweightLoadedPersistenceInfo loadedInfo;
-                string loadError;
-                if (!TryLoadValidatedDocumentFromPathLocked(
-                        targetPath,
-                        relativeSavePath,
-                        out document,
-                        out loadedInfo,
-                        out loadError))
+                LightweightSidecarDocument compactionDocument;
+                lock (storageLock)
                 {
-                    CoreLog.Warn(
-                        "IM Data Core skipped background compaction because the " +
-                        "durable journal could not be materialized: " + loadError);
+                    if (!TryBuildBackgroundCompactionDocumentLocked(
+                            persistenceSnapshot,
+                            out compactionDocument))
+                    {
+                        return;
+                    }
+                }
+
+                if (compactionDocument.Events.Count != expectedState.EventCount ||
+                    compactionDocument.CustomMutations.Count !=
+                        expectedState.CustomMutationCount ||
+                    compactionDocument.Checkpoints.Count !=
+                        expectedState.CheckpointCount ||
+                    compactionDocument.LastIssuedSequence !=
+                        expectedState.LastIssuedSequence)
+                {
                     return;
                 }
 
-                if (!string.Equals(
-                        loadedInfo.BaseFileHash,
-                        expectedState.BaseFileHash,
-                        StringComparison.Ordinal) ||
-                    document.Events.Count != expectedState.EventCount ||
-                    document.CustomMutations.Count !=
-                        expectedState.CustomMutationCount ||
-                    document.Checkpoints.Count != expectedState.CheckpointCount ||
-                    document.LastIssuedSequence != expectedState.LastIssuedSequence)
+                string physicalError;
+                if (!TryVerifyCompactionPhysicalBaseline(
+                        targetPath,
+                        expectedState,
+                        out physicalError))
                 {
+                    CoreLog.Warn(
+                        "IM Data Core skipped background compaction because the " +
+                        "physical base/journal generation changed: " + physicalError);
                     return;
                 }
 
@@ -2182,10 +2226,12 @@ namespace IMDataCore
                         BaseEventCount = 0,
                         BaseCustomMutationCount = 0,
                         BaseCheckpointCount = 0,
-                        TotalEventCount = document.Events.Count,
-                        TotalCustomMutationCount = document.CustomMutations.Count,
-                        TotalCheckpointCount = document.Checkpoints.Count,
-                        Document = document
+                        TotalEventCount = compactionDocument.Events.Count,
+                        TotalCustomMutationCount =
+                            compactionDocument.CustomMutations.Count,
+                        TotalCheckpointCount =
+                            compactionDocument.Checkpoints.Count,
+                        Document = compactionDocument
                     };
 
                 long baseBytes;
@@ -2244,6 +2290,120 @@ namespace IMDataCore
                 CoreLog.Info(
                     "IM Data Core compacted its journal in the background: base_bytes=" +
                     baseBytes.ToString(CultureInfo.InvariantCulture) + ".");
+            }
+        }
+
+        private bool TryBuildBackgroundCompactionDocumentLocked(
+            LightweightPersistenceSnapshot snapshot,
+            out LightweightSidecarDocument document)
+        {
+            document = null;
+            if (snapshot == null ||
+                snapshot.Document == null ||
+                disposed ||
+                snapshot.StateRevision != activeStateRevision ||
+                activeEvents.Count < snapshot.TotalEventCount ||
+                activeCustomMutations.Count <
+                    snapshot.TotalCustomMutationCount)
+            {
+                return false;
+            }
+
+            IReadOnlyList<LightweightCheckpointRecord> pathCheckpoints =
+                GetActiveCheckpointsForPathLocked(snapshot.RelativeSavePath);
+            if (pathCheckpoints.Count < snapshot.TotalCheckpointCount)
+            {
+                return false;
+            }
+
+            document = new LightweightSidecarDocument
+            {
+                FormatName = SidecarFormatName,
+                FormatVersion = SidecarFormatVersion,
+                RelativeSavePath = snapshot.RelativeSavePath,
+                LastIssuedSequence = snapshot.Document.LastIssuedSequence,
+                Events = CopyPrefix(activeEvents, snapshot.TotalEventCount),
+                CustomMutations = CopyPrefix(
+                    activeCustomMutations,
+                    snapshot.TotalCustomMutationCount),
+                Checkpoints = CopyPrefix(
+                    pathCheckpoints,
+                    snapshot.TotalCheckpointCount)
+            };
+            return true;
+        }
+
+        private static List<T> CopyPrefix<T>(
+            IReadOnlyList<T> source,
+            int count)
+        {
+            if (source == null || count < 0 || count > source.Count)
+            {
+                throw new ArgumentOutOfRangeException("count");
+            }
+
+            List<T> prefix = new List<T>(count);
+            for (int index = 0; index < count; index++)
+            {
+                prefix.Add(source[index]);
+            }
+            return prefix;
+        }
+
+        private static bool TryVerifyCompactionPhysicalBaseline(
+            string targetPath,
+            CommittedPathState expectedState,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (expectedState == null || !File.Exists(targetPath))
+            {
+                errorMessage = "The compact base snapshot no longer exists.";
+                return false;
+            }
+
+            try
+            {
+                string physicalBaseHash;
+                using (FileStream stream = new FileStream(
+                    targetPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    64 * 1024,
+                    FileOptions.SequentialScan))
+                using (SHA256 sha256 = SHA256.Create())
+                {
+                    physicalBaseHash = ToLowerHex(sha256.ComputeHash(stream));
+                }
+
+                if (!string.Equals(
+                        physicalBaseHash,
+                        expectedState.BaseFileHash,
+                        StringComparison.Ordinal))
+                {
+                    errorMessage =
+                        "The compact base fingerprint no longer matches the committed generation.";
+                    return false;
+                }
+
+                string journalPath = targetPath + ".imdc.journal";
+                long physicalJournalBytes = File.Exists(journalPath)
+                    ? new FileInfo(journalPath).Length
+                    : 0L;
+                if (physicalJournalBytes != expectedState.JournalBytes)
+                {
+                    errorMessage =
+                        "The journal length no longer matches the committed generation.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
             }
         }
 
@@ -2423,6 +2583,10 @@ namespace IMDataCore
             // File.Replace moved the previous base to .imdc.bak. Preserve the
             // journal tied to that base as well so backup recovery represents the
             // complete previous logical generation, not merely its compact base.
+            // If the copy fails, deliberately keep the original journal in place.
+            // Primary load rejects it by base hash, while backup recovery can pair
+            // it with .bak through the preferred-journal recovery path.
+            bool keepCurrentJournalForBackupRecovery = false;
             if (targetExisted && !snapshot.PreserveExistingBackup)
             {
                 string backupJournalPath =
@@ -2435,9 +2599,11 @@ namespace IMDataCore
                             backupJournalPath,
                             out backupJournalError))
                     {
+                        keepCurrentJournalForBackupRecovery = true;
                         CoreLog.Warn(
                             "IM Data Core could not preserve the previous journal " +
-                            "with its backup base: " + backupJournalError);
+                            "with its backup base; the original journal will be kept " +
+                            "as the backup recovery journal: " + backupJournalError);
                     }
                 }
                 else if (File.Exists(backupJournalPath) &&
@@ -2452,7 +2618,8 @@ namespace IMDataCore
             }
 
             string cleanupError;
-            if (!TryDeleteJournal(snapshot.TargetPath, out cleanupError) &&
+            if (!keepCurrentJournalForBackupRecovery &&
+                !TryDeleteJournal(snapshot.TargetPath, out cleanupError) &&
                 !string.IsNullOrEmpty(cleanupError))
             {
                 // The new base is authoritative. A journal tied to the previous
@@ -2563,7 +2730,7 @@ namespace IMDataCore
                         if (existingJournalVersion != JournalFormatVersion)
                         {
                             errorMessage =
-                                "The existing IMDC journal uses the legacy v1 entry format and must be compacted before appending.";
+                                "The existing IMDC journal format is unsupported by this build.";
                             return false;
                         }
                     }
@@ -2737,20 +2904,37 @@ namespace IMDataCore
                 out errorMessage);
         }
 
-        private object GetPersistenceIoLock(string targetPath)
+        internal static object GetSharedPersistenceIoLock(string targetPath)
         {
-            lock (storageLock)
+            string key = targetPath ?? string.Empty;
+            if (!string.IsNullOrEmpty(key))
+            {
+                try
+                {
+                    key = Path.GetFullPath(key);
+                }
+                catch
+                {
+                    // Callers validate physical mutation paths before I/O. Keep a
+                    // stable fallback key here so lock acquisition itself never
+                    // turns a supplemental persistence failure into a vanilla one.
+                }
+            }
+            lock (PersistenceIoRegistryLock)
             {
                 object pathLock;
-                if (!persistenceIoLocksByPath.TryGetValue(
-                        targetPath ?? string.Empty,
-                        out pathLock))
+                if (!PersistenceIoLocksByPath.TryGetValue(key, out pathLock))
                 {
                     pathLock = new object();
-                    persistenceIoLocksByPath[targetPath ?? string.Empty] = pathLock;
+                    PersistenceIoLocksByPath[key] = pathLock;
                 }
                 return pathLock;
             }
+        }
+
+        private static object GetPersistenceIoLock(string targetPath)
+        {
+            return GetSharedPersistenceIoLock(targetPath);
         }
 
         internal IMDataCorePersistenceDiagnostics GetPersistenceDiagnostics(
@@ -2836,6 +3020,23 @@ namespace IMDataCore
             out LightweightLoadedPersistenceInfo persistenceInfo,
             out string errorMessage)
         {
+            return TryLoadValidatedDocumentFromPathLocked(
+                path,
+                expectedRelativeSavePath,
+                null,
+                out document,
+                out persistenceInfo,
+                out errorMessage);
+        }
+
+        private bool TryLoadValidatedDocumentFromPathLocked(
+            string path,
+            string expectedRelativeSavePath,
+            string preferredJournalPath,
+            out LightweightSidecarDocument document,
+            out LightweightLoadedPersistenceInfo persistenceInfo,
+            out string errorMessage)
+        {
             document = null;
             persistenceInfo = new LightweightLoadedPersistenceInfo();
             errorMessage = string.Empty;
@@ -2865,17 +3066,24 @@ namespace IMDataCore
                     persistenceInfo.BaseFileHash = hashingStream.GetHashHex();
                 }
 
+                DocumentValidationState validationState;
                 if (!TryValidateDocumentLocked(
                         document,
                         expectedRelativeSavePath,
+                        out validationState,
                         out errorMessage))
                 {
                     document = null;
                     return false;
                 }
 
+                int baseCheckpointCount = document.Checkpoints.Count;
+                int baseEventCount = document.Events.Count;
+                int baseCustomMutationCount = document.CustomMutations.Count;
+
                 if (!TryReplayJournalLocked(
                         path,
+                        preferredJournalPath,
                         persistenceInfo.BaseFileHash,
                         document,
                         persistenceInfo,
@@ -2886,9 +3094,12 @@ namespace IMDataCore
                 }
 
                 if (persistenceInfo.JournalEntryCount > 0 &&
-                    !TryValidateDocumentLocked(
+                    !TryValidateDocumentSuffixLocked(
                         document,
-                        expectedRelativeSavePath,
+                        baseEventCount,
+                        baseCustomMutationCount,
+                        baseCheckpointCount,
+                        validationState,
                         out errorMessage))
                 {
                     document = null;
@@ -2906,13 +3117,90 @@ namespace IMDataCore
 
         private bool TryReplayJournalLocked(
             string basePath,
+            string preferredJournalPath,
             string baseFileHash,
             LightweightSidecarDocument document,
             LightweightLoadedPersistenceInfo persistenceInfo,
             out string errorMessage)
         {
             errorMessage = string.Empty;
-            string journalPath = basePath + ".imdc.journal";
+            string defaultJournalPath = basePath + ".imdc.journal";
+
+            // During atomic compaction File.Replace has already moved the prior base
+            // to .bak before its matching journal is copied to the backup-journal name.
+            // If the process dies in that narrow interval, the still-present primary
+            // journal is exactly the one that belongs to the backup base. Prefer it
+            // during backup recovery, then fall back to the normal backup journal.
+            if (!string.IsNullOrEmpty(preferredJournalPath) &&
+                !string.Equals(
+                    preferredJournalPath,
+                    defaultJournalPath,
+                    CorePaths.PathComparison) &&
+                File.Exists(preferredJournalPath))
+            {
+                bool preferredBaseHashMatched;
+                string preferredError;
+                if (TryReplayJournalFileLocked(
+                        preferredJournalPath,
+                        baseFileHash,
+                        document,
+                        persistenceInfo,
+                        out preferredBaseHashMatched,
+                        out preferredError))
+                {
+                    if (preferredBaseHashMatched)
+                    {
+                        return true;
+                    }
+
+                    // The preferred journal belongs to some other base generation.
+                    // Reset its diagnostics before trying the normal sibling journal.
+                    persistenceInfo.JournalBytes = 0L;
+                    persistenceInfo.JournalEntryCount = 0;
+                    persistenceInfo.ForceFullSnapshot = false;
+                }
+                else
+                {
+                    // Replay may have applied one or more fully committed rows before
+                    // discovering later corruption. Do not attempt a second journal
+                    // against that potentially advanced document.
+                    errorMessage = preferredError;
+                    return false;
+                }
+            }
+
+            bool defaultBaseHashMatched;
+            if (!TryReplayJournalFileLocked(
+                    defaultJournalPath,
+                    baseFileHash,
+                    document,
+                    persistenceInfo,
+                    out defaultBaseHashMatched,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            if (!defaultBaseHashMatched)
+            {
+                // An atomically replaced base can legitimately leave a stale journal
+                // behind until cleanup. Its base hash makes it unambiguously inapplicable.
+                persistenceInfo.ForceFullSnapshot = true;
+            }
+
+            return true;
+        }
+
+        private bool TryReplayJournalFileLocked(
+            string journalPath,
+            string baseFileHash,
+            LightweightSidecarDocument document,
+            LightweightLoadedPersistenceInfo persistenceInfo,
+            out bool baseHashMatched,
+            out string errorMessage)
+        {
+            baseHashMatched = true;
+            errorMessage = string.Empty;
             string normalizedJournalPath;
             if (!CorePaths.TryValidateContainedMutationPath(
                     journalPath,
@@ -2936,7 +3224,7 @@ namespace IMDataCore
                 return true;
             }
 
-            bool endsWithNewline = false;
+            bool endsWithNewline;
             using (FileStream tailStream = new FileStream(
                 normalizedJournalPath,
                 FileMode.Open,
@@ -2946,8 +3234,7 @@ namespace IMDataCore
                 FileOptions.RandomAccess))
             {
                 tailStream.Seek(-1L, SeekOrigin.End);
-                int lastByte = tailStream.ReadByte();
-                endsWithNewline = lastByte == '\n';
+                endsWithNewline = tailStream.ReadByte() == '\n';
             }
 
             using (FileStream stream = new FileStream(
@@ -2992,71 +3279,36 @@ namespace IMDataCore
                         baseFileHash,
                         StringComparison.Ordinal))
                 {
-                    // The base snapshot was atomically replaced but a crash occurred
-                    // before stale-journal cleanup. The hash makes that journal
-                    // unambiguously inapplicable, so ignore it and compact next save.
-                    persistenceInfo.ForceFullSnapshot = true;
+                    baseHashMatched = false;
                     return true;
                 }
 
-                if (journalFormatVersion == JournalFormatVersion)
+                if (journalFormatVersion != JournalFormatVersion)
                 {
-                    int replayedEntryCount;
-                    bool forceFullSnapshot;
-                    string replayError;
-                    if (!LightweightSidecarJson.TryReplayJournalTransactions(
-                            reader,
-                            endsWithNewline,
-                            document,
-                            out replayedEntryCount,
-                            out forceFullSnapshot,
-                            out replayError))
-                    {
-                        errorMessage =
-                            "The IMDC journal contains an invalid v2 transaction: " +
-                            replayError;
-                        return false;
-                    }
-
-                    persistenceInfo.JournalEntryCount += replayedEntryCount;
-                    persistenceInfo.ForceFullSnapshot |= forceFullSnapshot;
+                    errorMessage =
+                        "The IMDC journal format is unsupported by this IM Data Core version.";
+                    return false;
                 }
-                else
+
+                int replayedEntryCount;
+                bool forceFullSnapshot;
+                string replayError;
+                if (!LightweightSidecarJson.TryReplayJournalTransactions(
+                        reader,
+                        endsWithNewline,
+                        document,
+                        out replayedEntryCount,
+                        out forceFullSnapshot,
+                        out replayError))
                 {
-                    while (true)
-                    {
-                        string entryLine = reader.ReadLine();
-                        if (entryLine == null)
-                        {
-                            break;
-                        }
-
-                        try
-                        {
-                            LightweightSidecarJson.ApplyJournalEntry(
-                                entryLine,
-                                document);
-                            persistenceInfo.JournalEntryCount++;
-                        }
-                        catch (Exception exception)
-                        {
-                            if (!endsWithNewline && reader.Peek() < 0)
-                            {
-                                persistenceInfo.ForceFullSnapshot = true;
-                                break;
-                            }
-
-                            errorMessage =
-                                "The IMDC legacy journal contains an invalid entry: " +
-                                exception.Message;
-                            return false;
-                        }
-                    }
-
-                    // Read old v1 journals for compatibility, but compact them at
-                    // the next save so all new appends use transactional v2 rows.
-                    persistenceInfo.ForceFullSnapshot = true;
+                    errorMessage =
+                        "The IMDC journal contains an invalid transaction: " +
+                        replayError;
+                    return false;
                 }
+
+                persistenceInfo.JournalEntryCount += replayedEntryCount;
+                persistenceInfo.ForceFullSnapshot |= forceFullSnapshot;
             }
 
             return true;
@@ -3115,6 +3367,21 @@ namespace IMDataCore
             string expectedRelativeSavePath,
             out string errorMessage)
         {
+            DocumentValidationState ignoredState;
+            return TryValidateDocumentLocked(
+                document,
+                expectedRelativeSavePath,
+                out ignoredState,
+                out errorMessage);
+        }
+
+        private bool TryValidateDocumentLocked(
+            LightweightSidecarDocument document,
+            string expectedRelativeSavePath,
+            out DocumentValidationState validationState,
+            out string errorMessage)
+        {
+            validationState = null;
             errorMessage = string.Empty;
             if (document == null)
             {
@@ -3122,12 +3389,14 @@ namespace IMDataCore
                 return false;
             }
 
+            // Current-format only. Older on-disk formats are intentionally not
+            // migrated in this build; keeping one representation removes load-time
+            // normalization branches and makes ordering invariants explicit.
             if (!string.Equals(
                     document.FormatName,
                     SidecarFormatName,
                     StringComparison.Ordinal) ||
-                document.FormatVersion < 1 ||
-                document.FormatVersion > SidecarFormatVersion)
+                document.FormatVersion != SidecarFormatVersion)
             {
                 errorMessage =
                     "The sidecar format is unsupported by this IM Data Core version.";
@@ -3156,22 +3425,76 @@ namespace IMDataCore
                 return false;
             }
 
-            HashSet<long> sequences = new HashSet<long>();
-            HashSet<string> eventIdempotencyKeys =
-                new HashSet<string>(StringComparer.Ordinal);
-            HashSet<CheckpointIdentity> validatedCheckpointIdentities =
-                new HashSet<CheckpointIdentity>();
-            long maximumSequence = 0L;
+            validationState = new DocumentValidationState();
+            if (!TryValidateDocumentRowsLocked(
+                    document,
+                    0,
+                    0,
+                    0,
+                    validationState,
+                    out errorMessage))
+            {
+                validationState = null;
+                return false;
+            }
 
-            for (int index = 0; index < document.Events.Count; index++)
+            return true;
+        }
+
+        private bool TryValidateDocumentSuffixLocked(
+            LightweightSidecarDocument document,
+            int eventStartIndex,
+            int customMutationStartIndex,
+            int checkpointStartIndex,
+            DocumentValidationState validationState,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (document == null ||
+                validationState == null ||
+                eventStartIndex < 0 ||
+                eventStartIndex > document.Events.Count ||
+                customMutationStartIndex < 0 ||
+                customMutationStartIndex > document.CustomMutations.Count ||
+                checkpointStartIndex < 0 ||
+                checkpointStartIndex > document.Checkpoints.Count)
+            {
+                errorMessage =
+                    "The IMDC journal validation suffix is inconsistent.";
+                return false;
+            }
+
+            return TryValidateDocumentRowsLocked(
+                document,
+                eventStartIndex,
+                customMutationStartIndex,
+                checkpointStartIndex,
+                validationState,
+                out errorMessage);
+        }
+
+        private bool TryValidateDocumentRowsLocked(
+            LightweightSidecarDocument document,
+            int eventStartIndex,
+            int customMutationStartIndex,
+            int checkpointStartIndex,
+            DocumentValidationState validationState,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            for (int index = eventStartIndex;
+                index < document.Events.Count;
+                index++)
             {
                 LightweightEventRecord record = document.Events[index];
                 if (record == null ||
                     record.Sequence <= 0L ||
-                    !sequences.Add(record.Sequence))
+                    record.Sequence <= validationState.LastEventSequence ||
+                    !validationState.Sequences.Add(record.Sequence))
                 {
                     errorMessage =
-                        "The sidecar contains an invalid or duplicate event sequence.";
+                        "The sidecar contains an invalid, duplicate, or out-of-order event sequence.";
                     return false;
                 }
 
@@ -3188,7 +3511,7 @@ namespace IMDataCore
                             record.IdempotencyKey,
                             sanitizedIdempotencyKey,
                             StringComparison.Ordinal) ||
-                        !eventIdempotencyKeys.Add(
+                        !validationState.EventIdempotencyKeys.Add(
                             BuildCustomEventIdempotencyCompositeKey(
                                 record.NamespaceIdentifier,
                                 record.IdempotencyKey)))
@@ -3199,36 +3522,20 @@ namespace IMDataCore
                     }
                 }
 
-                if (document.FormatVersion < 3)
-                {
-                    string normalizedPayload;
-                    string jsonError;
-                    if (!LightweightSidecarJson.TryNormalizeJsonDocument(
-                            record.PayloadJson,
-                            out normalizedPayload,
-                            out jsonError))
-                    {
-                        errorMessage =
-                            "The sidecar contains an invalid event payload: " +
-                            jsonError;
-                        return false;
-                    }
-
-                    record.PayloadJson = normalizedPayload;
-                }
-                else if (record.PayloadJson == null)
+                if (record.PayloadJson == null)
                 {
                     errorMessage =
                         "The sidecar contains an invalid event payload.";
                     return false;
                 }
 
-                maximumSequence = Math.Max(
-                    maximumSequence,
+                validationState.LastEventSequence = record.Sequence;
+                validationState.MaximumSequence = Math.Max(
+                    validationState.MaximumSequence,
                     record.Sequence);
             }
 
-            for (int index = 0;
+            for (int index = customMutationStartIndex;
                 index < document.CustomMutations.Count;
                 index++)
             {
@@ -3247,33 +3554,18 @@ namespace IMDataCore
 
                 if ((!operationIsSet && !operationIsRemove) ||
                     mutation.Sequence <= 0L ||
-                    !sequences.Add(mutation.Sequence))
+                    mutation.Sequence <=
+                        validationState.LastCustomMutationSequence ||
+                    !validationState.Sequences.Add(mutation.Sequence))
                 {
                     errorMessage =
-                        "The sidecar contains an invalid or duplicate custom-data mutation.";
+                        "The sidecar contains an invalid, duplicate, or out-of-order custom-data mutation.";
                     return false;
                 }
 
                 if (operationIsSet)
                 {
-                    if (document.FormatVersion < 3)
-                    {
-                        string normalizedValue;
-                        string jsonError;
-                        if (!LightweightSidecarJson.TryNormalizeJsonDocument(
-                                mutation.ValueJson,
-                                out normalizedValue,
-                                out jsonError))
-                        {
-                            errorMessage =
-                                "The sidecar contains an invalid custom-data value: " +
-                                jsonError;
-                            return false;
-                        }
-
-                        mutation.ValueJson = normalizedValue;
-                    }
-                    else if (mutation.ValueJson == null)
+                    if (mutation.ValueJson == null)
                     {
                         errorMessage =
                             "The sidecar contains an invalid custom-data value.";
@@ -3285,12 +3577,13 @@ namespace IMDataCore
                     mutation.ValueJson = string.Empty;
                 }
 
-                maximumSequence = Math.Max(
-                    maximumSequence,
+                validationState.LastCustomMutationSequence = mutation.Sequence;
+                validationState.MaximumSequence = Math.Max(
+                    validationState.MaximumSequence,
                     mutation.Sequence);
             }
 
-            for (int index = 0;
+            for (int index = checkpointStartIndex;
                 index < document.Checkpoints.Count;
                 index++)
             {
@@ -3309,7 +3602,7 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (!validatedCheckpointIdentities.Add(
+                if (!validationState.CheckpointIdentities.Add(
                         CheckpointIdentity.From(checkpoint)))
                 {
                     errorMessage =
@@ -3318,7 +3611,8 @@ namespace IMDataCore
                 }
             }
 
-            if (document.LastIssuedSequence < maximumSequence)
+            if (document.LastIssuedSequence <
+                validationState.MaximumSequence)
             {
                 errorMessage =
                     "The sidecar sequence watermark is inconsistent.";
@@ -3327,7 +3621,6 @@ namespace IMDataCore
 
             return true;
         }
-
 
         private bool LoadDocumentLocked(LightweightSidecarDocument document)
         {
@@ -3535,9 +3828,19 @@ namespace IMDataCore
             latestTourStateByTourId.Clear();
             ResetActiveWatermarksLocked();
 
-            activeEvents.Sort(CompareEventsBySequenceAscending);
-            activeCustomMutations.Sort(
-                CompareCustomMutationsBySequenceAscending);
+            // Current v3 persistence is written in ascending sequence order.
+            // Runtime appends/rollback preserve that order, so avoid O(N log N)
+            // sorting on every load/rebuild unless a defensive monotonic scan finds
+            // that an in-memory transform actually disturbed it.
+            if (!IsEventSequenceOrdered(activeEvents))
+            {
+                activeEvents.Sort(CompareEventsBySequenceAscending);
+            }
+            if (!IsCustomMutationSequenceOrdered(activeCustomMutations))
+            {
+                activeCustomMutations.Sort(
+                    CompareCustomMutationsBySequenceAscending);
+            }
 
             for (int index = 0; index < activeEvents.Count; index++)
             {
@@ -4751,6 +5054,48 @@ namespace IMDataCore
             return dateComparison != 0
                 ? dateComparison
                 : left.Sequence.CompareTo(right.Sequence);
+        }
+
+        private static bool IsEventSequenceOrdered(
+            IReadOnlyList<LightweightEventRecord> records)
+        {
+            long previousSequence = 0L;
+            if (records == null)
+            {
+                return true;
+            }
+
+            for (int index = 0; index < records.Count; index++)
+            {
+                LightweightEventRecord record = records[index];
+                if (record == null || record.Sequence <= previousSequence)
+                {
+                    return false;
+                }
+                previousSequence = record.Sequence;
+            }
+            return true;
+        }
+
+        private static bool IsCustomMutationSequenceOrdered(
+            IReadOnlyList<LightweightCustomMutationRecord> records)
+        {
+            long previousSequence = 0L;
+            if (records == null)
+            {
+                return true;
+            }
+
+            for (int index = 0; index < records.Count; index++)
+            {
+                LightweightCustomMutationRecord record = records[index];
+                if (record == null || record.Sequence <= previousSequence)
+                {
+                    return false;
+                }
+                previousSequence = record.Sequence;
+            }
+            return true;
         }
 
         private static int CompareEventsBySequenceAscending(
