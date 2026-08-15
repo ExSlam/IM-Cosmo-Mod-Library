@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Dialogue Click Race Fix</ModName>
+    <RootNamespace>DialogueClickRaceFix</RootNamespace>
+    <AssemblyName>com.cosmo.dialogueclickracefix</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\DialogueClickRaceFix.cs" />
+    <Compile Include="src\GetNextNodeNullGuard.cs" />
+  </ItemGroup>
+</Project>

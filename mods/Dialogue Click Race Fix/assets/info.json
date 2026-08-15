@@ -1,0 +1,8 @@
+{
+  "Title": "Dialogue Click Race Fix",
+  "Description": "Prevents late dialogue clicks during the closing window from calling Next with a null active node and triggering GetNextSiblingNode/NullReferenceException errors.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.dialogueclickracefix"
+}
