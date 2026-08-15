@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Faster Skip Dialogue</ModName>
+    <RootNamespace>FasterSkipDialogue</RootNamespace>
+    <AssemblyName>com.cosmo.fasterskipdialogue</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\FasterSkipRuntime.cs" />
+    <Compile Include="src\FasterSkipPatches.cs" />
+    <Compile Include="src\DialogueCoroutineTiming.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="DOTween" Private="false">
+      <HintPath>$(dllDir)\DOTween.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

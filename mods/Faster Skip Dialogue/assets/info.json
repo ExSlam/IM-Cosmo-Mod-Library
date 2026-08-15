@@ -1,0 +1,8 @@
+{
+  "Title": "Faster Skip Dialogue",
+  "Description": "Makes the vanilla VN Skip button rapidly advance seen and unseen dialogue, accelerate VN transitions and timed cutscene holds, pause at choices, resume after a choice, and reset at the end of each dialogue scene.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["gameplay", "qol", "dialogue"],
+  "HarmonyID": "com.cosmo.fasterskipdialogue"
+}
