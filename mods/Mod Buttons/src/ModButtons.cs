@@ -30,6 +30,7 @@ namespace ModButtons
     public class Tabs_Manager_Awake { public static void Postfix() => ModButtonsBootstrap.EnsureButtonInstalled(); }
 
     [HarmonyPatch(typeof(Tabs_Manager), nameof(Tabs_Manager.OpenTab))]
+    [HarmonyAfter("com.tel.modmenus")]
     public class Tabs_Manager_OpenTab
     {
         public static void Postfix(Tabs_Manager._tab._type __0)
@@ -839,22 +840,18 @@ namespace ModButtons
                 hubButton.SetParent(parent, false);
             }
 
-            if (modMenusButton != null && modMenusButton.parent == parent)
-            {
-                hubButton.SetSiblingIndex(Mathf.Min(modMenusButton.GetSiblingIndex() + 1, parent.childCount - 1));
-            }
-            else
-            {
-                Transform standardSettingsBtn = parent.Cast<Transform>().FirstOrDefault(t => ButtonMatches(t, FallbackSettingsName));
-                if (standardSettingsBtn != null)
-                {
-                    hubButton.SetSiblingIndex(Mathf.Min(standardSettingsBtn.GetSiblingIndex() + 1, parent.childCount - 1));
-                }
-                else
-                {
-                    hubButton.SetSiblingIndex(Mathf.Max(0, parent.childCount - 2));
-                }
-            }
+            // Mod Buttons deliberately has only two ordering anchors:
+            // 1. ModMenus' Mod Settings button when ModMenus is present.
+            // 2. The vanilla Settings button when ModMenus is absent.
+            // It never anchors to Save & Quit/Main Menu or to a bottom-relative index,
+            // leaving that space available for other mods to order themselves there.
+            Transform anchor = modMenusButton != null && modMenusButton.parent == parent
+                ? modMenusButton
+                : FindVanillaSettingsButton(parent);
+
+            if (anchor == null) return;
+
+            MoveImmediatelyAfter(hubButton, anchor);
 
             RectTransform rect = parent as RectTransform;
             if (rect != null)
@@ -863,6 +860,39 @@ namespace ModButtons
             }
 
             Canvas.ForceUpdateCanvases();
+        }
+
+        private static Transform FindVanillaSettingsButton(Transform parent)
+        {
+            if (parent == null) return null;
+
+            Transform settingsButton = parent.Find(FallbackSettingsName);
+            return settingsButton != null && settingsButton.GetComponent<Button>() != null
+                ? settingsButton
+                : null;
+        }
+
+        private static void MoveImmediatelyAfter(Transform item, Transform anchor)
+        {
+            if (item == null || anchor == null || item == anchor || anchor.parent == null) return;
+
+            Transform parent = anchor.parent;
+            if (item.parent != parent)
+            {
+                item.SetParent(parent, false);
+            }
+
+            int itemIndex = item.GetSiblingIndex();
+            int targetIndex = anchor.GetSiblingIndex() + 1;
+
+            // SetSiblingIndex removes the item from its current slot before reinserting it.
+            // If the item started before the anchor, the removal shifts the target left by one.
+            if (itemIndex < targetIndex)
+            {
+                targetIndex--;
+            }
+
+            item.SetSiblingIndex(Mathf.Clamp(targetIndex, 0, parent.childCount - 1));
         }
 
         private static bool ButtonMatches(Transform candidate, string text)
