@@ -1,4 +1,6 @@
-# IM Data Core 3.4.0 patch summary
+# IM Data Core 3.4.1 patch summary
+
+- Restored the missing transient `Dictionary<int, singles._single>` used by unresolved single chart-position backfill.
 
 This revision focuses on persistence correctness under New Save/Overwrite Save branching, cross-engine compaction safety, and long-campaign save/load cost.
 
@@ -23,4 +25,4 @@ This revision focuses on persistence correctness under New Save/Overwrite Save b
 - Sidecar `FormatVersion` remains **3**.
 - Journal `FormatVersion` is **2**.
 - Older sidecar/journal formats are intentionally not supported.
-- Project/mod version is **3.4.0**.
+- Project/mod version is **3.4.1**.

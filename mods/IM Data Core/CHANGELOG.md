@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.4.1
+
+- Fixed the 3.4.0 unresolved-single chart backfill optimization failing to compile because its transient `pendingSingleChartResolutionBySingleId` dictionary declaration was omitted from `IMDataCoreController`.
+- Synchronized the project assembly version with the mod metadata at 3.4.1.
+
 ## 3.4.0
 
 - Fixed New Save -> later Overwrite Save checkpoint persistence by keeping the active multi-path checkpoint ledger intact after a full New Save snapshot.

@@ -1518,6 +1518,7 @@ namespace IMDataCore
         private readonly Dictionary<int, TourRuntimeCaptureState> tourRuntimeStateByTourId = new Dictionary<int, TourRuntimeCaptureState>();
         private readonly Dictionary<int, ConcertCastChangeSnapshot> concertEditBaselineByConcertId = new Dictionary<int, ConcertCastChangeSnapshot>();
         private readonly Dictionary<int, int> resolvedSingleChartPositionBySingleId = new Dictionary<int, int>();
+        private readonly Dictionary<int, singles._single> pendingSingleChartResolutionBySingleId = new Dictionary<int, singles._single>();
         private readonly Dictionary<string, int> pendingSubstoryCompletionCountByDialogueId = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly HashSet<string> idempotencyKeysForCurrentDate = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> pendingCustomEventIdempotencyKeys = new HashSet<string>(StringComparer.Ordinal);

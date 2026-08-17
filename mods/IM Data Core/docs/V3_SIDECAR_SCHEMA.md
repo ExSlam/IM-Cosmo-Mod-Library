@@ -2,7 +2,7 @@
 
 This document describes the private persisted representation used by IMDC 3.2. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
 
-The release version is 3.4.0, while the compact sidecar `FormatVersion` remains `3`. This build accepts only the current v3 sidecar and transactional journal format 2. Older sidecar and journal formats are intentionally unsupported; no compatibility migration path is maintained.
+The release version is 3.4.1, while the compact sidecar `FormatVersion` remains `3`. This build accepts only the current v3 sidecar and transactional journal format 2. Older sidecar and journal formats are intentionally unsupported; no compatibility migration path is maintained.
 
 ## Root
 
