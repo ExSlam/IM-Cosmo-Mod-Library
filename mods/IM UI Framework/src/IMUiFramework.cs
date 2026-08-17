@@ -1189,6 +1189,7 @@ namespace IMUiFramework
         private const string ScrollViewportObjectName = "Viewport";
         private const string ScrollContentObjectName = "Content";
         private const string ScrollbarObjectName = "Scrollbar";
+        private const string ListScrollSliderObjectName = "Slider";
         private const string ScrollbarHandleObjectName = "Handle";
         private const string CloseButtonObjectName = "Close";
         private const string SettingsContainerPath = "ScrollRect/Container";
@@ -3507,7 +3508,7 @@ namespace IMUiFramework
 
             scrollRect.viewport = viewportRect;
             scrollRect.content = contentRect;
-            AddScrollbar(scrollObj.transform, scrollRect);
+            AddVanillaListScrollIndicator(scrollObj.transform, scrollRect);
 
             contentRoot = content.transform;
         }
@@ -3590,6 +3591,30 @@ namespace IMUiFramework
                 if (field != null) field.SetValue(boxedColorBlock, value);
             }
             catch { }
+        }
+
+        private static void AddVanillaListScrollIndicator(Transform parent, ScrollRect target)
+        {
+            if (parent == null || target == null)
+            {
+                return;
+            }
+
+            // Idol Manager's producer Contracts, Salaries and Loans lists do not assign a
+            // Unity Scrollbar to ScrollRect.verticalScrollbar. They use a separate vertical
+            // Slider with a fixed circular handle and synchronize normalized values manually.
+            // Prefer that exact scene-serialized pattern for framework-created list views.
+            GameObject sliderObject;
+            Slider slider;
+            if (VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(
+                parent, target, ListScrollSliderObjectName, out sliderObject, out slider))
+            {
+                return;
+            }
+
+            // Main-menu/early-init fallback: the game's genuine Modern UI Pack Resources
+            // Scrollbar is still available and remains the correct generic MUIP control.
+            AddScrollbar(parent, target);
         }
 
         private static void AddScrollbar(Transform parent, ScrollRect target)

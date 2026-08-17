@@ -1,4 +1,4 @@
-# IM UI Framework 2.0.3 (Intermediary Mod)
+# IM UI Framework 2.1.0 (Intermediary Mod)
 
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
@@ -7,6 +7,25 @@ It targets three common problems:
 - Adding new buttons that match game style.
 - Building fully custom popups that still look and behave like base game UI.
 
+
+
+## 2.1.0: scene-native UI patterns + Modern UI Pack resources
+
+The framework now treats Idol Manager UI as two complementary sources instead of assuming every vanilla-looking control should come from Michsky Modern UI Pack `Resources`:
+
+- **Scene-native game patterns** are resolved through `PopupManager` and cloned from inactive serialized popup hierarchies. The source popup does not need to be opened.
+- **Michsky Modern UI Pack controls** remain available through `VanillaUiResources` and the complete `Resources` prefab catalog.
+
+The first scene-native control is the producer-list scroll indicator used identically by **Producer Contracts**, **Producer Salaries**, and **Producer Loans**. Those screens do not assign a Unity `Scrollbar` to `ScrollRect.verticalScrollbar`; they use a separate vertical `Slider` with `SliderDefault`, a fixed circular handle, and two-way normalized-position events. `TryCreateStyledScrollView` now prefers that exact pattern in the gameplay scene and falls back to the genuine MUIP `Resources/scrollbar/Scrollbar` only when the scene template is unavailable.
+
+New public scene APIs:
+- `VanillaUiSceneTemplates.TryGetPopupRoot(...)`
+- `VanillaUiSceneTemplates.TryFindPopupChild(...)`
+- `VanillaUiSceneTemplates.TryClonePopupChild(...)`
+- `VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(...)`
+- `VanillaUiSceneTemplates.ReserveProducerListViewportGutter(...)`
+
+See [`docs/Scene UI Patterns.md`](docs/Scene%20UI%20Patterns.md) for the scene-derived measurements and event wiring.
 
 ## 2.0.3: selected game font and vanilla corner shader
 
@@ -51,6 +70,12 @@ See [`docs/Vanilla UI Asset Layer.md`](docs/Vanilla%20UI%20Asset%20Layer.md) for
 Namespace: `IMUiFramework`
 
 Main class: `IMUiKit`
+
+Vanilla scene layer:
+- `VanillaUiSceneTemplates.TryGetPopupRoot(...)` / `TryFindPopupChild(...)`
+- `VanillaUiSceneTemplates.TryClonePopupChild(...)`
+- `VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(...)`
+- `VanillaUiSceneTemplates.ReserveProducerListViewportGutter(...)`
 
 Vanilla asset layer:
 - `VanillaUiResources.GetMuipManager()` / `CloneMuipManager()`

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0
+
+- Added a scene-template layer alongside the existing Michsky Modern UI Pack Resources layer. `VanillaUiSceneTemplates` can resolve and clone inactive popup children through `PopupManager` without opening the source popup.
+- Added `TryCreateProducerListScrollSlider`, reproducing the exact list-scroll pattern serialized in `main.unity` for Producer Contracts, Producer Salaries, and Producer Loans. These lists use a separate vertical `Slider` with a fixed circular handle, not `ScrollRect.verticalScrollbar`.
+- Framework-created styled scroll views now prefer the producer-list Slider pattern in the gameplay scene, preserving the game's fixed round thumb and thin grey track. If scene templates are unavailable, the framework still falls back to the genuine `Resources/scrollbar/Scrollbar` Modern UI Pack prefab.
+- Added scene-derived producer-list geometry constants and automatic right-side viewport reservation.
+
 ## 2.0.3
 
 - Fixed the framework TMP default so `IMUiKit.CreateText` follows Idol Manager's currently selected game font instead of defaulting to the MUIP button font. Bundled fonts are matched against loaded TMP assets; OS/external fonts are converted through the runtime TMP bridge and cached per selected legacy font.

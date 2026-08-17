@@ -1,6 +1,6 @@
-# IM UI Framework 2.0.0: Vanilla UI Asset Layer
+# IM UI Framework 2.1.0: Vanilla UI Sources
 
-Version 2.0.0 changes the framework's preferred UI source from "find an instantiated game object and clone it" to "load the original Unity `Resources` prefab first".
+IM UI Framework 2.1 distinguishes two equally real vanilla sources: **Unity `Resources` prefabs** (largely the bundled Michsky Modern UI Pack controls) and **scene-serialized Idol Manager composites** (game-specific arrangements such as the producer-list scroll slider). Resources remain preferred for controls that actually live in `Resources`; scene-native patterns are used where the game itself wires a composite directly in `main.unity`.
 
 This is based on the shipped Idol Manager assets recovered from `Idol Manager/IM_Data` and the game's decompiled Modern UI Pack code. The game's `UIManager*` components themselves load `Resources.Load<UIManager>("MUIP Manager")`, so the same runtime resource mechanism is used here.
 
@@ -166,9 +166,13 @@ Scrollbar
 
 The root carries Unity's `Scrollbar` plus `UIManagerScrollbar`. The stock size is 20 x 250 and the stock direction is `BottomToTop`. The background and handle are separate sliced images controlled by `MUIP Manager.scrollbarBackgroundColor` and `MUIP Manager.scrollbarColor`.
 
-`IMUiKit.TryCreateStyledScrollView` now uses this real prefab first. The old popup-search route remains only as compatibility fallback. Its last-resort hand-built scrollbar now follows the real hierarchy rather than parenting the handle directly under the root.
+This prefab is still exposed as the genuine **Modern UI Pack scrollbar control** through `VanillaUiResources.TryCreateScrollbar`. It is useful when a mod explicitly wants MUIP scrollbar behavior, including a proportional `Scrollbar.size` handle.
 
-`IMUiKit.ApplyVanillaScrollDefaults` now mirrors `ScrollRectDefault` from the decompiled game code: movement is `Clamped`; Windows/non-macOS sensitivity is **25**; macOS sensitivity is **3** with deceleration rate **0.05**.
+For ordinary Idol Manager list UIs, however, `main.unity` shows a different game-native pattern. Producer Contracts, Producer Salaries, and Producer Loans each leave `ScrollRect.verticalScrollbar` **null** and use a separate `UnityEngine.UI.Slider` with `SliderDefault`. The slider has a fixed circular handle and is synchronized to the `ScrollRect` through events. `IMUiKit.TryCreateStyledScrollView` now prefers that exact scene-native pattern in the gameplay scene. If the scene template cannot be resolved, it falls back to the genuine MUIP Resources scrollbar described above.
+
+See [`Scene UI Patterns.md`](Scene%20UI%20Patterns.md) for the exact hierarchy, measurements, colors, sprites, and event wiring recovered from `main.unity`.
+
+`IMUiKit.ApplyVanillaScrollDefaults` mirrors `ScrollRectDefault` from the decompiled game code: movement is `Clamped`; Windows/non-macOS sensitivity is **25**; macOS sensitivity is **3** with deceleration rate **0.05**.
 
 ## Fonts
 
@@ -212,12 +216,12 @@ The game's language system also manages `TMP_Settings.fallbackFontAssets`; IM UI
 
 ## Compatibility strategy
 
-Resource source order in 2.0.0 is:
+Control source strategy in 2.1.0 is:
 
-1. the genuine `Resources` prefab from the shipped game
-2. known popup/runtime template lookup where an actual Resources prefab is unavailable
-3. faithful framework reconstruction
-4. simple generic fallback only as a last resort
+1. use a proven scene-native pattern when the game itself serializes that composite in the loaded scene
+2. otherwise use the genuine `Resources` prefab from the shipped game
+3. use known popup/runtime template lookup where an actual Resources prefab is unavailable
+4. use a faithful framework reconstruction or simple generic fallback only as a last resort
 
 Existing 1.x APIs remain available. `IMUiBridges.TryCloneModernControl<T>` now silently gains the Resources-first behavior for known MUIP component types. An overload accepting an explicit resource path, component callback, and theme callback is available when a specific prefab variant is required.
 

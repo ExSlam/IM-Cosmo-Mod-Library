@@ -1,8 +1,8 @@
 {
   "Title": "IM UI Framework",
-  "Description": "Vanilla-first UI toolkit for Idol Manager modders: load the game's real Resources prefabs, clone and customize MUIP themes, use internal/external fonts, inject controls, and build popup UI.",
+  "Description": "Vanilla-first UI toolkit for Idol Manager modders: use the game's scene-native UI patterns and real Michsky Modern UI Pack Resources prefabs, fonts, themes, controls, and popup helpers.",
   "Author": "Cosmo",
-  "Version": "2.0.3",
+  "Version": "2.1.0",
   "Tags": [
     "ui",
     "framework",
