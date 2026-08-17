@@ -3,11 +3,12 @@
     <ModName>IM UI Framework</ModName>
     <RootNamespace>IMUiFramework</RootNamespace>
     <AssemblyName>com.cosmo.imuiframework</AssemblyName>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\IMUiFramework.cs" />
+    <Compile Include="src\IMUiCompat.cs" />
     <Compile Include="src\IMUiBridges.cs" />
     <Compile Include="src\IMUiTween.cs" />
     <Compile Include="src\VanillaUiResources.cs" />

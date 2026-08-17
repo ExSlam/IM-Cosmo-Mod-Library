@@ -53,7 +53,7 @@ namespace IMUiFramework
             if (string.IsNullOrEmpty(relativePathOrName))
             {
                 T direct = Root.GetComponent<T>();
-                return direct != null ? direct : Root.GetComponentInChildren<T>(true);
+                return direct != null ? direct : IMUiCompat.GetComponentInChildren<T>(Root);
             }
 
             Transform target = Find(relativePathOrName);
@@ -63,7 +63,7 @@ namespace IMUiFramework
             }
 
             T component = target.GetComponent<T>();
-            return component != null ? component : target.GetComponentInChildren<T>(true);
+            return component != null ? component : IMUiCompat.GetComponentInChildren<T>(target);
         }
 
         public bool SetText(string relativePathOrName, string text, bool enableWordWrap = true)
@@ -90,7 +90,7 @@ namespace IMUiFramework
             Button button = target.GetComponent<Button>();
             if (button == null)
             {
-                button = target.GetComponentInChildren<Button>(true);
+                button = IMUiCompat.GetComponentInChildren<Button>(target);
             }
             if (button == null)
             {

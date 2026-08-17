@@ -702,7 +702,7 @@ namespace IMUiFramework
                 : InstantiatePrefab(resourcePath, parent, objectName, active, settings);
             if (instance == null) return false;
             component = instance.GetComponent<T>();
-            if (component == null) component = instance.GetComponentInChildren<T>(true);
+            if (component == null) component = IMUiCompat.GetComponentInChildren<T>(instance);
             if (component == null)
             {
                 UnityEngine.Object.Destroy(instance);

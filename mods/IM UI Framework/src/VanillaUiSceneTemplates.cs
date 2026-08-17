@@ -104,7 +104,7 @@ namespace IMUiFramework
             slider = instance.GetComponent<Slider>();
             if (slider == null)
             {
-                slider = instance.GetComponentInChildren<Slider>(true);
+                slider = IMUiCompat.GetComponentInChildren<Slider>(instance);
             }
             if (slider == null)
             {

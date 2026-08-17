@@ -464,16 +464,17 @@ namespace IMUiFramework
             Graphic target = selectable.targetGraphic;
             bool textTarget = target is TMP_Text || target is Text;
 
-            if (selectable is TMP_InputField || selectable is InputField || selectable is TMP_Dropdown || selectable is Dropdown)
+            if (selectable is TMP_InputField || selectable is InputField || selectable is Dropdown ||
+                string.Equals(selectable.GetType().FullName, "TMPro.TMP_Dropdown", StringComparison.Ordinal))
             {
                 Image fieldImage = target as Image;
                 if (fieldImage != null) fieldImage.color = theme.SurfaceRaised;
                 ColorBlock fieldColors = selectable.colors;
-                fieldColors.normalColor = mainScript.white32;
-                fieldColors.highlightedColor = new Color32(248, 248, 248, 255);
-                fieldColors.pressedColor = new Color32(238, 238, 238, 255);
-                fieldColors.selectedColor = new Color32(248, 248, 248, 255);
-                fieldColors.disabledColor = new Color32(255, 255, 255, 128);
+                IMUiCompat.SetColorBlockColor(ref fieldColors, "normal", mainScript.white32);
+                IMUiCompat.SetColorBlockColor(ref fieldColors, "highlighted", new Color32(248, 248, 248, 255));
+                IMUiCompat.SetColorBlockColor(ref fieldColors, "pressed", new Color32(238, 238, 238, 255));
+                IMUiCompat.SetColorBlockColor(ref fieldColors, "selected", new Color32(248, 248, 248, 255));
+                IMUiCompat.SetColorBlockColor(ref fieldColors, "disabled", new Color32(255, 255, 255, 128));
                 selectable.colors = fieldColors;
                 TextMeshProUGUI[] fieldTmps = selectable.GetComponentsInChildren<TextMeshProUGUI>(true);
                 for (int i = 0; i < fieldTmps.Length; i++) fieldTmps[i].color = theme.TextPrimary;
@@ -485,11 +486,11 @@ namespace IMUiFramework
             if (textTarget)
             {
                 ColorBlock colors = selectable.colors;
-                colors.normalColor = theme.Accent;
-                colors.highlightedColor = theme.AccentHover;
-                colors.pressedColor = theme.AccentPressed;
-                colors.selectedColor = theme.AccentHover;
-                colors.disabledColor = theme.AccentDisabled;
+                IMUiCompat.SetColorBlockColor(ref colors, "normal", theme.Accent);
+                IMUiCompat.SetColorBlockColor(ref colors, "highlighted", theme.AccentHover);
+                IMUiCompat.SetColorBlockColor(ref colors, "pressed", theme.AccentPressed);
+                IMUiCompat.SetColorBlockColor(ref colors, "selected", theme.AccentHover);
+                IMUiCompat.SetColorBlockColor(ref colors, "disabled", theme.AccentDisabled);
                 selectable.colors = colors;
                 target.color = mainScript.white32;
                 return;
@@ -500,11 +501,11 @@ namespace IMUiFramework
             {
                 image.color = theme.Accent;
                 ColorBlock colors = selectable.colors;
-                colors.normalColor = mainScript.white32;
-                colors.highlightedColor = new Color32(245, 245, 245, 255);
-                colors.pressedColor = new Color32(230, 230, 230, 255);
-                colors.selectedColor = new Color32(245, 245, 245, 255);
-                colors.disabledColor = new Color32(255, 255, 255, 128);
+                IMUiCompat.SetColorBlockColor(ref colors, "normal", mainScript.white32);
+                IMUiCompat.SetColorBlockColor(ref colors, "highlighted", new Color32(245, 245, 245, 255));
+                IMUiCompat.SetColorBlockColor(ref colors, "pressed", new Color32(230, 230, 230, 255));
+                IMUiCompat.SetColorBlockColor(ref colors, "selected", new Color32(245, 245, 245, 255));
+                IMUiCompat.SetColorBlockColor(ref colors, "disabled", new Color32(255, 255, 255, 128));
                 selectable.colors = colors;
             }
 

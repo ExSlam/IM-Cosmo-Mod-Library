@@ -1,4 +1,4 @@
-# IM UI Framework 3.0.0 (Intermediary Mod)
+# IM UI Framework 3.1.0 (Intermediary Mod)
 
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
@@ -8,6 +8,11 @@ It targets three common problems:
 - Building fully custom popups that still look and behave like base game UI.
 
 
+
+
+## 3.1.0: Idol Manager Unity compatibility pass
+
+Version 3.1 keeps the v3 composable/custom-UI API intact while making the implementation compile against Idol Manager's older Unity API surface. Scene discovery, inactive-child lookup, UnityEvent inspection, TMP dropdown detection, and ColorBlock mutation now go through compatibility shims instead of relying on newer Unity convenience members.
 
 ## 3.0.0: composable vanilla UI, not just popup cloning
 

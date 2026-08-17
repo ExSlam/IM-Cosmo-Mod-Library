@@ -2535,7 +2535,7 @@ namespace IMUiFramework
             Settings_Slider settingsSlider = sliderObject.GetComponent<Settings_Slider>();
             if (settingsSlider == null)
             {
-                settingsSlider = sliderObject.GetComponentInChildren<Settings_Slider>(true);
+                settingsSlider = IMUiCompat.GetComponentInChildren<Settings_Slider>(sliderObject);
             }
 
             if (settingsSlider == null)
@@ -2580,7 +2580,7 @@ namespace IMUiFramework
             Checkbox_Text checkbox = checkboxObject.GetComponent<Checkbox_Text>();
             if (checkbox == null)
             {
-                checkbox = checkboxObject.GetComponentInChildren<Checkbox_Text>(true);
+                checkbox = IMUiCompat.GetComponentInChildren<Checkbox_Text>(checkboxObject);
             }
 
             if (checkbox == null)
@@ -2664,7 +2664,7 @@ namespace IMUiFramework
             Button button = obj.GetComponent<Button>();
             if (button == null)
             {
-                button = obj.GetComponentInChildren<Button>(true);
+                button = IMUiCompat.GetComponentInChildren<Button>(obj);
             }
             return button;
         }
@@ -4276,7 +4276,7 @@ namespace IMUiFramework
                             continue;
                         }
 
-                        T found = popup.GetComponentInChildren<T>(true);
+                        T found = IMUiCompat.GetComponentInChildren<T>(popup);
                         if (found != null)
                         {
                             template = found;
@@ -4300,7 +4300,7 @@ namespace IMUiFramework
                         continue;
                     }
 
-                    T found = entry.obj.GetComponentInChildren<T>(true);
+                    T found = IMUiCompat.GetComponentInChildren<T>(entry.obj);
                     if (found != null)
                     {
                         template = found;
@@ -4747,7 +4747,7 @@ namespace IMUiFramework
                 Scrollbar resourceScrollbar = resourcePrefab.GetComponent<Scrollbar>();
                 if (resourceScrollbar == null)
                 {
-                    resourceScrollbar = resourcePrefab.GetComponentInChildren<Scrollbar>(true);
+                    resourceScrollbar = IMUiCompat.GetComponentInChildren<Scrollbar>(resourcePrefab);
                 }
                 if (resourceScrollbar != null)
                 {
@@ -4777,7 +4777,7 @@ namespace IMUiFramework
                         continue;
                     }
 
-                    Scrollbar sb = popup.GetComponentInChildren<Scrollbar>(true);
+                    Scrollbar sb = IMUiCompat.GetComponentInChildren<Scrollbar>(popup);
                     if (sb != null)
                     {
                         defaultScrollbarTemplate = sb;
@@ -4808,7 +4808,7 @@ namespace IMUiFramework
                 Image image = buttonTemplate.GetComponent<Image>();
                 if (image == null)
                 {
-                    image = buttonTemplate.GetComponentInChildren<Image>(true);
+                    image = IMUiCompat.GetComponentInChildren<Image>(buttonTemplate);
                 }
 
                 if (image != null)
@@ -4816,7 +4816,7 @@ namespace IMUiFramework
                     buttonBackground = image.color;
                 }
 
-                TextMeshProUGUI tmp = buttonTemplate.GetComponentInChildren<TextMeshProUGUI>(true);
+                TextMeshProUGUI tmp = IMUiCompat.GetComponentInChildren<TextMeshProUGUI>(buttonTemplate);
                 if (tmp != null)
                 {
                     buttonTextColor = tmp.color;

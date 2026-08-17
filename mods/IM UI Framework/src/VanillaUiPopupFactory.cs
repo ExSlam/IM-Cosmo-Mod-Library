@@ -73,7 +73,7 @@ namespace IMUiFramework
             if (string.IsNullOrEmpty(relativePathOrName))
             {
                 T direct = Root.GetComponent<T>();
-                return direct != null ? direct : Root.GetComponentInChildren<T>(true);
+                return direct != null ? direct : IMUiCompat.GetComponentInChildren<T>(Root);
             }
             Transform transform = Find(relativePathOrName);
             if (transform == null)
@@ -81,7 +81,7 @@ namespace IMUiFramework
                 return null;
             }
             T component = transform.GetComponent<T>();
-            return component != null ? component : transform.GetComponentInChildren<T>(true);
+            return component != null ? component : IMUiCompat.GetComponentInChildren<T>(transform);
         }
 
         public bool SetText(string relativePathOrName, string text, bool enableWordWrap = true)
@@ -107,7 +107,7 @@ namespace IMUiFramework
             Button button = target.GetComponent<Button>();
             if (button == null)
             {
-                button = target.GetComponentInChildren<Button>(true);
+                button = IMUiCompat.GetComponentInChildren<Button>(target);
             }
             if (button == null)
             {
@@ -615,7 +615,7 @@ namespace IMUiFramework
                     ScrollRect scroll = requested.GetComponent<ScrollRect>();
                     if (scroll == null)
                     {
-                        scroll = requested.GetComponentInChildren<ScrollRect>(true);
+                        scroll = IMUiCompat.GetComponentInChildren<ScrollRect>(requested);
                     }
                     if (scroll != null)
                     {
@@ -623,7 +623,7 @@ namespace IMUiFramework
                     }
                 }
             }
-            return root.GetComponentInChildren<ScrollRect>(true);
+            return IMUiCompat.GetComponentInChildren<ScrollRect>(root);
         }
 
         private static Transform ResolveContentRoot(Transform root, string path, ScrollRect scrollRect)
@@ -659,7 +659,7 @@ namespace IMUiFramework
                     Button button = requested.GetComponent<Button>();
                     if (button == null)
                     {
-                        button = requested.GetComponentInChildren<Button>(true);
+                        button = IMUiCompat.GetComponentInChildren<Button>(requested);
                     }
                     if (button != null)
                     {
@@ -697,7 +697,7 @@ namespace IMUiFramework
                     tmp = requested.GetComponent<TMP_Text>();
                     if (tmp == null)
                     {
-                        tmp = requested.GetComponentInChildren<TMP_Text>(true);
+                        tmp = IMUiCompat.GetComponentInChildren<TMP_Text>(requested);
                     }
                     if (tmp != null)
                     {
@@ -707,7 +707,7 @@ namespace IMUiFramework
                     legacy = requested.GetComponent<Text>();
                     if (legacy == null)
                     {
-                        legacy = requested.GetComponentInChildren<Text>(true);
+                        legacy = IMUiCompat.GetComponentInChildren<Text>(requested);
                     }
                     if (legacy != null)
                     {

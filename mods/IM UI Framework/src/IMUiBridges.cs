@@ -42,7 +42,7 @@ namespace IMUiFramework
                 template = resourcePrefab.GetComponent<T>();
                 if (template == null)
                 {
-                    template = resourcePrefab.GetComponentInChildren<T>(true);
+                    template = IMUiCompat.GetComponentInChildren<T>(resourcePrefab);
                 }
                 if (template != null)
                 {
@@ -61,7 +61,7 @@ namespace IMUiFramework
                         continue;
                     }
 
-                    T found = entry.obj.GetComponentInChildren<T>(true);
+                    T found = IMUiCompat.GetComponentInChildren<T>(entry.obj);
                     if (found != null)
                     {
                         template = found;
@@ -125,7 +125,7 @@ namespace IMUiFramework
             control = controlObject.GetComponent<T>();
             if (control == null)
             {
-                control = controlObject.GetComponentInChildren<T>(true);
+                control = IMUiCompat.GetComponentInChildren<T>(controlObject);
             }
 
             if (control != null)
@@ -219,7 +219,7 @@ namespace IMUiFramework
             Button button = root.GetComponent<Button>();
             if (button == null)
             {
-                button = root.GetComponentInChildren<Button>(true);
+                button = IMUiCompat.GetComponentInChildren<Button>(root);
             }
 
             if (button == null)
@@ -520,7 +520,7 @@ namespace IMUiFramework
                 template = resourcePrefab.GetComponent<CustomDropdown>();
                 if (template == null)
                 {
-                    template = resourcePrefab.GetComponentInChildren<CustomDropdown>(true);
+                    template = IMUiCompat.GetComponentInChildren<CustomDropdown>(resourcePrefab);
                 }
                 if (template != null)
                 {
@@ -557,7 +557,7 @@ namespace IMUiFramework
                     continue;
                 }
 
-                CustomDropdown found = popup.GetComponentInChildren<CustomDropdown>(true);
+                CustomDropdown found = IMUiCompat.GetComponentInChildren<CustomDropdown>(popup);
                 if (found != null)
                 {
                     template = found;
@@ -575,7 +575,7 @@ namespace IMUiFramework
                         continue;
                     }
 
-                    CustomDropdown found = entry.obj.GetComponentInChildren<CustomDropdown>(true);
+                    CustomDropdown found = IMUiCompat.GetComponentInChildren<CustomDropdown>(entry.obj);
                     if (found != null)
                     {
                         template = found;
@@ -630,7 +630,7 @@ namespace IMUiFramework
             dropdown = dropdownObject.GetComponent<CustomDropdown>();
             if (dropdown == null)
             {
-                dropdown = dropdownObject.GetComponentInChildren<CustomDropdown>(true);
+                dropdown = IMUiCompat.GetComponentInChildren<CustomDropdown>(dropdownObject);
             }
             if (dropdown == null)
             {
@@ -1507,7 +1507,7 @@ namespace IMUiFramework
                 return;
             }
 
-            Lang_Button lang = dropdownRoot.GetComponentInChildren<Lang_Button>(true);
+            Lang_Button lang = IMUiCompat.GetComponentInChildren<Lang_Button>(dropdownRoot);
             if (lang != null)
             {
                 lang.Constant = string.Empty;
@@ -1520,7 +1520,7 @@ namespace IMUiFramework
             }
             if (text == null)
             {
-                text = dropdownRoot.GetComponentInChildren<TextMeshProUGUI>(true);
+                text = IMUiCompat.GetComponentInChildren<TextMeshProUGUI>(dropdownRoot);
             }
             if (text != null)
             {

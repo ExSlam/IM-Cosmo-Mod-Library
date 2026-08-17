@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace IMUiFramework
 {
@@ -212,8 +211,7 @@ namespace IMUiFramework
             else
             {
                 List<MonoBehaviour> all = new List<MonoBehaviour>();
-                Scene scene = SceneManager.GetActiveScene();
-                GameObject[] roots = scene.IsValid() ? scene.GetRootGameObjects() : new GameObject[0];
+                GameObject[] roots = IMUiCompat.GetCurrentSceneRoots();
                 for (int i = 0; i < roots.Length; i++)
                 {
                     GameObject sceneRoot = roots[i];
@@ -446,7 +444,7 @@ namespace IMUiFramework
             }
 
             VanillaUiReferenceTemplateDescriptor descriptor = new VanillaUiReferenceTemplateDescriptor();
-            descriptor.SceneName = SceneManager.GetActiveScene().name ?? string.Empty;
+            descriptor.SceneName = IMUiCompat.GetCurrentSceneName();
             descriptor.OwnerHierarchyPath = VanillaUiSceneCatalog.GetHierarchyPath(behaviour.transform);
             descriptor.OwnerHierarchyOccurrenceIndex = GetScenePathOccurrenceIndex(behaviour.transform);
             descriptor.OwnerComponentType = behaviour.GetType().Name ?? string.Empty;
@@ -532,24 +530,12 @@ namespace IMUiFramework
             {
                 return true;
             }
-            return source.GetComponentInChildren<RectTransform>(true) != null;
+            return IMUiCompat.GetComponentInChildren<RectTransform>(source) != null;
         }
 
         private static bool IsSceneObject(GameObject source)
         {
-            if (source == null)
-            {
-                return false;
-            }
-            try
-            {
-                Scene scene = source.scene;
-                return scene.IsValid() && scene.isLoaded;
-            }
-            catch
-            {
-                return false;
-            }
+            return IMUiCompat.IsSceneObject(source);
         }
 
         private static bool MatchesTypeName(Type type, string requested)

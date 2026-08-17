@@ -1,4 +1,4 @@
-# IM UI Framework 3.0.0 Coverage Audit
+# IM UI Framework 3.1.0 Coverage Audit
 
 This audit was produced from the supplied decompiled Idol Manager source, `IM_Scenes` export, and `IM some assets` export.
 

@@ -5,7 +5,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace IMUiFramework
@@ -52,7 +51,7 @@ namespace IMUiFramework
     }
 
     /// <summary>
-    /// Version 3 scene index. Unlike GameObject.Find, the index is built from Scene.GetRootGameObjects(),
+    /// Version 3 scene index. Unlike GameObject.Find, the index is built from all loaded scene roots,
     /// so inactive vanilla UI is available without opening it. This is the universal scene-native layer:
     /// callers can resolve or clone any RectTransform hierarchy in the currently-loaded Idol Manager scene,
     /// not only the handful of controls that happen to have dedicated framework helpers.
@@ -100,7 +99,7 @@ namespace IMUiFramework
                 {
                     descriptor = new VanillaPopupDescriptor();
                     descriptor.Type = type;
-                    descriptor.SceneName = SceneManager.GetActiveScene().name ?? string.Empty;
+                    descriptor.SceneName = IMUiCompat.GetCurrentSceneName();
                 }
                 result.Add(descriptor);
             }
@@ -119,7 +118,7 @@ namespace IMUiFramework
         {
             descriptor = new VanillaPopupDescriptor();
             descriptor.Type = type;
-            descriptor.SceneName = SceneManager.GetActiveScene().name ?? string.Empty;
+            descriptor.SceneName = IMUiCompat.GetCurrentSceneName();
             // PopupManager._popup defaults these to true. Use the same defaults when the current
             // scene contains a known template hierarchy but its PopupManager entry is absent.
             descriptor.BlurBackground = true;
@@ -471,7 +470,7 @@ namespace IMUiFramework
             component = instance.GetComponent<T>();
             if (component == null)
             {
-                component = instance.GetComponentInChildren<T>(true);
+                component = IMUiCompat.GetComponentInChildren<T>(instance);
             }
             if (component == null)
             {
@@ -487,7 +486,6 @@ namespace IMUiFramework
             List<VanillaSceneUiDescriptor> result = new List<VanillaSceneUiDescriptor>();
             EnsureSceneIndex();
             string normalizedRoot = string.IsNullOrEmpty(rootPath) ? string.Empty : NormalizePath(rootPath);
-            Scene scene = SceneManager.GetActiveScene();
 
             for (int transformIndex = 0; transformIndex < allIndexedTransforms.Count; transformIndex++)
             {
@@ -527,7 +525,7 @@ namespace IMUiFramework
                     }
                 }
 
-                descriptor.SceneName = scene.name ?? string.Empty;
+                descriptor.SceneName = IMUiCompat.GetCurrentSceneName();
                 descriptor.HierarchyPath = path;
                 descriptor.HierarchyOccurrenceIndex = occurrenceIndex;
                 descriptor.Name = transform.name ?? string.Empty;
@@ -896,14 +894,14 @@ namespace IMUiFramework
 
         private static void EnsureSceneIndex()
         {
-            Scene scene = SceneManager.GetActiveScene();
-            GameObject[] roots = scene.IsValid() ? scene.GetRootGameObjects() : new GameObject[0];
-            if (scene.handle == indexedSceneHandle && roots.Length == indexedRootCount && pathIndex.Count > 0)
+            int sceneHandle = IMUiCompat.GetCurrentSceneHandle();
+            if (sceneHandle == indexedSceneHandle && pathIndex.Count > 0)
             {
                 return;
             }
 
-            indexedSceneHandle = scene.handle;
+            GameObject[] roots = IMUiCompat.GetCurrentSceneRoots();
+            indexedSceneHandle = sceneHandle;
             indexedRootCount = roots.Length;
             pathIndex.Clear();
             pathMatches.Clear();
@@ -1007,35 +1005,23 @@ namespace IMUiFramework
                 return false;
             }
 
-            int count;
-            try
-            {
-                count = unityEvent.GetPersistentEventCount();
-            }
-            catch
+            List<UnityEngine.Object> persistentTargets;
+            if (!IMUiCompat.TryGetPersistentTargets(unityEvent, out persistentTargets))
             {
                 return false;
             }
 
             // No serialized listener means there is no vanilla wiring to preserve. Replacing such
             // events also guarantees a source object's runtime-only listeners are not carried over.
-            if (count == 0)
+            if (persistentTargets.Count == 0)
             {
                 return false;
             }
 
             Assembly gameAssembly = typeof(PopupManager).Assembly;
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < persistentTargets.Count; i++)
             {
-                UnityEngine.Object target;
-                try
-                {
-                    target = unityEvent.GetPersistentTarget(i);
-                }
-                catch
-                {
-                    return false;
-                }
+                UnityEngine.Object target = persistentTargets[i];
 
                 if (target == null)
                 {

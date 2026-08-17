@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.1.0
+
+- Added `IMUiCompat`, a centralized compatibility layer for Idol Manager's older Unity API assemblies.
+- Replaced `SceneManager.GetActiveScene()`, `Scene.IsValid()`, `Scene.GetRootGameObjects()`, and `Scene.name` dependencies with inactive-safe loaded-scene discovery based on reflection and loaded object scene identity.
+- Replaced unsupported `GetComponentInChildren<T>(true)` calls with an include-inactive compatibility helper built on the supported plural overload.
+- Reworked safe persistent UnityEvent inspection to use reflection and the serialized `m_PersistentCalls -> m_Calls -> m_Target` graph when `UnityEventBase.GetPersistentEventCount/GetPersistentTarget` are unavailable. This preserves internal vanilla wiring such as the producer-list ScrollRect/Slider pair without compiling against newer UnityEvent APIs.
+- Removed the compile-time dependency on `TMPro.TMP_Dropdown`, which Idol Manager's TextMeshPro assembly does not define; TMP dropdowns are detected by runtime type name when present.
+- Reworked v3 semantic `ColorBlock` theming to mutate the serialized backing fields by reflection, matching the compatibility strategy already used elsewhere in the framework for Idol Manager's read-only normal/pressed/selected/disabled color properties.
+- No public v3 custom-UI API was removed or renamed.
+
 ## 3.0.0
 
 - Reframed v3 around **composable custom UI** rather than whole-popup cloning. Exact popup/scene cloning remains available, but custom mods can now borrow individual vanilla pieces and freely choose their own layout, size, text, events and colors.

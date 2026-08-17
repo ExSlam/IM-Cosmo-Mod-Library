@@ -34,7 +34,7 @@ namespace IMUiFramework
         {
             if (Root == null) return null;
             T component = Root.GetComponent<T>();
-            return component != null ? component : Root.GetComponentInChildren<T>(true);
+            return component != null ? component : IMUiCompat.GetComponentInChildren<T>(Root);
         }
 
         public Transform Find(string relativePathOrName)
@@ -304,7 +304,7 @@ namespace IMUiFramework
             }
 
             Button button = instance.GetComponent<Button>();
-            if (button == null) button = instance.GetComponentInChildren<Button>(true);
+            if (button == null) button = IMUiCompat.GetComponentInChildren<Button>(instance);
             if (button != null && onClick != null)
             {
                 button.onClick = new Button.ButtonClickedEvent();
@@ -345,7 +345,7 @@ namespace IMUiFramework
                     : VanillaUiPopupFactory.FindInHierarchy(instance.transform, item.PathOrName);
                 if (target == null) continue;
                 Graphic graphic = target.GetComponent<Graphic>();
-                if (graphic == null) graphic = target.GetComponentInChildren<Graphic>(true);
+                if (graphic == null) graphic = IMUiCompat.GetComponentInChildren<Graphic>(target);
                 if (graphic == null) continue;
                 graphic.color = item.UseRole ? resolvedTheme.GetColor(item.Role) : item.Color;
             }
