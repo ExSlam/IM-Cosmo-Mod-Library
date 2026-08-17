@@ -1,8 +1,8 @@
 {
   "Title": "IM UI Framework",
-  "Description": "Vanilla-first UI toolkit for Idol Manager modders: use the game's scene-native UI patterns and real Michsky Modern UI Pack Resources prefabs, fonts, themes, controls, and popup helpers.",
+  "Description": "Composable vanilla-style UI toolkit for Idol Manager mods: exact scene pieces and 218 shipped controls, semantic vanilla/custom color themes, vanilla month pagers, list scrolling, grids, cards, popup helpers, fonts, and low-level popup/scene templates.",
   "Author": "Cosmo",
-  "Version": "2.1.0",
+  "Version": "3.0.0",
   "Tags": [
     "ui",
     "framework",

@@ -3,7 +3,7 @@
     <ModName>IM UI Framework</ModName>
     <RootNamespace>IMUiFramework</RootNamespace>
     <AssemblyName>com.cosmo.imuiframework</AssemblyName>
-    <Version>2.1.0</Version>
+    <Version>3.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +14,16 @@
     <Compile Include="src\VanillaUiTheme.cs" />
     <Compile Include="src\VanillaUiFonts.cs" />
     <Compile Include="src\VanillaUiSceneTemplates.cs" />
+    <Compile Include="src\VanillaUiSceneCatalog.cs" />
+    <Compile Include="src\VanillaUiSceneFactory.cs" />
+    <Compile Include="src\VanillaPopupTemplateCatalog.cs" />
+    <Compile Include="src\VanillaUiControlFactory.cs" />
+    <Compile Include="src\VanillaUiPopupFactory.cs" />
+    <Compile Include="src\VanillaUiReferenceTemplates.cs" />
+    <Compile Include="src\IMUiPatterns.cs" />
+    <Compile Include="src\IMUiPrimitives.cs" />
+    <Compile Include="src\IMUiElementBuilder.cs" />
+    <Compile Include="src\IMUiThemeV3.cs" />
   </ItemGroup>
 
   <ItemGroup>

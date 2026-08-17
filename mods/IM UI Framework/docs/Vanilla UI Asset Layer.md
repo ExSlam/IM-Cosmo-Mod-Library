@@ -216,12 +216,12 @@ The game's language system also manages `TMP_Settings.fallbackFontAssets`; IM UI
 
 ## Compatibility strategy
 
-Control source strategy in 2.1.0 is:
+Control source strategy in 3.0.0 is:
 
-1. use a proven scene-native pattern when the game itself serializes that composite in the loaded scene
-2. otherwise use the genuine `Resources` prefab from the shipped game
-3. use known popup/runtime template lookup where an actual Resources prefab is unavailable
-4. use a faithful framework reconstruction or simple generic fallback only as a last resort
+1. clone the exact serialized scene hierarchy when the desired game-specific popup/widget exists in the loaded scene (`VanillaUiSceneCatalog` / `VanillaUiPopupFactory`)
+2. use the genuine `Resources` prefab for reusable Modern UI Pack controls (`VanillaUiControlFactory` / `VanillaUiResources`)
+3. preserve safe internal vanilla event wiring in `Template` clones while stripping popup-specific game controllers
+4. use a faithful framework reconstruction or simple generic fallback only when no vanilla scene or Resources source exists
 
 Existing 1.x APIs remain available. `IMUiBridges.TryCloneModernControl<T>` now silently gains the Resources-first behavior for known MUIP component types. An overload accepting an explicit resource path, component callback, and theme callback is available when a specific prefab variant is required.
 

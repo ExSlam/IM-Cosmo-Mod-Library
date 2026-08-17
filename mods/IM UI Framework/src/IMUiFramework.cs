@@ -1840,6 +1840,17 @@ namespace IMUiFramework
             PopupManager manager;
             if (!TryGetPopupManager(out manager))
             {
+                // Main-menu initialization does not always expose PopupManager through main.Data.
+                // V3 can still resolve the serialized popup canvas directly from the active scene.
+                GameObject sceneParent;
+                if (VanillaUiSceneCatalog.TryFindSceneObject("AgencyPopups", out sceneParent) && sceneParent != null)
+                {
+                    return sceneParent.transform;
+                }
+                if (VanillaUiSceneCatalog.TryFindSceneObject("GUI_Popups/Popups", out sceneParent) && sceneParent != null)
+                {
+                    return sceneParent.transform;
+                }
                 return null;
             }
 
@@ -1855,20 +1866,27 @@ namespace IMUiFramework
             {
             }
 
-            if (manager.popups == null)
+            if (manager.popups != null)
             {
-                return null;
-            }
-
-            for (int i = 0; i < manager.popups.Length; i++)
-            {
-                PopupManager._popup entry = manager.popups[i];
-                if (entry != null && entry.obj != null && entry.obj.transform.parent != null)
+                for (int i = 0; i < manager.popups.Length; i++)
                 {
-                    return entry.obj.transform.parent;
+                    PopupManager._popup entry = manager.popups[i];
+                    if (entry != null && entry.obj != null && entry.obj.transform.parent != null)
+                    {
+                        return entry.obj.transform.parent;
+                    }
                 }
             }
 
+            GameObject fallbackParent;
+            if (VanillaUiSceneCatalog.TryFindSceneObject("AgencyPopups", out fallbackParent) && fallbackParent != null)
+            {
+                return fallbackParent.transform;
+            }
+            if (VanillaUiSceneCatalog.TryFindSceneObject("GUI_Popups/Popups", out fallbackParent) && fallbackParent != null)
+            {
+                return fallbackParent.transform;
+            }
             return null;
         }
 
@@ -2090,6 +2108,134 @@ namespace IMUiFramework
             };
 
             return true;
+        }
+
+        /// <summary>
+        /// Version 3 scene-native scaffold. Clones an actual vanilla popup hierarchy instead of
+        /// constructing its chrome from primitives, then exposes the familiar PopupScaffold slots.
+        /// Use contentPath when a template has multiple list/container candidates.
+        /// </summary>
+        /// <summary>
+        /// Lowest-boilerplate v3 scaffold overload. Content/panel/title/scroll/close slots are detected
+        /// from the cloned vanilla hierarchy; callers only choose the source popup and their text/name.
+        /// </summary>
+        public static bool TryCreateVanillaPopupScaffold(
+            PopupManager._type templateType,
+            string popupName,
+            string title,
+            out PopupScaffold scaffold)
+        {
+            return TryCreateVanillaPopupScaffold(
+                templateType,
+                popupName,
+                title,
+                null,
+                false,
+                out scaffold);
+        }
+
+        public static bool TryCreateVanillaPopupScaffold(
+            PopupManager._type templateType,
+            string popupName,
+            string title,
+            string contentPath,
+            bool clearContent,
+            out PopupScaffold scaffold)
+        {
+            scaffold = null;
+            VanillaPopupOptions options = new VanillaPopupOptions();
+            options.TemplateType = templateType;
+            options.ObjectName = popupName;
+            options.Title = title;
+            options.ContentPath = contentPath;
+            options.ClearContent = clearContent;
+            options.CloneMode = VanillaUiCloneMode.Template;
+
+            VanillaPopupHandle handle;
+            if (!VanillaUiPopupFactory.TryCreate(options, out handle) || handle == null || !handle.IsValid)
+            {
+                return false;
+            }
+
+            scaffold = ConvertVanillaPopupHandle(handle);
+            return scaffold != null && scaffold.IsValid;
+        }
+
+        /// <summary>
+        /// Version 3 one-call registered scaffold using a vanilla popup as its exact visual/layout source.
+        /// Backdrop flags are inherited from the template's PopupManager entry.
+        /// </summary>
+        /// <summary>
+        /// Lowest-boilerplate registered v3 scaffold overload. Uses automatic vanilla slot detection.
+        /// </summary>
+        public static bool TryCreateRegisteredVanillaPopupScaffold(
+            PopupManager._type templateType,
+            PopupManager._type registrationType,
+            string popupName,
+            string title,
+            out PopupScaffold scaffold)
+        {
+            return TryCreateRegisteredVanillaPopupScaffold(
+                templateType,
+                registrationType,
+                popupName,
+                title,
+                null,
+                false,
+                out scaffold);
+        }
+
+        public static bool TryCreateRegisteredVanillaPopupScaffold(
+            PopupManager._type templateType,
+            PopupManager._type registrationType,
+            string popupName,
+            string title,
+            string contentPath,
+            bool clearContent,
+            out PopupScaffold scaffold)
+        {
+            scaffold = null;
+            VanillaPopupOptions options = new VanillaPopupOptions();
+            options.TemplateType = templateType;
+            options.RegistrationType = registrationType;
+            options.RegisterWithPopupManager = true;
+            options.ObjectName = popupName;
+            options.Title = title;
+            options.ContentPath = contentPath;
+            options.ClearContent = clearContent;
+            options.CloneMode = VanillaUiCloneMode.Template;
+
+            VanillaPopupHandle handle;
+            if (!VanillaUiPopupFactory.TryCreate(options, out handle) || handle == null || !handle.IsValid)
+            {
+                return false;
+            }
+
+            scaffold = ConvertVanillaPopupHandle(handle);
+            if (scaffold != null)
+            {
+                scaffold.RegisteredWithPopupManager = true;
+            }
+            return scaffold != null && scaffold.IsValid;
+        }
+
+        private static PopupScaffold ConvertVanillaPopupHandle(VanillaPopupHandle handle)
+        {
+            if (handle == null || !handle.IsValid)
+            {
+                return null;
+            }
+
+            PopupScaffold scaffold = new PopupScaffold();
+            scaffold.Root = handle.Root;
+            scaffold.Popup = handle.Popup;
+            scaffold.PanelRect = handle.PanelRect;
+            scaffold.TitleText = handle.TitleTmp as TextMeshProUGUI;
+            scaffold.ContentRoot = handle.ContentRoot;
+            scaffold.ScrollRect = handle.ScrollRect;
+            scaffold.CloseButton = handle.CloseButton;
+            scaffold.RegisteredWithPopupManager = handle.IsRegistered;
+            return scaffold;
         }
 
         /// <summary>

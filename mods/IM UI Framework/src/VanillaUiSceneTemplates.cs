@@ -33,48 +33,20 @@ namespace IMUiFramework
         /// </summary>
         public static bool TryGetPopupRoot(PopupManager._type popupType, out GameObject popupRoot)
         {
-            popupRoot = null;
-            PopupManager manager;
-            if (!IMUiKit.TryGetPopupManager(out manager) || manager == null || manager.popups == null)
-            {
-                return false;
-            }
-
-            PopupManager._popup entry = manager.GetByType(popupType);
-            if (entry == null || entry.obj == null)
-            {
-                return false;
-            }
-
-            popupRoot = entry.obj;
-            return true;
+            return VanillaUiSceneCatalog.TryGetPopupRoot(popupType, out popupRoot);
         }
 
         /// <summary>
         /// Finds a child below a serialized popup root, including inactive descendants.
-        /// Transform.Find does not require the hierarchy to be active.
         /// </summary>
         public static bool TryFindPopupChild(PopupManager._type popupType, string relativePath, out Transform child)
         {
-            child = null;
-            if (string.IsNullOrEmpty(relativePath))
-            {
-                return false;
-            }
-
-            GameObject popupRoot;
-            if (!TryGetPopupRoot(popupType, out popupRoot) || popupRoot == null)
-            {
-                return false;
-            }
-
-            child = popupRoot.transform.Find(relativePath);
-            return child != null;
+            return VanillaUiSceneCatalog.TryFindPopupChild(popupType, relativePath, out child);
         }
 
         /// <summary>
-        /// Clones an exact scene-serialized UI child without opening its source popup.
-        /// Useful for game-native composite controls that do not exist as Resources prefabs.
+        /// Backward-compatible exact clone helper. Version 3 callers that want controller stripping can use
+        /// VanillaUiSceneCatalog.TryClonePopupChild with VanillaUiCloneMode.Template or VisualOnly.
         /// </summary>
         public static bool TryClonePopupChild(
             PopupManager._type popupType,
@@ -83,32 +55,14 @@ namespace IMUiFramework
             string objectName,
             out GameObject instance)
         {
-            instance = null;
-            if (parent == null)
-            {
-                return false;
-            }
-
-            Transform template;
-            if (!TryFindPopupChild(popupType, relativePath, out template) || template == null)
-            {
-                return false;
-            }
-
-            instance = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-            if (instance == null)
-            {
-                return false;
-            }
-
-            if (!string.IsNullOrEmpty(objectName))
-            {
-                instance.name = objectName;
-            }
-
-            IMUiKit.ApplyLayerRecursively(instance, parent.gameObject.layer);
-            instance.SetActive(true);
-            return true;
+            return VanillaUiSceneCatalog.TryClonePopupChild(
+                popupType,
+                relativePath,
+                parent,
+                objectName,
+                VanillaUiCloneMode.Exact,
+                true,
+                out instance);
         }
 
         /// <summary>

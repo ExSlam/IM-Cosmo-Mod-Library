@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.0
+
+- Reframed v3 around **composable custom UI** rather than whole-popup cloning. Exact popup/scene cloning remains available, but custom mods can now borrow individual vanilla pieces and freely choose their own layout, size, text, events and colors.
+- Added `IMUiTheme`, semantic `IMUiColorRole`s, and `IMUiThemePreset`s. Vanilla is now a preset rather than a hard-coded palette.
+- Added `IMUiVanillaColors` exposing every named `mainScript` Color32 preset: white, red/light red, green/light green, blue/light blue/dark blue, pink, grey, black/black-gold, gold/dark gold, active/inactive tab blue, and transparent.
+- Added `IMUiPrimitives` for vanilla-sprite surfaces/cards, text, dividers, grids, and buttons without copying a whole source popup.
+- Added `IMUiElementBuilder` for fluent cloning of any individual popup child, arbitrary scene object, exact `Resources` prefab, or Modern UI Pack control, with per-instance text/size/font/callback/theme overrides and post-theme per-child `GraphicColor(...)` overrides.
+- Added `IMUiComposer.TryCreateMonthPager`, using the literal Singles-chart previous/next month controls (`U+F33A` / `U+F33B`) and month label. The icon-capable source font is intentionally preserved so the private-use arrow glyphs cannot become missing-character boxes.
+- Added `IMUiComposer.TryCreateScrollView` and `TryAttachVanillaListScrollIndicator` around the exact Contracts/Salaries/Loans `Slider` scrollbar surrogate. Vanilla geometry remains fixed; custom accents use a neutral shipped rounded sprite for the thumb so baked purple pixels do not contaminate custom colors.
+- Added semantic-theme bridging for every Modern UI Pack control family through `VanillaUiControlFactory`, including buttons, inputs, dropdowns, selectors, switches, toggles, sliders, range/radial sliders, progress bars, lists, modal/movable windows, notifications, tooltips, context menus and window managers. Exact variants remain available through all 218 `VanillaUiPrefabCatalog` paths.
+- Added role-aware theming for Selectables, inputs/carets/selections, sliders, scrollbars, toggles, structural surfaces and text while avoiding blanket portrait/icon tinting.
+- Added vanilla-style calendar/card cell helpers that reuse the Singles-chart sliced panel visual instead of spreadsheet-like `Outline` borders.
+- Kept the exhaustive inactive-safe scene index, all popup template descriptors, and serialized `prefab_*` reference access from the earlier v3 work as lower-level source layers.
+- Added short-form primitive/composer overloads (`CreatePanel`, `CreateCard`, `CreateLabel`, simple themed buttons, month pager, scroll view, popup shell) so basic custom UI does not need an options object for every element.
+- Added scene-derived neutral color presets (`PanelOuter`, `PanelInner`, `TrackGrey`, `ChartArrowHover`) alongside the complete `mainScript` palette and arbitrary `Color32` overrides.
+- Added `V3 Composable Custom UI.md` and `V3 Custom Component Coverage.md`, and rewrote migration guidance so the recommended path is now "compose vanilla pieces" instead of "clone the closest popup".
+
 ## 2.1.0
 
 - Added a scene-template layer alongside the existing Michsky Modern UI Pack Resources layer. `VanillaUiSceneTemplates` can resolve and clone inactive popup children through `PopupManager` without opening the source popup.
