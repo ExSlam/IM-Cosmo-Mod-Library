@@ -908,6 +908,7 @@ namespace IdolCareerDiary
         internal const string MemberNameRebuildLayout = "RebuildLayout";
         internal const string MemberNameCreateStyledButton = "CreateStyledButton";
         internal const string MemberNameCloneStyledButton = "CloneStyledButton";
+        internal const string MemberNameApplyGameFont = "ApplyGameFont";
         internal static string TextImUiFrameworkApiMethodSignatureMismatch { get { return ModLocalization.Get("TextImUiFrameworkApiMethodSignatureMismatch", "IM UI Framework API method signature mismatch."); } }
         internal static string TextImUiFrameworkBridgeMethodIsUnavailable { get { return ModLocalization.Get("TextImUiFrameworkBridgeMethodIsUnavailable", "IM UI Framework bridge method is unavailable."); } }
         internal static string TextImDataCoreErrorPrefix { get { return ModLocalization.Get("TextImDataCoreErrorPrefix", "IMDataCore: "); } }
@@ -3018,6 +3019,7 @@ namespace IdolCareerDiary
         private static MethodInfo methodRebuildLayout;
         private static MethodInfo methodCreateStyledButton;
         private static MethodInfo methodCloneStyledButton;
+        private static MethodInfo methodApplyGameFont;
 
         internal static bool TryResolveDependency(out string errorMessage)
         {
@@ -3163,6 +3165,15 @@ namespace IdolCareerDiary
             return true;
         }
 
+        internal static bool TryApplyGameFont(GameObject root, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (root == null) return false;
+            if (!TryEnsureBridgeReady(out errorMessage)) return false;
+            if (methodApplyGameFont == null) return false;
+            return TryInvokeVoid(methodApplyGameFont, new object[] { root }, out errorMessage);
+        }
+
         private static bool TryEnsureBridgeReady(out string errorMessage)
         {
             lock (Sync)
@@ -3246,6 +3257,7 @@ namespace IdolCareerDiary
             methodRebuildLayout = FindMethod(uiKitType, C.MemberNameRebuildLayout, C.LastFromCount);
             methodCreateStyledButton = FindMethod(uiKitType, C.MemberNameCreateStyledButton, C.UiFrameworkCreateStyledButtonMethodParameterCount);
             methodCloneStyledButton = FindMethod(uiKitType, C.MemberNameCloneStyledButton, C.UiFrameworkCloneStyledButtonMethodParameterCount);
+            methodApplyGameFont = FindMethod(uiKitType, C.MemberNameApplyGameFont, C.LastFromCount);
 
             if (methodInitialize == null ||
                 methodCreateUiObject == null ||
@@ -8766,6 +8778,9 @@ namespace IdolCareerDiary
                 text.verticalOverflow = VerticalWrapMode.Overflow;
                 text.alignment = TextAnchor.MiddleCenter;
             }
+
+            string fontError;
+            IMUiFrameworkApi.TryApplyGameFont(button.gameObject, out fontError);
         }
 
         /// <summary>
@@ -9055,6 +9070,8 @@ namespace IdolCareerDiary
             target.enableWordWrapping = false;
             target.overflowMode = TextOverflowModes.Ellipsis;
             target.raycastTarget = false;
+            string fontError;
+            IMUiFrameworkApi.TryApplyGameFont(target.gameObject, out fontError);
         }
 
         /// <summary>

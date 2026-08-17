@@ -5,7 +5,7 @@
 ## Dependencies
 
 - `IM Data Core` (`com.cosmo.imdatacore`) version `3.2.0` or higher
-- `IM UI Framework` (`com.cosmo.imuiframework`) version `1.0.0` or higher
+- `IM UI Framework` (`com.cosmo.imuiframework`) version `2.0.3` or higher
 
 This mod does not ship a separate persistence backend. It reads timeline events from IM Data Core and renders UI with IM UI Framework.
 
@@ -122,3 +122,8 @@ Project file:
 
 Example command:
 - `dotnet build "mods/Idol Career Diary/Idol Career Diary.csproj" -c Release`
+
+
+## 1.2.1 font consistency
+
+Timeline toolbar buttons and the manually-created TMP search field now ask IM UI Framework 2.0.3 to apply Idol Manager's currently selected game font after they are constructed. This fixes the mixed-font timeline UI that could otherwise leave framework/fallback button labels and search text on a MUIP/TMP default while the rest of the diary followed the game font.
