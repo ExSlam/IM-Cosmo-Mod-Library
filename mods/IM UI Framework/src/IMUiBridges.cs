@@ -29,12 +29,26 @@ namespace IMUiFramework
         }
 
         /// <summary>
-        /// Finds an existing Modern UI Pack control, including controls in inactive game
-        /// popup prefabs. This is the preferred template source for new MUI controls.
+        /// Finds a Modern UI Pack template. Version 2.0 checks the game's genuine
+        /// Resources prefab first, then inactive popup/runtime objects as fallback.
         /// </summary>
         public static bool TryFindModernTemplate<T>(out T template) where T : Component
         {
             template = null;
+
+            GameObject resourcePrefab;
+            if (VanillaUiResources.TryGetDefaultPrefabForComponent<T>(out resourcePrefab) && resourcePrefab != null)
+            {
+                template = resourcePrefab.GetComponent<T>();
+                if (template == null)
+                {
+                    template = resourcePrefab.GetComponentInChildren<T>(true);
+                }
+                if (template != null)
+                {
+                    return true;
+                }
+            }
 
             PopupManager manager;
             if (IMUiKit.TryGetPopupManager(out manager) && manager != null && manager.popups != null)
@@ -61,9 +75,8 @@ namespace IMUiFramework
         }
 
         /// <summary>
-        /// Clones a Modern UI Pack control from the game's UI. It supports any public MUI
-        /// component type, including ButtonManager, CustomInputField, SliderManager,
-        /// SwitchManager, ToggleAnim, ModalWindowManager, and ProgressBar.
+        /// Creates a Modern UI Pack control. Known component types are instantiated from the
+        /// game's original Resources prefab first; scene/popup cloning is compatibility fallback.
         /// </summary>
         public static bool TryCloneModernControl<T>(
             Transform parent,
@@ -78,10 +91,27 @@ namespace IMUiFramework
                 return false;
             }
 
+            string resourcePath = VanillaUiResources.GetDefaultResourcePathForComponent(typeof(T));
+            if (!string.IsNullOrEmpty(resourcePath))
+            {
+                if (VanillaUiResources.TryInstantiatePrefab<T>(
+                    resourcePath,
+                    parent,
+                    objectName,
+                    out controlObject,
+                    out control,
+                    null,
+                    null,
+                    true))
+                {
+                    return true;
+                }
+            }
+
             T template;
             if (!TryFindModernTemplate(out template) || template == null)
             {
-                Log("TryCloneModernControl failed: no " + typeof(T).Name + " template found.");
+                Log("TryCloneModernControl failed: no " + typeof(T).Name + " Resources prefab or scene template found.");
                 return false;
             }
 
@@ -106,6 +136,30 @@ namespace IMUiFramework
             UnityEngine.Object.Destroy(controlObject);
             controlObject = null;
             return false;
+        }
+
+        /// <summary>
+        /// Instantiates a specific vanilla Resources prefab and exposes both the component and every
+        /// MUIP theme field through callbacks. Use this when a non-default variant is required.
+        /// </summary>
+        public static bool TryCloneModernControl<T>(
+            string resourcePath,
+            Transform parent,
+            string objectName,
+            out GameObject controlObject,
+            out T control,
+            Action<T> configure = null,
+            Action<VanillaUiThemeSettings> configureTheme = null) where T : Component
+        {
+            return VanillaUiResources.TryInstantiatePrefab(
+                resourcePath,
+                parent,
+                objectName,
+                out controlObject,
+                out control,
+                configure,
+                configureTheme,
+                true);
         }
 
         /// <summary>
@@ -460,6 +514,20 @@ namespace IMUiFramework
         public static bool TryFindModernDropdownTemplate(out CustomDropdown template)
         {
             template = null;
+            GameObject resourcePrefab = VanillaUiResources.LoadPrefab(VanillaUiPrefabCatalog.Dropdown.Standard);
+            if (resourcePrefab != null)
+            {
+                template = resourcePrefab.GetComponent<CustomDropdown>();
+                if (template == null)
+                {
+                    template = resourcePrefab.GetComponentInChildren<CustomDropdown>(true);
+                }
+                if (template != null)
+                {
+                    return true;
+                }
+            }
+
             PopupManager manager;
             if (!IMUiKit.TryGetPopupManager(out manager))
             {
@@ -537,16 +605,26 @@ namespace IMUiFramework
                 return false;
             }
 
-            CustomDropdown template;
-            if (!TryFindModernDropdownTemplate(out template) || template == null)
+            if (!VanillaUiResources.TryInstantiatePrefab<CustomDropdown>(
+                VanillaUiPrefabCatalog.Dropdown.Standard,
+                parent,
+                string.IsNullOrEmpty(objectName) ? "IMUiFramework_ModernDropdown" : objectName,
+                out dropdownObject,
+                out dropdown,
+                null,
+                null,
+                true))
             {
-                Log("TryCreateModernDropdown failed: no CustomDropdown template found.");
-                return false;
+                CustomDropdown template;
+                if (!TryFindModernDropdownTemplate(out template) || template == null)
+                {
+                    Log("TryCreateModernDropdown failed: no CustomDropdown Resources prefab or scene template found.");
+                    return false;
+                }
+                dropdownObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+                dropdownObject.name = string.IsNullOrEmpty(objectName) ? "IMUiFramework_ModernDropdown" : objectName;
+                dropdownObject.SetActive(true);
             }
-
-            dropdownObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-            dropdownObject.name = string.IsNullOrEmpty(objectName) ? "IMUiFramework_ModernDropdown" : objectName;
-            dropdownObject.SetActive(true);
             IMUiKit.ClearLocalizationComponents(dropdownObject);
 
             dropdown = dropdownObject.GetComponent<CustomDropdown>();
@@ -603,10 +681,23 @@ namespace IMUiFramework
                 return false;
             }
 
+            if (VanillaUiResources.TryInstantiatePrefab<WindowManager>(
+                VanillaUiPrefabCatalog.WindowManager.Window_Manager,
+                parent,
+                string.IsNullOrEmpty(objectName) ? "IMUiFramework_ModernWindow" : objectName,
+                out windowObject,
+                out windowManager,
+                null,
+                null,
+                true))
+            {
+                return true;
+            }
+
             WindowManager template = UnityEngine.Object.FindObjectOfType<WindowManager>();
             if (template == null)
             {
-                Log("TryCloneModernWindowManager failed: no WindowManager template found.");
+                Log("TryCloneModernWindowManager failed: no WindowManager Resources prefab or scene template found.");
                 return false;
             }
 

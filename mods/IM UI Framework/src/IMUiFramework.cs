@@ -780,6 +780,64 @@ namespace IMUiFramework
         }
     }
 
+    internal sealed class IMUiRoundedCornerMaterial : MonoBehaviour
+    {
+        private static readonly int WidthHeightRadiusProperty = Shader.PropertyToID("_WidthHeightRadius");
+        private Material ownedMaterial;
+        private RectTransform rectTransform;
+        private float radius;
+        private Vector2 lastSize = new Vector2(float.MinValue, float.MinValue);
+        private float lastRadius = float.MinValue;
+
+        public void Configure(Material material, float cornerRadius)
+        {
+            if (ownedMaterial != null && ownedMaterial != material)
+            {
+                UnityEngine.Object.Destroy(ownedMaterial);
+            }
+            ownedMaterial = material;
+            radius = Mathf.Max(0f, cornerRadius);
+            rectTransform = transform as RectTransform;
+            Refresh(true);
+        }
+
+        private void OnEnable()
+        {
+            Refresh(true);
+        }
+
+        private void OnRectTransformDimensionsChange()
+        {
+            Refresh(true);
+        }
+
+        private void LateUpdate()
+        {
+            Refresh(false);
+        }
+
+        private void Refresh(bool force)
+        {
+            if (ownedMaterial == null) return;
+            if (rectTransform == null) rectTransform = transform as RectTransform;
+            if (rectTransform == null) return;
+            Vector2 size = rectTransform.rect.size;
+            if (!force && size == lastSize && Mathf.Approximately(radius, lastRadius)) return;
+            lastSize = size;
+            lastRadius = radius;
+            ownedMaterial.SetVector(WidthHeightRadiusProperty, new Vector4(Mathf.Abs(size.x), Mathf.Abs(size.y), radius, 0f));
+        }
+
+        private void OnDestroy()
+        {
+            if (ownedMaterial != null)
+            {
+                UnityEngine.Object.Destroy(ownedMaterial);
+                ownedMaterial = null;
+            }
+        }
+    }
+
     public sealed class PopupScaffold
     {
         internal bool RegisteredWithPopupManager;
@@ -1169,9 +1227,9 @@ namespace IMUiFramework
         private const float DefaultPopupScrollOffsetMaxX = -32f;
         private const float DefaultPopupScrollOffsetMaxY = -90f;
         private const float DefaultCloseButtonBottomOffset = 12f;
-        private const float DefaultScrollSensitivity = 30f;
+        private const float DefaultScrollSensitivity = 25f;
         private const int DefaultScrollContentPadding = 4;
-        private const float DefaultScrollbarWidth = 12f;
+        private const float DefaultScrollbarWidth = 20f;
         private const float DefaultScrollbarRightOffset = -4f;
         private const float DefaultScrollbarSpacing = 6f;
         private const float DefaultMinButtonMeasureWidth = 900f;
@@ -1192,6 +1250,8 @@ namespace IMUiFramework
 
         private static TMP_FontAsset defaultTmpFont;
         private static Font defaultLegacyFont;
+        private static bool defaultTmpFontExplicitlySet;
+        private static bool defaultLegacyFontExplicitlySet;
         private static GameObject defaultButtonTemplate;
         private static Scrollbar defaultScrollbarTemplate;
         private static Settings_Slider defaultSettingsSliderTemplate;
@@ -1202,7 +1262,8 @@ namespace IMUiFramework
         private static Color32 buttonBackground = new Color32(241, 122, 170, 255);
         private static Color32 buttonTextColor = new Color32(255, 255, 255, 255);
         private static Color32 titleColor = new Color32(61, 42, 80, 255);
-        private static readonly Color32 ScrollbarTrackColor = new Color32(210, 210, 210, 190);
+        private static readonly Color32 ScrollbarTrackColor = new Color32(255, 255, 255, 25);
+        private static readonly Color32 ScrollbarHandleColor = new Color32(255, 255, 255, 255);
         private static readonly Vector2 AnchorBottomLeft = new Vector2(0f, 0f);
         private static readonly Vector2 AnchorTopRight = new Vector2(1f, 1f);
         private static readonly Vector2 AnchorCentered = new Vector2(0.5f, 0.5f);
@@ -2627,6 +2688,22 @@ namespace IMUiFramework
             TextAlignmentOptions alignment,
             Color color)
         {
+            return CreateText(parent, name, text, fontSize, alignment, color, null);
+        }
+
+        /// <summary>
+        /// Creates TMP text with an explicit internal or runtime-created TMP font. Passing null
+        /// follows Idol Manager's currently selected game font first, then framework fallbacks.
+        /// </summary>
+        public static TextMeshProUGUI CreateText(
+            Transform parent,
+            string name,
+            string text,
+            int fontSize,
+            TextAlignmentOptions alignment,
+            Color color,
+            TMP_FontAsset font)
+        {
             EnsureDefaultFonts();
 
             GameObject obj = CreateUiObject(name, parent);
@@ -2636,9 +2713,13 @@ namespace IMUiFramework
             tmp.alignment = alignment;
             tmp.color = color;
             tmp.raycastTarget = false;
-            if (defaultTmpFont != null)
+            TMP_FontAsset resolvedFont = font != null
+                ? font
+                : (defaultTmpFontExplicitlySet ? defaultTmpFont : VanillaUiFonts.GetGameSelectedTmpFont());
+            if (resolvedFont == null) resolvedFont = defaultTmpFont;
+            if (resolvedFont != null)
             {
-                tmp.font = defaultTmpFont;
+                tmp.font = resolvedFont;
             }
 
             return tmp;
@@ -2652,6 +2733,23 @@ namespace IMUiFramework
             TextAnchor alignment,
             Color color)
         {
+            return CreateLegacyText(parent, name, text, fontSize, alignment, color, null, false);
+        }
+
+        /// <summary>
+        /// Creates legacy Unity UI text with an explicit Font. Set followGameFont to true to add
+        /// Idol Manager's Font_Replacer so later language/font changes follow the base game.
+        /// </summary>
+        public static Text CreateLegacyText(
+            Transform parent,
+            string name,
+            string text,
+            int fontSize,
+            TextAnchor alignment,
+            Color color,
+            Font font,
+            bool followGameFont = false)
+        {
             EnsureDefaultFonts();
 
             GameObject obj = CreateUiObject(name, parent);
@@ -2663,12 +2761,73 @@ namespace IMUiFramework
             uiText.raycastTarget = false;
             uiText.horizontalOverflow = HorizontalWrapMode.Wrap;
             uiText.verticalOverflow = VerticalWrapMode.Overflow;
-            if (defaultLegacyFont != null)
+            Font resolvedFont = font != null
+                ? font
+                : (defaultLegacyFontExplicitlySet ? defaultLegacyFont : VanillaUiFonts.GetGameSelectedLegacyFont());
+            if (resolvedFont == null) resolvedFont = defaultLegacyFont;
+            if (resolvedFont != null)
             {
-                uiText.font = defaultLegacyFont;
+                uiText.font = resolvedFont;
+            }
+            if (followGameFont)
+            {
+                VanillaUiFonts.MakeLegacyTextFollowGameFont(uiText);
             }
 
             return uiText;
+        }
+
+        public static void SetDefaultTmpFont(TMP_FontAsset font)
+        {
+            defaultTmpFont = font;
+            defaultTmpFontExplicitlySet = font != null;
+        }
+
+        public static void SetDefaultLegacyFont(Font font)
+        {
+            defaultLegacyFont = font;
+            defaultLegacyFontExplicitlySet = font != null;
+        }
+
+        /// <summary>
+        /// Applies Idol Manager's currently selected game font to all TMP and legacy text
+        /// below a UI root. This is safe for cloned vanilla prefabs and mod-created text.
+        /// </summary>
+        public static void ApplyGameFont(GameObject root)
+        {
+            VanillaUiFonts.ApplyGameFont(root, true);
+        }
+
+        /// <summary>
+        /// Applies Idol Manager's own UI/RoundedCorners/RoundedCorners shader with a precise
+        /// radius. A lightweight updater mirrors the shipped Nobi component's width/height/radius
+        /// updates without requiring mods to reference Nobi.UiRoundedCorners.dll directly.
+        /// </summary>
+        public static bool TryApplyVanillaRoundedCorners(GameObject target, float radius)
+        {
+            if (target == null) return false;
+            Image image = target.GetComponent<Image>();
+            if (image == null) image = target.AddComponent<Image>();
+            return TryApplyVanillaRoundedCorners(image, radius);
+        }
+
+        public static bool TryApplyVanillaRoundedCorners(Image image, float radius)
+        {
+            if (image == null) return false;
+            Shader shader = Shader.Find("UI/RoundedCorners/RoundedCorners");
+            if (shader == null) return false;
+
+            Material material = new Material(shader);
+            material.name = "IMUiFramework Vanilla Rounded Corners";
+            material.hideFlags = HideFlags.DontSave;
+            image.sprite = null;
+            image.type = Image.Type.Simple;
+            image.material = material;
+
+            IMUiRoundedCornerMaterial updater = image.GetComponent<IMUiRoundedCornerMaterial>();
+            if (updater == null) updater = image.gameObject.AddComponent<IMUiRoundedCornerMaterial>();
+            updater.Configure(material, radius);
+            return true;
         }
 
         public static Button CreateButtonFromTemplateOrStyle(
@@ -2784,6 +2943,29 @@ namespace IMUiFramework
             layout.startAxis = GridLayoutGroup.Axis.Horizontal;
             layout.childAlignment = childAlignment;
             return container;
+        }
+
+        /// <summary>
+        /// Applies the exact ScrollRectDefault values used by Idol Manager: clamped motion,
+        /// sensitivity 25 on non-macOS, and sensitivity 3/deceleration 0.05 on macOS.
+        /// </summary>
+        public static void ApplyVanillaScrollDefaults(ScrollRect scrollRect)
+        {
+            if (scrollRect == null)
+            {
+                return;
+            }
+
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            if (Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.OSXEditor)
+            {
+                scrollRect.scrollSensitivity = 3f;
+                scrollRect.decelerationRate = 0.05f;
+            }
+            else
+            {
+                scrollRect.scrollSensitivity = DefaultScrollSensitivity;
+            }
         }
 
         /// <summary>
@@ -3150,10 +3332,9 @@ namespace IMUiFramework
                 tmp.color = buttonTextColor;
                 tmp.enableWordWrapping = false;
                 tmp.alignment = TextAlignmentOptions.Center;
-                if (defaultTmpFont != null)
-                {
-                    tmp.font = defaultTmpFont;
-                }
+                TMP_FontAsset gameFont = defaultTmpFontExplicitlySet ? defaultTmpFont : VanillaUiFonts.GetGameSelectedTmpFont();
+                if (gameFont == null) gameFont = defaultTmpFont;
+                if (gameFont != null) tmp.font = gameFont;
             }
 
             Text[] texts = buttonRoot.GetComponentsInChildren<Text>(true);
@@ -3167,6 +3348,14 @@ namespace IMUiFramework
 
                 text.text = resolved;
                 text.color = buttonTextColor;
+                if (!defaultLegacyFontExplicitlySet)
+                {
+                    VanillaUiFonts.MakeLegacyTextFollowGameFont(text);
+                }
+                else if (defaultLegacyFont != null)
+                {
+                    text.font = defaultLegacyFont;
+                }
             }
         }
 
@@ -3277,8 +3466,7 @@ namespace IMUiFramework
             scrollRect = scrollObj.AddComponent<ScrollRect>();
             scrollRect.horizontal = false;
             scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            scrollRect.scrollSensitivity = DefaultScrollSensitivity;
+            ApplyVanillaScrollDefaults(scrollRect);
 
             GameObject viewport = CreateUiObject(ScrollViewportObjectName, scrollObj.transform);
             RectTransform viewportRect = viewport.GetComponent<RectTransform>();
@@ -3364,6 +3552,46 @@ namespace IMUiFramework
             return button;
         }
 
+        private static ColorBlock ConfigureVanillaScrollbarColorBlock(ColorBlock colors)
+        {
+            // Idol Manager's bundled UnityEngine.UI exposes only highlightedColor,
+            // colorMultiplier and fadeDuration as writable ColorBlock properties. The other
+            // colors are serialized private fields. Set through reflection so the emergency
+            // scrollbar can still mirror the vanilla prefab without requiring a newer UI DLL.
+            object boxed = colors;
+            SetColorBlockMember(boxed, "normalColor", "m_NormalColor", new Color(1f, 1f, 1f, 0.78431374f));
+            SetColorBlockMember(boxed, "highlightedColor", "m_HighlightedColor", new Color(1f, 1f, 1f, 0.9607843f));
+            SetColorBlockMember(boxed, "pressedColor", "m_PressedColor", Color.white);
+            SetColorBlockMember(boxed, "selectedColor", "m_SelectedColor", new Color(1f, 1f, 1f, 0.9607843f));
+            SetColorBlockMember(boxed, "disabledColor", "m_DisabledColor", new Color(1f, 1f, 1f, 0.39215687f));
+            SetColorBlockMember(boxed, "colorMultiplier", "m_ColorMultiplier", 1f);
+            SetColorBlockMember(boxed, "fadeDuration", "m_FadeDuration", 0.1f);
+            return (ColorBlock)boxed;
+        }
+
+        private static void SetColorBlockMember(object boxedColorBlock, string propertyName, string fieldName, object value)
+        {
+            if (boxedColorBlock == null) return;
+            Type type = boxedColorBlock.GetType();
+            try
+            {
+                PropertyInfo property = type.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+                if (property != null && property.CanWrite)
+                {
+                    property.SetValue(boxedColorBlock, value, null);
+                    return;
+                }
+            }
+            catch { }
+
+            try
+            {
+                FieldInfo field = type.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field != null) field.SetValue(boxedColorBlock, value);
+            }
+            catch { }
+        }
+
         private static void AddScrollbar(Transform parent, ScrollRect target)
         {
             if (parent == null || target == null)
@@ -3371,33 +3599,60 @@ namespace IMUiFramework
                 return;
             }
 
-            Scrollbar template = GetDefaultScrollbarTemplate();
             GameObject scrollbarObj;
             Scrollbar scrollbar;
-            if (template != null)
+            if (!VanillaUiResources.TryCreateScrollbar(parent, ScrollbarObjectName, out scrollbarObj, out scrollbar))
             {
-                scrollbarObj = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-                scrollbarObj.name = ScrollbarObjectName;
-                scrollbar = scrollbarObj.GetComponent<Scrollbar>();
+                Scrollbar template = GetDefaultScrollbarTemplate();
+                if (template != null)
+                {
+                    scrollbarObj = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+                    scrollbarObj.name = ScrollbarObjectName;
+                    scrollbar = scrollbarObj.GetComponent<Scrollbar>();
+                }
+                else
+                {
+                    // Faithful emergency reconstruction of Resources/scrollbar/Scrollbar.prefab.
+                    scrollbarObj = CreateUiObject(ScrollbarObjectName, parent);
+                    scrollbar = scrollbarObj.AddComponent<Scrollbar>();
+
+                    GameObject backgroundObj = CreateUiObject("Background", scrollbarObj.transform);
+                    RectTransform backgroundRect = backgroundObj.GetComponent<RectTransform>();
+                    backgroundRect.anchorMin = Vector2.zero;
+                    backgroundRect.anchorMax = Vector2.one;
+                    backgroundRect.offsetMin = new Vector2(5f, 5f);
+                    backgroundRect.offsetMax = new Vector2(-5f, -5f);
+                    Image backgroundImage = backgroundObj.AddComponent<Image>();
+                    backgroundImage.color = ScrollbarTrackColor;
+                    backgroundImage.type = Image.Type.Sliced;
+
+                    GameObject slidingAreaObj = CreateUiObject("Sliding Area", scrollbarObj.transform);
+                    RectTransform slidingAreaRect = slidingAreaObj.GetComponent<RectTransform>();
+                    slidingAreaRect.anchorMin = Vector2.zero;
+                    slidingAreaRect.anchorMax = Vector2.one;
+                    slidingAreaRect.offsetMin = new Vector2(5f, 5f);
+                    slidingAreaRect.offsetMax = new Vector2(-5f, -5f);
+
+                    GameObject handleObj = CreateUiObject(ScrollbarHandleObjectName, slidingAreaObj.transform);
+                    RectTransform handleRect = handleObj.GetComponent<RectTransform>();
+                    handleRect.anchorMin = Vector2.zero;
+                    handleRect.anchorMax = Vector2.one;
+                    handleRect.offsetMin = Vector2.zero;
+                    handleRect.offsetMax = Vector2.zero;
+                    Image handleImage = handleObj.AddComponent<Image>();
+                    handleImage.color = ScrollbarHandleColor;
+                    handleImage.type = Image.Type.Sliced;
+
+                    scrollbar.targetGraphic = handleImage;
+                    scrollbar.handleRect = handleRect;
+                    scrollbar.transition = Selectable.Transition.ColorTint;
+                    scrollbar.colors = ConfigureVanillaScrollbarColorBlock(scrollbar.colors);
+                }
             }
-            else
+
+            if (scrollbarObj == null || scrollbar == null)
             {
-                scrollbarObj = CreateUiObject(ScrollbarObjectName, parent);
-                Image trackImage = scrollbarObj.AddComponent<Image>();
-                trackImage.color = ScrollbarTrackColor;
-
-                scrollbar = scrollbarObj.AddComponent<Scrollbar>();
-                GameObject handleObj = CreateUiObject(ScrollbarHandleObjectName, scrollbarObj.transform);
-                RectTransform handleRect = handleObj.GetComponent<RectTransform>();
-                handleRect.anchorMin = Vector2.zero;
-                handleRect.anchorMax = Vector2.one;
-                handleRect.offsetMin = Vector2.zero;
-                handleRect.offsetMax = Vector2.zero;
-
-                Image handleImage = handleObj.AddComponent<Image>();
-                handleImage.color = buttonBackground;
-                scrollbar.targetGraphic = handleImage;
-                scrollbar.handleRect = handleRect;
+                return;
             }
 
             RectTransform scrollbarRect = scrollbarObj.GetComponent<RectTransform>();
@@ -4315,6 +4570,21 @@ namespace IMUiFramework
                 return defaultScrollbarTemplate;
             }
 
+            GameObject resourcePrefab = VanillaUiResources.LoadPrefab(VanillaUiPrefabCatalog.Scrollbar.Standard);
+            if (resourcePrefab != null)
+            {
+                Scrollbar resourceScrollbar = resourcePrefab.GetComponent<Scrollbar>();
+                if (resourceScrollbar == null)
+                {
+                    resourceScrollbar = resourcePrefab.GetComponentInChildren<Scrollbar>(true);
+                }
+                if (resourceScrollbar != null)
+                {
+                    defaultScrollbarTemplate = resourceScrollbar;
+                    return defaultScrollbarTemplate;
+                }
+            }
+
             PopupManager._type[] preference =
             {
                 PopupManager._type.producer_salaries,
@@ -4379,7 +4649,7 @@ namespace IMUiFramework
                 if (tmp != null)
                 {
                     buttonTextColor = tmp.color;
-                    if (tmp.font != null)
+                    if (tmp.font != null && defaultTmpFont == null)
                     {
                         defaultTmpFont = tmp.font;
                     }
@@ -4452,20 +4722,35 @@ namespace IMUiFramework
 
         private static void EnsureDefaultFonts()
         {
+            if (!defaultTmpFontExplicitlySet)
+            {
+                TMP_FontAsset selectedTmp = VanillaUiFonts.GetGameSelectedTmpFont();
+                if (selectedTmp != null) defaultTmpFont = selectedTmp;
+            }
             if (defaultTmpFont == null)
             {
-                TextMeshProUGUI[] tmps = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>();
-                for (int i = 0; i < tmps.Length; i++)
+                defaultTmpFont = VanillaUiFonts.GetMuipFont(VanillaMuipFontRole.Button);
+                if (defaultTmpFont == null) defaultTmpFont = VanillaUiFonts.GetLiberationSansSdf();
+                if (defaultTmpFont == null)
                 {
-                    TextMeshProUGUI tmp = tmps[i];
-                    if (tmp != null && tmp.font != null)
+                    TextMeshProUGUI[] tmps = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>();
+                    for (int i = 0; i < tmps.Length; i++)
                     {
-                        defaultTmpFont = tmp.font;
-                        break;
+                        TextMeshProUGUI tmp = tmps[i];
+                        if (tmp != null && tmp.font != null)
+                        {
+                            defaultTmpFont = tmp.font;
+                            break;
+                        }
                     }
                 }
             }
 
+            if (!defaultLegacyFontExplicitlySet)
+            {
+                Font selectedLegacy = VanillaUiFonts.GetGameSelectedLegacyFont();
+                if (selectedLegacy != null) defaultLegacyFont = selectedLegacy;
+            }
             if (defaultLegacyFont == null)
             {
                 Text[] texts = UnityEngine.Object.FindObjectsOfType<Text>();

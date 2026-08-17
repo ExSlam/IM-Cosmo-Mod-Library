@@ -1,4 +1,4 @@
-# IM UI Framework (Intermediary Mod)
+# IM UI Framework 2.0.3 (Intermediary Mod)
 
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
@@ -7,11 +7,78 @@ It targets three common problems:
 - Adding new buttons that match game style.
 - Building fully custom popups that still look and behave like base game UI.
 
+
+## 2.0.3: selected game font and vanilla corner shader
+
+- `IMUiKit.CreateText` now uses Idol Manager's currently selected game font by default, including runtime OS fonts through the TMP bridge.
+- `IMUiKit.ApplyGameFont(root)` normalizes TMP and legacy text in cloned/custom UI and keeps legacy `Text` tied to `Font_Replacer`.
+- Framework-created/cloned button labels now follow the selected game font unless a caller explicitly overrides the framework default.
+- `IMUiKit.TryApplyVanillaRoundedCorners` uses the shipped `UI/RoundedCorners/RoundedCorners` shader with live RectTransform dimensions, avoiding oversized rounded-button sprites for panel chrome.
+
+
+## 2.0.2: Idol Manager Unity compatibility fixes
+
+- Uses the parent library's shared `dll` directory for the additional `UnityEngine.TextCoreModule.dll` reference required by TMP `FaceInfo`.
+- Enumerates loaded fonts through a version-compatible reflection bridge instead of requiring the unavailable generic `Resources.FindObjectsOfTypeAll<T>()` overload.
+- Uses the correct `Dropdown.Dropdown_Multi_Select` catalog constant for the vanilla multi-select prefab.
+- Preserves the vanilla emergency-scrollbar ColorBlock values on Idol Manager's older UnityEngine.UI build even though several ColorBlock properties are read-only there.
+
+## 2.0.1: catalog compile fix
+
+- Fixed three C# CS0542 naming collisions in `VanillaUiPrefabCatalog`.
+- `Dropdown.Dropdown` is now `Dropdown.Standard`.
+- `Scrollbar.Scrollbar` is now `Scrollbar.Standard`.
+- `Tooltip.Tooltip` is now `Tooltip.Standard`.
+- Resource paths and runtime behavior are unchanged.
+
+## 2.0.0: vanilla-first asset layer
+
+Version 2.0.0 adds a resource-backed UI layer built from Idol Manager's shipped Unity assets and decompiled UI code. The framework now prefers the game's actual `Resources` prefabs over cloning whichever control happens to be instantiated in a popup.
+
+New public APIs:
+- `VanillaUiPrefabCatalog`: complete catalog of all 218 UI prefabs found under the game's exported `Resources` tree, including all 150 button variants.
+- `VanillaUiResources`: `Resources.Load`/instantiate helpers, typed control creators, per-instance MUIP theme assignment, and generic component/theme configuration callbacks.
+- `VanillaUiThemeSettings`: typed snapshot of every public setting on the shipped `MUIP Manager` `UIManager` ScriptableObject.
+- `VanillaUiFonts`: access to the game's selected/bundled legacy fonts, the TMP equivalent of the currently selected game font, loaded TMP fonts, MUIP role fonts, OS/external dynamic fonts, and runtime TMP font creation.
+- `IMUiBridges.TryCloneModernControl<T>(resourcePath, ...)`: explicit prefab-variant loading while retaining the old generic API.
+
+Existing 1.x APIs remain source-compatible. Known Modern UI Pack controls now load their real vanilla prefab first and only fall back to scene/popup template discovery if the resource is unavailable.
+
+See [`docs/Vanilla UI Asset Layer.md`](docs/Vanilla%20UI%20Asset%20Layer.md) for the 2.0.0 behavior, [`docs/Vanilla Prefab Catalog.md`](docs/Vanilla%20Prefab%20Catalog.md) for every resource prefab path, and [`docs/MUIP Vanilla Defaults.md`](docs/MUIP%20Vanilla%20Defaults.md) for every shipped `MUIP Manager` setting and default.
+
 ## Included API
 
 Namespace: `IMUiFramework`
 
 Main class: `IMUiKit`
+
+Vanilla asset layer:
+- `VanillaUiResources.GetMuipManager()` / `CloneMuipManager()`
+- `VanillaUiResources.LoadPrefab(...)` / `InstantiatePrefab(...)`
+- `VanillaUiResources.TryInstantiatePrefab<T>(...)`
+- `VanillaUiResources.TryCreateScrollbar(...)`
+- `VanillaUiResources.TryCreateModernButton(...)`
+- `VanillaUiResources.TryCreateDropdown(...)`
+- `VanillaUiResources.TryCreateInputField(...)`
+- `VanillaUiResources.TryCreateSlider(...)`
+- `VanillaUiResources.TryCreateSwitch(...)`
+- `VanillaUiResources.TryCreateToggle(...)`
+- `VanillaUiResources.TryCreateProgressBar(...)`
+- `VanillaUiResources.TryCreateLoopProgressBar(...)`
+- `VanillaUiResources.TryCreateFilledProgressBar(...)`
+- `VanillaUiResources.TryCreateListView(...)`
+- `VanillaUiResources.TryCreateMovableWindow(...)`
+- `VanillaUiResources.TryCreateModalWindow(...)`
+- `VanillaUiResources.TryCreateTooltip(...)`
+- `VanillaUiResources.TryCreateContextMenu(...)`
+- `VanillaUiResources.TryCreateHorizontalSelector(...)`
+- `VanillaUiResources.TryCreateNotification(...)`
+- `VanillaUiResources.TryCreateWindowManager(...)`
+- `VanillaUiThemeSettings.FromVanilla()`
+- `VanillaUiFonts.GetMuipFont(...)`
+- `VanillaUiFonts.GetGameSelectedLegacyFont()`
+- `VanillaUiFonts.LoadExternalOrOsLegacyFont(...)`
+- `VanillaUiFonts.LoadExternalOrOsTmpFont(...)`
 
 Core methods:
 - `TryAddTopMenuButton(...)`
@@ -388,3 +455,10 @@ Project file:
 
 Example command:
 - `dotnet build "mods/IM UI Framework/IM UI Framework.csproj" -c Release`
+
+
+## 2.0.3 font and corner behavior
+
+`IMUiKit.CreateText` now follows Idol Manager's active `Fonts.GetFont()` selection by default. `VanillaUiFonts.GetGameSelectedTmpFont()` matches a loaded TMP asset for bundled fonts and creates a runtime TMP asset for an OS/dynamic font when needed. Use `IMUiKit.ApplyGameFont(root)` to normalize cloned or manually-created TMP/legacy text under an existing hierarchy.
+
+`IMUiKit.TryApplyVanillaRoundedCorners(image, radius)` uses the game's shipped `UI/RoundedCorners/RoundedCorners` shader and updates `_WidthHeightRadius` whenever the target RectTransform changes. This is intended for the subtle 4-8 UI-unit corner radii used by vanilla panels and cards, not button-pill stretching.

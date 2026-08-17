@@ -3,13 +3,16 @@
     <ModName>IM UI Framework</ModName>
     <RootNamespace>IMUiFramework</RootNamespace>
     <AssemblyName>com.cosmo.imuiframework</AssemblyName>
-    <Version>1.3.0</Version>
+    <Version>2.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\IMUiFramework.cs" />
     <Compile Include="src\IMUiBridges.cs" />
     <Compile Include="src\IMUiTween.cs" />
+    <Compile Include="src\VanillaUiResources.cs" />
+    <Compile Include="src\VanillaUiTheme.cs" />
+    <Compile Include="src\VanillaUiFonts.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +21,9 @@
     </Reference>
     <Reference Include="UnityEngine" Private="false">
       <HintPath>$(dllDir)\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.TextCoreModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
