@@ -1,8 +1,11 @@
 {
   "Title": "Monthly Ledger",
-  "Description": "Adds a localized monthly income and expense ledger to the Action Hub with details including singles and concert incomes. Requires Mod Buttons, IM Data Core 2.0+, and IM UI Framework.",
+  "Description": "Adds a localized monthly income and expense ledger to the Action Hub with details including singles and concert incomes. Requires Mod Buttons, IM Data Core 2.0+, and IM UI Framework 2.0.3+.",
   "Author": "Cosmo",
-  "Version": "0.1.2",
-  "Tags": ["ui", "im-data-core"],
+  "Version": "0.2.3",
+  "Tags": [
+    "ui",
+    "im-data-core"
+  ],
   "HarmonyID": "com.cosmo.monthlyledger"
 }

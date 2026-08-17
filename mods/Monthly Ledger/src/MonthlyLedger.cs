@@ -5,11 +5,18 @@ using System.Collections.Generic;
 using HarmonyLib;
 using IMDataCore;
 using ModLocalizationSystem;
+using Michsky.UI.ModernUIPack;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 using IMUiKit = UiFrameworkReference::IMUiFramework.IMUiKit;
 using PopupScaffold = UiFrameworkReference::IMUiFramework.PopupScaffold;
+using VanillaMuipFontRole = UiFrameworkReference::IMUiFramework.VanillaMuipFontRole;
+using VanillaUiFonts = UiFrameworkReference::IMUiFramework.VanillaUiFonts;
+using VanillaUiPrefabCatalog = UiFrameworkReference::IMUiFramework.VanillaUiPrefabCatalog;
+using VanillaUiResources = UiFrameworkReference::IMUiFramework.VanillaUiResources;
+using VanillaUiThemeSettings = UiFrameworkReference::IMUiFramework.VanillaUiThemeSettings;
 
 namespace MonthlyLedger
 {
@@ -25,6 +32,10 @@ namespace MonthlyLedger
         internal const string PreviousButtonObjectName = "MonthlyLedger_PreviousMonth";
         internal const string NextButtonObjectName = "MonthlyLedger_NextMonth";
         internal const string MonthLabelObjectName = "MonthlyLedger_Month";
+        internal const string SearchRowObjectName = "MonthlyLedger_Search";
+        internal const string SearchInputObjectName = "MonthlyLedger_SearchInput";
+        internal const string ScrollbarGutterObjectName = "MonthlyLedger_ScrollbarGutter";
+        internal const string ResultsRootObjectName = "MonthlyLedger_Results";
         internal const string SummaryRowObjectName = "MonthlyLedger_Summary";
         internal const string IncomeSectionObjectName = "MonthlyLedger_Income";
         internal const string ExpenseSectionObjectName = "MonthlyLedger_Expenses";
@@ -33,6 +44,10 @@ namespace MonthlyLedger
         internal const string CategoryObjectPrefix = "MonthlyLedger_Category_";
         internal const string CategoryHeaderObjectName = "CategoryHeader";
         internal const string RecordRowObjectName = "Record";
+        internal const string CategoryRecordsObjectName = "Records";
+        internal const string CategoryCollapseObjectName = "Collapse";
+        internal const string CategoryCollapseOpenObjectName = "Open";
+        internal const string CategoryCollapseClosedObjectName = "Closed";
         internal const string SummaryCardObjectPrefix = "SummaryCard_";
         internal const string LabelObjectName = "Label";
         internal const string ValueObjectName = "Value";
@@ -40,6 +55,8 @@ namespace MonthlyLedger
         internal const string DateObjectName = "Date";
         internal const string PreviousArrowText = "<";
         internal const string NextArrowText = ">";
+        internal const string FallbackExpandedGlyph = "▼";
+        internal const string FallbackCollapsedGlyph = "▶";
         internal const string DateFormatMonth = "DATETIME__MONTH";
         internal const string DateFormatRecord = "DATETIME__SHORT";
         internal const string PositivePrefix = "+";
@@ -116,6 +133,8 @@ namespace MonthlyLedger
         internal const string KeyIncome = "ui.income";
         internal const string KeyExpenses = "ui.expenses";
         internal const string KeyNetRevenue = "ui.net_revenue";
+        internal const string KeySearchPlaceholder = "ui.search_placeholder";
+        internal const string KeyNoSearchResults = "state.no_search_results";
         internal const string KeyNoCompleteMonth = "state.no_complete_month";
         internal const string KeyNoTransactions = "state.no_transactions";
         internal const string KeyTruncated = "state.truncated";
@@ -156,6 +175,8 @@ namespace MonthlyLedger
         internal const string FallbackIncome = "Income";
         internal const string FallbackExpenses = "Expenses";
         internal const string FallbackNetRevenue = "Net revenue";
+        internal const string FallbackSearchPlaceholder = "Search transactions...";
+        internal const string FallbackNoSearchResults = "No transactions match this search.";
         internal const string FallbackNoCompleteMonth = "No fully recorded completed month is available yet.";
         internal const string FallbackNoTransactions = "No transactions were recorded for this month.";
         internal const string FallbackTruncated = "This month contains more records than can be displayed. Totals shown are incomplete.";
@@ -173,15 +194,17 @@ namespace MonthlyLedger
         internal const int NextMonthOffset = 1;
         internal const int MaximumTransactionCount = 10000;
         internal const int ZeroIndex = 0;
-        internal const int TitleFontSize = 24;
-        internal const int SummaryLabelFontSize = 17;
-        internal const int SummaryValueFontSize = 23;
-        internal const int SectionFontSize = 24;
-        internal const int CategoryFontSize = 19;
-        internal const int RecordFontSize = 16;
+        internal const int TitleFontSize = 22;
+        internal const int SummaryLabelFontSize = 16;
+        internal const int SummaryValueFontSize = 21;
+        internal const int SectionFontSize = 22;
+        internal const int CategoryFontSize = 18;
+        internal const int RecordFontSize = 15;
         internal const int StateFontSize = 20;
-        internal const int PopupTitleFontSize = 28;
+        internal const int PopupTitleFontSize = 27;
         internal const int CloseButtonFontSize = 18;
+        internal const int ArrowButtonFontSize = 22;
+        internal const int CollapseGlyphFontSize = 16;
         internal const int LayoutPadding = 8;
         internal const int CategoryPadding = 6;
         internal const int RecordLeftPadding = 18;
@@ -194,26 +217,41 @@ namespace MonthlyLedger
         internal const float PopupScrollRightInset = -16f;
         internal const float PopupScrollBottomInset = 56f;
         internal const float PopupScrollTopInset = -58f;
-        internal const float PopupViewportScrollbarGutter = -30f;
-        internal const float PopupScrollbarWidth = 12f;
-        internal const float PopupScrollbarRightOffset = -2f;
-        internal const float CloseButtonWidth = 140f;
-        internal const float CloseButtonHeight = 32f;
+        internal const float PopupViewportScrollbarGutter = -24f;
+        internal const int ContentPaddingLeft = 24;
+        internal const int ContentPaddingRight = 8;
+        internal const float SearchRowHeight = 42f;
+        internal const float SearchInputWidth = 520f;
+        internal const float SearchInputHeight = 36f;
+        internal const float PopupCornerRadius = 6f;
+        internal const float SurfaceCornerRadius = 5f;
+        internal const float CardCornerRadius = 5f;
+        internal const float SearchCornerRadius = 4f;
+        internal const float CategoryCornerRadius = 4f;
+        internal const float VanillaScrollbarWidth = 20f;
+        internal const float VanillaScrollbarRightOffset = -3f;
+        internal const float VanillaScrollbarSpacing = 4f;
+        internal const float ScrollbarGutterWidth = 16f;
+        internal const float ScrollbarGutterRightOffset = -2f;
+        internal const float ScrollbarGutterVerticalInset = 8f;
+        internal const float CloseButtonWidth = 150f;
+        internal const float CloseButtonHeight = 36f;
         internal const float CloseButtonBottomOffset = 10f;
-        internal const float NavigationHeight = 44f;
-        internal const float ArrowButtonWidth = 52f;
-        internal const float ArrowButtonHeight = 34f;
-        internal const float MonthLabelWidth = 620f;
-        internal const float SummaryHeight = 86f;
-        internal const float SummaryCardWidth = 260f;
-        internal const float SectionHeadingHeight = 34f;
-        internal const float CategoryHeaderHeight = 32f;
+        internal const float NavigationHeight = 40f;
+        internal const float ArrowButtonWidth = 48f;
+        internal const float ArrowButtonHeight = 32f;
+        internal const float MonthLabelWidth = 300f;
+        internal const float SummaryHeight = 80f;
+        internal const float SummaryCardWidth = 245f;
+        internal const float SectionHeadingHeight = 32f;
+        internal const float CategoryHeaderHeight = 30f;
+        internal const float CategoryCollapseWidth = 28f;
         internal const float RecordHeight = 27f;
         internal const float DetailedRecordLineHeight = 22f;
         internal const float DetailedRecordVerticalPadding = 8f;
-        internal const float RecordDateWidth = 130f;
-        internal const float RecordDetailWidth = 480f;
-        internal const float RecordAmountWidth = 200f;
+        internal const float RecordDateWidth = 118f;
+        internal const float RecordDetailWidth = 445f;
+        internal const float RecordAmountWidth = 175f;
         internal const float LayoutSpacing = 7f;
         internal const float SmallLayoutSpacing = 3f;
         internal const float ScrollTopPosition = 1f;
@@ -245,6 +283,8 @@ namespace MonthlyLedger
         internal static string Income { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyIncome, MonthlyLedgerConstants.FallbackIncome); } }
         internal static string Expenses { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyExpenses, MonthlyLedgerConstants.FallbackExpenses); } }
         internal static string NetRevenue { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNetRevenue, MonthlyLedgerConstants.FallbackNetRevenue); } }
+        internal static string SearchPlaceholder { get { return ModLocalization.Get(MonthlyLedgerConstants.KeySearchPlaceholder, MonthlyLedgerConstants.FallbackSearchPlaceholder); } }
+        internal static string NoSearchResults { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoSearchResults, MonthlyLedgerConstants.FallbackNoSearchResults); } }
         internal static string NoCompleteMonth { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoCompleteMonth, MonthlyLedgerConstants.FallbackNoCompleteMonth); } }
         internal static string NoTransactions { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoTransactions, MonthlyLedgerConstants.FallbackNoTransactions); } }
         internal static string Truncated { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyTruncated, MonthlyLedgerConstants.FallbackTruncated); } }
@@ -401,6 +441,12 @@ namespace MonthlyLedger
         private static DateTime earliestMonth;
         private static DateTime latestMonth;
         private static DateTime selectedMonth;
+        private static readonly HashSet<string> CollapsedCategoryKeys = new HashSet<string>(StringComparer.Ordinal);
+        private static GameObject vanillaGroupCollapseTemplate;
+        private static List<IMDataCoreMoneyTransaction> currentTransactions = new List<IMDataCoreMoneyTransaction>();
+        private static bool currentWasTruncated;
+        private static string searchQuery = string.Empty;
+        private static Transform resultsRoot;
 
         internal static void Initialize(PopupManager manager)
         {
@@ -458,6 +504,8 @@ namespace MonthlyLedger
                 RectTransform closeRect = scaffold.CloseButton.GetComponent<RectTransform>();
                 if (closeRect != null)
                 {
+                    // Keep the framework/game button's normal 36px height instead of the old
+                    // ledger-specific 32px squeeze. Width is normalized to the vanilla scaffold.
                     closeRect.sizeDelta = new Vector2(MonthlyLedgerConstants.CloseButtonWidth, MonthlyLedgerConstants.CloseButtonHeight);
                     closeRect.anchoredPosition = new Vector2(MonthlyLedgerConstants.ZeroSize, MonthlyLedgerConstants.CloseButtonBottomOffset);
                 }
@@ -471,6 +519,7 @@ namespace MonthlyLedger
 
             if (scaffold.ScrollRect == null)
             {
+                ApplyGameFont(scaffold.Root);
                 return;
             }
 
@@ -488,13 +537,19 @@ namespace MonthlyLedger
                 viewportRect.offsetMax = new Vector2(MonthlyLedgerConstants.PopupViewportScrollbarGutter, MonthlyLedgerConstants.ZeroSize);
             }
 
-            Scrollbar scrollbar = scaffold.ScrollRect.verticalScrollbar;
-            RectTransform scrollbarRect = scrollbar != null ? scrollbar.GetComponent<RectTransform>() : null;
-            if (scrollbarRect != null)
+            VerticalLayoutGroup contentLayout = scaffold.ContentRoot != null ? scaffold.ContentRoot.GetComponent<VerticalLayoutGroup>() : null;
+            if (contentLayout != null)
             {
-                scrollbarRect.sizeDelta = new Vector2(MonthlyLedgerConstants.PopupScrollbarWidth, MonthlyLedgerConstants.ZeroSize);
-                scrollbarRect.anchoredPosition = new Vector2(MonthlyLedgerConstants.PopupScrollbarRightOffset, MonthlyLedgerConstants.ZeroSize);
+                contentLayout.padding = new RectOffset(
+                    MonthlyLedgerConstants.ContentPaddingLeft,
+                    MonthlyLedgerConstants.ContentPaddingRight,
+                    MonthlyLedgerConstants.LayoutPadding,
+                    MonthlyLedgerConstants.LayoutPadding);
             }
+
+            ApplyRoundedPopupChrome();
+            EnsureVanillaScrollbar();
+            ApplyGameFont(scaffold.Root);
         }
 
         internal static void Open()
@@ -589,37 +644,25 @@ namespace MonthlyLedger
                 return;
             }
 
+            currentTransactions = transactions ?? new List<IMDataCoreMoneyTransaction>();
+            currentWasTruncated = wasTruncated;
+            CreateSearchBar();
+
             long incomeTotal = MonthlyLedgerConstants.ZeroMoney;
             long expenseTotal = MonthlyLedgerConstants.ZeroMoney;
-            for (int transactionIndex = MonthlyLedgerConstants.ZeroIndex; transactionIndex < transactions.Count; transactionIndex++)
+            for (int transactionIndex = MonthlyLedgerConstants.ZeroIndex; transactionIndex < currentTransactions.Count; transactionIndex++)
             {
-                long amount = transactions[transactionIndex].Amount;
-                if (amount > MonthlyLedgerConstants.ZeroMoney)
-                {
-                    incomeTotal += amount;
-                }
-                else
-                {
-                    expenseTotal += amount;
-                }
+                long amount = currentTransactions[transactionIndex].Amount;
+                if (amount > MonthlyLedgerConstants.ZeroMoney) incomeTotal += amount;
+                else expenseTotal += amount;
             }
-
             CreateSummaryRow(incomeTotal, expenseTotal, incomeTotal + expenseTotal);
-            if (wasTruncated)
-            {
-                CreateWarningText(MonthlyLedgerText.Truncated);
-            }
 
-            if (transactions.Count == MonthlyLedgerConstants.ZeroIndex)
-            {
-                CreateStateText(MonthlyLedgerText.NoTransactions);
-                FinishRender();
-                return;
-            }
-
-            List<LedgerCategoryGroup> groups = BuildGroups(transactions);
-            CreateSection(MonthlyLedgerText.Income, groups, true, MonthlyLedgerConstants.IncomeSectionObjectName);
-            CreateSection(MonthlyLedgerText.Expenses, groups, false, MonthlyLedgerConstants.ExpenseSectionObjectName);
+            GameObject body = IMUiKit.CreateVerticalLayoutContainer(
+                scaffold.ContentRoot, MonthlyLedgerConstants.ResultsRootObjectName, MonthlyLedgerConstants.SmallLayoutSpacing,
+                0, 0, 0, 0, true, false, true);
+            resultsRoot = body.transform;
+            RenderFilteredResults();
             FinishRender();
         }
 
@@ -644,13 +687,17 @@ namespace MonthlyLedger
                 false,
                 false);
             SetPreferredSize(row, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.NavigationHeight);
+            HorizontalLayoutGroup navigationLayout = row.GetComponent<HorizontalLayoutGroup>();
+            if (navigationLayout != null)
+            {
+                navigationLayout.childAlignment = TextAnchor.MiddleCenter;
+                navigationLayout.spacing = 12f;
+            }
 
-            Button previous = IMUiKit.CreateStyledButton(
+            Button previous = CreateVanillaMonthButton(
                 row.transform,
                 MonthlyLedgerConstants.PreviousButtonObjectName,
                 MonthlyLedgerConstants.PreviousArrowText,
-                MonthlyLedgerConstants.ArrowButtonWidth,
-                MonthlyLedgerConstants.ArrowButtonHeight,
                 ShowPreviousMonth);
             TextMeshProUGUI month = IMUiKit.CreateText(
                 row.transform,
@@ -660,15 +707,130 @@ namespace MonthlyLedger
                 TextAlignmentOptions.Center,
                 mainScript.black32);
             SetPreferredSize(month.gameObject, MonthlyLedgerConstants.MonthLabelWidth, MonthlyLedgerConstants.NavigationHeight);
-            Button next = IMUiKit.CreateStyledButton(
+            Button next = CreateVanillaMonthButton(
                 row.transform,
                 MonthlyLedgerConstants.NextButtonObjectName,
                 MonthlyLedgerConstants.NextArrowText,
-                MonthlyLedgerConstants.ArrowButtonWidth,
-                MonthlyLedgerConstants.ArrowButtonHeight,
                 ShowNextMonth);
             SetButtonActive(previous, selectedMonth > earliestMonth);
             SetButtonActive(next, selectedMonth < latestMonth);
+        }
+
+        private static void CreateSearchBar()
+        {
+            GameObject row = IMUiKit.CreateHorizontalLayoutContainer(
+                scaffold.ContentRoot, MonthlyLedgerConstants.SearchRowObjectName, 0f, 0, 0, 0, 0, false, false, false);
+            SetPreferredSize(row, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.SearchRowHeight);
+            HorizontalLayoutGroup rowLayout = row.GetComponent<HorizontalLayoutGroup>();
+            if (rowLayout != null) rowLayout.childAlignment = TextAnchor.MiddleCenter;
+
+            GameObject instance;
+            CustomInputField manager;
+            if (VanillaUiResources.TryCreateInputField(
+                row.transform, MonthlyLedgerConstants.SearchInputObjectName, out instance, out manager,
+                VanillaUiPrefabCatalog.InputField.Input_Field_Standard_Middle,
+                null,
+                delegate(VanillaUiThemeSettings theme)
+                {
+                    TMP_FontAsset gameFont = ResolveGameTmpFont();
+                    if (gameFont != null) theme.inputFieldFont = gameFont;
+                    theme.inputFieldFontSize = MonthlyLedgerConstants.RecordFontSize;
+                    theme.inputFieldColor = mainScript.black32;
+                }))
+            {
+                RectTransform rect = instance.GetComponent<RectTransform>();
+                if (rect != null) rect.sizeDelta = new Vector2(MonthlyLedgerConstants.SearchInputWidth, MonthlyLedgerConstants.SearchInputHeight);
+                SetPreferredSize(instance, MonthlyLedgerConstants.SearchInputWidth, MonthlyLedgerConstants.SearchInputHeight);
+                ApplyRoundedImage(instance, SummaryCardColor, MonthlyLedgerConstants.SearchCornerRadius).raycastTarget = true;
+
+                TMP_InputField input = instance.GetComponent<TMP_InputField>();
+                if (input == null) input = instance.GetComponentInChildren<TMP_InputField>(true);
+                if (input != null)
+                {
+                    input.text = searchQuery;
+                    input.caretColor = mainScript.blue32;
+                    Color selection = mainScript.blue32;
+                    selection.a = 0.28f;
+                    input.selectionColor = selection;
+                    TMP_Text text = input.textComponent;
+                    if (text != null)
+                    {
+                        text.color = mainScript.black32;
+                        text.fontSize = MonthlyLedgerConstants.RecordFontSize;
+                        TMP_FontAsset font = ResolveGameTmpFont();
+                        if (font != null) text.font = font;
+                    }
+                    Transform placeholderTransform = instance.transform.Find("Placeholder");
+                    TMP_Text placeholder = placeholderTransform != null ? placeholderTransform.GetComponent<TMP_Text>() : null;
+                    if (placeholder != null)
+                    {
+                        placeholder.text = MonthlyLedgerText.SearchPlaceholder;
+                        placeholder.color = mainScript.grey_light32;
+                        placeholder.fontSize = MonthlyLedgerConstants.RecordFontSize;
+                        TMP_FontAsset font = ResolveGameTmpFont();
+                        if (font != null) placeholder.font = font;
+                    }
+                    input.onValueChanged = new TMP_InputField.OnChangeEvent();
+                    input.onValueChanged.AddListener(OnSearchChanged);
+                }
+            }
+        }
+
+        private static void OnSearchChanged(string value)
+        {
+            searchQuery = (value ?? string.Empty).Trim();
+            RenderFilteredResults();
+        }
+
+        private static void RenderFilteredResults()
+        {
+            if (resultsRoot == null) return;
+            IMUiKit.ClearChildren(resultsRoot);
+            if (currentWasTruncated) CreateWarningText(resultsRoot, MonthlyLedgerText.Truncated);
+            if (currentTransactions == null || currentTransactions.Count == 0)
+            {
+                CreateStateText(resultsRoot, MonthlyLedgerText.NoTransactions);
+                ApplyGameFont(resultsRoot.gameObject);
+                IMUiKit.RebuildLayout(scaffold.ContentRoot);
+                return;
+            }
+
+            List<IMDataCoreMoneyTransaction> filtered = new List<IMDataCoreMoneyTransaction>();
+            for (int i = 0; i < currentTransactions.Count; i++)
+            {
+                if (TransactionMatchesSearch(currentTransactions[i], searchQuery)) filtered.Add(currentTransactions[i]);
+            }
+            if (filtered.Count == 0)
+            {
+                CreateStateText(resultsRoot, MonthlyLedgerText.NoSearchResults);
+                ApplyGameFont(resultsRoot.gameObject);
+                IMUiKit.RebuildLayout(scaffold.ContentRoot);
+                return;
+            }
+
+            List<LedgerCategoryGroup> groups = BuildGroups(filtered);
+            CreateSection(resultsRoot, MonthlyLedgerText.Income, groups, true, MonthlyLedgerConstants.IncomeSectionObjectName);
+            CreateSection(resultsRoot, MonthlyLedgerText.Expenses, groups, false, MonthlyLedgerConstants.ExpenseSectionObjectName);
+            ApplyGameFont(resultsRoot.gameObject);
+            IMUiKit.RebuildLayout(scaffold.ContentRoot);
+        }
+
+        private static bool TransactionMatchesSearch(IMDataCoreMoneyTransaction transaction, string query)
+        {
+            if (string.IsNullOrEmpty(query)) return true;
+            string category = MonthlyLedgerText.Category(transaction.CategoryCode ?? string.Empty);
+            string detail = MonthlyLedgerDetailText.Format(transaction);
+            string amount = FormatSignedMoney(transaction.Amount);
+            string date = transaction.GameDateTime ?? string.Empty;
+            DateTime parsed;
+            if (DateTime.TryParse(transaction.GameDateTime, out parsed)) date += " " + ExtensionMethods.ToString_Loc(parsed, MonthlyLedgerConstants.DateFormatRecord);
+            return ContainsIgnoreCase(category, query) || ContainsIgnoreCase(detail, query) || ContainsIgnoreCase(amount, query)
+                || ContainsIgnoreCase(date, query) || ContainsIgnoreCase(transaction.CategoryCode, query) || ContainsIgnoreCase(transaction.DetailCode, query);
+        }
+
+        private static bool ContainsIgnoreCase(string value, string query)
+        {
+            return !string.IsNullOrEmpty(value) && value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static void CreateSummaryRow(long income, long expenses, long netRevenue)
@@ -703,7 +865,7 @@ namespace MonthlyLedger
                 true,
                 false,
                 false);
-            card.AddComponent<Image>().color = SummaryCardColor;
+            ApplyRoundedImage(card, SummaryCardColor, MonthlyLedgerConstants.CardCornerRadius);
             SetPreferredSize(card, MonthlyLedgerConstants.SummaryCardWidth, MonthlyLedgerConstants.SummaryHeight);
             IMUiKit.CreateText(card.transform, MonthlyLedgerConstants.LabelObjectName, label, MonthlyLedgerConstants.SummaryLabelFontSize, TextAlignmentOptions.Center, mainScript.black32);
             IMUiKit.CreateText(card.transform, MonthlyLedgerConstants.ValueObjectName, FormatSignedMoney(value), MonthlyLedgerConstants.SummaryValueFontSize, TextAlignmentOptions.Center, valueColor);
@@ -757,10 +919,10 @@ namespace MonthlyLedger
             return MonthlyLedgerConstants.CategoryOrder.Length;
         }
 
-        private static void CreateSection(string heading, List<LedgerCategoryGroup> groups, bool income, string objectName)
+        private static void CreateSection(Transform parent, string heading, List<LedgerCategoryGroup> groups, bool income, string objectName)
         {
             GameObject section = IMUiKit.CreateVerticalLayoutContainer(
-                scaffold.ContentRoot,
+                parent,
                 objectName,
                 MonthlyLedgerConstants.SmallLayoutSpacing,
                 MonthlyLedgerConstants.ZeroIndex,
@@ -786,6 +948,9 @@ namespace MonthlyLedger
 
         private static void CreateCategory(Transform parent, LedgerCategoryGroup group)
         {
+            string stateKey = GetCategoryStateKey(group);
+            bool expanded = !CollapsedCategoryKeys.Contains(stateKey);
+
             GameObject category = IMUiKit.CreateVerticalLayoutContainer(
                 parent,
                 MonthlyLedgerConstants.CategoryObjectPrefix + group.CategoryCode,
@@ -805,19 +970,196 @@ namespace MonthlyLedger
                 MonthlyLedgerConstants.CategoryPadding,
                 MonthlyLedgerConstants.ZeroIndex,
                 MonthlyLedgerConstants.ZeroIndex,
-                true,
+                false,
                 false,
                 false);
-            header.AddComponent<Image>().color = CategoryHeaderColor;
+            Image headerImage = ApplyRoundedImage(header, CategoryHeaderColor, MonthlyLedgerConstants.CategoryCornerRadius);
             SetPreferredSize(header, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.CategoryHeaderHeight);
+
+            GameObject collapseIndicator = CreateVanillaCollapseIndicator(header.transform, expanded);
             TextMeshProUGUI label = IMUiKit.CreateText(header.transform, MonthlyLedgerConstants.LabelObjectName, MonthlyLedgerText.Category(group.CategoryCode), MonthlyLedgerConstants.CategoryFontSize, TextAlignmentOptions.Left, mainScript.black32);
             SetFlexibleWidth(label.gameObject);
             TextMeshProUGUI total = IMUiKit.CreateText(header.transform, MonthlyLedgerConstants.ValueObjectName, FormatSignedMoney(group.Total), MonthlyLedgerConstants.CategoryFontSize, TextAlignmentOptions.Right, group.IsIncome ? mainScript.green32 : mainScript.red32);
             SetPreferredSize(total.gameObject, MonthlyLedgerConstants.RecordAmountWidth, MonthlyLedgerConstants.CategoryHeaderHeight);
 
+            GameObject records = IMUiKit.CreateVerticalLayoutContainer(
+                category.transform,
+                MonthlyLedgerConstants.CategoryRecordsObjectName,
+                MonthlyLedgerConstants.SmallLayoutSpacing,
+                MonthlyLedgerConstants.ZeroIndex,
+                MonthlyLedgerConstants.ZeroIndex,
+                MonthlyLedgerConstants.ZeroIndex,
+                MonthlyLedgerConstants.ZeroIndex,
+                true,
+                false,
+                true);
             for (int recordIndex = MonthlyLedgerConstants.ZeroIndex; recordIndex < group.Records.Count; recordIndex++)
             {
-                CreateRecord(category.transform, group.Records[recordIndex], group.IsIncome);
+                CreateRecord(records.transform, group.Records[recordIndex], group.IsIncome);
+            }
+            records.SetActive(expanded);
+
+            // The vanilla idol list stores a Showing flag on the group and rebuilds the list
+            // when Group_Title.OnCollapse toggles it. Monthly Ledger mirrors that model with a
+            // per-category state key while keeping the category total visible in the header.
+            Button headerButton = header.AddComponent<Button>();
+            headerButton.targetGraphic = headerImage;
+            headerButton.onClick.AddListener(delegate
+            {
+                ToggleCategory(stateKey, records, collapseIndicator);
+            });
+        }
+
+        private static string GetCategoryStateKey(LedgerCategoryGroup group)
+        {
+            return (group.IsIncome ? MonthlyLedgerConstants.SectionIncome : MonthlyLedgerConstants.SectionExpense)
+                + MonthlyLedgerConstants.CategorySignSeparator
+                + group.CategoryCode;
+        }
+
+        private static void ToggleCategory(string stateKey, GameObject records, GameObject collapseIndicator)
+        {
+            if (records == null)
+            {
+                return;
+            }
+
+            bool expanded = !records.activeSelf;
+            records.SetActive(expanded);
+            if (expanded)
+            {
+                CollapsedCategoryKeys.Remove(stateKey);
+            }
+            else
+            {
+                CollapsedCategoryKeys.Add(stateKey);
+            }
+
+            UpdateCollapseIndicator(collapseIndicator, expanded);
+            if (scaffold != null && scaffold.ContentRoot != null)
+            {
+                IMUiKit.RebuildLayout(scaffold.ContentRoot);
+            }
+        }
+
+        private static GameObject CreateVanillaCollapseIndicator(Transform parent, bool expanded)
+        {
+            GameObject template = GetVanillaGroupCollapseTemplate();
+            if (template != null)
+            {
+                GameObject clone = UnityEngine.Object.Instantiate(template, parent, false);
+                clone.name = MonthlyLedgerConstants.CategoryCollapseObjectName;
+                IMUiKit.ApplyLayerRecursively(clone, parent.gameObject.layer);
+
+                // The source control has a persistent Group_Title.OnCollapse callback. This
+                // clone is visual-only; the category header owns the click behavior.
+                Button sourceButton = clone.GetComponent<Button>();
+                if (sourceButton != null)
+                {
+                    sourceButton.onClick = new Button.ButtonClickedEvent();
+                    sourceButton.enabled = false;
+                }
+                ButtonDefault sourceDefault = clone.GetComponent<ButtonDefault>();
+                if (sourceDefault != null)
+                {
+                    sourceDefault.enabled = false;
+                }
+                Graphic[] graphics = clone.GetComponentsInChildren<Graphic>(true);
+                for (int graphicIndex = MonthlyLedgerConstants.ZeroIndex; graphicIndex < graphics.Length; graphicIndex++)
+                {
+                    if (graphics[graphicIndex] != null)
+                    {
+                        graphics[graphicIndex].raycastTarget = false;
+                    }
+                }
+
+                SetPreferredSize(clone, MonthlyLedgerConstants.CategoryCollapseWidth, MonthlyLedgerConstants.CategoryHeaderHeight);
+                UpdateCollapseIndicator(clone, expanded);
+                return clone;
+            }
+
+            TextMeshProUGUI fallback = IMUiKit.CreateText(
+                parent,
+                MonthlyLedgerConstants.CategoryCollapseObjectName,
+                expanded ? MonthlyLedgerConstants.FallbackExpandedGlyph : MonthlyLedgerConstants.FallbackCollapsedGlyph,
+                MonthlyLedgerConstants.CollapseGlyphFontSize,
+                TextAlignmentOptions.Center,
+                mainScript.grey_light32);
+            SetPreferredSize(fallback.gameObject, MonthlyLedgerConstants.CategoryCollapseWidth, MonthlyLedgerConstants.CategoryHeaderHeight);
+            return fallback.gameObject;
+        }
+
+        private static GameObject GetVanillaGroupCollapseTemplate()
+        {
+            if (vanillaGroupCollapseTemplate != null)
+            {
+                return vanillaGroupCollapseTemplate;
+            }
+
+            if (Camera.main == null)
+            {
+                return null;
+            }
+            mainScript main = Camera.main.GetComponent<mainScript>();
+            if (main == null || main.Data == null)
+            {
+                return null;
+            }
+            data_girls girls = main.Data.GetComponent<data_girls>();
+            if (girls == null || girls.prefab_group == null)
+            {
+                return null;
+            }
+
+            Group_Title groupTitle = girls.prefab_group.GetComponent<Group_Title>();
+            if (groupTitle == null)
+            {
+                groupTitle = girls.prefab_group.GetComponentInChildren<Group_Title>(true);
+            }
+            if (groupTitle == null)
+            {
+                return null;
+            }
+
+            GameObject open = groupTitle.Collapse_Opened;
+            GameObject closed = groupTitle.Collapse_Closed;
+            Transform collapse = open != null && open.transform.parent != null
+                ? open.transform.parent
+                : (closed != null ? closed.transform.parent : null);
+            if (collapse != null)
+            {
+                vanillaGroupCollapseTemplate = collapse.gameObject;
+            }
+            return vanillaGroupCollapseTemplate;
+        }
+
+        private static void UpdateCollapseIndicator(GameObject indicator, bool expanded)
+        {
+            if (indicator == null)
+            {
+                return;
+            }
+
+            Transform open = indicator.transform.Find(MonthlyLedgerConstants.CategoryCollapseOpenObjectName);
+            if (open == null) open = indicator.transform.Find("Opened");
+            Transform closed = indicator.transform.Find(MonthlyLedgerConstants.CategoryCollapseClosedObjectName);
+            if (open != null || closed != null)
+            {
+                if (open != null)
+                {
+                    open.gameObject.SetActive(expanded);
+                }
+                if (closed != null)
+                {
+                    closed.gameObject.SetActive(!expanded);
+                }
+                return;
+            }
+
+            TextMeshProUGUI fallback = indicator.GetComponent<TextMeshProUGUI>();
+            if (fallback != null)
+            {
+                fallback.text = expanded ? MonthlyLedgerConstants.FallbackExpandedGlyph : MonthlyLedgerConstants.FallbackCollapsedGlyph;
             }
         }
 
@@ -859,25 +1201,254 @@ namespace MonthlyLedger
             SetPreferredSize(amount.gameObject, MonthlyLedgerConstants.RecordAmountWidth, rowHeight);
         }
 
-        private static void CreateStateText(string message)
+        private static void CreateStateText(string message) { CreateStateText(scaffold.ContentRoot, message); }
+        private static void CreateStateText(Transform parent, string message)
         {
-            TextMeshProUGUI text = IMUiKit.CreateText(scaffold.ContentRoot, MonthlyLedgerConstants.EmptyStateObjectName, message, MonthlyLedgerConstants.StateFontSize, TextAlignmentOptions.Center, mainScript.grey_light32);
+            TextMeshProUGUI text = IMUiKit.CreateText(parent, MonthlyLedgerConstants.EmptyStateObjectName, message, MonthlyLedgerConstants.StateFontSize, TextAlignmentOptions.Center, mainScript.grey_light32, ResolveGameTmpFont());
             text.enableWordWrapping = true;
         }
 
-        private static void CreateWarningText(string message)
+        private static void CreateWarningText(string message) { CreateWarningText(scaffold.ContentRoot, message); }
+        private static void CreateWarningText(Transform parent, string message)
         {
-            TextMeshProUGUI text = IMUiKit.CreateText(scaffold.ContentRoot, MonthlyLedgerConstants.WarningObjectName, message, MonthlyLedgerConstants.RecordFontSize, TextAlignmentOptions.Center, mainScript.red32);
+            TextMeshProUGUI text = IMUiKit.CreateText(parent, MonthlyLedgerConstants.WarningObjectName, message, MonthlyLedgerConstants.RecordFontSize, TextAlignmentOptions.Center, mainScript.red32, ResolveGameTmpFont());
             text.enableWordWrapping = true;
         }
 
         private static void FinishRender()
         {
+            ApplyGameFont(scaffold.Root);
             IMUiKit.RebuildLayout(scaffold.ContentRoot);
             if (scaffold.ScrollRect != null)
             {
                 scaffold.ScrollRect.verticalNormalizedPosition = MonthlyLedgerConstants.ScrollTopPosition;
             }
+        }
+
+        private static Button CreateVanillaMonthButton(Transform parent, string objectName, string label, UnityAction onClick)
+        {
+            GameObject instance;
+            ButtonManagerBasic manager;
+            if (VanillaUiResources.TryCreateBasicButton(
+                parent,
+                objectName,
+                out instance,
+                out manager,
+                VanillaUiPrefabCatalog.Button.basic_Pink,
+                delegate(ButtonManagerBasic control)
+                {
+                    control.buttonText = label;
+                    control.useCustomContent = false;
+                    control.UpdateUI();
+                }))
+            {
+                RectTransform rect = instance.GetComponent<RectTransform>();
+                if (rect != null)
+                {
+                    rect.sizeDelta = new Vector2(MonthlyLedgerConstants.ArrowButtonWidth, MonthlyLedgerConstants.ArrowButtonHeight);
+                }
+                SetPreferredSize(instance, MonthlyLedgerConstants.ArrowButtonWidth, MonthlyLedgerConstants.ArrowButtonHeight);
+
+                TextMeshProUGUI buttonText = instance.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (buttonText != null)
+                {
+                    buttonText.text = label;
+                    buttonText.fontSize = MonthlyLedgerConstants.ArrowButtonFontSize;
+                    buttonText.alignment = TextAlignmentOptions.Center;
+                    TMP_FontAsset gameFont = ResolveGameTmpFont();
+                    if (gameFont != null)
+                    {
+                        VanillaUiFonts.Apply(buttonText, gameFont);
+                    }
+                }
+
+                Button button = instance.GetComponent<Button>();
+                if (button == null)
+                {
+                    button = instance.GetComponentInChildren<Button>(true);
+                }
+                if (button != null)
+                {
+                    button.onClick = new Button.ButtonClickedEvent();
+                    if (onClick != null)
+                    {
+                        button.onClick.AddListener(onClick);
+                    }
+                    return button;
+                }
+
+                UnityEngine.Object.Destroy(instance);
+            }
+
+            // Resource failure is not fatal; retain the framework's old safe fallback.
+            return IMUiKit.CreateStyledButton(
+                parent,
+                objectName,
+                label,
+                MonthlyLedgerConstants.ArrowButtonWidth,
+                MonthlyLedgerConstants.ArrowButtonHeight,
+                onClick);
+        }
+
+        private static void EnsureVanillaScrollbar()
+        {
+            if (scaffold == null || scaffold.ScrollRect == null) return;
+
+            IMUiKit.ApplyVanillaScrollDefaults(scaffold.ScrollRect);
+            Scrollbar scrollbar = scaffold.ScrollRect.verticalScrollbar;
+            bool hasVanillaHierarchy = scrollbar != null
+                && scrollbar.transform.Find("Background") != null
+                && scrollbar.transform.Find("Sliding Area/Handle") != null;
+
+            if (!hasVanillaHierarchy)
+            {
+                GameObject scrollbarObject;
+                Scrollbar vanillaScrollbar;
+                if (VanillaUiResources.TryCreateScrollbar(
+                    scaffold.ScrollRect.transform,
+                    "Scrollbar",
+                    out scrollbarObject,
+                    out vanillaScrollbar,
+                    null,
+                    delegate(VanillaUiThemeSettings theme)
+                    {
+                        theme.scrollbarColor = mainScript.blue32;
+                        Color track = mainScript.grey_light32;
+                        track.a = 0.22f;
+                        theme.scrollbarBackgroundColor = track;
+                    }))
+                {
+                    if (scrollbar != null && scrollbar.gameObject != scrollbarObject)
+                    {
+                        UnityEngine.Object.Destroy(scrollbar.gameObject);
+                    }
+                    scrollbar = vanillaScrollbar;
+                    scaffold.ScrollRect.verticalScrollbar = vanillaScrollbar;
+                }
+            }
+
+            EnsureScrollbarGutter();
+            scaffold.ScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            scaffold.ScrollRect.verticalScrollbarSpacing = MonthlyLedgerConstants.VanillaScrollbarSpacing;
+
+            RectTransform scrollbarRect = scrollbar != null ? scrollbar.GetComponent<RectTransform>() : null;
+            if (scrollbarRect != null)
+            {
+                scrollbarRect.anchorMin = new Vector2(1f, 0f);
+                scrollbarRect.anchorMax = new Vector2(1f, 1f);
+                scrollbarRect.pivot = new Vector2(1f, 1f);
+                scrollbarRect.sizeDelta = new Vector2(MonthlyLedgerConstants.VanillaScrollbarWidth, 0f);
+                scrollbarRect.anchoredPosition = new Vector2(MonthlyLedgerConstants.VanillaScrollbarRightOffset, 0f);
+                scrollbar.direction = Scrollbar.Direction.BottomToTop;
+                scrollbarRect.SetAsLastSibling();
+            }
+
+            if (scrollbar != null)
+            {
+                UIManagerScrollbar manager = scrollbar.GetComponent<UIManagerScrollbar>();
+                Image handleImage = null;
+                Image backgroundImage = null;
+                if (manager != null)
+                {
+                    handleImage = manager.bar;
+                    backgroundImage = manager.background;
+                    manager.enabled = false;
+                }
+                if (handleImage == null)
+                {
+                    Transform handle = scrollbar.transform.Find("Sliding Area/Handle");
+                    handleImage = handle != null ? handle.GetComponent<Image>() : null;
+                }
+                if (backgroundImage == null)
+                {
+                    Transform background = scrollbar.transform.Find("Background");
+                    backgroundImage = background != null ? background.GetComponent<Image>() : null;
+                }
+
+                if (handleImage != null) handleImage.color = mainScript.blue32;
+                if (backgroundImage != null)
+                {
+                    Color track = mainScript.grey_light32;
+                    track.a = 0.24f;
+                    backgroundImage.color = track;
+                }
+            }
+        }
+
+        private static void EnsureScrollbarGutter()
+        {
+            Transform root = scaffold.ScrollRect.transform;
+            Transform existing = root.Find(MonthlyLedgerConstants.ScrollbarGutterObjectName);
+            GameObject gutter = existing != null ? existing.gameObject : IMUiKit.CreateUiObject(MonthlyLedgerConstants.ScrollbarGutterObjectName, root);
+            Image image = gutter.GetComponent<Image>();
+            if (image == null) image = gutter.AddComponent<Image>();
+            Color gutterColor = mainScript.black32;
+            gutterColor.a = 0.055f;
+            image.color = gutterColor;
+            image.raycastTarget = false;
+
+            RectTransform rect = gutter.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.sizeDelta = new Vector2(
+                MonthlyLedgerConstants.ScrollbarGutterWidth,
+                -(MonthlyLedgerConstants.ScrollbarGutterVerticalInset * 2f));
+            rect.anchoredPosition = new Vector2(MonthlyLedgerConstants.ScrollbarGutterRightOffset, 0f);
+            rect.SetAsLastSibling();
+        }
+
+        private static void ApplyRoundedPopupChrome()
+        {
+            if (scaffold == null) return;
+            if (scaffold.PanelRect != null)
+            {
+                Image panelImage = scaffold.PanelRect.GetComponent<Image>();
+                Color panelColor = panelImage != null ? panelImage.color : new Color32(232, 230, 230, 255);
+                ApplyRoundedImage(scaffold.PanelRect.gameObject, panelColor, MonthlyLedgerConstants.PopupCornerRadius);
+            }
+            if (scaffold.ScrollRect != null)
+            {
+                Image scrollImage = scaffold.ScrollRect.GetComponent<Image>();
+                Color innerColor = scrollImage != null ? scrollImage.color : Color.white;
+                ApplyRoundedImage(scaffold.ScrollRect.gameObject, innerColor, MonthlyLedgerConstants.SurfaceCornerRadius);
+                if (scaffold.ScrollRect.viewport != null)
+                {
+                    Image viewportImage = scaffold.ScrollRect.viewport.GetComponent<Image>();
+                    if (viewportImage != null)
+                    {
+                        ApplyRoundedImage(viewportImage.gameObject, viewportImage.color, MonthlyLedgerConstants.SurfaceCornerRadius);
+                    }
+                }
+            }
+        }
+
+        private static Image ApplyRoundedImage(GameObject target, Color color, float radius)
+        {
+            Image image = target.GetComponent<Image>();
+            if (image == null) image = target.AddComponent<Image>();
+            image.color = color;
+
+            if (!IMUiKit.TryApplyVanillaRoundedCorners(image, radius))
+            {
+                // The rounded-corner shader ships with Idol Manager. If it is unexpectedly unavailable,
+                // prefer a clean rectangle over the oversized rounded-button sprite used in 0.2.1/0.2.2.
+                image.sprite = null;
+                image.material = null;
+                image.type = Image.Type.Simple;
+            }
+            return image;
+        }
+
+        private static void ApplyGameFont(GameObject root)
+        {
+            if (root == null) return;
+            VanillaUiFonts.ApplyGameFont(root, true);
+        }
+
+        private static TMP_FontAsset ResolveGameTmpFont()
+        {
+            return VanillaUiFonts.GetGameSelectedTmpFont();
         }
 
         private static void ShowPreviousMonth()

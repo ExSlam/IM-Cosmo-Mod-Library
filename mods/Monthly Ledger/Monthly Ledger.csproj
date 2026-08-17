@@ -3,7 +3,7 @@
     <ModName>Monthly Ledger</ModName>
     <RootNamespace>MonthlyLedger</RootNamespace>
     <AssemblyName>com.cosmo.monthlyledger</AssemblyName>
-    <Version>0.1.2</Version>
+    <Version>0.2.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
