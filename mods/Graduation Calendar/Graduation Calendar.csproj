@@ -3,10 +3,28 @@
     <ModName>Graduation Calendar</ModName>
     <RootNamespace>GraduationCalendar</RootNamespace>
     <AssemblyName>com.cosmo.graduationcalendar</AssemblyName>
-    <Version>0.2.1</Version>
+    <Version>0.3.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\GraduationCalendar.cs" />
+    <Compile Include="src\EmbeddedIMUiFramework\*.cs" />
+  </ItemGroup>
+
+  <!--
+    IM UI Framework v3.1 is vendored as source into this assembly. There is deliberately
+    no ProjectReference to the standalone framework, so Steam Workshop subscribers do
+    not need a second required item for Graduation Calendar's UI to function.
+  -->
+  <ItemGroup>
+    <Reference Include="DOTween" Private="false">
+      <HintPath>$(dllDir)\DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.TextCoreModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

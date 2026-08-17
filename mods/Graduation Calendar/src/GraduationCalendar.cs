@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using HarmonyLib;
+using GraduationCalendar.EmbeddedIMUiFramework;
 using ModLocalizationSystem;
 using TMPro;
 using UnityEngine;
@@ -121,6 +122,7 @@ namespace GraduationCalendar
     {
         private static void Postfix(PopupManager __instance)
         {
+            IMUiKit.Initialize(__instance);
             GraduationCalendarUI.EnsureBootstrap(__instance);
         }
     }
@@ -170,10 +172,6 @@ namespace GraduationCalendar
         private const float CalendarCellHeight = 90f;
         private const float CalendarHeaderHeight = 22f;
         private const float CalendarPortraitSize = 22f;
-        private const int SelectorFontSize = 22;
-        private const float SelectorLabelHeight = 28f;
-        private const float ArrowButtonWidth = 32f;
-        private const float ArrowButtonHeight = 28f;
         private const int CustomPopupId = 1195594060; // ASCII "GCAL"
         private const int MonthsInYear = 12;
         private const int FirstMonthOfYear = 1;
@@ -237,10 +235,6 @@ namespace GraduationCalendar
         private const string MonthNameFormat = "MMMM";
         private const string LegacyFontFallbackName = "Arial.ttf";
         private const string TextObjectName = "Text";
-        private const string ScrollbarObjectName = "Scrollbar";
-        private const string ScrollbarHandleObjectName = "Handle";
-        private const string ArrowNextLabel = ">";
-        private const string ArrowPreviousLabel = "<";
         private const string CalendarIconObjectName = "CalendarIcon";
         private const string CalendarIconFileName = "calendar.png";
         private const string PluginsFolderName = "Plugins";
@@ -251,12 +245,6 @@ namespace GraduationCalendar
         private const string IconKeyword = "icon";
         private const string CalendarKeyword = "calendar";
         private const string ArrowKeyword = "arrow";
-        private const string LeftKeyword = "left";
-        private const string RightKeyword = "right";
-        private const string NextKeyword = "next";
-        private const string PreviousKeyword = "prev";
-        private const string RoundKeyword = "round";
-        private const string CircleKeyword = "circle";
         private const string ButtonKeyword = "button";
         private const string BackgroundShortKeyword = "bg";
         private const string BackgroundKeyword = "background";
@@ -931,8 +919,6 @@ namespace GraduationCalendar
             const string nextMonthButtonName = "NextMonth";
             const string graduationsOnlyButtonName = "GraduationsOnly";
             const string scrollViewObjectName = "ScrollView";
-            const string viewportObjectName = "Viewport";
-            const string contentObjectName = "Content";
             const string closeButtonName = "Close";
             const string titleLocalizationKey = "ui.title";
             const string titleFallbackText = "Graduation Calendar";
@@ -1008,10 +994,9 @@ namespace GraduationCalendar
             }
             panelRect.anchoredPosition = new Vector2(zeroAnchor, panelVerticalOffset);
             Image panelImage = panel.AddComponent<Image>();
-            Color32 outerColor;
-            Color32 innerColor;
-            GetSinglesPanelColors(out outerColor, out innerColor);
-            panelImage.color = outerColor;
+            IMUiTheme calendarTheme = IMUiTheme.Vanilla();
+            IMUiPrimitives.TryCopyVanillaPanelVisual(panelImage);
+            panelImage.color = calendarTheme.SurfaceOuter;
 
             TextMeshProUGUI title = CreateText(
                 panel.transform,
@@ -1027,61 +1012,55 @@ namespace GraduationCalendar
             titleRect.sizeDelta = new Vector2(titleWidth, titleHeight);
             titleRect.anchoredPosition = new Vector2(zeroAnchor, titleVerticalOffset);
 
-            GameObject yearRow = CreateUIObject(yearRowName, panel.transform);
-            RectTransform yearRect = yearRow.GetComponent<RectTransform>();
+            IMUiMonthPagerOptions yearPagerOptions = new IMUiMonthPagerOptions();
+            yearPagerOptions.ObjectName = yearRowName;
+            yearPagerOptions.Label = selectedYear.ToString();
+            yearPagerOptions.Width = yearRowWidth;
+            yearPagerOptions.Height = rowHeight;
+            yearPagerOptions.LabelWidth = yearLabelWidth;
+            yearPagerOptions.Spacing = rowButtonSpacing;
+            yearPagerOptions.OnPrevious = OnPrevYear;
+            yearPagerOptions.OnNext = OnNextYear;
+            IMUiMonthPagerHandle yearPager;
+            if (!IMUiComposer.TryCreateMonthPager(panel.transform, yearPagerOptions, out yearPager))
+            {
+                return;
+            }
+            RectTransform yearRect = yearPager.Root.GetComponent<RectTransform>();
             yearRect.anchorMin = new Vector2(centerAnchor, edgeAnchor);
             yearRect.anchorMax = new Vector2(centerAnchor, edgeAnchor);
             yearRect.pivot = new Vector2(centerAnchor, edgeAnchor);
-            yearRect.sizeDelta = new Vector2(yearRowWidth, rowHeight);
             yearRect.anchoredPosition = new Vector2(zeroAnchor, yearRowVerticalOffset);
-            HorizontalLayoutGroup yearLayout = yearRow.AddComponent<HorizontalLayoutGroup>();
-            yearLayout.childAlignment = TextAnchor.MiddleCenter;
-            yearLayout.spacing = rowButtonSpacing;
-            yearLayout.childControlHeight = true;
-            yearLayout.childControlWidth = true;
-            yearLayout.childForceExpandHeight = false;
-            yearLayout.childForceExpandWidth = false;
+            yearPager.PreviousButton.gameObject.name = previousYearButtonName;
+            yearPager.NextButton.gameObject.name = nextYearButtonName;
+            yearPager.Label.gameObject.name = yearLabelObjectName;
+            yearLabel = yearPager.Label;
+            yearRowObject = yearPager.Root;
 
-            Button prevButton = CreateArrowButton(yearRow.transform, previousYearButtonName, false, OnPrevYear);
-            yearLabel = CreateText(
-                yearRow.transform,
-                yearLabelObjectName,
-                selectedYear.ToString(),
-                SelectorFontSize,
-                TextAlignmentOptions.Center,
-                GetPurpleTextColor());
-            RectTransform yearLabelRect = yearLabel.GetComponent<RectTransform>();
-            yearLabelRect.sizeDelta = new Vector2(yearLabelWidth, SelectorLabelHeight);
-            Button nextButton = CreateArrowButton(yearRow.transform, nextYearButtonName, true, OnNextYear);
-            yearRowObject = yearRow;
-
-            GameObject monthRow = CreateUIObject(monthRowName, panel.transform);
-            RectTransform monthRect = monthRow.GetComponent<RectTransform>();
+            IMUiMonthPagerOptions monthPagerOptions = new IMUiMonthPagerOptions();
+            monthPagerOptions.ObjectName = monthRowName;
+            monthPagerOptions.Label = EmptyString;
+            monthPagerOptions.Width = monthRowWidth;
+            monthPagerOptions.Height = rowHeight;
+            monthPagerOptions.LabelWidth = monthLabelWidth;
+            monthPagerOptions.Spacing = rowButtonSpacing;
+            monthPagerOptions.OnPrevious = OnPrevMonth;
+            monthPagerOptions.OnNext = OnNextMonth;
+            IMUiMonthPagerHandle monthPager;
+            if (!IMUiComposer.TryCreateMonthPager(panel.transform, monthPagerOptions, out monthPager))
+            {
+                return;
+            }
+            RectTransform monthRect = monthPager.Root.GetComponent<RectTransform>();
             monthRect.anchorMin = new Vector2(centerAnchor, edgeAnchor);
             monthRect.anchorMax = new Vector2(centerAnchor, edgeAnchor);
             monthRect.pivot = new Vector2(centerAnchor, edgeAnchor);
-            monthRect.sizeDelta = new Vector2(monthRowWidth, rowHeight);
             monthRect.anchoredPosition = new Vector2(zeroAnchor, monthRowVerticalOffset);
-            HorizontalLayoutGroup monthLayout = monthRow.AddComponent<HorizontalLayoutGroup>();
-            monthLayout.childAlignment = TextAnchor.MiddleCenter;
-            monthLayout.spacing = rowButtonSpacing;
-            monthLayout.childControlHeight = true;
-            monthLayout.childControlWidth = true;
-            monthLayout.childForceExpandHeight = false;
-            monthLayout.childForceExpandWidth = false;
-
-            Button prevMonthButton = CreateArrowButton(monthRow.transform, previousMonthButtonName, false, OnPrevMonth);
-            monthLabel = CreateText(
-                monthRow.transform,
-                monthLabelObjectName,
-                EmptyString,
-                SelectorFontSize,
-                TextAlignmentOptions.Center,
-                GetPurpleTextColor());
-            RectTransform monthLabelRect = monthLabel.GetComponent<RectTransform>();
-            monthLabelRect.sizeDelta = new Vector2(monthLabelWidth, SelectorLabelHeight);
-            Button nextMonthButton = CreateArrowButton(monthRow.transform, nextMonthButtonName, true, OnNextMonth);
-            monthRowObject = monthRow;
+            monthPager.PreviousButton.gameObject.name = previousMonthButtonName;
+            monthPager.NextButton.gameObject.name = nextMonthButtonName;
+            monthPager.Label.gameObject.name = monthLabelObjectName;
+            monthLabel = monthPager.Label;
+            monthRowObject = monthPager.Root;
 
             Button gradOnlyButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1100,56 +1079,24 @@ namespace GraduationCalendar
             graduationsOnlyButtonObject = gradOnlyButton.gameObject;
             SetButtonBackgroundColor(graduationsOnlyButtonObject, GetButtonBackgroundColor());
 
-            GameObject scrollView = CreateUIObject(scrollViewObjectName, panel.transform);
-            RectTransform scrollRectTransform = scrollView.GetComponent<RectTransform>();
-            scrollRectTransform.anchorMin = new Vector2(zeroAnchor, zeroAnchor);
-            scrollRectTransform.anchorMax = new Vector2(edgeAnchor, edgeAnchor);
-            scrollRectTransform.offsetMin = new Vector2(scrollOffsetLeft, scrollOffsetBottom);
-            scrollRectTransform.offsetMax = new Vector2(scrollOffsetRight, scrollOffsetTop);
-            Image scrollImage = scrollView.AddComponent<Image>();
-            scrollImage.color = innerColor;
-            scrollRect = scrollView.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            IMUiScrollViewOptions scrollOptions = new IMUiScrollViewOptions();
+            scrollOptions.ObjectName = scrollViewObjectName;
+            scrollOptions.OffsetMin = new Vector2(scrollOffsetLeft, scrollOffsetBottom);
+            scrollOptions.OffsetMax = new Vector2(scrollOffsetRight, scrollOffsetTop);
+            scrollOptions.PaddingLeft = contentPaddingLeft;
+            scrollOptions.PaddingRight = contentPaddingRight;
+            scrollOptions.PaddingTop = contentPaddingTop;
+            scrollOptions.PaddingBottom = contentPaddingBottom;
+            scrollOptions.Spacing = contentSpacing;
+            scrollOptions.UseVanillaListIndicator = true;
+            IMUiScrollViewHandle scrollHandle;
+            if (!IMUiComposer.TryCreateScrollView(panel.transform, scrollOptions, out scrollHandle))
+            {
+                return;
+            }
+            scrollRect = scrollHandle.ScrollRect;
             scrollRect.scrollSensitivity = scrollSensitivity;
-
-            GameObject viewport = CreateUIObject(viewportObjectName, scrollView.transform);
-            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = Vector2.zero;
-            viewportRect.offsetMax = Vector2.zero;
-            Image viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = innerColor;
-            Mask mask = viewport.AddComponent<Mask>();
-            mask.showMaskGraphic = false;
-
-            GameObject content = CreateUIObject(contentObjectName, viewport.transform);
-            RectTransform contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(zeroAnchor, edgeAnchor);
-            contentRect.anchorMax = new Vector2(edgeAnchor, edgeAnchor);
-            contentRect.pivot = new Vector2(centerAnchor, edgeAnchor);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = new Vector2(zeroAnchor, zeroAnchor);
-
-            VerticalLayoutGroup contentLayout = content.AddComponent<VerticalLayoutGroup>();
-            contentLayout.childAlignment = TextAnchor.UpperLeft;
-            contentLayout.padding = new RectOffset(contentPaddingLeft, contentPaddingRight, contentPaddingTop, contentPaddingBottom);
-            contentLayout.spacing = contentSpacing;
-            contentLayout.childControlHeight = true;
-            contentLayout.childControlWidth = true;
-            contentLayout.childForceExpandHeight = false;
-            contentLayout.childForceExpandWidth = true;
-            ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            CreateScrollbar(scrollView.transform, scrollRect);
-
-            contentRoot = content.transform;
+            contentRoot = scrollHandle.Content;
 
             Button closeButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1289,51 +1236,6 @@ namespace GraduationCalendar
             return null;
         }
 
-        private static void GetSinglesPanelColors(out Color32 outerColor, out Color32 innerColor)
-        {
-            const byte outerRed = 235;
-            const byte outerGreen = 234;
-            const byte outerBlue = 233;
-            const byte outerAlpha = 255;
-            const byte innerRed = 254;
-            const byte innerGreen = 254;
-            const byte innerBlue = 254;
-            const byte innerAlpha = 255;
-
-            outerColor = new Color32(outerRed, outerGreen, outerBlue, outerAlpha);
-            innerColor = new Color32(innerRed, innerGreen, innerBlue, innerAlpha);
-            try
-            {
-                Image panelImage = FindSinglesPanelImage();
-                Image innerImage = FindSinglesInnerImage();
-                if (panelImage != null)
-                {
-                    outerColor = panelImage.color;
-                }
-                if (innerImage != null)
-                {
-                    innerColor = innerImage.color;
-                }
-                if (GetColorLuma(outerColor) > GetColorLuma(innerColor))
-                {
-                    Color32 swap = outerColor;
-                    outerColor = innerColor;
-                    innerColor = swap;
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        private static float GetColorLuma(Color32 color)
-        {
-            const float redLumaWeight = 0.2126f;
-            const float greenLumaWeight = 0.7152f;
-            const float blueLumaWeight = 0.0722f;
-            return color.r * redLumaWeight + color.g * greenLumaWeight + color.b * blueLumaWeight;
-        }
-
         private static Vector2 GetSinglesPanelSize()
         {
             try
@@ -1366,20 +1268,6 @@ namespace GraduationCalendar
                 return null;
             }
             return FindPanelImage(popup.transform);
-        }
-
-        private static Image FindSinglesInnerImage()
-        {
-            GameObject popup = PopupManager.GetObject(PopupManager._type.single_senbatsu);
-            if (popup == null)
-            {
-                popup = PopupManager.GetObject(PopupManager._type.single_new);
-            }
-            if (popup == null)
-            {
-                return null;
-            }
-            return FindSecondLargestImage(popup.transform);
         }
 
         private static Image FindPanelImage(Transform root)
@@ -1463,205 +1351,6 @@ namespace GraduationCalendar
             return best;
         }
 
-        private static Image FindSecondLargestImage(Transform root)
-        {
-            if (root == null)
-            {
-                return null;
-            }
-            const float minimumArea = 0f;
-            Image largest = null;
-            Image second = null;
-            float largestArea = minimumArea;
-            float secondArea = minimumArea;
-            List<Image> images = GetComponentsInChildrenAll<Image>(root);
-            foreach (Image image in images)
-            {
-                if (image == null)
-                {
-                    continue;
-                }
-                RectTransform rect = image.GetComponent<RectTransform>();
-                if (rect == null)
-                {
-                    continue;
-                }
-                float area = rect.rect.width * rect.rect.height;
-                if (area <= minimumArea)
-                {
-                    continue;
-                }
-                if (area > largestArea)
-                {
-                    second = largest;
-                    secondArea = largestArea;
-                    largest = image;
-                    largestArea = area;
-                }
-                else if (area > secondArea)
-                {
-                    second = image;
-                    secondArea = area;
-                }
-            }
-            return second != null ? second : largest;
-        }
-
-        private static Image FindSmallestSpriteImage(Transform root)
-        {
-            if (root == null)
-            {
-                return null;
-            }
-            const float minimumArea = 0f;
-            Image smallest = null;
-            float smallestArea = float.MaxValue;
-            List<Image> images = GetComponentsInChildrenAll<Image>(root);
-            foreach (Image image in images)
-            {
-                if (image == null || image.sprite == null)
-                {
-                    continue;
-                }
-                RectTransform rect = image.GetComponent<RectTransform>();
-                if (rect == null)
-                {
-                    continue;
-                }
-                float area = rect.rect.width * rect.rect.height;
-                if (area <= minimumArea)
-                {
-                    continue;
-                }
-                if (area < smallestArea)
-                {
-                    smallest = image;
-                    smallestArea = area;
-                }
-            }
-            return smallest;
-        }
-
-        private static GameObject GetSinglesArrowButtonTemplate(bool next)
-        {
-            const float noScore = -1f;
-            const float zeroScore = 0f;
-            const float arrowSpriteScoreBonus = 2f;
-            const float directionNameScoreBonus = 1.5f;
-            const float roundSpriteScoreBonus = 3f;
-            const float maxAspectScore = 3f;
-            const float aspectNormalizationDivisor = 5f;
-            const float compactArrowButtonMaxSize = 40f;
-            const float minimumArrowButtonSize = 0f;
-
-            GameObject popup = PopupManager.GetObject(PopupManager._type.single_senbatsu);
-            if (popup == null)
-            {
-                popup = PopupManager.GetObject(PopupManager._type.single_release);
-            }
-            if (popup == null)
-            {
-                popup = PopupManager.GetObject(PopupManager._type.single_new);
-            }
-            if (popup == null)
-            {
-                popup = PopupManager.GetObject(PopupManager._type.single_chart);
-            }
-            if (popup == null)
-            {
-                return GetChartButtonTemplate(next);
-            }
-            GameObject best = null;
-            float bestScore = noScore;
-            List<Button> buttons = GetComponentsInChildrenAll<Button>(popup.transform);
-            foreach (Button button in buttons)
-            {
-                if (button == null)
-                {
-                    continue;
-                }
-                GameObject go = button.gameObject;
-                RectTransform rect = go.GetComponent<RectTransform>();
-                if (rect == null)
-                {
-                    continue;
-                }
-                float width = rect.rect.width;
-                float height = rect.rect.height;
-                if (width <= minimumArrowButtonSize || height <= minimumArrowButtonSize)
-                {
-                    continue;
-                }
-                bool arrowSprite = HasArrowSprite(go.transform, next);
-                string nameLower = go.name != null ? go.name.ToLowerInvariant() : EmptyString;
-                bool nameMatches = next
-                    ? (nameLower.Contains(NextKeyword) || nameLower.Contains(RightKeyword))
-                    : (nameLower.Contains(PreviousKeyword) || nameLower.Contains(LeftKeyword));
-                if (!arrowSprite)
-                {
-                    continue;
-                }
-                float score = zeroScore;
-                if (arrowSprite)
-                {
-                    score += arrowSpriteScoreBonus;
-                }
-                if (nameMatches)
-                {
-                    score += directionNameScoreBonus;
-                }
-                float aspect = Mathf.Abs(width - height);
-                score += Mathf.Clamp(maxAspectScore - aspect / aspectNormalizationDivisor, zeroScore, maxAspectScore);
-                if (width <= compactArrowButtonMaxSize && height <= compactArrowButtonMaxSize)
-                {
-                    score += arrowSpriteScoreBonus;
-                }
-                string spriteName = GetButtonSpriteName(button);
-                if (!string.IsNullOrEmpty(spriteName)
-                    && (spriteName.Contains(RoundKeyword) || spriteName.Contains(CircleKeyword)))
-                {
-                    score += roundSpriteScoreBonus;
-                }
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    best = go;
-                }
-            }
-            if (best != null)
-            {
-                return best;
-            }
-            return GetChartButtonTemplate(next);
-        }
-
-        private static string GetButtonSpriteName(Button button)
-        {
-            if (button == null)
-            {
-                return EmptyString;
-            }
-            Image target = button.targetGraphic as Image;
-            if (target != null && target.sprite != null && !string.IsNullOrEmpty(target.sprite.name))
-            {
-                return target.sprite.name.ToLowerInvariant();
-            }
-            List<Image> images = GetComponentsInChildrenAll<Image>(button.transform);
-            foreach (Image image in images)
-            {
-                if (image == null || image.sprite == null)
-                {
-                    continue;
-                }
-                string name = image.sprite.name;
-                if (!string.IsNullOrEmpty(name))
-                {
-                    return name.ToLowerInvariant();
-                }
-            }
-            return EmptyString;
-        }
-
         private static Color32 GetPurpleTextColor()
         {
             return mainScript.lightBlue32;
@@ -1680,48 +1369,6 @@ namespace GraduationCalendar
         private static Color32 GetButtonBackgroundColor()
         {
             return mainScript.blue32;
-        }
-
-        private static GameObject GetChartButtonTemplate(bool next)
-        {
-            Chart_Popup chart = GetChartPopup();
-            if (chart == null)
-            {
-                return null;
-            }
-            return next ? chart.Button_NextMonth : chart.Button_PrevMonth;
-        }
-
-        private static Chart_Popup GetChartPopup()
-        {
-            try
-            {
-                GameObject popup = PopupManager.GetObject(PopupManager._type.single_chart);
-                if (popup == null)
-                {
-                    PopupManager manager = GetPopupManager();
-                    if (manager != null && manager.popups != null)
-                    {
-                        foreach (PopupManager._popup entry in manager.popups)
-                        {
-                            if (entry != null && entry.type == PopupManager._type.single_chart && entry.obj != null)
-                            {
-                                popup = entry.obj;
-                                break;
-                            }
-                        }
-                    }
-                    if (popup == null)
-                    {
-                        return null;
-                    }
-                }
-                return popup.GetComponent<Chart_Popup>();
-            }
-            catch
-            {
-                return null;
-            }
         }
 
         private static GameObject CreateUIObject(string name, Transform parent)
@@ -1769,210 +1416,6 @@ namespace GraduationCalendar
                 uiText.font = defaultLegacyFont;
             }
             return uiText;
-        }
-
-        private static void CreateScrollbar(Transform parent, ScrollRect target)
-        {
-            const float scrollbarEdgeAnchor = 1f;
-            const float scrollbarBaseAnchor = 0f;
-            const float scrollbarWidth = 12f;
-            const float scrollbarOffsetX = -4f;
-            const float scrollbarSpacing = 6f;
-
-            if (parent == null || target == null)
-            {
-                return;
-            }
-            Scrollbar template = GetScrollbarTemplate();
-            GameObject scrollbarObj;
-            Scrollbar scrollbar;
-            if (template != null)
-            {
-                scrollbarObj = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-                scrollbarObj.name = ScrollbarObjectName;
-                SetLayerRecursively(scrollbarObj, parent.gameObject.layer);
-                scrollbarObj.SetActive(true);
-                scrollbar = scrollbarObj.GetComponent<Scrollbar>();
-                if (scrollbar == null)
-                {
-                    scrollbar = scrollbarObj.AddComponent<Scrollbar>();
-                }
-                CanvasGroup group = scrollbarObj.GetComponent<CanvasGroup>();
-                if (group != null)
-                {
-                    group.alpha = VisibleAlpha;
-                    group.interactable = true;
-                    group.blocksRaycasts = true;
-                }
-            }
-            else
-            {
-                scrollbarObj = CreateUIObject(ScrollbarObjectName, parent);
-                Image trackImage = scrollbarObj.AddComponent<Image>();
-                trackImage.color = GetScrollbarTrackColor();
-                trackImage.raycastTarget = true;
-                scrollbar = scrollbarObj.AddComponent<Scrollbar>();
-
-                GameObject handleObj = CreateUIObject(ScrollbarHandleObjectName, scrollbarObj.transform);
-                RectTransform handleRect = handleObj.GetComponent<RectTransform>();
-                handleRect.anchorMin = Vector2.zero;
-                handleRect.anchorMax = Vector2.one;
-                handleRect.offsetMin = Vector2.zero;
-                handleRect.offsetMax = Vector2.zero;
-                Image handleImage = handleObj.AddComponent<Image>();
-                handleImage.color = GetButtonBackgroundColor();
-
-                Sprite handleSprite = GetScrollbarHandleSprite();
-                if (handleSprite != null)
-                {
-                    handleImage.sprite = handleSprite;
-                    handleImage.type = Image.Type.Sliced;
-                }
-
-                scrollbar.targetGraphic = handleImage;
-                scrollbar.handleRect = handleRect;
-            }
-
-            RectTransform scrollbarRect = scrollbarObj.GetComponent<RectTransform>();
-            scrollbarRect.anchorMin = new Vector2(scrollbarEdgeAnchor, scrollbarBaseAnchor);
-            scrollbarRect.anchorMax = new Vector2(scrollbarEdgeAnchor, scrollbarEdgeAnchor);
-            scrollbarRect.pivot = new Vector2(scrollbarEdgeAnchor, scrollbarEdgeAnchor);
-            scrollbarRect.sizeDelta = new Vector2(scrollbarWidth, scrollbarBaseAnchor);
-            scrollbarRect.anchoredPosition = new Vector2(scrollbarOffsetX, scrollbarBaseAnchor);
-
-            scrollbar.direction = Scrollbar.Direction.BottomToTop;
-            target.verticalScrollbar = scrollbar;
-            target.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
-            target.verticalScrollbarSpacing = scrollbarSpacing;
-        }
-
-        private static Color32 GetScrollbarTrackColor()
-        {
-            const byte scrollbarTrackAlpha = 180;
-            Color32 baseColor = mainScript.grey_light32;
-            baseColor.a = scrollbarTrackAlpha;
-            return baseColor;
-        }
-
-        private static Sprite GetScrollbarHandleSprite()
-        {
-            try
-            {
-                Scrollbar template = GetScrollbarTemplate();
-                if (template != null)
-                {
-                    if (template.handleRect != null)
-                    {
-                        Image img = template.handleRect.GetComponent<Image>();
-                        if (img != null && img.sprite != null)
-                        {
-                            return img.sprite;
-                        }
-                    }
-                    Image target = template.targetGraphic as Image;
-                    if (target != null && target.sprite != null)
-                    {
-                        return target.sprite;
-                    }
-                }
-            }
-            catch
-            {
-            }
-            return null;
-        }
-
-        private static Scrollbar GetScrollbarTemplate()
-        {
-            const int firstTemplateIndex = 0;
-            try
-            {
-                Scrollbar preferred = FindScrollbarInPopup(PopupManager._type.producer_salaries);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.producer_contracts);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.producer_loans);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.notifications);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.awards);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.single_release);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.single_senbatsu);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.single_chart);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                preferred = FindScrollbarInPopup(PopupManager._type.SNS);
-                if (preferred != null)
-                {
-                    return preferred;
-                }
-                Scrollbar[] all = UnityEngine.Object.FindObjectsOfType<Scrollbar>();
-                if (all.Length > 0)
-                {
-                    return all[firstTemplateIndex];
-                }
-            }
-            catch
-            {
-            }
-            return null;
-        }
-
-        private static Scrollbar FindScrollbarInPopup(PopupManager._type type)
-        {
-            const int firstScrollbarIndex = 0;
-            GameObject popup = PopupManager.GetObject(type);
-            if (popup == null)
-            {
-                PopupManager manager = GetPopupManager();
-                if (manager != null && manager.popups != null)
-                {
-                    foreach (PopupManager._popup entry in manager.popups)
-                    {
-                        if (entry != null && entry.type == type && entry.obj != null)
-                        {
-                            popup = entry.obj;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (popup == null)
-            {
-                return null;
-            }
-            List<Scrollbar> scrollbars = GetComponentsInChildrenAll<Scrollbar>(popup.transform);
-            if (scrollbars.Count > 0)
-            {
-                return scrollbars[firstScrollbarIndex];
-            }
-            return null;
         }
 
         private static Button CreateButton(Transform parent, string name, string label, float width, float height, Action onClick)
@@ -2071,55 +1514,6 @@ namespace GraduationCalendar
             }
             CaptureDefaultFontFrom(obj);
             return button;
-        }
-
-        private static Button CreateArrowButton(Transform parent, string name, bool next, Action onClick)
-        {
-            GameObject template = GetChartButtonTemplate(next);
-            if (template == null)
-            {
-                template = GetSinglesArrowButtonTemplate(next);
-            }
-            if (template == null)
-            {
-                string label = next ? ArrowNextLabel : ArrowPreviousLabel;
-                return CreateButton(parent, name, label, ArrowButtonWidth, ArrowButtonHeight, onClick);
-            }
-            const float keepTemplateSizeValue = 0f;
-            Button button = CreateButtonFromTemplate(
-                parent,
-                name,
-                null,
-                keepTemplateSizeValue,
-                keepTemplateSizeValue,
-                onClick,
-                template,
-                true,
-                true);
-            ApplyArrowButtonStyle(button != null ? button.gameObject : null, next);
-            EnsureArrowButtonSize(button);
-            return button;
-        }
-
-        private static void EnsureArrowButtonSize(Button button)
-        {
-            if (button == null)
-            {
-                return;
-            }
-            RectTransform rect = button.GetComponent<RectTransform>();
-            if (rect == null)
-            {
-                return;
-            }
-            rect.sizeDelta = new Vector2(ArrowButtonWidth, ArrowButtonHeight);
-            LayoutElement layout = button.GetComponent<LayoutElement>();
-            if (layout == null)
-            {
-                layout = button.gameObject.AddComponent<LayoutElement>();
-            }
-            layout.preferredWidth = ArrowButtonWidth;
-            layout.preferredHeight = ArrowButtonHeight;
         }
 
         private static void SetButtonSize(GameObject obj, float width, float height)
@@ -2814,7 +2208,7 @@ namespace GraduationCalendar
         {
             const string dayCellObjectName = "DayCell";
             GameObject cell = CreateUIObject(dayCellObjectName, parent);
-            AddCalendarCellBorder(cell);
+            AddCalendarCellBorder(cell, true);
             LayoutElement layout = cell.AddComponent<LayoutElement>();
             layout.preferredWidth = CalendarCellWidth;
             layout.preferredHeight = CalendarCellHeight;
@@ -2952,41 +2346,14 @@ namespace GraduationCalendar
             dayBadge.transform.SetAsLastSibling();
         }
 
-        private static void AddCalendarCellBorder(GameObject cell)
+        private static void AddCalendarCellBorder(GameObject cell, bool emptyCell = false)
         {
-            const byte borderTransparentChannel = 255;
-            const byte borderTransparentAlpha = 0;
-            const byte outlineColorChannel = 180;
-            const byte outlineAlpha = 160;
-            const float outlineOffsetX = 1f;
-            const float outlineOffsetY = -1f;
-
             if (cell == null)
             {
                 return;
             }
-            Image image = cell.GetComponent<Image>();
-            if (image == null)
-            {
-                image = cell.AddComponent<Image>();
-            }
-            image.color = new Color32(
-                borderTransparentChannel,
-                borderTransparentChannel,
-                borderTransparentChannel,
-                borderTransparentAlpha);
-            Outline outline = cell.GetComponent<Outline>();
-            if (outline == null)
-            {
-                outline = cell.AddComponent<Outline>();
-            }
-            outline.effectColor = new Color32(
-                outlineColorChannel,
-                outlineColorChannel,
-                outlineColorChannel,
-                outlineAlpha);
-            outline.effectDistance = new Vector2(outlineOffsetX, outlineOffsetY);
-            outline.useGraphicAlpha = false;
+
+            IMUiComposer.ApplyCalendarCellStyle(cell, IMUiTheme.Vanilla(), emptyCell);
         }
 
         private static void AddCalendarPortrait(Transform parent, data_girls.girls girl)
@@ -3703,98 +3070,6 @@ namespace GraduationCalendar
             image.preserveAspect = true;
             image.color = mainScript.white32;
             return image;
-        }
-
-        private static void ApplyArrowButtonStyle(GameObject buttonObject, bool next)
-        {
-            if (buttonObject == null)
-            {
-                return;
-            }
-            bool hasArrow = HasArrowSprite(buttonObject.transform, next);
-            if (hasArrow)
-            {
-                HideButtonText(buttonObject);
-            }
-            SetArrowButtonColors(buttonObject);
-        }
-
-        private static void SetArrowButtonColors(GameObject buttonObject)
-        {
-            if (buttonObject == null)
-            {
-                return;
-            }
-            Color32 bg = GetButtonBackgroundColor();
-            Color32 fg = GetButtonTextColor();
-            Image smallest = FindSmallestSpriteImage(buttonObject.transform);
-            Image largest = FindLargestImage(buttonObject.transform);
-            List<Image> images = GetComponentsInChildrenAll<Image>(buttonObject.transform);
-            foreach (Image image in images)
-            {
-                if (image == null)
-                {
-                    continue;
-                }
-                if (image == smallest)
-                {
-                    image.color = fg;
-                    continue;
-                }
-                if (image == largest)
-                {
-                    image.color = bg;
-                    continue;
-                }
-                if (image.sprite == null)
-                {
-                    image.color = bg;
-                    continue;
-                }
-                string spriteName = image.sprite.name.ToLowerInvariant();
-                bool arrow = spriteName.Contains(ArrowKeyword)
-                    || spriteName.Contains(LeftKeyword)
-                    || spriteName.Contains(RightKeyword);
-                image.color = arrow ? fg : bg;
-            }
-        }
-
-        private static bool HasArrowSprite(Transform root, bool next)
-        {
-            if (root == null)
-            {
-                return false;
-            }
-            List<Image> images = GetComponentsInChildrenAll<Image>(root);
-            foreach (Image image in images)
-            {
-                if (image == null || image.sprite == null)
-                {
-                    continue;
-                }
-                string spriteName = image.sprite.name.ToLowerInvariant();
-                if (spriteName.Length == 0)
-                {
-                    continue;
-                }
-                bool hasArrow = spriteName.Contains(ArrowKeyword)
-                    || spriteName.Contains(LeftKeyword)
-                    || spriteName.Contains(RightKeyword);
-                if (!hasArrow)
-                {
-                    continue;
-                }
-                if (spriteName.Contains(LeftKeyword) || spriteName.Contains(PreviousKeyword))
-                {
-                    return !next;
-                }
-                if (spriteName.Contains(RightKeyword) || spriteName.Contains(NextKeyword))
-                {
-                    return next;
-                }
-                return true;
-            }
-            return false;
         }
 
         private static void SetButtonBackgroundColor(GameObject buttonObject, Color32 color)
