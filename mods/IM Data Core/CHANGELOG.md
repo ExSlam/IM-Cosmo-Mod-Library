@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.4.2
+
+- Made every persisted `election_number` mirror vanilla election numbering directly: finished elections use `_SSK.Count`, while the current unfinished election uses `SEvent_SSK.CountElections() + 1`.
+- Kept `_SSK.ID`/event `EntityId` strictly as internal identity and lookup data; it is not used as the player-facing election number.
+
 ## 3.4.1
 
 - Fixed the 3.4.0 unresolved-single chart backfill optimization failing to compile because its transient `pendingSingleChartResolutionBySingleId` dictionary declaration was omitted from `IMDataCoreController`.

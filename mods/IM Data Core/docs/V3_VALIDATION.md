@@ -18,7 +18,7 @@ This revision was checked against the supplied Cosmo Mod Library source and the 
 
 ## Source/package checks
 
-- `assets/info.json` and `IM Data Core.csproj` report **3.4.1**.
+- `assets/info.json` and `IM Data Core.csproj` report **3.4.2**.
 - Edited JSON metadata parses as strict JSON and the project file parses as XML.
 - A string/comment-aware delimiter scan is run over the IM Data Core C# sources before packaging.
 - Current source/docs use Idol Manager's **New Save** / **Overwrite Save** terminology and contain no references to the removed legacy journal-version constant.

@@ -4372,7 +4372,7 @@ namespace IMDataCore
                 ElectionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
                 ElectionRankingSummary = BuildElectionRankingSummary(election),
                 ElectionRankedIdolIdList = BuildElectionRankedIdolIdentifierList(election),
-                ElectionNumber = ResolveSaveScopedElectionNumber(election),
+                ElectionNumber = ResolveVanillaElectionNumber(election),
                 ElectionProductionLevel = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.production),
                 ElectionLogisticsLevel = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.logistics),
                 ElectionProductionCost = election.GetProductionCost(),
@@ -4481,44 +4481,24 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Resolves the player-facing election number from the elections loaded for the
-        /// active save.  The game's election identifier and runtime Count field can carry
-        /// values from a previously played save during same-session new-game transitions.
+        /// Resolves the player-facing election number using the same state that vanilla
+        /// SEvent_SSK._SSK.GetTitle() uses. Internal election IDs remain lookup keys only:
+        /// finished elections keep the Count assigned by Finish(), while the current
+        /// unfinished election is one after SEvent_SSK.CountElections().
         /// </summary>
-        private static int ResolveSaveScopedElectionNumber(SEvent_SSK._SSK election)
+        private static int ResolveVanillaElectionNumber(SEvent_SSK._SSK election)
         {
             if (election == null)
             {
                 return CoreConstants.ZeroBasedListStartIndex;
             }
 
-            int completedCount = CoreConstants.ZeroBasedListStartIndex;
-            if (SEvent_SSK.Elections != null)
+            if (election.Status == SEvent_Tour.tour._status.finished)
             {
-                for (int electionIndex = CoreConstants.ZeroBasedListStartIndex; electionIndex < SEvent_SSK.Elections.Count; electionIndex++)
-                {
-                    SEvent_SSK._SSK candidate = SEvent_SSK.Elections[electionIndex];
-                    if (candidate == null)
-                    {
-                        continue;
-                    }
-
-                    bool isSelectedElection = object.ReferenceEquals(candidate, election) || candidate.ID == election.ID;
-                    if (candidate.Status == SEvent_Tour.tour._status.finished)
-                    {
-                        completedCount++;
-                    }
-
-                    if (isSelectedElection)
-                    {
-                        return candidate.Status == SEvent_Tour.tour._status.finished
-                            ? Mathf.Max(CoreConstants.MinimumNonEmptyCollectionCount, completedCount)
-                            : completedCount + CoreConstants.MinimumNonEmptyCollectionCount;
-                    }
-                }
+                return election.Count;
             }
 
-            return completedCount + CoreConstants.MinimumNonEmptyCollectionCount;
+            return SEvent_SSK.CountElections() + CoreConstants.MinimumNonEmptyCollectionCount;
         }
 
         /// <summary>

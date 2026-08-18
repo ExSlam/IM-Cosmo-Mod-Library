@@ -6445,7 +6445,7 @@ namespace IdolCareerDiary
         /// <summary>
         /// Builds explicit output for election lifecycle events.
         /// </summary>
-        private static void BuildElectionPresentation(string type, IMDataCoreEvent ev, JSONNode payload, Presentation p, List<string> lines)
+        private void BuildElectionPresentation(string type, IMDataCoreEvent ev, JSONNode payload, Presentation p, List<string> lines)
         {
             if (type == C.EventElectionCreated)
             {
@@ -6472,7 +6472,7 @@ namespace IdolCareerDiary
                 p.Title = C.TextElectionPlaceAdjusted;
             }
 
-            p.WithWhom = C.TextElection + Normalize(ev != null ? ev.EntityId : string.Empty);
+            p.WithWhom = ResolveElectionDisplayLabel(ev, payload);
             AddTransitionLine(lines, C.LabelStatus, ReadStr(payload, C.JsonElectionPrevStatus), ReadStr(payload, C.JsonElectionNewStatus));
             AddCodeLineIfKnown(lines, C.LabelStatus, ReadStr(payload, C.JsonElectionStatus));
             AddCodeLineIfKnown(lines, C.LabelAction, ReadStr(payload, C.JsonElectionLifecycleAction));
@@ -14598,7 +14598,7 @@ namespace IdolCareerDiary
             else if (type == C.EventElectionStatusChanged || type == C.EventElectionResultRecorded)
             {
                 p.Title = type == C.EventElectionStatusChanged ? C.TextElectionStatusUpdated : C.TextElectionResultRecorded;
-                p.WithWhom = C.TextElection + Normalize(ev.EntityId);
+                p.WithWhom = ResolveElectionDisplayLabel(ev, payload);
 
                 string transition = BuildStatusTransitionText(ReadStr(payload, C.JsonElectionPrevStatus), ReadStr(payload, C.JsonElectionNewStatus));
                 if (!string.IsNullOrEmpty(transition))
@@ -14742,8 +14742,11 @@ namespace IdolCareerDiary
             if (string.Equals(ev.EntityKind, C.KindElection, StringComparison.Ordinal))
             {
                 int electionNumber = ResolveElectionDisplayNumber(ev, payload);
-                p.WithWhom = C.TextElection + electionNumber.ToString(CultureInfo.InvariantCulture);
-                outcomeLines.Add(C.TextElection + C.SeparatorColonSpace + electionNumber.ToString(CultureInfo.InvariantCulture));
+                p.WithWhom = ResolveElectionDisplayLabel(electionNumber);
+                outcomeLines.Add(C.TextElection + C.SeparatorColonSpace +
+                    (electionNumber > C.ZeroIndex
+                        ? electionNumber.ToString(CultureInfo.InvariantCulture)
+                        : C.LabelUnknown));
             }
 
             if (string.IsNullOrEmpty(p.WithWhom))
@@ -14764,60 +14767,80 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Resolves an election ordinal only from election entities in the active save's
-        /// loaded diary rows.  A payload number larger than that ordinal is stale carryover.
+        /// Resolves the player-facing election number. IM Data Core persists this as
+        /// `election_number`; event EntityId remains the vanilla election object's internal
+        /// lookup ID and is never used as the displayed ordinal.
+        ///
+        /// Older/malformed rows without `election_number` first borrow the number from
+        /// another loaded row for the same election, then fall back to the live vanilla
+        /// election object using the exact GetTitle()/Finish() count semantics. This never
+        /// derives an ordinal from the number of diary pages currently loaded.
         /// </summary>
         private int ResolveElectionDisplayNumber(IMDataCoreEvent selectedEvent, JSONNode selectedPayload)
         {
             if (selectedEvent == null)
             {
-                return C.LastFromCount;
+                return C.ZeroIndex;
             }
 
-            Dictionary<string, long> firstEventByElection = new Dictionary<string, long>(StringComparer.Ordinal);
+            int payloadNumber = ReadInt(selectedPayload, C.JsonElectionNumber);
+            if (payloadNumber > C.ZeroIndex)
+            {
+                return payloadNumber;
+            }
+
+            string selectedEntityId = selectedEvent.EntityId ?? string.Empty;
             for (int eventIndex = C.ZeroIndex; eventIndex < cachedEvents.Count; eventIndex++)
             {
                 IMDataCoreEvent candidate = cachedEvents[eventIndex];
-                if (candidate == null || !string.Equals(candidate.EntityKind, C.KindElection, StringComparison.Ordinal))
+                if (candidate == null ||
+                    !string.Equals(candidate.EntityKind, C.KindElection, StringComparison.Ordinal) ||
+                    !string.Equals(candidate.EntityId ?? string.Empty, selectedEntityId, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                string entityId = candidate.EntityId ?? string.Empty;
-                long firstEventId;
-                if (!firstEventByElection.TryGetValue(entityId, out firstEventId) || candidate.EventId < firstEventId)
+                int candidateNumber = ReadInt(ParsePayload(candidate.PayloadJson), C.JsonElectionNumber);
+                if (candidateNumber > C.ZeroIndex)
                 {
-                    firstEventByElection[entityId] = candidate.EventId;
+                    return candidateNumber;
                 }
             }
 
-            string selectedEntityId = selectedEvent.EntityId ?? string.Empty;
-            if (!firstEventByElection.ContainsKey(selectedEntityId))
+            int electionId;
+            if (TryParseInt(selectedEntityId, out electionId))
             {
-                firstEventByElection[selectedEntityId] = selectedEvent.EventId;
-            }
-
-            List<KeyValuePair<string, long>> ordered = new List<KeyValuePair<string, long>>(firstEventByElection);
-            ordered.Sort(delegate (KeyValuePair<string, long> left, KeyValuePair<string, long> right)
-            {
-                int byEvent = left.Value.CompareTo(right.Value);
-                return byEvent != C.ZeroIndex
-                    ? byEvent
-                    : string.Compare(left.Key, right.Key, StringComparison.Ordinal);
-            });
-
-            int ordinal = C.LastFromCount;
-            for (int index = C.ZeroIndex; index < ordered.Count; index++)
-            {
-                if (string.Equals(ordered[index].Key, selectedEntityId, StringComparison.Ordinal))
+                SEvent_SSK._SSK election = SEvent_SSK.GetSSKByID(electionId);
+                if (election != null)
                 {
-                    ordinal = index + C.LastFromCount;
-                    break;
+                    if (election.Status == SEvent_Tour.tour._status.finished)
+                    {
+                        return election.Count > C.ZeroIndex ? election.Count : C.ZeroIndex;
+                    }
+
+                    return SEvent_SSK.CountElections() + C.LastFromCount;
                 }
             }
 
-            int payloadNumber = ReadInt(selectedPayload, C.JsonElectionNumber);
-            return payloadNumber > C.ZeroIndex ? Mathf.Min(payloadNumber, ordinal) : ordinal;
+            return C.ZeroIndex;
+        }
+
+        /// <summary>
+        /// Formats an election label without ever substituting the internal election ID.
+        /// </summary>
+        private string ResolveElectionDisplayLabel(IMDataCoreEvent selectedEvent, JSONNode selectedPayload)
+        {
+            return ResolveElectionDisplayLabel(ResolveElectionDisplayNumber(selectedEvent, selectedPayload));
+        }
+
+        /// <summary>
+        /// Formats a resolved election number for player-facing UI.
+        /// </summary>
+        private static string ResolveElectionDisplayLabel(int electionNumber)
+        {
+            return C.TextElection + (electionNumber > C.ZeroIndex
+                ? electionNumber.ToString(CultureInfo.InvariantCulture)
+                : C.LabelUnknown);
         }
 
         /// <summary>
@@ -19017,7 +19040,7 @@ namespace IdolCareerDiary
 
             if (kind == C.KindElection)
             {
-                return C.TextElection + Normalize(ev.EntityId);
+                return ResolveElectionDisplayLabel(ev, payload);
             }
 
             if (kind == C.KindContract)

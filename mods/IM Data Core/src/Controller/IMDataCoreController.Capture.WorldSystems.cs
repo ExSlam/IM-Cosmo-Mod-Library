@@ -539,7 +539,7 @@ namespace IMDataCore
                     ElectionRankingSummary = BuildElectionRankingSummary(election),
                     ElectionRankedIdolIdList =
                         BuildElectionRankedIdolIdentifierList(election),
-                    ElectionNumber = ResolveSaveScopedElectionNumber(election)
+                    ElectionNumber = ResolveVanillaElectionNumber(election)
                 };
 
                 EnqueueEventRecordLocked(
@@ -599,7 +599,7 @@ namespace IMDataCore
                 ElectionPlaceBefore = snapshot.PreviousPlace,
                 ElectionPlaceAfter = adjustedPlace,
                 ElectionBroadcastType = CoreEnumNameMapping.ToElectionBroadcastCode(election.Broadcast),
-                ElectionNumber = ResolveSaveScopedElectionNumber(election)
+                ElectionNumber = ResolveVanillaElectionNumber(election)
             };
 
             lock (runtimeLock)
@@ -652,7 +652,7 @@ namespace IMDataCore
                 ElectionConcertId = ResolveConcertIdOrInvalid(election.Concert),
                 ElectionReleaseSingleId = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 ElectionResultCount = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
-                ElectionNumber = ResolveSaveScopedElectionNumber(election),
+                ElectionNumber = ResolveVanillaElectionNumber(election),
                 ElectionFinishDate = CoreDateTimeUtility.ToRoundTripString(election.FinishDate)
             };
 
@@ -3988,7 +3988,7 @@ namespace IMDataCore
                 election_concert_id = ResolveConcertIdOrInvalid(election.Concert),
                 election_release_single_id = ResolveSingleIdOrInvalid(election.ReleaseSingle),
                 election_result_count = election.Results != null ? election.Results.Count : CoreConstants.ZeroBasedListStartIndex,
-                election_number = ResolveSaveScopedElectionNumber(election),
+                election_number = ResolveVanillaElectionNumber(election),
                 election_production_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.production),
                 election_logistics_level = ResolveElectionProgressableValue(election, SEvent_SSK._SSK._progressable._type.logistics),
                 election_production_cost = election.GetProductionCost(),

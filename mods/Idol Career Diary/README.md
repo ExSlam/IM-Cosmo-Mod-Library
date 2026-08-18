@@ -124,6 +124,12 @@ Example command:
 - `dotnet build "mods/Idol Career Diary/Idol Career Diary.csproj" -c Release`
 
 
+## 1.2.2 election numbering
+
+- Election labels now always use IM Data Core's persisted `election_number`, never the event `EntityId`/vanilla `_SSK.ID`.
+- Removed the partial-cache ordinal clamp that could turn a later election into `Election #1` when older diary pages had not been loaded yet.
+- Rows missing `election_number` fall back to another row for the same election or to vanilla `_SSK.Count` / `SEvent_SSK.CountElections() + 1`; the number of loaded diary pages no longer affects election numbering.
+
 ## 1.2.1 font consistency
 
 Timeline toolbar buttons and the manually-created TMP search field now ask IM UI Framework 2.0.3 to apply Idol Manager's currently selected game font after they are constructed. This fixes the mixed-font timeline UI that could otherwise leave framework/fallback button labels and search text on a MUIP/TMP default while the rest of the diary followed the game font.
