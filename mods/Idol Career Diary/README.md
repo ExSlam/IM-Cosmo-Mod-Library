@@ -30,6 +30,9 @@ the next vanilla save boundary, following IM Data Core 3.2's persistence model.
 - Shows complete election rankings (including votes and points), including rankings extended by Tel's Extended SSK.
 - Promotes election-attached single and concert events into the idol timeline and links to them from election details.
 - Keeps timeline rendering stable when dependencies are present; shows dependency errors when required mods are missing.
+- Opens graduated idols through Graduation Details when that optional mod is available, preserving
+  the archived-profile context. Missing related-idol headshots remain placeholders instead of
+  launching unobserved unique-idol portrait loads.
 - Lets content-only mods override diary text by shipping JSON files in an `Idol Career Diary` folder.
 
 ## Timeline UI and long-save behavior

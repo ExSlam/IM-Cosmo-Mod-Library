@@ -11132,7 +11132,11 @@ namespace IdolCareerDiary
             Sprite headshot = TryResolveRelatedIdolHeadshot(girl);
             if (headshot == null)
             {
-                data_girls_textures.AddToQueue(girl, null);
+                // Do not start a fire-and-forget portrait load here. For built-in
+                // unique idols AddToQueue enters vanilla's asynchronous SpriteAtlas
+                // path, whose completion callback assumes a non-null atlas. This card
+                // did not observe or repaint from that load anyway, so a transparent
+                // placeholder is both safer and behaviorally honest.
                 portraitImage.color = mainScript.transparent32;
                 portraitImage.sprite = null;
                 return;
@@ -18614,6 +18618,15 @@ namespace IdolCareerDiary
                 return false;
             }
 
+            // Let Graduation Details establish its archival-profile context before
+            // touching Profile_Popup.Set. Calling Set directly first would cause GD's
+            // Prefix to clear that context, losing the frozen graduation snapshot.
+            if (girl.status == data_girls._status.graduated
+                && TryOpenGraduatedProfileThroughGraduationDetails(girl))
+            {
+                return true;
+            }
+
             mainScript main;
             PopupManager popup;
             if (!TryGetMainAndPopup(out main, out popup))
@@ -18646,6 +18659,45 @@ namespace IdolCareerDiary
             popup.Open(PopupManager._type.girl_profile, true);
             pp.Set(girl);
             return true;
+        }
+
+        /// <summary>
+        /// Uses Graduation Details' optional bridge when opening a graduated idol.
+        /// Reflection keeps Idol Career Diary independently loadable when GD is absent.
+        /// </summary>
+        private static bool TryOpenGraduatedProfileThroughGraduationDetails(data_girls.girls girl)
+        {
+            if (girl == null || girl.status != data_girls._status.graduated)
+            {
+                return false;
+            }
+
+            try
+            {
+                Type apiType = AccessTools.TypeByName("GraduationDetails.GraduationDetailsApi");
+                if (apiType == null)
+                {
+                    return false;
+                }
+                MethodInfo method = apiType.GetMethod(
+                    "TryOpenArchivedProfile",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new Type[] { typeof(int) },
+                    null);
+                if (method == null)
+                {
+                    return false;
+                }
+                object result = method.Invoke(null, new object[] { girl.id });
+                return result is bool && (bool)result;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Graduation Details profile bridge failed for idol "
+                    + girl.id.ToString(CultureInfo.InvariantCulture) + ": " + ex);
+                return false;
+            }
         }
 
         /// <summary>
@@ -22469,23 +22521,27 @@ namespace IdolCareerDiary
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Profile_Popup __instance, data_girls.girls _Girl)
         {
-            if (__instance == null)
+            try
             {
-                return;
-            }
+                if (__instance == null || !Runtime.EnsureHardDependencyAvailable())
+                {
+                    return;
+                }
 
-            if (!Runtime.EnsureHardDependencyAvailable())
+                CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
+                if (controller == null)
+                {
+                    controller = __instance.gameObject.AddComponent<CareerDiaryController>();
+                }
+
+                controller.Initialize(__instance, _Girl);
+            }
+            catch (Exception ex)
             {
-                return;
+                // The diary is additive UI. A diary failure must never abort the
+                // underlying vanilla/Graduation Details profile popup.
+                Log.Warn("Profile Set integration failed safely: " + ex);
             }
-
-            CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
-            if (controller == null)
-            {
-                controller = __instance.gameObject.AddComponent<CareerDiaryController>();
-            }
-
-            controller.Initialize(__instance, _Girl);
         }
     }
 
@@ -22502,23 +22558,25 @@ namespace IdolCareerDiary
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Profile_Popup __instance)
         {
-            if (__instance == null)
+            try
             {
-                return;
-            }
+                if (__instance == null || !Runtime.EnsureHardDependencyAvailable())
+                {
+                    return;
+                }
 
-            if (!Runtime.EnsureHardDependencyAvailable())
+                CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
+                if (controller == null)
+                {
+                    controller = __instance.gameObject.AddComponent<CareerDiaryController>();
+                }
+
+                controller.Initialize(__instance, __instance.Girl);
+            }
+            catch (Exception ex)
             {
-                return;
+                Log.Warn("Profile header integration failed safely: " + ex);
             }
-
-            CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
-            if (controller == null)
-            {
-                controller = __instance.gameObject.AddComponent<CareerDiaryController>();
-            }
-
-            controller.Initialize(__instance, __instance.Girl);
         }
     }
 
@@ -22535,20 +22593,22 @@ namespace IdolCareerDiary
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Profile_Popup __instance)
         {
-            if (__instance == null)
+            try
             {
-                return;
-            }
+                if (__instance == null || !Runtime.EnsureHardDependencyAvailable())
+                {
+                    return;
+                }
 
-            if (!Runtime.EnsureHardDependencyAvailable())
-            {
-                return;
+                CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
+                if (controller != null)
+                {
+                    controller.OnBaseTabSelected();
+                }
             }
-
-            CareerDiaryController controller = __instance.gameObject.GetComponent<CareerDiaryController>();
-            if (controller != null)
+            catch (Exception ex)
             {
-                controller.OnBaseTabSelected();
+                Log.Warn("Profile tab integration failed safely: " + ex);
             }
         }
     }
