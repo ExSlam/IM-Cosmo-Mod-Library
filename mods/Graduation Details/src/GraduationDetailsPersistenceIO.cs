@@ -110,7 +110,7 @@ namespace GraduationDetails
                 string prefix = BuildDirectoryPrefix(root);
                 if (!candidate.StartsWith(
                         prefix,
-                        StringComparison.OrdinalIgnoreCase))
+                        GraduationDetailsPathSemantics.Comparison))
                 {
                     return false;
                 }
@@ -124,7 +124,7 @@ namespace GraduationDetails
                     string.Equals(
                         candidate,
                         normalizedPath,
-                        StringComparison.OrdinalIgnoreCase);
+                        GraduationDetailsPathSemantics.Comparison);
             }
             catch
             {
@@ -218,7 +218,7 @@ namespace GraduationDetails
         {
             return candidatePath.StartsWith(
                 BuildDirectoryPrefix(normalizedRoot),
-                StringComparison.OrdinalIgnoreCase);
+                GraduationDetailsPathSemantics.Comparison);
         }
 
         private static bool HasReparsePointBelowRoot(

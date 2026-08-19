@@ -56,6 +56,8 @@ namespace GraduationDetails
                 new Type[] { typeof(string) });
         }
 
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.cosmo.imdatacore")]
         private static IEnumerable<CodeInstruction> Transpiler(
             IEnumerable<CodeInstruction> instructions,
             ILGenerator generator,
@@ -208,6 +210,8 @@ namespace GraduationDetails
                     new Type[] { typeof(bool) });
         }
 
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.cosmo.imdatacore")]
         private static IEnumerable<CodeInstruction> Transpiler(
             IEnumerable<CodeInstruction> instructions,
             ILGenerator generator,

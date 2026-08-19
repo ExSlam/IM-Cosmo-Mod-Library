@@ -43,10 +43,16 @@ function Assert-PathEqual {
     )
     $expectedPath = [System.IO.Path]::GetFullPath($Expected)
     $actualPath = [System.IO.Path]::GetFullPath($Actual)
+    $comparison = if ([System.IO.Path]::DirectorySeparatorChar -eq '\') {
+        [System.StringComparison]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparison]::Ordinal
+    }
     if (-not [string]::Equals(
             $expectedPath,
             $actualPath,
-            [System.StringComparison]::OrdinalIgnoreCase)) {
+            $comparison)) {
         throw ("{0} Expected: [{1}] Actual: [{2}]" -f `
             $Message, $expectedPath, $actualPath)
     }
@@ -525,6 +531,12 @@ namespace UnityEngine
         'GraduationDetails.StaffIdolRecord', $true)
     $snapshotType = $assembly.GetType(
         'GraduationDetails.GraduationSnapshot', $true)
+    Assert-True ($null -ne $snapshotType.GetField('IdolType', (Get-ReflectionFlags))) `
+        'Graduation snapshots are missing the vanilla idol-type portrait reference.'
+    Assert-True ($null -ne $snapshotType.GetField('PortraitAssets', (Get-ReflectionFlags))) `
+        'Graduation snapshots are missing vanilla portrait asset references.'
+    Assert-True ($null -ne $snapshotType.GetField('CustomSpriteAddress', (Get-ReflectionFlags))) `
+        'Graduation snapshots are missing the unique-idol sprite address.'
     $custodyType = $assembly.GetType(
         'GraduationDetails.CustodyOwner', $true)
 
@@ -553,6 +565,20 @@ namespace UnityEngine
         1 `
         ([int]$formatVersionField.GetRawConstantValue()) `
         'The lightweight format version changed unexpectedly.'
+
+    $caseProbeLower = Join-Path $testRoot 'case-probe'
+    $caseProbeUpper = Join-Path $testRoot 'CASE-PROBE'
+    $samePathCall = Invoke-ReflectedMethod `
+        $null $engineType 'SamePath' `
+        ([object[]]@($caseProbeLower, $caseProbeUpper)) $true
+    if ([System.IO.Path]::DirectorySeparatorChar -eq '\') {
+        Assert-True ([bool]$samePathCall.ReturnValue) `
+            'Windows path identity unexpectedly became case-sensitive.'
+    }
+    else {
+        Assert-False ([bool]$samePathCall.ReturnValue) `
+            'Unix path identity remained incorrectly case-insensitive.'
+    }
 
     $dataRoot = Join-Path $testRoot 'data'
     $detailsRoot = Join-Path $testRoot 'GraduationDetails'
@@ -750,6 +776,15 @@ namespace UnityEngine
         ([System.IO.File]::ReadAllText($vanillaSavePath)) `
         'Graduation Details modified the vanilla save.'
 
+    $initializeEmptyGuard = [System.Activator]::CreateInstance($engineType, $true)
+    $initializeEmptyArgs = [object[]]@($scope, $null)
+    $initializeEmptyCall = Invoke-ReflectedMethod `
+        $initializeEmptyGuard $engineType 'InitializeEmpty' $initializeEmptyArgs $false
+    Assert-False ([bool]$initializeEmptyCall.ReturnValue) `
+        'InitializeEmpty accepted a scope that already had physical sidecar data.'
+    Assert-True ([bool](Get-MemberValue $initializeEmptyGuard 'IsPersistenceBlocked')) `
+        'InitializeEmpty did not fail closed for an existing sidecar.'
+
     $initialJson = [System.IO.File]::ReadAllText($sidecarPath)
     $initialBytes = [Convert]::ToBase64String(
         [System.IO.File]::ReadAllBytes($sidecarPath))
@@ -826,6 +861,24 @@ namespace UnityEngine
     Assert-False (Read-Record $loaded 'TryGetSnapshot' 101).Found `
         'A missing exact checkpoint inherited snapshot state.'
 
+    # The controller uses this guard when an existing physical sidecar has no
+    # exact vanilla checkpoint. Verify that the writable-empty hazard is closed.
+    $mismatchGuard = New-Engine $engineType $scope
+    $guardMissingActivation = Activate-Checkpoint $mismatchGuard $missingStamp
+    Assert-False $guardMissingActivation.Found `
+        'The mismatch guard unexpectedly found a checkpoint.'
+    Invoke-ReflectedMethod `
+        $mismatchGuard $engineType 'EnterReadOnlyEmptyForCurrentScope' `
+        ([object[]]@($scope, 'test unmatched checkpoint')) $false | Out-Null
+    Assert-True ([bool](Get-MemberValue $mismatchGuard 'IsPersistenceBlocked')) `
+        'An unmatched existing sidecar did not enter read-only empty state.'
+    $guardPersist = Persist-ForScope $mismatchGuard $scope
+    Assert-False $guardPersist.Succeeded `
+        'A read-only empty mismatch was allowed to overwrite its sidecar.'
+    Assert-Equal $initialBytes `
+        ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($sidecarPath))) `
+        'The mismatch guard changed the existing sidecar.'
+
     # Re-activate the old save and create a divergent branch. The high-water mark
     # stays monotonic, while abandoned future mutations disappear on persistence.
     $olderActivation = Activate-Checkpoint $loaded $olderStamp
@@ -861,6 +914,64 @@ namespace UnityEngine
     Assert-SequenceEqual @([long]3, [long]9) `
         @(Get-Sequences $branchDocument 'Checkpoints') `
         'The divergent branch retained an abandoned future checkpoint.'
+
+    $backupPath = $sidecarPath + '.graduationdetails.bak'
+    Assert-True (Test-Path -LiteralPath $backupPath -PathType Leaf) `
+        'A successful replacement did not retain the previous sidecar generation.'
+    $retainedBackupBytes = [Convert]::ToBase64String(
+        [System.IO.File]::ReadAllBytes($backupPath))
+    Assert-Equal $initialBytes $retainedBackupBytes `
+        'The retained backup is not the previous successful sidecar generation.'
+    $branchBytes = [Convert]::ToBase64String(
+        [System.IO.File]::ReadAllBytes($sidecarPath))
+
+    # A corrupt primary must load from the retained backup. Re-persisting that
+    # recovered state must keep the known-good backup rather than replacing it
+    # with the corrupt primary generation.
+    [System.IO.File]::WriteAllText($sidecarPath, '{ corrupt-primary')
+    $recovered = New-Engine $engineType $scope
+    $recoveredActivation = Activate-Checkpoint $recovered $newerStamp
+    Assert-True $recoveredActivation.Found `
+        'The retained backup was not used after primary corruption.'
+    Assert-MarriageMarker $recovered 101 'Late Player'
+    $recoveryPersist = Persist-ForScope $recovered $scope
+    Assert-True $recoveryPersist.Succeeded `
+        ('Recovered sidecar persistence failed: ' + $recoveryPersist.ErrorMessage)
+    Assert-Equal $retainedBackupBytes `
+        ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($backupPath))) `
+        'Recovery persistence replaced the known-good retained backup.'
+
+    # If neither generation can be activated, initialization must fail closed and
+    # the unreadable files must remain byte-for-byte untouched.
+    [System.IO.File]::WriteAllText($sidecarPath, '{ corrupt-primary-again')
+    [System.IO.File]::WriteAllText($backupPath, '{ corrupt-backup')
+    $corruptPrimaryBytes = [Convert]::ToBase64String(
+        [System.IO.File]::ReadAllBytes($sidecarPath))
+    $corruptBackupBytes = [Convert]::ToBase64String(
+        [System.IO.File]::ReadAllBytes($backupPath))
+    $blockedEngine = [System.Activator]::CreateInstance($engineType, $true)
+    $blockedInitArgs = [object[]]@($scope, $null)
+    $blockedInit = Invoke-ReflectedMethod `
+        $blockedEngine $engineType 'Initialize' $blockedInitArgs $false
+    Assert-False ([bool]$blockedInit.ReturnValue) `
+        'Corrupt primary and backup unexpectedly initialized.'
+    Assert-True ([bool](Get-MemberValue $blockedEngine 'IsPersistenceBlocked')) `
+        'Corrupt persistence data did not block writes for its save scope.'
+    $blockedPersist = Persist-ForScope $blockedEngine $scope
+    Assert-False $blockedPersist.Succeeded `
+        'Fail-closed storage allowed corrupt sidecar data to be replaced.'
+    Assert-Equal $corruptPrimaryBytes `
+        ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($sidecarPath))) `
+        'Fail-closed initialization changed the corrupt primary.'
+    Assert-Equal $corruptBackupBytes `
+        ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($backupPath))) `
+        'Fail-closed initialization changed the corrupt retained backup.'
+
+    # Restore the valid divergent generation for the remaining tests.
+    [System.IO.File]::WriteAllBytes(
+        $sidecarPath, [Convert]::FromBase64String($branchBytes))
+    [System.IO.File]::WriteAllBytes(
+        $backupPath, [Convert]::FromBase64String($retainedBackupBytes))
 
     $branchReload = New-Engine $engineType $scope
     $branchActivation = Activate-Checkpoint $branchReload $branchStamp
@@ -949,10 +1060,11 @@ namespace UnityEngine
                 '.graduationdetails.tmp.*')))
     Assert-Equal 0 $temporaryArtifacts.Count `
         'A failed atomic replacement left a temporary sidecar behind.'
-    Assert-False `
-        (Test-Path -LiteralPath `
-            ($sidecarPath + '.graduationdetails.bak')) `
-        'A failed atomic replacement left a backup sidecar behind.'
+    if (Test-Path -LiteralPath $backupPath -PathType Leaf) {
+        Assert-Equal $retainedBackupBytes `
+            ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($backupPath))) `
+            'A failed atomic replacement changed the retained recovery generation.'
+    }
 
     $postFailureReload = New-Engine $engineType $scope
     $postFailureActivation = Activate-Checkpoint `
@@ -1114,7 +1226,7 @@ namespace UnityEngine
         ([System.IO.File]::ReadAllText($sentinelPath)) `
         'Scope rotation changed the non-GUID sentinel.'
 
-    # Exercise the controller's final Save As portrait helper against real files.
+    # Exercise the controller's final New Save portrait helper against real files.
     # A destination may already contain an older portrait under the same safe name;
     # the durable temporary-file replacement must overwrite it, not skip the copy.
     $portraitSourceScope = $resolvedScopes[
@@ -1128,7 +1240,7 @@ namespace UnityEngine
     $portraitSnapshot = New-Record $snapshotType @{
         GirlId = 909; Birthdate = '2009-09-09'; AgeAtGraduation = 18
         PortraitFile = $portraitFileName; FirstName = 'Portrait'
-        LastName = 'Source'; Nickname = 'Save As Portrait'
+        LastName = 'Source'; Nickname = 'New Save Portrait'
         TextureSignature = 'portrait-save-as'
     }
     Invoke-Upsert $portraitEngine 'TryUpsertSnapshot' $portraitSnapshot
@@ -1155,12 +1267,12 @@ namespace UnityEngine
         $null $controllerType 'CopyReferencedPortraitsLocked' `
         ([object[]]@($portraitTargetScope)) $true
     Assert-True ([bool]$copyCall.ReturnValue) `
-        'Save As could not replace a stale same-named destination portrait.'
+        'New Save could not replace a stale same-named destination portrait.'
     Assert-Equal `
         ([Convert]::ToBase64String($freshPortraitBytes)) `
         ([Convert]::ToBase64String(
             [System.IO.File]::ReadAllBytes($targetPortrait))) `
-        'Save As retained stale portrait bytes at the destination.'
+        'New Save retained stale portrait bytes at the destination.'
     Assert-Equal 0 `
         @([System.IO.Directory]::GetFiles(
             $targetPortraitDirectory,
@@ -1246,7 +1358,7 @@ namespace UnityEngine
     Write-Host (
         'Graduation Details lightweight persistence regression tests passed: ' +
         'mirrored paths, exact rollback, divergent branching, transient first ' +
-        'save, compact schema, atomic-failure recovery, and portrait Save As ' +
+        'save, compact schema, atomic-failure recovery, and portrait New Save ' +
         'replacement/retry, capture staging, and owned-session cleanup.')
 }
 finally {

@@ -2,7 +2,7 @@
   "Title": "Graduation Details",
   "Description": "Adds a graduated idol details popup with lightweight, exact-save supplemental persistence.",
   "Author": "Cosmo",
-  "Version": "1.1.3",
+  "Version": "1.1.4",
   "Tags": ["ui", "gameplay"],
   "HarmonyID": "com.cosmo.graduationdetails"
 }

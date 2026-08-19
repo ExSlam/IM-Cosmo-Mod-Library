@@ -605,13 +605,26 @@ namespace GraduationDetails
         public int GirlId = -1;
         public string Birthdate = "";
         public int AgeAtGraduation = -1;
+        // Legacy v1 copied portrait. New snapshots use vanilla asset references below.
         public string PortraitFile = "";
         public string FirstName = "";
         public string LastName = "";
         public string Nickname = "";
         public string TextureSignature = "";
+        public data_girls.girls._type IdolType = data_girls.girls._type.NORMAL;
+        public string CustomId = "";
+        public string CustomSpriteAddress = "";
+        public List<PortraitAssetReference> PortraitAssets =
+            new List<PortraitAssetReference>();
         public List<FanSnapshot> Fans = new List<FanSnapshot>();
         public List<BondSectionSnapshot> Bonds = new List<BondSectionSnapshot>();
+    }
+
+    [Serializable]
+    internal sealed class PortraitAssetReference
+    {
+        public data_girls_textures._spriteType Type;
+        public string AssetId = "";
     }
 
     [Serializable]
@@ -721,8 +734,11 @@ namespace GraduationDetails
                 snapshot.Bonds = new List<BondSectionSnapshot>();
             }
 
+            if (!HasPortraitReferences(snapshot))
+            {
+                CapturePortraitReferences(snapshot, girl);
+            }
             Upsert(snapshot);
-            TryCapturePortrait(girl, snapshot);
         }
 
         internal static void Backfill(List<data_girls.girls> girls)
@@ -1225,6 +1241,185 @@ namespace GraduationDetails
                 snapshot);
         }
 
+        private static bool HasPortraitReferences(GraduationSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return false;
+            }
+            if (snapshot.IdolType != data_girls.girls._type.NORMAL)
+            {
+                return true;
+            }
+            if (snapshot.PortraitAssets == null)
+            {
+                return false;
+            }
+            foreach (PortraitAssetReference reference in snapshot.PortraitAssets)
+            {
+                if (reference != null && !string.IsNullOrEmpty(reference.AssetId))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void CapturePortraitReferences(
+            GraduationSnapshot snapshot,
+            data_girls.girls girl)
+        {
+            if (snapshot == null || girl == null)
+            {
+                return;
+            }
+
+            snapshot.IdolType = girl.Type;
+            snapshot.CustomId = girl.Type == data_girls.girls._type.NORMAL
+                ? ""
+                : (girl.GetCustomID() ?? "");
+            snapshot.CustomSpriteAddress = girl.Type == data_girls.girls._type.NORMAL
+                ? ""
+                : (girl.GetCustomSpriteAddress() ?? "");
+            snapshot.PortraitAssets = new List<PortraitAssetReference>();
+            if (girl.textureAssets == null)
+            {
+                return;
+            }
+            foreach (data_girls.girls._textureAsset textureAsset in girl.textureAssets)
+            {
+                if (textureAsset == null || textureAsset.asset == null)
+                {
+                    continue;
+                }
+                string assetId = textureAsset.asset.GetID();
+                if (string.IsNullOrEmpty(assetId))
+                {
+                    continue;
+                }
+                snapshot.PortraitAssets.Add(new PortraitAssetReference
+                {
+                    Type = textureAsset.type,
+                    AssetId = assetId
+                });
+            }
+        }
+
+        internal static bool PortraitReferencesMatchCurrent(
+            GraduationSnapshot snapshot,
+            data_girls.girls girl)
+        {
+            if (snapshot == null || girl == null || snapshot.IdolType != girl.Type)
+            {
+                return false;
+            }
+
+            // Built-in unique idols use vanilla's custom SpriteAtlas path. If the
+            // archived identity still matches the live graduated idol, let vanilla
+            // render it exactly once instead of starting a second Addressables load.
+            if (snapshot.IdolType != data_girls.girls._type.NORMAL)
+            {
+                string currentCustomId = girl.GetCustomID() ?? string.Empty;
+                string currentAddress = girl.GetCustomSpriteAddress() ?? string.Empty;
+                return string.Equals(snapshot.CustomId ?? string.Empty, currentCustomId, StringComparison.Ordinal)
+                    && string.Equals(snapshot.CustomSpriteAddress ?? string.Empty, currentAddress, StringComparison.Ordinal);
+            }
+
+            string archivedSignature = snapshot.TextureSignature ?? string.Empty;
+            string currentSignature = GraduationIdentity.TextureSignature(girl);
+            return !string.IsNullOrEmpty(archivedSignature)
+                && !string.IsNullOrEmpty(currentSignature)
+                && string.Equals(archivedSignature, currentSignature, StringComparison.Ordinal);
+        }
+
+        internal static bool TryCreatePortraitRenderGirl(
+            GraduationSnapshot snapshot,
+            out data_girls.girls renderGirl)
+        {
+            renderGirl = null;
+            if (snapshot == null || snapshot.IdolType != data_girls.girls._type.NORMAL)
+            {
+                // Non-normal idols are SpriteAtlas-backed. Replaying that asynchronous
+                // vanilla path from an archival shell is unsafe because the game's
+                // completion callback assumes a successful, non-null atlas. The live
+                // idol handles the matching case; legacy PNG remains the mismatch fallback.
+                return false;
+            }
+            if (snapshot.PortraitAssets == null || snapshot.PortraitAssets.Count == 0)
+            {
+                return false;
+            }
+
+            Dictionary<data_girls_textures._spriteType, data_girls_textures._textureAsset> assetsByType =
+                new Dictionary<data_girls_textures._spriteType, data_girls_textures._textureAsset>();
+            foreach (PortraitAssetReference reference in snapshot.PortraitAssets)
+            {
+                if (reference == null
+                    || string.IsNullOrEmpty(reference.AssetId)
+                    || reference.Type == data_girls_textures._spriteType.NONE
+                    || assetsByType.ContainsKey(reference.Type))
+                {
+                    return false;
+                }
+
+                data_girls_textures._textureAsset asset =
+                    data_girls_textures.GetTextureAssetByID(reference.AssetId, reference.Type);
+                // Vanilla's resolver deliberately falls back by type. Archival restoration
+                // must require BOTH the exact saved ID and the exact saved sprite type so a
+                // missing portrait mod cannot substitute a different body/hair/face/accessory.
+                if (asset == null
+                    || asset.type != reference.Type
+                    || !string.Equals(asset.GetID(), reference.AssetId, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+                assetsByType.Add(reference.Type, asset);
+            }
+
+            // Portrait_Renderer treats textureAssets[0] as the body for crop/geometry data.
+            // Reject incomplete descriptors rather than handing vanilla a malformed list.
+            if (!assetsByType.ContainsKey(data_girls_textures._spriteType.body))
+            {
+                return false;
+            }
+
+            List<data_girls.girls._textureAsset> resolved = new List<data_girls.girls._textureAsset>();
+            AddResolvedPortraitPart(resolved, assetsByType, data_girls_textures._spriteType.body);
+            AddResolvedPortraitPart(resolved, assetsByType, data_girls_textures._spriteType.hair);
+            AddResolvedPortraitPart(resolved, assetsByType, data_girls_textures._spriteType.face);
+            AddResolvedPortraitPart(resolved, assetsByType, data_girls_textures._spriteType.acc);
+
+            data_girls.girls detached = new data_girls.girls
+            {
+                id = snapshot.GirlId,
+                firstName = snapshot.FirstName ?? string.Empty,
+                lastName = snapshot.LastName ?? string.Empty,
+                nickname = snapshot.Nickname ?? string.Empty,
+                Type = data_girls.girls._type.NORMAL,
+                textureAssets = resolved
+            };
+            detached.UpdateTextureData();
+            renderGirl = detached;
+            return true;
+        }
+
+        private static void AddResolvedPortraitPart(
+            List<data_girls.girls._textureAsset> destination,
+            Dictionary<data_girls_textures._spriteType, data_girls_textures._textureAsset> source,
+            data_girls_textures._spriteType type)
+        {
+            data_girls_textures._textureAsset asset;
+            if (destination == null || source == null || !source.TryGetValue(type, out asset) || asset == null)
+            {
+                return;
+            }
+            destination.Add(new data_girls.girls._textureAsset
+            {
+                type = type,
+                asset = asset
+            });
+        }
+
         private static void TryCapturePortrait(data_girls.girls girl, GraduationSnapshot snapshot)
         {
             string readablePath = GetPortraitPath(snapshot);
@@ -1306,14 +1501,6 @@ namespace GraduationDetails
             snapshot.LastName = girl.lastName ?? "";
             snapshot.Nickname = girl.nickname ?? "";
             snapshot.TextureSignature = GraduationIdentity.TextureSignature(girl);
-
-            string expectedFile = BuildPortraitFileName(girl, snapshot.TextureSignature);
-            if (string.IsNullOrEmpty(snapshot.PortraitFile)
-                || IsLegacyPortraitFile(snapshot.PortraitFile, girl)
-                || !string.Equals(snapshot.PortraitFile, expectedFile, StringComparison.OrdinalIgnoreCase))
-            {
-                snapshot.PortraitFile = expectedFile;
-            }
         }
 
         private static bool IsLegacyPortraitFile(string portraitFile, data_girls.girls girl)
@@ -1386,14 +1573,7 @@ namespace GraduationDetails
     {
         internal static void Show(data_girls.girls girl)
         {
-            if (girl == null)
-            {
-                return;
-            }
-            GraduationSnapshotStore.Capture(girl);
-            GraduationDetailsState.Begin(girl, false);
-
-            OpenProfile(girl);
+            TryShow(girl, false);
         }
 
         internal static void ShowForStaff(staff._staff staffer)
@@ -1408,49 +1588,109 @@ namespace GraduationDetails
                 return;
             }
             data_girls.girls girl = data_girls.GetGirlByID(girlId);
-            if (girl == null)
-            {
-                return;
-            }
-            GraduationSnapshotStore.Capture(girl);
-            GraduationDetailsState.Begin(girl, true);
-            OpenProfile(girl);
+            TryShow(girl, true);
         }
 
-        private static void OpenProfile(data_girls.girls girl)
+        internal static bool TryShow(data_girls.girls girl, bool allowNonGraduated)
         {
             if (girl == null)
             {
-                return;
+                return false;
             }
 
-            if (Camera.main == null)
+            // The graduation Prefix already captured the authoritative snapshot.
+            // Do not recapture on click: the idol has already been removed from
+            // active relationship/fan structures by then, and recapture can both
+            // drift archival state and touch stale post-removal graph objects.
+            try
             {
-                return;
+                if (GraduationSnapshotStore.GetSnapshot(girl.id) == null)
+                {
+                    GraduationSnapshotStore.Capture(girl);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Snapshot enrichment is optional. Still open the underlying profile
+                // even if a legacy/post-removal record cannot be backfilled safely.
+                Debug.LogWarning("Graduation Details: snapshot preparation failed for idol "
+                    + girl.id + ": " + ex);
+            }
+
+            try
+            {
+                GraduationDetailsState.Begin(girl, allowNonGraduated);
+                if (OpenProfile(girl))
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("Graduation Details: archived profile open failed for idol "
+                    + girl.id + ": " + ex);
+            }
+
+            GraduationDetailsState.Clear();
+            return false;
+        }
+
+        private static bool OpenProfile(data_girls.girls girl)
+        {
+            if (girl == null || Camera.main == null)
+            {
+                return false;
             }
             mainScript main = Camera.main.GetComponent<mainScript>();
             if (main == null || main.Data == null)
             {
-                return;
+                return false;
             }
             PopupManager popupManager = main.Data.GetComponent<PopupManager>();
             if (popupManager == null)
             {
-                return;
+                return false;
             }
             PopupManager._popup popup = popupManager.GetByType(PopupManager._type.girl_profile);
             if (popup == null || popup.obj == null)
             {
-                return;
+                return false;
             }
             Profile_Popup profile = popup.obj.GetComponent<Profile_Popup>();
             if (profile == null)
             {
-                return;
+                return false;
             }
             popupManager.Open(PopupManager._type.girl_profile, true);
             profile.Set(girl);
             profile.SetTab(Profile_Popup._tabs.jobs);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Optional reflection bridge for profile-integrated companion mods.
+    /// </summary>
+    public static class GraduationDetailsApi
+    {
+        public static bool TryOpenArchivedProfile(int girlId)
+        {
+            try
+            {
+                data_girls.girls girl = data_girls.GetGirlByID(girlId);
+                if (girl == null || girl.status != data_girls._status.graduated)
+                {
+                    return false;
+                }
+                return GraduationDetailsProfile.TryShow(girl, false);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("Graduation Details: companion profile request failed for idol "
+                    + girlId + ": " + ex);
+                GraduationDetailsState.Clear();
+                return false;
+            }
         }
     }
 
@@ -1784,21 +2024,26 @@ namespace GraduationDetails
     {
         private static void Postfix(Profile_Popup __instance)
         {
-            if (__instance == null)
+            try
             {
-                return;
+                if (__instance == null || !GraduationDetailsState.IsFor(__instance.Girl))
+                {
+                    return;
+                }
+                GraduationSnapshot snapshot = GraduationSnapshotStore.GetSnapshot(__instance.Girl.id);
+                if (snapshot == null)
+                {
+                    return;
+                }
+                ApplySnapshotDob(__instance, snapshot);
+                ApplySnapshotPortrait(__instance, snapshot);
             }
-            if (!GraduationDetailsState.IsFor(__instance.Girl))
+            catch (Exception ex)
             {
-                return;
+                // Graduation Details is an enhancement to the vanilla profile. Never let
+                // archival rendering abort the underlying popup.
+                Debug.LogWarning("Graduation Details: archived profile rendering failed: " + ex);
             }
-            GraduationSnapshot snapshot = GraduationSnapshotStore.GetSnapshot(__instance.Girl.id);
-            if (snapshot == null)
-            {
-                return;
-            }
-            ApplySnapshotDob(__instance, snapshot);
-            ApplySnapshotPortrait(__instance, snapshot);
         }
 
         private static void ApplySnapshotDob(Profile_Popup profile, GraduationSnapshot snapshot)
@@ -1831,6 +2076,44 @@ namespace GraduationDetails
 
         private static void ApplySnapshotPortrait(Profile_Popup profile, GraduationSnapshot snapshot)
         {
+            if (profile == null || profile.Girl == null || snapshot == null)
+            {
+                return;
+            }
+
+            // RenderHeader has already asked vanilla to render the live idol. In the
+            // overwhelmingly common case the graduated idol still carries the exact
+            // archived portrait identity, so doing nothing is both correct and safer.
+            // In particular this avoids duplicate Addressables loads for built-in unique idols.
+            if (GraduationSnapshotStore.PortraitReferencesMatchCurrent(snapshot, profile.Girl))
+            {
+                return;
+            }
+
+            data_girls.girls portraitGirl;
+            if (GraduationSnapshotStore.TryCreatePortraitRenderGirl(snapshot, out portraitGirl))
+            {
+                // A single cache render is sufficient for the detached NORMAL idol.
+                // Queueing the same detached portrait separately for both targets can
+                // overlap render/cache work; use vanilla's full-portrait path once instead.
+                mainScript main = Camera.main != null ? Camera.main.GetComponent<mainScript>() : null;
+                data_girls_textures textures = main != null && main.Data != null
+                    ? main.Data.GetComponent<data_girls_textures>()
+                    : null;
+                if (textures != null)
+                {
+                    List<GameObject> targets = new List<GameObject>();
+                    if (profile.Portrait != null) targets.Add(profile.Portrait);
+                    if (profile.Portrait_Shadow != null) targets.Add(profile.Portrait_Shadow);
+                    if (targets.Count > 0)
+                    {
+                        textures._setFullPortrait(portraitGirl, targets);
+                        return;
+                    }
+                }
+            }
+
+            // Backward compatibility for v1 sidecars that embedded a copied PNG.
             string portraitPath = GraduationSnapshotStore.GetPortraitPath(snapshot);
             if (string.IsNullOrEmpty(portraitPath) || !File.Exists(portraitPath))
             {
@@ -1846,14 +2129,8 @@ namespace GraduationDetails
             Sprite cached = LoadTexture.GetSprite(cacheKey);
             if (cached != null)
             {
-                if (portrait != null)
-                {
-                    portrait.sprite = cached;
-                }
-                if (shadow != null)
-                {
-                    shadow.sprite = cached;
-                }
+                if (portrait != null) portrait.sprite = cached;
+                if (shadow != null) shadow.sprite = cached;
                 return;
             }
             if (LoadTexture.instance != null)

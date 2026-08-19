@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace GraduationDetails
@@ -19,6 +20,20 @@ namespace GraduationDetails
         internal string PersistentDataRootPath = "";
         internal string RootDirectoryPath = "";
         internal bool IsTransient;
+    }
+
+    /// <summary>
+    /// Host-aware path identity. Windows paths are case-insensitive while Unix-like
+    /// paths remain case-sensitive, matching IM Data Core's persistence semantics.
+    /// </summary>
+    internal static class GraduationDetailsPathSemantics
+    {
+        internal static readonly bool IsCaseInsensitive =
+            Path.DirectorySeparatorChar == '\\';
+        internal static readonly StringComparer Comparer =
+            IsCaseInsensitive ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        internal static readonly StringComparison Comparison =
+            IsCaseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
     }
 
     /// <summary>
@@ -226,7 +241,7 @@ namespace GraduationDetails
                 string.Equals(
                     dataRoot,
                     detailsRoot,
-                    StringComparison.OrdinalIgnoreCase) ||
+                    GraduationDetailsPathSemantics.Comparison) ||
                 IsStrictlyContainedPath(dataRoot, detailsRoot) ||
                 IsStrictlyContainedPath(detailsRoot, dataRoot))
             {
@@ -420,7 +435,7 @@ namespace GraduationDetails
             if (string.Equals(
                     fileName,
                     GlobalDataFileName,
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 return false;
             }
@@ -432,7 +447,7 @@ namespace GraduationDetails
                 string.Equals(
                     segments[0],
                     ManualSavesFolderName,
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 return IsOpaquePathSegment(segments[1]) &&
                     IsSaveJsonFileName(fileName);
@@ -441,7 +456,7 @@ namespace GraduationDetails
                 !string.Equals(
                     segments[0],
                     StoryModeFolderName,
-                    StringComparison.OrdinalIgnoreCase) ||
+                    GraduationDetailsPathSemantics.Comparison) ||
                 !IsOpaquePathSegment(segments[1]))
             {
                 return false;
@@ -454,7 +469,7 @@ namespace GraduationDetails
                 string.Equals(
                     segments[2],
                     ManualSavesFolderName,
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 return IsOpaquePathSegment(segments[3]) &&
                     IsSaveJsonFileName(fileName);
@@ -469,11 +484,11 @@ namespace GraduationDetails
             return string.Equals(
                     fileName,
                     AutoSaveFileName,
-                    StringComparison.OrdinalIgnoreCase) ||
+                    GraduationDetailsPathSemantics.Comparison) ||
                 string.Equals(
                     fileName,
                     ManualSaveFileName,
-                    StringComparison.OrdinalIgnoreCase);
+                    GraduationDetailsPathSemantics.Comparison);
         }
 
         private static bool IsSaveJsonFileName(string fileName)
@@ -481,7 +496,7 @@ namespace GraduationDetails
             return string.Equals(
                 fileName,
                 SaveFileName,
-                StringComparison.OrdinalIgnoreCase);
+                GraduationDetailsPathSemantics.Comparison);
         }
 
         private static bool IsStoryChapterFolderName(string folderName)
@@ -489,7 +504,7 @@ namespace GraduationDetails
             if (string.IsNullOrEmpty(folderName) ||
                 !folderName.StartsWith(
                     StoryChapterFolderPrefix,
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 return false;
             }
@@ -587,7 +602,7 @@ namespace GraduationDetails
             {
                 return Path.GetFullPath(candidatePath).StartsWith(
                     BuildDirectoryPrefix(Path.GetFullPath(rootDirectory)),
-                    StringComparison.OrdinalIgnoreCase);
+                    GraduationDetailsPathSemantics.Comparison);
             }
             catch
             {
@@ -699,7 +714,7 @@ namespace GraduationDetails
                         checkpoint.RelativeSavePath),
                     GraduationDetailsPaths.NormalizeRelativePath(
                         RelativeSavePath),
-                    StringComparison.OrdinalIgnoreCase) &&
+                    GraduationDetailsPathSemantics.Comparison) &&
                 string.Equals(
                     checkpoint.LastSave ?? "",
                     LastSave ?? "",
@@ -739,6 +754,102 @@ namespace GraduationDetails
         public long PlaytimeSeconds;
         public string GameDateTime = "";
         public long Sequence;
+        public List<GraduationDetailsEnabledModRecord> EnabledMods =
+            new List<GraduationDetailsEnabledModRecord>();
+    }
+
+    [Serializable]
+    internal sealed class GraduationDetailsEnabledModRecord
+    {
+        public string ModName = "";
+        public string Title = "";
+        public string Version = "";
+        public string SteamWorkshopId = "";
+    }
+
+    internal static class GraduationDetailsEnabledMods
+    {
+        internal static List<GraduationDetailsEnabledModRecord> Capture()
+        {
+            List<GraduationDetailsEnabledModRecord> result =
+                new List<GraduationDetailsEnabledModRecord>();
+            try
+            {
+                if (Mods._Mods == null)
+                {
+                    return result;
+                }
+                foreach (Mods._mod mod in Mods._Mods)
+                {
+                    try
+                    {
+                        if (mod == null || !mod.IsEnabled())
+                        {
+                            continue;
+                        }
+                        ulong workshopId = mod.GetSteamID();
+                        result.Add(new GraduationDetailsEnabledModRecord
+                        {
+                            ModName = mod.ModName ?? "",
+                            Title = mod.Title ?? "",
+                            Version = mod.Version ?? "",
+                            SteamWorkshopId = workshopId == 0UL
+                                ? ""
+                                : workshopId.ToString(CultureInfo.InvariantCulture)
+                        });
+                    }
+                    catch
+                    {
+                        // Keep enumerating if one mod exposes bad metadata.
+                    }
+                }
+            }
+            catch
+            {
+                // Save persistence must not fail because mod metadata enumeration did.
+            }
+            return result
+                .OrderBy(item => item.ModName ?? "", StringComparer.Ordinal)
+                .ToList();
+        }
+
+        internal static List<GraduationDetailsEnabledModRecord> Clone(
+            IEnumerable<GraduationDetailsEnabledModRecord> source)
+        {
+            List<GraduationDetailsEnabledModRecord> result =
+                new List<GraduationDetailsEnabledModRecord>();
+            if (source == null)
+            {
+                return result;
+            }
+            foreach (GraduationDetailsEnabledModRecord item in source)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+                result.Add(new GraduationDetailsEnabledModRecord
+                {
+                    ModName = item.ModName ?? "",
+                    Title = item.Title ?? "",
+                    Version = item.Version ?? "",
+                    SteamWorkshopId = item.SteamWorkshopId ?? ""
+                });
+            }
+            return result;
+        }
+    }
+
+    [Serializable]
+    internal sealed class GraduationDetailsImDataCoreDocument
+    {
+        public string FormatName = "GraduationDetails.IMDataCoreSnapshot";
+        public int FormatVersion = 1;
+        public List<MarriageRecord> MarriageRecords = new List<MarriageRecord>();
+        public List<StaffIdolRecord> StaffRecords = new List<StaffIdolRecord>();
+        public List<GraduationSnapshot> Snapshots = new List<GraduationSnapshot>();
+        public List<GraduationDetailsEnabledModRecord> EnabledMods =
+            new List<GraduationDetailsEnabledModRecord>();
     }
 
     [Serializable]
@@ -766,6 +877,445 @@ namespace GraduationDetails
         public string Operation = GraduationDetailsStorageEngine.OperationSet;
         public int GirlId = -1;
         public GraduationSnapshot Value;
+    }
+}
+
+namespace GraduationDetails
+{
+    /// <summary>
+    /// Optional IM Data Core bridge. Reflection keeps Graduation Details loadable when
+    /// IMDC is not installed, while IMDC custom state supplies its checkpointed,
+    /// fail-closed persistence when available.
+    /// </summary>
+    internal static class GraduationDetailsImDataCoreBridge
+    {
+        private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
+        private const string InteropApiTypeName = "IMDataCore.IMDataCoreInteropApi";
+        private const string NamespaceIdentifier = "graduation_details";
+        private const string DataKey = "graduation_details_snapshot";
+        private const string ExpectedFormatName = "GraduationDetails.IMDataCoreSnapshot";
+        private const int ExpectedFormatVersion = 1;
+
+        private static readonly object BridgeLock = new object();
+        private static Type apiType;
+        private static Type interopApiType;
+        private static object session;
+        private static bool lookupAttempted;
+        private static bool delegatedStateObserved;
+
+        internal static bool HasDelegatedState
+        {
+            get
+            {
+                lock (BridgeLock)
+                {
+                    return delegatedStateObserved;
+                }
+            }
+        }
+
+        internal static void ResetBranchState()
+        {
+            lock (BridgeLock)
+            {
+                delegatedStateObserved = false;
+            }
+        }
+
+        internal static bool TryLoad(
+            GraduationDetailsStorageEngine engine,
+            out bool found,
+            out bool available,
+            out string errorMessage)
+        {
+            found = false;
+            available = false;
+            errorMessage = "";
+            if (engine == null)
+            {
+                errorMessage = "The Graduation Details storage engine is missing.";
+                return false;
+            }
+
+            lock (BridgeLock)
+            {
+                if (!TryEnsureSessionLocked(out available, out errorMessage))
+                {
+                    return false;
+                }
+                if (!available)
+                {
+                    return true;
+                }
+
+                string json;
+                if (!TryGetJsonLocked(DataKey, out json, out found, out errorMessage))
+                {
+                    return false;
+                }
+                if (!found)
+                {
+                    return true;
+                }
+                delegatedStateObserved = true;
+
+                GraduationDetailsImDataCoreDocument document;
+                try
+                {
+                    document = JsonUtility.FromJson<GraduationDetailsImDataCoreDocument>(json);
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = "IM Data Core Graduation Details snapshot could not be parsed: " +
+                        exception.Message;
+                    return false;
+                }
+                if (document == null ||
+                    !string.Equals(document.FormatName, ExpectedFormatName, StringComparison.Ordinal) ||
+                    document.FormatVersion != ExpectedFormatVersion)
+                {
+                    errorMessage = "IM Data Core contains an unsupported Graduation Details snapshot format.";
+                    return false;
+                }
+
+                engine.InitializeTransient();
+                bool changed;
+                string mutationError;
+                if (document.MarriageRecords != null)
+                {
+                    foreach (MarriageRecord record in document.MarriageRecords)
+                    {
+                        if (!engine.TryUpsertMarriageRecord(record, out changed, out mutationError))
+                        {
+                            errorMessage = mutationError;
+                            engine.InitializeTransient();
+                            return false;
+                        }
+                    }
+                }
+                if (document.StaffRecords != null)
+                {
+                    foreach (StaffIdolRecord record in document.StaffRecords)
+                    {
+                        if (!engine.TryUpsertStaffRecord(record, out changed, out mutationError))
+                        {
+                            errorMessage = mutationError;
+                            engine.InitializeTransient();
+                            return false;
+                        }
+                    }
+                }
+                if (document.Snapshots != null)
+                {
+                    foreach (GraduationSnapshot snapshot in document.Snapshots)
+                    {
+                        if (!engine.TryUpsertSnapshot(snapshot, out changed, out mutationError))
+                        {
+                            errorMessage = mutationError;
+                            engine.InitializeTransient();
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+
+        internal static bool TrySync(
+            GraduationDetailsStorageEngine engine,
+            out bool available,
+            out string errorMessage)
+        {
+            available = false;
+            errorMessage = "";
+            if (engine == null)
+            {
+                errorMessage = "The Graduation Details storage engine is missing.";
+                return false;
+            }
+
+            lock (BridgeLock)
+            {
+                if (!TryEnsureSessionLocked(out available, out errorMessage))
+                {
+                    return false;
+                }
+                if (!available)
+                {
+                    return true;
+                }
+
+                bool persistenceWritable;
+                if (!TryIsPersistenceWritableLocked(
+                        out persistenceWritable,
+                        out errorMessage))
+                {
+                    return false;
+                }
+                if (!persistenceWritable)
+                {
+                    return false;
+                }
+
+                GraduationDetailsImDataCoreDocument document =
+                    new GraduationDetailsImDataCoreDocument
+                    {
+                        MarriageRecords = engine.GetMarriageRecords(),
+                        StaffRecords = engine.GetStaffRecords(),
+                        Snapshots = engine.GetSnapshots(),
+                        EnabledMods = GraduationDetailsEnabledMods.Capture()
+                    };
+                string json = JsonUtility.ToJson(document, false);
+                return TrySetJsonLocked(DataKey, json, out errorMessage);
+            }
+        }
+
+        private static bool TryEnsureSessionLocked(
+            out bool available,
+            out string errorMessage)
+        {
+            available = false;
+            errorMessage = "";
+            if (!lookupAttempted || apiType == null || interopApiType == null)
+            {
+                lookupAttempted = true;
+                foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (apiType == null)
+                    {
+                        apiType = assembly.GetType(ApiTypeName, false);
+                    }
+                    if (interopApiType == null)
+                    {
+                        interopApiType = assembly.GetType(InteropApiTypeName, false);
+                    }
+                    if (apiType != null && interopApiType != null)
+                    {
+                        break;
+                    }
+                }
+            }
+            if (apiType == null || interopApiType == null)
+            {
+                // Older IMDC builds do not expose the reflection-safe owner-aware
+                // facade. Treat them as unavailable and keep standalone persistence.
+                return true;
+            }
+
+            try
+            {
+                MethodInfo isReadyMethod = apiType.GetMethod(
+                    "IsReady",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (isReadyMethod == null || !(bool)isReadyMethod.Invoke(null, null))
+                {
+                    return true;
+                }
+                available = true;
+                if (session != null)
+                {
+                    return true;
+                }
+
+                MethodInfo registerMethod = interopApiType.GetMethod(
+                    "TryRegisterNamespace",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (registerMethod == null)
+                {
+                    errorMessage = "IM Data Core does not expose namespace registration.";
+                    return false;
+                }
+                object[] arguments = new object[]
+                {
+                    NamespaceIdentifier,
+                    typeof(GraduationDetailsImDataCoreBridge).Assembly,
+                    null,
+                    ""
+                };
+                bool registered = (bool)registerMethod.Invoke(null, arguments);
+                if (!registered || arguments[2] == null)
+                {
+                    errorMessage = arguments[3] as string ??
+                        "IM Data Core rejected the Graduation Details namespace.";
+                    return false;
+                }
+                session = arguments[2];
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = "IM Data Core bridge initialization failed: " +
+                    UnwrapReflectionException(exception).Message;
+                return false;
+            }
+        }
+
+        private static bool TryIsPersistenceWritableLocked(
+            out bool writable,
+            out string errorMessage)
+        {
+            writable = false;
+            errorMessage = "";
+            try
+            {
+                MethodInfo method = apiType.GetMethod(
+                    "TryGetPersistenceDiagnostics",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                {
+                    errorMessage =
+                        "IM Data Core does not expose persistence diagnostics.";
+                    return false;
+                }
+
+                object[] arguments = new object[] { null, "" };
+                bool succeeded = (bool)method.Invoke(null, arguments);
+                if (!succeeded || arguments[0] == null)
+                {
+                    errorMessage = arguments[1] as string ??
+                        "IM Data Core persistence diagnostics were unavailable.";
+                    return false;
+                }
+
+                object diagnostics = arguments[0];
+                PropertyInfo blockedProperty = diagnostics.GetType().GetProperty(
+                    "IsPersistenceBlocked",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (blockedProperty == null ||
+                    blockedProperty.PropertyType != typeof(bool))
+                {
+                    errorMessage =
+                        "IM Data Core persistence diagnostics are incompatible.";
+                    return false;
+                }
+
+                bool blocked = (bool)blockedProperty.GetValue(diagnostics, null);
+                if (!blocked)
+                {
+                    writable = true;
+                    return true;
+                }
+
+                PropertyInfo reasonProperty = diagnostics.GetType().GetProperty(
+                    "BlockedReason",
+                    BindingFlags.Public | BindingFlags.Instance);
+                string reason = reasonProperty != null
+                    ? reasonProperty.GetValue(diagnostics, null) as string
+                    : "";
+                errorMessage = string.IsNullOrEmpty(reason)
+                    ? "IM Data Core persistence is blocked for the active save."
+                    : "IM Data Core persistence is blocked for the active save: " +
+                        reason;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = "IM Data Core persistence diagnostics failed: " +
+                    UnwrapReflectionException(exception).Message;
+                return false;
+            }
+        }
+
+        private static bool TrySetJsonLocked(
+            string key,
+            string json,
+            out string errorMessage)
+        {
+            errorMessage = "";
+            try
+            {
+                MethodInfo method = interopApiType.GetMethod(
+                    "TrySetCustomJson",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                {
+                    errorMessage = "IM Data Core does not expose custom JSON writes.";
+                    return false;
+                }
+                object[] arguments = new object[]
+                {
+                    session,
+                    typeof(GraduationDetailsImDataCoreBridge).Assembly,
+                    key,
+                    json ?? "",
+                    ""
+                };
+                bool succeeded = (bool)method.Invoke(null, arguments);
+                if (!succeeded)
+                {
+                    errorMessage = arguments[4] as string ?? "IM Data Core custom JSON write failed.";
+                }
+                else
+                {
+                    delegatedStateObserved = true;
+                }
+                return succeeded;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = "IM Data Core custom JSON write failed: " +
+                    UnwrapReflectionException(exception).Message;
+                return false;
+            }
+        }
+
+        private static bool TryGetJsonLocked(
+            string key,
+            out string json,
+            out bool found,
+            out string errorMessage)
+        {
+            json = "";
+            found = false;
+            errorMessage = "";
+            try
+            {
+                MethodInfo method = interopApiType.GetMethod(
+                    "TryGetCustomJson",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                {
+                    errorMessage = "IM Data Core does not expose custom JSON reads.";
+                    return false;
+                }
+                object[] arguments = new object[]
+                {
+                    session,
+                    typeof(GraduationDetailsImDataCoreBridge).Assembly,
+                    key,
+                    "",
+                    ""
+                };
+                bool succeeded = (bool)method.Invoke(null, arguments);
+                if (!succeeded)
+                {
+                    string reportedError = arguments[4] as string ?? "";
+                    if (string.IsNullOrEmpty(reportedError))
+                    {
+                        return true;
+                    }
+                    errorMessage = reportedError;
+                    return false;
+                }
+                json = arguments[3] as string ?? "";
+                found = true;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage = "IM Data Core custom JSON read failed: " +
+                    UnwrapReflectionException(exception).Message;
+                return false;
+            }
+        }
+
+        private static Exception UnwrapReflectionException(Exception exception)
+        {
+            TargetInvocationException invocation = exception as TargetInvocationException;
+            return invocation != null && invocation.InnerException != null
+                ? invocation.InnerException
+                : exception;
+        }
     }
 }
 
@@ -826,6 +1376,10 @@ namespace GraduationDetails
                     {
                         WarnSafely(errorMessage);
                     }
+                    else if (changed)
+                    {
+                        TrySyncToImDataCoreLocked();
+                    }
                 }
             }
             catch (Exception exception)
@@ -871,6 +1425,10 @@ namespace GraduationDetails
                     {
                         WarnSafely(errorMessage);
                     }
+                    else if (changed)
+                    {
+                        TrySyncToImDataCoreLocked();
+                    }
                 }
             }
             catch (Exception exception)
@@ -894,6 +1452,10 @@ namespace GraduationDetails
                             out errorMessage))
                     {
                         WarnSafely(errorMessage);
+                    }
+                    else if (changed)
+                    {
+                        TrySyncToImDataCoreLocked();
                     }
                 }
             }
@@ -940,6 +1502,10 @@ namespace GraduationDetails
                             out errorMessage))
                     {
                         WarnSafely(errorMessage);
+                    }
+                    else if (changed)
+                    {
+                        TrySyncToImDataCoreLocked();
                     }
                 }
             }
@@ -1105,8 +1671,43 @@ namespace GraduationDetails
                         WarnSafely(errorMessage);
                         return;
                     }
-                    bool portraitsReady =
-                        CopyReferencedPortraitsLocked(targetScope);
+                    bool imDataCoreAvailable = false;
+                    bool imDataCoreSyncSucceeded = false;
+                    if (!storageEngine.IsPersistenceBlocked)
+                    {
+                        imDataCoreSyncSucceeded =
+                            GraduationDetailsImDataCoreBridge.TrySync(
+                                storageEngine,
+                                out imDataCoreAvailable,
+                                out errorMessage);
+                    }
+                    if (imDataCoreAvailable && imDataCoreSyncSucceeded)
+                    {
+                        // IM Data Core owns the exact-checkpoint sidecar when active.
+                        // The standalone Graduation Details sidecar is intentionally
+                        // left untouched instead of dual-writing divergent histories.
+                        activeScope = targetScope;
+                        ClearWorkingPortraitFilesLocked();
+                        return;
+                    }
+                    if (imDataCoreAvailable &&
+                        GraduationDetailsImDataCoreBridge.HasDelegatedState)
+                    {
+                        WarnSafely(
+                            "IM Data Core already owns Graduation Details persistence, " +
+                            "but this save-boundary update failed. Existing delegated " +
+                            "state was preserved instead of writing a divergent standalone " +
+                            "sidecar: " + errorMessage);
+                        return;
+                    }
+                    if (imDataCoreAvailable && !string.IsNullOrEmpty(errorMessage))
+                    {
+                        WarnSafely(
+                            "IM Data Core delegation was unavailable for this new " +
+                            "Graduation Details state; using the standalone sidecar: " +
+                            errorMessage);
+                    }
+
                     if (!storageEngine.TryPersistForScope(
                             targetScope,
                             out errorMessage))
@@ -1116,17 +1717,8 @@ namespace GraduationDetails
                             errorMessage);
                         return;
                     }
-                    if (portraitsReady)
-                    {
-                        activeScope = targetScope;
-                        ClearWorkingPortraitFilesLocked();
-                    }
-                    else
-                    {
-                        WarnSafely(
-                            "The sidecar was saved, but the prior portrait scope " +
-                            "was retained so a failed portrait copy can be retried.");
-                    }
+                    activeScope = targetScope;
+                    ClearWorkingPortraitFilesLocked();
                 }
             }
             catch (Exception exception)
@@ -1141,6 +1733,7 @@ namespace GraduationDetails
             SaveManager.SavedData loadedSaveData,
             string dataFileName)
         {
+            GraduationDetailsImDataCoreBridge.ResetBranchState();
             GraduationDetailsStorageEngine loadedEngine =
                 new GraduationDetailsStorageEngine();
             GraduationDetailsSaveScope targetScope = null;
@@ -1165,35 +1758,84 @@ namespace GraduationDetails
                     return;
                 }
 
-                GraduationDetailsSaveStamp stamp;
                 string errorMessage;
+                bool delegatedFound;
+                bool imDataCoreAvailable;
+                bool delegatedLoadSucceeded =
+                    GraduationDetailsImDataCoreBridge.TryLoad(
+                        loadedEngine,
+                        out delegatedFound,
+                        out imDataCoreAvailable,
+                        out errorMessage);
+                if (delegatedLoadSucceeded &&
+                    imDataCoreAvailable &&
+                    delegatedFound)
+                {
+                    InstallLoadedEngine(loadedEngine, targetScope);
+                    return;
+                }
+                if (!delegatedLoadSucceeded &&
+                    imDataCoreAvailable &&
+                    delegatedFound)
+                {
+                    loadedEngine.InitializeTransient();
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        targetScope,
+                        "The existing IM Data Core Graduation Details snapshot could " +
+                        "not be safely activated and was preserved unchanged. " +
+                        errorMessage);
+                    InstallLoadedEngine(loadedEngine, targetScope);
+                    WarnSafely(
+                        "IM Data Core contains Graduation Details state that could not " +
+                        "be safely activated; supplemental state is empty and read-only " +
+                        "for this save: " + errorMessage);
+                    return;
+                }
+                if (imDataCoreAvailable && !string.IsNullOrEmpty(errorMessage))
+                {
+                    WarnSafely(
+                        "IM Data Core Graduation Details integration was unavailable; " +
+                        "checking the standalone sidecar instead: " + errorMessage);
+                }
+
+                bool initialized = loadedEngine.Initialize(
+                    targetScope,
+                    out errorMessage);
+                if (!initialized)
+                {
+                    WarnSafely(
+                        "The sidecar could not be safely activated: " +
+                        errorMessage);
+                    if (loadedEngine.IsPersistenceBlocked)
+                    {
+                        InstallLoadedEngine(loadedEngine, targetScope);
+                        WarnSafely(
+                            "Graduation Details persistence is read-only for this " +
+                            "save so the existing sidecar/recovery data cannot be overwritten.");
+                        return;
+                    }
+
+                    lock (PersistenceLock)
+                    {
+                        ResetToTransientLocked();
+                    }
+                    return;
+                }
+
+                GraduationDetailsSaveStamp stamp;
                 if (!GraduationDetailsSaveStamp.TryCreate(
                         loadedSaveData,
                         targetScope.RelativeSavePath,
                         out stamp,
                         out errorMessage))
                 {
-                    loadedEngine.InitializeEmpty(targetScope, out errorMessage);
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        targetScope,
+                        "The loaded vanilla save did not provide a safe checkpoint " +
+                        "identity; existing Graduation Details data was left untouched.");
                     InstallLoadedEngine(loadedEngine, targetScope);
                     WarnSafely(errorMessage);
                     return;
-                }
-
-                if (!loadedEngine.Initialize(targetScope, out errorMessage))
-                {
-                    WarnSafely(
-                        "The sidecar was ignored safely: " + errorMessage);
-                    if (!loadedEngine.InitializeEmpty(
-                            targetScope,
-                            out errorMessage))
-                    {
-                        lock (PersistenceLock)
-                        {
-                            ResetToTransientLocked();
-                        }
-                        WarnSafely(errorMessage);
-                        return;
-                    }
                 }
 
                 bool checkpointFound;
@@ -1204,17 +1846,33 @@ namespace GraduationDetails
                         out activatedSequence,
                         out errorMessage))
                 {
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        targetScope,
+                        "The Graduation Details checkpoint set could not be safely " +
+                        "activated; existing sidecar data was left untouched. " +
+                        errorMessage);
                     WarnSafely(errorMessage);
-                    loadedEngine.InitializeEmpty(targetScope, out errorMessage);
                 }
                 else if (!checkpointFound &&
-                    File.Exists(targetScope.SidecarFilePath))
+                    HasPhysicalPersistenceData(targetScope))
                 {
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        targetScope,
+                        "No exact Graduation Details checkpoint matched the loaded " +
+                        "vanilla save; state is empty and read-only for this path so " +
+                        "the unmatched sidecar history is preserved.");
                     WarnSafely(
                         "No exact checkpoint matched the loaded vanilla save; " +
-                        "supplemental state started empty.");
+                        "supplemental state is empty and read-only for this path.");
                 }
                 InstallLoadedEngine(loadedEngine, targetScope);
+                lock (PersistenceLock)
+                {
+                    if (!storageEngine.IsPersistenceBlocked)
+                    {
+                        TrySyncToImDataCoreLocked();
+                    }
+                }
             }
             catch (Exception exception)
             {
@@ -1223,8 +1881,10 @@ namespace GraduationDetails
                     exception.Message);
                 if (targetScope != null)
                 {
-                    string ignoredError;
-                    loadedEngine.InitializeEmpty(targetScope, out ignoredError);
+                    loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                        targetScope,
+                        "Graduation Details load restoration failed unexpectedly; " +
+                        "persistence was blocked to preserve any existing data.");
                     InstallLoadedEngine(loadedEngine, targetScope);
                 }
                 else
@@ -1237,10 +1897,40 @@ namespace GraduationDetails
             }
         }
 
+        private static bool HasPhysicalPersistenceData(
+            GraduationDetailsSaveScope scope)
+        {
+            return scope != null &&
+                (File.Exists(scope.SidecarFilePath) ||
+                 File.Exists(scope.SidecarFilePath + ".graduationdetails.bak"));
+        }
+
+        private static void TrySyncToImDataCoreLocked()
+        {
+            if (storageEngine == null || storageEngine.IsPersistenceBlocked)
+            {
+                return;
+            }
+            bool available;
+            string errorMessage;
+            if (!GraduationDetailsImDataCoreBridge.TrySync(
+                    storageEngine,
+                    out available,
+                    out errorMessage) &&
+                available &&
+                !string.IsNullOrEmpty(errorMessage))
+            {
+                WarnSafely(
+                    "IM Data Core delegation update failed; the current in-memory " +
+                    "Graduation Details state was retained: " + errorMessage);
+            }
+        }
+
         internal static void OnNewGameStarting()
         {
             try
             {
+                GraduationDetailsImDataCoreBridge.ResetBranchState();
                 lock (PersistenceLock)
                 {
                     ResetToTransientLocked();
@@ -1361,7 +2051,7 @@ namespace GraduationDetails
                 !string.Equals(
                     Path.GetFileName(portraitDirectory),
                     "Portraits",
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 return;
             }
@@ -1394,7 +2084,7 @@ namespace GraduationDetails
                     !string.Equals(
                         Path.GetFullPath(sessionInfo.Parent.FullName),
                         Path.GetFullPath(cacheRoot),
-                        StringComparison.OrdinalIgnoreCase) ||
+                        GraduationDetailsPathSemantics.Comparison) ||
                     !Guid.TryParseExact(
                         sessionInfo.Name,
                         "N",
@@ -1676,7 +2366,7 @@ namespace GraduationDetails
                 return string.Equals(
                     Path.GetFullPath(first),
                     Path.GetFullPath(second),
-                    StringComparison.OrdinalIgnoreCase);
+                    GraduationDetailsPathSemantics.Comparison);
             }
             catch
             {
@@ -1757,7 +2447,7 @@ namespace GraduationDetails
                         document.RelativeSavePath),
                     GraduationDetailsPaths.NormalizeRelativePath(
                         scope.RelativeSavePath),
-                    StringComparison.OrdinalIgnoreCase))
+                    GraduationDetailsPathSemantics.Comparison))
             {
                 errorMessage = "The sidecar belongs to a different vanilla save path.";
                 return false;
@@ -1844,7 +2534,7 @@ namespace GraduationDetails
                             checkpoint.RelativeSavePath),
                         GraduationDetailsPaths.NormalizeRelativePath(
                             scope.RelativeSavePath),
-                        StringComparison.OrdinalIgnoreCase))
+                        GraduationDetailsPathSemantics.Comparison))
                 {
                     errorMessage = "The sidecar contains an invalid checkpoint.";
                     return false;
@@ -1904,7 +2594,7 @@ namespace GraduationDetails
                         first.RelativeSavePath),
                     GraduationDetailsPaths.NormalizeRelativePath(
                         second.RelativeSavePath),
-                    StringComparison.OrdinalIgnoreCase) &&
+                    GraduationDetailsPathSemantics.Comparison) &&
                 string.Equals(
                     first.LastSave ?? "",
                     second.LastSave ?? "",
@@ -1932,7 +2622,7 @@ namespace GraduationDetails
                         GraduationDetailsPaths.NormalizeRelativePath(
                             checkpoint.RelativeSavePath),
                         normalizedRelativePath,
-                        StringComparison.OrdinalIgnoreCase))),
+                        GraduationDetailsPathSemantics.Comparison))),
                 MarriageMutations = CloneMarriageMutations(
                     activeMarriageMutations),
                 StaffMutations = CloneStaffMutations(activeStaffMutations),
@@ -1944,6 +2634,7 @@ namespace GraduationDetails
         private static bool TryWriteAtomically(
             GraduationDetailsSaveScope scope,
             string content,
+            bool preserveExistingBackup,
             out string errorMessage)
         {
             errorMessage = "";
@@ -1966,7 +2657,7 @@ namespace GraduationDetails
 
             string temporaryPath = targetPath + ".graduationdetails.tmp." +
                 Guid.NewGuid().ToString("N");
-            string backupPath = targetPath + ".graduationdetails.bak";
+            string backupPath = GetBackupPath(targetPath);
             string validatedTemporaryPath;
             string validatedBackupPath;
             if (!GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
@@ -1992,26 +2683,29 @@ namespace GraduationDetails
                     content ?? "");
                 if (File.Exists(targetPath))
                 {
-                    if (File.Exists(validatedBackupPath))
+                    if (preserveExistingBackup)
                     {
-                        File.Delete(validatedBackupPath);
+                        // The retained backup is the known-good generation used to
+                        // recover this session. Do not replace it with the corrupt
+                        // primary that prompted recovery.
+                        File.Replace(
+                            validatedTemporaryPath,
+                            targetPath,
+                            null,
+                            true);
                     }
-                    File.Replace(
-                        validatedTemporaryPath,
-                        targetPath,
-                        validatedBackupPath,
-                        true);
-                    try
+                    else
                     {
                         if (File.Exists(validatedBackupPath))
                         {
                             File.Delete(validatedBackupPath);
                         }
-                    }
-                    catch
-                    {
-                        // The primary sidecar is already committed. A stale owned
-                        // backup is harmless and must not turn success into failure.
+                        // Retain the replaced primary as one recovery generation.
+                        File.Replace(
+                            validatedTemporaryPath,
+                            targetPath,
+                            validatedBackupPath,
+                            true);
                     }
                 }
                 else
@@ -2063,7 +2757,9 @@ namespace GraduationDetails
                     LastSave = checkpoint.LastSave ?? "",
                     PlaytimeSeconds = checkpoint.PlaytimeSeconds,
                     GameDateTime = checkpoint.GameDateTime ?? "",
-                    Sequence = checkpoint.Sequence
+                    Sequence = checkpoint.Sequence,
+                    EnabledMods = GraduationDetailsEnabledMods.Clone(
+                        checkpoint.EnabledMods)
                 });
             }
             return result.OrderBy(checkpoint => checkpoint.Sequence).ToList();
@@ -2157,7 +2853,7 @@ namespace GraduationDetails
                 return string.Equals(
                     Path.GetFullPath(first),
                     Path.GetFullPath(second),
-                    StringComparison.OrdinalIgnoreCase);
+                    GraduationDetailsPathSemantics.Comparison);
             }
             catch
             {
@@ -2212,6 +2908,31 @@ namespace GraduationDetails
                 new List<GraduationDetailsSnapshotMutationRecord>();
 
         private long lastIssuedSequence;
+        private string persistenceBlockedSidecarPath = "";
+        private string persistenceBlockReason = "";
+        private string recoveredFromBackupSidecarPath = "";
+
+        internal bool IsPersistenceBlocked
+        {
+            get
+            {
+                lock (stateLock)
+                {
+                    return !string.IsNullOrEmpty(persistenceBlockedSidecarPath);
+                }
+            }
+        }
+
+        internal string PersistenceBlockReason
+        {
+            get
+            {
+                lock (stateLock)
+                {
+                    return persistenceBlockReason ?? "";
+                }
+            }
+        }
 
         internal long LastIssuedSequence
         {
@@ -2229,6 +2950,8 @@ namespace GraduationDetails
             lock (stateLock)
             {
                 ResetAllLocked();
+                ClearPersistenceBlockLocked();
+                recoveredFromBackupSidecarPath = "";
             }
         }
 
@@ -2245,6 +2968,19 @@ namespace GraduationDetails
             lock (stateLock)
             {
                 ResetAllLocked();
+                recoveredFromBackupSidecarPath = "";
+                string backupPath = GetBackupPath(validatedScope.SidecarFilePath);
+                if (File.Exists(validatedScope.SidecarFilePath) || File.Exists(backupPath))
+                {
+                    errorMessage =
+                        "Existing Graduation Details persistence data was preserved " +
+                        "instead of being replaced with empty state.";
+                    BlockPersistenceForScopeLocked(
+                        validatedScope.SidecarFilePath,
+                        errorMessage);
+                    return false;
+                }
+                ClearPersistenceBlockLocked();
                 return true;
             }
         }
@@ -2260,45 +2996,153 @@ namespace GraduationDetails
                 return false;
             }
 
+            string primaryPath = validatedScope.SidecarFilePath;
+            string backupPath = GetBackupPath(primaryPath);
             try
             {
-                if (!File.Exists(validatedScope.SidecarFilePath))
+                bool primaryExists = File.Exists(primaryPath);
+                bool backupExists = File.Exists(backupPath);
+                if (!primaryExists && !backupExists)
                 {
                     return InitializeEmpty(validatedScope, out errorMessage);
                 }
-                string json = File.ReadAllText(validatedScope.SidecarFilePath);
-                GraduationDetailsSidecarDocument document =
-                    JsonUtility.FromJson<GraduationDetailsSidecarDocument>(json);
-                if (!TryValidateDocument(
-                        document,
+
+                GraduationDetailsSidecarDocument document;
+                string primaryError = "";
+                if (primaryExists &&
+                    TryReadValidatedDocument(
+                        primaryPath,
                         validatedScope,
-                        out errorMessage))
+                        out document,
+                        out primaryError))
                 {
-                    return false;
+                    lock (stateLock)
+                    {
+                        LoadDocumentLocked(document);
+                        ClearPersistenceBlockLocked();
+                        recoveredFromBackupSidecarPath = "";
+                    }
+                    return true;
                 }
 
+                string backupError = "";
+                if (backupExists &&
+                    TryReadValidatedDocument(
+                        backupPath,
+                        validatedScope,
+                        out document,
+                        out backupError))
+                {
+                    lock (stateLock)
+                    {
+                        LoadDocumentLocked(document);
+                        ClearPersistenceBlockLocked();
+                        recoveredFromBackupSidecarPath = primaryPath;
+                    }
+                    return true;
+                }
+
+                errorMessage = BuildInitializationFailureMessage(
+                    primaryExists,
+                    primaryError,
+                    backupExists,
+                    backupError);
                 lock (stateLock)
                 {
                     ResetAllLocked();
-                    lastIssuedSequence = document.LastIssuedSequence;
-                    durableCheckpoints = CloneCheckpoints(document.Checkpoints);
-                    durableMarriageMutations = CloneMarriageMutations(
-                        document.MarriageMutations);
-                    durableStaffMutations = CloneStaffMutations(
-                        document.StaffMutations);
-                    durableSnapshotMutations = CloneSnapshotMutations(
-                        document.SnapshotMutations);
-                    // Nothing is materialized until the loaded vanilla stamp selects
-                    // an exact checkpoint.
-                    ClearActiveLocked();
+                    recoveredFromBackupSidecarPath = "";
+                    BlockPersistenceForScopeLocked(primaryPath, errorMessage);
                 }
-                return true;
+                return false;
             }
             catch (Exception exception)
             {
                 errorMessage = exception.Message;
+                lock (stateLock)
+                {
+                    ResetAllLocked();
+                    recoveredFromBackupSidecarPath = "";
+                    BlockPersistenceForScopeLocked(primaryPath, errorMessage);
+                }
                 return false;
             }
+        }
+
+        internal void EnterReadOnlyEmptyForCurrentScope(
+            GraduationDetailsSaveScope scope,
+            string reason)
+        {
+            if (scope == null)
+            {
+                return;
+            }
+            lock (stateLock)
+            {
+                ClearActiveLocked();
+                recoveredFromBackupSidecarPath = "";
+                BlockPersistenceForScopeLocked(
+                    scope.SidecarFilePath,
+                    string.IsNullOrWhiteSpace(reason)
+                        ? "Graduation Details persistence is read-only for the loaded save."
+                        : reason);
+            }
+        }
+
+        private bool TryReadValidatedDocument(
+            string path,
+            GraduationDetailsSaveScope scope,
+            out GraduationDetailsSidecarDocument document,
+            out string errorMessage)
+        {
+            document = null;
+            errorMessage = "";
+            try
+            {
+                string json = File.ReadAllText(path);
+                document = JsonUtility.FromJson<GraduationDetailsSidecarDocument>(json);
+                return TryValidateDocument(document, scope, out errorMessage);
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                document = null;
+                return false;
+            }
+        }
+
+        private void LoadDocumentLocked(GraduationDetailsSidecarDocument document)
+        {
+            ResetAllLocked();
+            lastIssuedSequence = document.LastIssuedSequence;
+            durableCheckpoints = CloneCheckpoints(document.Checkpoints);
+            durableMarriageMutations = CloneMarriageMutations(document.MarriageMutations);
+            durableStaffMutations = CloneStaffMutations(document.StaffMutations);
+            durableSnapshotMutations = CloneSnapshotMutations(document.SnapshotMutations);
+            // Nothing is materialized until the loaded vanilla stamp selects
+            // an exact checkpoint.
+            ClearActiveLocked();
+        }
+
+        private static string BuildInitializationFailureMessage(
+            bool primaryExists,
+            string primaryError,
+            bool backupExists,
+            string backupError)
+        {
+            if (primaryExists && backupExists)
+            {
+                return "The primary Graduation Details sidecar could not be activated (" +
+                    (primaryError ?? "unknown error") +
+                    "), and its retained backup also failed validation (" +
+                    (backupError ?? "unknown error") + ").";
+            }
+            if (primaryExists)
+            {
+                return "The existing Graduation Details sidecar could not be activated: " +
+                    (primaryError ?? "unknown error") + ".";
+            }
+            return "The retained Graduation Details backup could not be activated: " +
+                (backupError ?? "unknown error") + ".";
         }
 
         internal bool TryActivateCheckpoint(
@@ -2385,7 +3229,8 @@ namespace GraduationDetails
                     LastSave = stamp.LastSave ?? "",
                     PlaytimeSeconds = stamp.PlaytimeSeconds,
                     GameDateTime = stamp.GameDateTime ?? "",
-                    Sequence = sequence
+                    Sequence = sequence,
+                    EnabledMods = GraduationDetailsEnabledMods.Capture()
                 });
                 return true;
             }
@@ -2544,6 +3389,28 @@ namespace GraduationDetails
             }
         }
 
+        internal List<MarriageRecord> GetMarriageRecords()
+        {
+            lock (stateLock)
+            {
+                return marriageRecords.Values
+                    .OrderBy(record => record.GirlId)
+                    .Select(GraduationDetailsRecordUtility.Clone)
+                    .ToList();
+            }
+        }
+
+        internal List<StaffIdolRecord> GetStaffRecords()
+        {
+            lock (stateLock)
+            {
+                return staffRecords.Values
+                    .OrderBy(record => record.StaffId)
+                    .Select(GraduationDetailsRecordUtility.Clone)
+                    .ToList();
+            }
+        }
+
         internal bool TryGetSnapshot(
             int girlId,
             out GraduationSnapshot snapshot)
@@ -2631,12 +3498,25 @@ namespace GraduationDetails
             {
                 try
                 {
+                    if (IsPersistenceBlockedForScopeLocked(validatedScope))
+                    {
+                        errorMessage = string.IsNullOrEmpty(persistenceBlockReason)
+                            ? "Graduation Details persistence is blocked for this save because existing sidecar data could not be safely activated."
+                            : persistenceBlockReason;
+                        return false;
+                    }
+
                     GraduationDetailsSidecarDocument document =
                         BuildDocumentLocked(validatedScope.RelativeSavePath);
                     string json = JsonUtility.ToJson(document, false);
+                    bool preserveExistingBackup =
+                        SamePath(
+                            recoveredFromBackupSidecarPath,
+                            validatedScope.SidecarFilePath);
                     if (!TryWriteAtomically(
                             validatedScope,
                             json,
+                            preserveExistingBackup,
                             out errorMessage))
                     {
                         return false;
@@ -2650,6 +3530,13 @@ namespace GraduationDetails
                     durableSnapshotMutations = CloneSnapshotMutations(
                         document.SnapshotMutations);
                     activeCheckpoints = CloneCheckpoints(document.Checkpoints);
+                    ClearPersistenceBlockLocked();
+                    if (SamePath(
+                            recoveredFromBackupSidecarPath,
+                            validatedScope.SidecarFilePath))
+                    {
+                        recoveredFromBackupSidecarPath = "";
+                    }
                     return true;
                 }
                 catch (Exception exception)
@@ -2739,6 +3626,30 @@ namespace GraduationDetails
             snapshots.Clear();
         }
 
+        private static string GetBackupPath(string sidecarPath)
+        {
+            return (sidecarPath ?? "") + ".graduationdetails.bak";
+        }
+
+        private void BlockPersistenceForScopeLocked(string sidecarPath, string reason)
+        {
+            persistenceBlockedSidecarPath = sidecarPath ?? "";
+            persistenceBlockReason = reason ?? "";
+        }
+
+        private void ClearPersistenceBlockLocked()
+        {
+            persistenceBlockedSidecarPath = "";
+            persistenceBlockReason = "";
+        }
+
+        private bool IsPersistenceBlockedForScopeLocked(GraduationDetailsSaveScope scope)
+        {
+            return scope != null &&
+                !string.IsNullOrEmpty(persistenceBlockedSidecarPath) &&
+                SamePath(persistenceBlockedSidecarPath, scope.SidecarFilePath);
+        }
+
         private void ResetAllLocked()
         {
             ClearActiveLocked();
@@ -2810,9 +3721,28 @@ namespace GraduationDetails
                 LastName = source.LastName ?? "",
                 Nickname = source.Nickname ?? "",
                 TextureSignature = source.TextureSignature ?? "",
+                IdolType = source.IdolType,
+                CustomId = source.CustomId ?? "",
+                CustomSpriteAddress = source.CustomSpriteAddress ?? "",
+                PortraitAssets = new List<PortraitAssetReference>(),
                 Fans = new List<FanSnapshot>(),
                 Bonds = new List<BondSectionSnapshot>()
             };
+            if (source.PortraitAssets != null)
+            {
+                foreach (PortraitAssetReference reference in source.PortraitAssets)
+                {
+                    if (reference == null)
+                    {
+                        continue;
+                    }
+                    clone.PortraitAssets.Add(new PortraitAssetReference
+                    {
+                        Type = reference.Type,
+                        AssetId = reference.AssetId ?? ""
+                    });
+                }
+            }
             if (source.Fans != null)
             {
                 foreach (FanSnapshot fan in source.Fans)
@@ -2919,10 +3849,42 @@ namespace GraduationDetails
                 !SameText(first.LastName, second.LastName) ||
                 !SameText(first.Nickname, second.Nickname) ||
                 !SameText(first.TextureSignature, second.TextureSignature) ||
+                first.IdolType != second.IdolType ||
+                !SameText(first.CustomId, second.CustomId) ||
+                !SameText(first.CustomSpriteAddress, second.CustomSpriteAddress) ||
+                !SamePortraitAssets(first.PortraitAssets, second.PortraitAssets) ||
                 !SameFans(first.Fans, second.Fans) ||
                 !SameBonds(first.Bonds, second.Bonds))
             {
                 return false;
+            }
+            return true;
+        }
+
+        private static bool SamePortraitAssets(
+            List<PortraitAssetReference> first,
+            List<PortraitAssetReference> second)
+        {
+            int firstCount = first == null ? 0 : first.Count;
+            int secondCount = second == null ? 0 : second.Count;
+            if (firstCount != secondCount)
+            {
+                return false;
+            }
+            for (int index = 0; index < firstCount; index++)
+            {
+                PortraitAssetReference left = first[index];
+                PortraitAssetReference right = second[index];
+                if (ReferenceEquals(left, right))
+                {
+                    continue;
+                }
+                if (left == null || right == null ||
+                    left.Type != right.Type ||
+                    !SameText(left.AssetId, right.AssetId))
+                {
+                    return false;
+                }
             }
             return true;
         }
