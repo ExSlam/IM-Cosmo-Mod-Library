@@ -18,6 +18,10 @@ using VanillaUiPrefabCatalog = UiFrameworkReference::IMUiFramework.VanillaUiPref
 using VanillaUiResources = UiFrameworkReference::IMUiFramework.VanillaUiResources;
 using VanillaUiSceneTemplates = UiFrameworkReference::IMUiFramework.VanillaUiSceneTemplates;
 using VanillaUiThemeSettings = UiFrameworkReference::IMUiFramework.VanillaUiThemeSettings;
+using IMUiElementHandle = UiFrameworkReference::IMUiFramework.IMUiElementHandle;
+using IMUiPresets = UiFrameworkReference::IMUiFramework.IMUiPresets;
+using IMUiTheme = UiFrameworkReference::IMUiFramework.IMUiTheme;
+using IMUiThemeApplication = UiFrameworkReference::IMUiFramework.IMUiThemeApplication;
 
 namespace MonthlyLedger
 {
@@ -186,8 +190,8 @@ namespace MonthlyLedger
         internal const string FallbackDependencyError = "Monthly Ledger requires an active, compatible installation of {0}.";
         internal const string FallbackCoverageFailed = "Exact monthly ledger coverage has not started for this save.";
         internal const string FallbackOther = "Other";
-        internal const string DataCoreDependencyDisplayName = "IM Data Core 3.4.3+";
-        internal const string MinimumDataCoreAssemblyVersionText = "3.4.3.0";
+        internal const string DataCoreDependencyDisplayName = "IM Data Core 3.4.5+";
+        internal const string MinimumDataCoreAssemblyVersionText = "3.4.5.0";
 
         internal const int PopupTypeValue = 997;
         internal const int FirstDayOfMonth = 1;
@@ -234,8 +238,8 @@ namespace MonthlyLedger
         internal const float CloseButtonHeight = 36f;
         internal const float CloseButtonBottomOffset = 10f;
         internal const float NavigationHeight = 40f;
-        internal const float ArrowButtonWidth = 48f;
-        internal const float ArrowButtonHeight = 32f;
+        internal const float ArrowButtonWidth = 32.9545f;
+        internal const float ArrowButtonHeight = 29f;
         internal const float MonthLabelWidth = 300f;
         internal const float SummaryHeight = 80f;
         internal const float SummaryCardWidth = 245f;
@@ -1281,60 +1285,36 @@ namespace MonthlyLedger
 
         private static Button CreateVanillaMonthButton(Transform parent, string objectName, string label, UnityAction onClick)
         {
-            GameObject instance;
-            ButtonManagerBasic manager;
-            if (VanillaUiResources.TryCreateBasicButton(
-                parent,
-                objectName,
-                out instance,
-                out manager,
-                VanillaUiPrefabCatalog.Button.basic_Pink,
-                delegate(ButtonManagerBasic control)
-                {
-                    control.buttonText = label;
-                    control.useCustomContent = false;
-                    control.UpdateUI();
-                }))
+            IMUiElementHandle handle;
+            bool previous = string.Equals(label, MonthlyLedgerConstants.PreviousArrowText, StringComparison.Ordinal);
+            bool created = (previous ? IMUiPresets.PreviousMonthButton() : IMUiPresets.NextMonthButton())
+                .Parent(parent)
+                .Named(objectName)
+                .OnClick(onClick)
+                .Theme(IMUiTheme.FromAccent(mainScript.red32), IMUiThemeApplication.AccentOnly)
+                .Build(out handle);
+            if (created && handle != null && handle.Root != null)
             {
-                RectTransform rect = instance.GetComponent<RectTransform>();
-                if (rect != null)
-                {
-                    rect.sizeDelta = new Vector2(MonthlyLedgerConstants.ArrowButtonWidth, MonthlyLedgerConstants.ArrowButtonHeight);
-                }
-                SetPreferredSize(instance, MonthlyLedgerConstants.ArrowButtonWidth, MonthlyLedgerConstants.ArrowButtonHeight);
-
-                TextMeshProUGUI buttonText = instance.GetComponentInChildren<TextMeshProUGUI>(true);
-                if (buttonText != null)
-                {
-                    buttonText.text = label;
-                    buttonText.fontSize = MonthlyLedgerConstants.ArrowButtonFontSize;
-                    buttonText.alignment = TextAlignmentOptions.Center;
-                    TMP_FontAsset gameFont = ResolveGameTmpFont();
-                    if (gameFont != null)
-                    {
-                        VanillaUiFonts.Apply(buttonText, gameFont);
-                    }
-                }
-
-                Button button = instance.GetComponent<Button>();
-                if (button == null)
-                {
-                    button = instance.GetComponentInChildren<Button>(true);
-                }
+                Button button = handle.Get<Button>();
                 if (button != null)
                 {
-                    button.onClick = new Button.ButtonClickedEvent();
-                    if (onClick != null)
+                    RectTransform rect = handle.Root.GetComponent<RectTransform>();
+                    if (rect != null)
                     {
-                        button.onClick.AddListener(onClick);
+                        rect.sizeDelta = new Vector2(
+                            MonthlyLedgerConstants.ArrowButtonWidth,
+                            MonthlyLedgerConstants.ArrowButtonHeight);
                     }
+                    SetPreferredSize(
+                        handle.Root,
+                        MonthlyLedgerConstants.ArrowButtonWidth,
+                        MonthlyLedgerConstants.ArrowButtonHeight);
                     return button;
                 }
-
-                UnityEngine.Object.Destroy(instance);
+                UnityEngine.Object.Destroy(handle.Root);
             }
 
-            // Resource failure is not fatal; retain the framework's old safe fallback.
+            // Preserve a functional fallback if the Single Chart template is unavailable.
             return IMUiKit.CreateStyledButton(
                 parent,
                 objectName,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6
+
+- Replaced the red text `<` / `>` month controls with the same Singles-chart arrow-button templates used by Graduation Calendar, themed red per instance.
+- Added dedicated staff-severance capture/detail output so severance payments no longer fall through as generic staff cost.
+- Clarified idol weekly salary details as the amount actually paid that week. IM Data Core snapshots the final salary used by vanilla's weekly expense deduction after any automatic policy-driven salary adjustments.
+- Raised the IM Data Core requirement to 3.4.5 for the new transaction attribution.
+
 ## 0.2.5
 
 - Kept the visible transaction list capped at 10,000 rows while calculating income, expense, and net totals from IM Data Core's complete uncapped month aggregate.

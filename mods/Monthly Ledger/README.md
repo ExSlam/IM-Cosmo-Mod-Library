@@ -5,8 +5,12 @@ Monthly Ledger adds an Action Hub button that opens a queued, game-style popup c
 ## Dependencies
 
 - Mod Buttons
-- IM Data Core 3.4.3 or newer
+- IM Data Core 3.4.5 or newer
 - IM UI Framework 2.1.0 or newer
+
+## 0.2.6 transaction-detail correction
+
+Month navigation now uses the same scene-derived previous/next arrow buttons as Graduation Calendar, with a red per-instance theme instead of red `<` / `>` text. Staff severance is captured at `staff._staff.Fire_Severance` and rendered as a severance payment with the staff member, role, payment, and skill snapshot rather than generic staff cost. Weekly idol salary rows say **Paid this week** and retain the exact salary included in vanilla's weekly deduction after automatic salary-policy adjustments have finished.
 
 ## 0.2.5 complete monthly totals
 

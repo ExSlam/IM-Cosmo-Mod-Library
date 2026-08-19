@@ -87,3 +87,6 @@ detail.label.finished=Finished
 detail.label.role=Role
 detail.label.progress=Progress
 detail.role.assistant_manager=Assistant Manager
+detail.staff_severance=Staff severance
+detail.label.weekly_take_home=Paid this week
+detail.label.severance_pay=Severance pay

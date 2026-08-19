@@ -14,6 +14,7 @@ namespace MonthlyLedger
         internal const string KindShow = "show";
         internal const string KindIdolSalary = "idol_salary";
         internal const string KindStaffSalary = "staff_salary";
+        internal const string KindStaffSeverance = "staff_severance";
         internal const string KindTheaterAttendance = "theater_attendance";
         internal const string KindTheaterStreaming = "theater_streaming";
         internal const string KindCafeDaily = "cafe_daily";
@@ -162,6 +163,8 @@ namespace MonthlyLedger
         internal const string KeyFanAudience = "detail.label.fan_audience";
         internal const string KeySkills = "detail.label.skills";
         internal const string KeyRole = "detail.label.role";
+        internal const string KeyWeeklyTakeHome = "detail.label.weekly_take_home";
+        internal const string KeySeverancePay = "detail.label.severance_pay";
         internal const string KeyProgress = "detail.label.progress";
         internal const string KeyAssistantManagerRole = "detail.role.assistant_manager";
         internal const string KeyMultiplierValue = "detail.format.multiplier";
@@ -191,6 +194,8 @@ namespace MonthlyLedger
         internal const string FallbackFanAudience = "Fan audience";
         internal const string FallbackSkills = "Skills";
         internal const string FallbackRole = "Role";
+        internal const string FallbackWeeklyTakeHome = "Paid this week";
+        internal const string FallbackSeverancePay = "Severance pay";
         internal const string FallbackProgress = "Progress";
         internal const string FallbackAssistantManager = "Assistant Manager";
         internal const string FallbackPhotoshoot = "Photoshoot";
@@ -330,6 +335,7 @@ namespace MonthlyLedger
                 case MonthlyLedgerDetailConstants.KindShow: return FormatShow(details);
                 case MonthlyLedgerDetailConstants.KindIdolSalary: return FormatIdolSalary(details);
                 case MonthlyLedgerDetailConstants.KindStaffSalary: return FormatStaffSalary(details);
+                case MonthlyLedgerDetailConstants.KindStaffSeverance: return FormatStaffSeverance(details);
                 case MonthlyLedgerDetailConstants.KindTheaterAttendance: return FormatTheaterAttendance(details);
                 case MonthlyLedgerDetailConstants.KindTheaterStreaming: return FormatTheaterStreaming(details);
                 case MonthlyLedgerDetailConstants.KindCafeDaily: return FormatCafe(details);
@@ -418,7 +424,7 @@ namespace MonthlyLedger
             {
                 details.IdolName,
                 JoinFields(
-                    Field(Vanilla(MonthlyLedgerDetailConstants.VanillaSalary, MonthlyLedgerDetailConstants.FallbackSalary), Money(details.SalaryAmount)),
+                    Field(Custom(MonthlyLedgerDetailConstants.KeyWeeklyTakeHome, MonthlyLedgerDetailConstants.FallbackWeeklyTakeHome), Money(details.SalaryAmount)),
                     Field(Vanilla(MonthlyLedgerDetailConstants.VanillaFame, MonthlyLedgerDetailConstants.FallbackFame), Number(details.IdolFame)),
                     Field(Vanilla(MonthlyLedgerDetailConstants.VanillaScandalPoints, MonthlyLedgerDetailConstants.FallbackScandalPoints), Number(details.IdolScandalPoints)))
             });
@@ -434,6 +440,21 @@ namespace MonthlyLedger
                         ? string.Empty
                         : Field(Custom(MonthlyLedgerDetailConstants.KeyRole, MonthlyLedgerDetailConstants.FallbackRole), StaffRole(details.StaffRoleCode)),
                     Field(Vanilla(MonthlyLedgerDetailConstants.VanillaSalary, MonthlyLedgerDetailConstants.FallbackSalary), Money(details.SalaryAmount)))
+            };
+            AppendStaffSkills(lines, details.StaffSkills);
+            return JoinLines(lines);
+        }
+
+        private static string FormatStaffSeverance(IMDataCoreMoneyTransactionDetail details)
+        {
+            List<string> lines = new List<string>
+            {
+                JoinFields(
+                    details.StaffName,
+                    string.IsNullOrEmpty(details.StaffRoleCode)
+                        ? string.Empty
+                        : Field(Custom(MonthlyLedgerDetailConstants.KeyRole, MonthlyLedgerDetailConstants.FallbackRole), StaffRole(details.StaffRoleCode)),
+                    Field(Custom(MonthlyLedgerDetailConstants.KeySeverancePay, MonthlyLedgerDetailConstants.FallbackSeverancePay), Money(details.PaymentAmount)))
             };
             AppendStaffSkills(lines, details.StaffSkills);
             return JoinLines(lines);
