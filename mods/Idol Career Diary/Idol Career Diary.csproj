@@ -4,7 +4,7 @@
     <DeployFolderName>IdolCareerDiary</DeployFolderName>
     <RootNamespace>IdolCareerDiary</RootNamespace>
     <AssemblyName>com.cosmo.idolcareerdiary</AssemblyName>
-    <Version>1.2.3</Version>
+    <Version>1.2.4</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1161,3 +1161,4 @@ RawText.Clique_Joined=Clique Joined
 RawText.Idol_Hired=Idol Hired
 RawText.Idol_Relationship_Status_Changed=Idol Relationship Status Changed
 RawText.Player_Relationship_Changed=Producer Relationship Changed
+TextIdolGraduationOutcome=After Graduation

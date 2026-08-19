@@ -4,12 +4,19 @@
 
 ## Dependencies
 
-- `IM Data Core` (`com.cosmo.imdatacore`) version `3.2.0` or higher
+- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.5` or higher
 - `IM UI Framework` (`com.cosmo.imuiframework`) version `2.0.3` or higher
 
 This mod does not ship a separate persistence backend. It reads timeline events from IM Data Core and renders UI with IM UI Framework.
 
-Idol Career Diary uses IM Data Core's public API only. With IM Data Core 3.2,
+## 1.2.4 graduation, election, and concert detail pass
+
+- Timeline source rows are career-windowed before aggregation/deduplication: events before the idol's hiring date and events after an actually completed graduation are excluded from that idol's diary. The graduation day itself remains included.
+- IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Graduation** using vanilla's final `Graduation_Trivia_Text`, so JSON-only graduation-trivia additions are preserved without a hard dependency on their mod.
+- Election rankings use compact rows in `rank → portrait → idol name → votes → points` order. Both the portrait and idol name open that ranked idol's profile, including the existing Graduation Details bridge for graduated idols.
+- Concert details retain the ordered setlist snapshot with song/group, satisfaction, sales, center portrait/name, stamina/skill, numbered talk breaks with up to three MC portraits/names, cards used, and chronological disaster outcomes. The unrelated generic **With whom** field is no longer populated for concert entries.
+
+Idol Career Diary uses IM Data Core's public API only. With IM Data Core 3.4.5,
 entity identifiers are read from the event's `EntityId`, and new timeline data
 uses the canonical `single_released`, `show_episode_released`,
 `contract_cancelled`, and `idol_status_changed` event names. Readers for their
@@ -17,7 +24,7 @@ old aliases remain so imported or third-party events can still be displayed.
 
 The last-selected diary entry is supplemental state stored through IM Data
 Core. It is immediately visible in the active session and becomes durable at
-the next vanilla save boundary, following IM Data Core 3.2's persistence model.
+the next vanilla save boundary, following IM Data Core 3.4.5's persistence model.
 
 ## Player-facing behavior
 

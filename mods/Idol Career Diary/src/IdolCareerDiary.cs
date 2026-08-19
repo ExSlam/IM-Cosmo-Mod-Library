@@ -23,8 +23,8 @@ namespace IdolCareerDiary
     {
         internal const string HarmonyId = "com.cosmo.idolcareerdiary";
         internal const string HarmonyIdImDataCore = "com.cosmo.imdatacore";
-        internal const string MinimumImDataCoreDisplayVersion = "3.2.0";
-        internal const string MinimumImDataCoreAssemblyVersionText = "3.2.0.0";
+        internal const string MinimumImDataCoreDisplayVersion = "3.4.5";
+        internal const string MinimumImDataCoreAssemblyVersionText = "3.4.5.0";
         internal static readonly Version MinimumImDataCoreAssemblyVersion = new Version(MinimumImDataCoreAssemblyVersionText);
         internal const string HarmonyIdImUiFramework = "com.cosmo.imuiframework";
         internal const string HarmonyIdGraduationRebalances = "com.cosmo.graduationrebalances";
@@ -515,6 +515,7 @@ namespace IdolCareerDiary
         internal const string EventIdolHired = "idol_hired";
         internal const string EventIdolGraduationAnnounced = "idol_graduation_announced";
         internal const string EventIdolGraduated = "idol_graduated";
+        internal const string EventIdolGraduationOutcome = "idol_graduation_outcome";
         internal const string EventIdolBirthday = "idol_birthday";
         internal const string EventIdolGroupTransferred = "idol_group_transferred";
         internal const string EventIdolSalaryChanged = "idol_salary_changed";
@@ -1615,6 +1616,7 @@ namespace IdolCareerDiary
         internal static string TextIdolJoinedAgency { get { return ModLocalization.Get("TextIdolJoinedAgency", "Idol Joined Agency"); } }
         internal static string TextGraduationAnnounced { get { return ModLocalization.Get("TextGraduationAnnounced", "Graduation Announced"); } }
         internal static string TextIdolGraduated { get { return ModLocalization.Get("TextIdolGraduated", "Idol Graduated"); } }
+        internal static string TextIdolGraduationOutcome { get { return ModLocalization.Get("TextIdolGraduationOutcome", "After Graduation"); } }
         internal static string TextIdolBirthday { get { return ModLocalization.Get("TextIdolBirthday", "Birthday"); } }
         internal static string TextIdolGroupTransfer { get { return ModLocalization.Get("TextIdolGroupTransfer", "Idol Group Transfer"); } }
         internal static string TextFromGroup { get { return ModLocalization.Get("TextFromGroup", "From Group"); } }
@@ -1636,6 +1638,7 @@ namespace IdolCareerDiary
         internal const string KeyIdolHiringDate = "idol_hiring_date";
         internal static string TextGraduationDate { get { return ModLocalization.Get("TextGraduationDate", "Graduation Date"); } }
         internal const string KeyIdolGraduationDate = "idol_graduation_date";
+        internal const string KeyIdolGraduationOutcome = "idol_graduation_outcome";
         internal static string LabelTrivia { get { return ModLocalization.Get("LabelTrivia", "Trivia"); } }
         internal const string KeyIdolCustomTrivia = "idol_custom_trivia";
         internal const string KeyIdolTrivia = "idol_trivia";
@@ -6000,6 +6003,18 @@ namespace IdolCareerDiary
             List<IMDataCoreEvent> events = loadedSourceEvents;
             if (events != null)
             {
+                List<IMDataCoreEvent> careerWindowEvents =
+                    new List<IMDataCoreEvent>(events.Count);
+                for (int sourceIndex = C.ZeroIndex; sourceIndex < events.Count; sourceIndex++)
+                {
+                    IMDataCoreEvent sourceEvent = events[sourceIndex];
+                    if (sourceEvent != null && IsWithinCurrentIdolCareerWindow(sourceEvent))
+                    {
+                        careerWindowEvents.Add(sourceEvent);
+                    }
+                }
+                events = careerWindowEvents;
+
                 HashSet<string> relevantConcertEntityIds =
                     ResolveRelevantConcertEntityIds(events);
                 HashSet<string> supersedingEventKeys =
@@ -6321,6 +6336,42 @@ namespace IdolCareerDiary
         /// <summary>
         /// Returns true when one technical SetStatus event should be hidden from diary timeline.
         /// </summary>
+        /// <summary>
+        /// Keeps shared agency chronology attached to this profile inside the idol's
+        /// actual agency career. Graduation announcements may set a future
+        /// Graduation_Date, so the upper bound applies only after vanilla marks the
+        /// idol graduated. The graduation-outcome event shares the graduation day
+        /// and remains visible as the final diary entry.
+        /// </summary>
+        private bool IsWithinCurrentIdolCareerWindow(IMDataCoreEvent ev)
+        {
+            if (idol == null || ev == null)
+            {
+                return true;
+            }
+
+            DateTime eventDate;
+            if (!TryResolveTimelineDate(ev, out eventDate))
+            {
+                return true;
+            }
+
+            if (idol.Hiring_Date != default(DateTime) &&
+                eventDate.Date < idol.Hiring_Date.Date)
+            {
+                return false;
+            }
+
+            if (idol.status == data_girls._status.graduated &&
+                idol.Graduation_Date != default(DateTime) &&
+                eventDate.Date > idol.Graduation_Date.Date)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         private static bool IsSuppressedSetStatusEvent(IMDataCoreEvent ev)
         {
             if (ev == null)
@@ -6576,7 +6627,11 @@ namespace IdolCareerDiary
             }
 
             string title = NormalizeRawText(ReadStr(payload, C.KeyConcertTitle));
-            p.WithWhom = title != C.LabelUnknown ? title : (C.TextConcert + Normalize(ev != null ? ev.EntityId : string.Empty));
+            p.WithWhom = string.Empty;
+            if (title != C.LabelUnknown)
+            {
+                lines.Add(C.TextConcert + C.SeparatorColonSpace + title);
+            }
             AddCodeLineIfKnown(lines, C.LabelVenue, ReadStr(payload, C.KeyConcertVenue));
             AddTransitionLine(lines, C.LabelStatus, ReadStr(payload, C.KeyConcertPreviousStatus), ReadStr(payload, C.KeyConcertNewStatus));
             AddCodeLineIfKnown(lines, C.LabelStatus, ReadStr(payload, C.KeyConcertStatus));
@@ -7617,9 +7672,25 @@ namespace IdolCareerDiary
             {
                 p.Title = C.TextIdolGraduated;
             }
+            else if (type == C.EventIdolGraduationOutcome)
+            {
+                p.Title = C.TextIdolGraduationOutcome;
+            }
             else
             {
                 p.Title = C.TextIdolGroupTransfer;
+            }
+
+            if (type == C.EventIdolGraduationOutcome)
+            {
+                string graduationOutcome = NormalizeRawText(
+                    ReadStr(payload, C.KeyIdolGraduationOutcome));
+                if (!string.IsNullOrEmpty(graduationOutcome) &&
+                    graduationOutcome != C.LabelUnknown)
+                {
+                    lines.Add(graduationOutcome);
+                }
+                return;
             }
 
             if (type == C.EventIdolGroupTransferred)
@@ -10016,14 +10087,6 @@ namespace IdolCareerDiary
             {
                 ElectionRankingRow row = rows[rowIndex];
                 data_girls.girls rankedIdol = data_girls.GetGirlByID(row.IdolId);
-                if (rankedIdol == null)
-                {
-                    AddText(
-                        diaryDetailContentRoot,
-                        C.SeparatorHash + row.Place.ToString(CultureInfo.InvariantCulture) +
-                        C.SeparatorColonSpace + ResolveIdolNameById(row.IdolId));
-                    continue;
-                }
 
                 GameObject rankingRow = CreateUiObject(
                     "CareerDiary_ElectionRanking_" + rowIndex.ToString(CultureInfo.InvariantCulture),
@@ -10047,7 +10110,25 @@ namespace IdolCareerDiary
                     rankElement.flexibleWidth = C.FloatZero;
                 }
 
-                AddTimelineParticipantCard(rankingRow.transform, rankedIdol, rowIndex, C.ZeroIndex);
+                if (rankedIdol != null)
+                {
+                    AddElectionIdolProfileCell(rankingRow.transform, rankedIdol, rowIndex);
+                }
+                else
+                {
+                    GameObject historicalName = AddCardText(
+                        rankingRow.transform,
+                        ResolveIdolNameById(row.IdolId),
+                        true);
+                    LayoutElement historicalNameLayout = historicalName != null
+                        ? historicalName.GetComponent<LayoutElement>()
+                        : null;
+                    if (historicalNameLayout != null)
+                    {
+                        historicalNameLayout.preferredWidth = C.TimelineParticipantCardWidth;
+                        historicalNameLayout.flexibleWidth = C.FloatZero;
+                    }
+                }
 
                 AddCardText(
                     rankingRow.transform,
@@ -10060,6 +10141,89 @@ namespace IdolCareerDiary
                     C.SeparatorSpace + C.TextElectionPoints,
                     false);
             }
+        }
+
+        /// <summary>
+        /// Adds the compact face + name profile opener used by election ranking rows.
+        /// Both controls open the ranked idol's profile so every idol in the complete
+        /// election snapshot is directly navigable.
+        /// </summary>
+        private void AddElectionIdolProfileCell(
+            Transform parent,
+            data_girls.girls rankedIdol,
+            int rowIndex)
+        {
+            if (parent == null || rankedIdol == null)
+            {
+                return;
+            }
+
+            int idolId = rankedIdol.id;
+            string idText = idolId.ToString(CultureInfo.InvariantCulture);
+            GameObject portraitObject = CreateUiObject(
+                "CareerDiary_ElectionPortrait_" +
+                rowIndex.ToString(CultureInfo.InvariantCulture) +
+                C.SeparatorUnderscore + idText,
+                parent);
+            Image portraitImage = portraitObject.AddComponent<Image>();
+            portraitImage.color = mainScript.white32;
+            portraitImage.preserveAspect = true;
+            LayoutElement portraitLayout = portraitObject.AddComponent<LayoutElement>();
+            portraitLayout.preferredWidth = C.TimelineParticipantPortraitSize;
+            portraitLayout.preferredHeight = C.TimelineParticipantPortraitSize;
+            portraitLayout.minWidth = C.TimelineParticipantPortraitSize;
+            portraitLayout.minHeight = C.TimelineParticipantPortraitSize;
+            portraitLayout.flexibleWidth = C.FloatZero;
+            portraitLayout.flexibleHeight = C.FloatZero;
+            ApplyRelatedIdolHeadshot(portraitImage, rankedIdol);
+
+            Button portraitButton = portraitObject.AddComponent<Button>();
+            portraitButton.targetGraphic = portraitImage;
+            portraitButton.transition = Selectable.Transition.ColorTint;
+            portraitButton.onClick.AddListener(delegate
+            {
+                OpenIdolProfile(idolId);
+            });
+
+            GameObject nameObject = AddCardText(
+                parent,
+                ResolveIdolName(rankedIdol),
+                true);
+            if (nameObject == null)
+            {
+                return;
+            }
+
+            LayoutElement nameLayout = nameObject.GetComponent<LayoutElement>();
+            if (nameLayout == null)
+            {
+                nameLayout = nameObject.AddComponent<LayoutElement>();
+            }
+            nameLayout.preferredWidth = C.TimelineParticipantCardWidth;
+            nameLayout.flexibleWidth = C.FloatZero;
+
+            Image nameHitTarget = nameObject.GetComponent<Image>();
+            if (nameHitTarget == null)
+            {
+                nameHitTarget = nameObject.AddComponent<Image>();
+            }
+            nameHitTarget.color = new Color(
+                C.FloatZero,
+                C.FloatZero,
+                C.FloatZero,
+                C.FloatZero);
+
+            Button nameButton = nameObject.GetComponent<Button>();
+            if (nameButton == null)
+            {
+                nameButton = nameObject.AddComponent<Button>();
+            }
+            nameButton.targetGraphic = nameHitTarget;
+            nameButton.transition = Selectable.Transition.ColorTint;
+            nameButton.onClick.AddListener(delegate
+            {
+                OpenIdolProfile(idolId);
+            });
         }
 
         /// <summary>
@@ -16230,6 +16394,7 @@ namespace IdolCareerDiary
                 case C.EventIdolHired:
                 case C.EventIdolGraduationAnnounced:
                 case C.EventIdolGraduated:
+                case C.EventIdolGraduationOutcome:
                 case C.EventIdolGroupTransferred:
                     BuildIdolLifecyclePresentation(type, ev, payload, p, outcomeLines);
                     return true;
