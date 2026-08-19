@@ -384,6 +384,27 @@ namespace IMUiFramework
             }
         }
 
+        /// <summary>
+        /// Copies Idol Manager's shipped rounded white button image onto a passive Image.
+        /// This is useful for compact badges/chips that should keep native rounded corners
+        /// without carrying an interactive Button controller.
+        /// </summary>
+        public static bool TryCopyRoundedWhiteVisual(Image target)
+        {
+            if (target == null) return false;
+            GameObject source = VanillaUiResources.LoadPrefab(
+                VanillaUiPrefabCatalog.Button.rounded_White);
+            if (source == null) return false;
+            Image sourceImage = source.GetComponent<Image>();
+            if (sourceImage == null)
+            {
+                sourceImage = IMUiCompat.GetComponentInChildren<Image>(source);
+            }
+            if (sourceImage == null) return false;
+            IMUiStyle.CopyImageVisual(sourceImage, target, false);
+            return true;
+        }
+
         public static bool TryCopyVanillaPanelVisual(Image target)
         {
             if (target == null) return false;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.1.1
+
+- Added optional per-scroll-view producer-list Slider right inset and viewport gutter values while preserving the vanilla constants as defaults.
+- Added month-pager horizontal label padding so localized labels can be sized without changing the arrow control geometry.
+- Added `IMUiPrimitives.TryCopyRoundedWhiteVisual` for reusing Idol Manager's shipped `button/rounded/White` image on compact badges and custom surfaces.
+- Kept the old producer-slider creation overload for source compatibility.
+
 ## 3.1.0
 
 - Added `IMUiCompat`, a centralized compatibility layer for Idol Manager's older Unity API assemblies.

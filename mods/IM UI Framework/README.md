@@ -1,4 +1,4 @@
-# IM UI Framework 3.1.0 (Intermediary Mod)
+# IM UI Framework 3.1.1 (Intermediary Mod)
 
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
@@ -9,6 +9,10 @@ It targets three common problems:
 
 
 
+
+## 3.1.1: localized pager and scroll-geometry controls
+
+3.1.1 keeps every 3.1.0 default intact but lets a custom screen opt into a different producer-list indicator inset/gutter, add explicit horizontal padding around month-pager labels, and copy the shipped rounded-white button visual onto compact custom badges. These are per-instance composition options rather than global scene changes.
 
 ## 3.1.0: Idol Manager Unity compatibility pass
 
@@ -59,6 +63,9 @@ IMUiScrollViewOptions options = new IMUiScrollViewOptions();
 options.Theme = theme;
 options.OffsetMin = new Vector2(16f, 56f);
 options.OffsetMax = new Vector2(-32f, -92f);
+// Optional. Defaults remain the exact vanilla producer-list geometry.
+options.VanillaIndicatorRightCenterInset = 7f;
+options.VanillaViewportRightInset = 22f;
 
 IMUiScrollViewHandle list;
 IMUiComposer.TryCreateScrollView(panel, options, out list);

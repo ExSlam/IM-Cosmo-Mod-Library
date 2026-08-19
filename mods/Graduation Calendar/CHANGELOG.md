@@ -1,5 +1,14 @@
 # Graduation Calendar Changelog
 
+## 0.3.3
+
+- Moved the scene-native producer-list scroll indicator farther right for the calendar while keeping a safe content gutter.
+- Sized month navigation from the longest localized month name plus small explicit padding, and tightened only the space between the previous/next arrow controls and the label.
+- Increased month/year label breathing room without hard-coding English month widths.
+- Restored the calendar popup to a brighter near-white surface treatment.
+- Reduced and re-aligned day-number badges and reused the shipped rounded white button visual for softer rounded corners.
+- Updated the vendored IM UI Framework helpers with per-scroll-view indicator geometry, month-label padding, and rounded-white visual reuse.
+
 ## 0.3.2
 
 - Updated the vendored UI runtime to the IM UI Framework 3.1 compatibility code.

@@ -54,6 +54,9 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
         public float Height = 40f;
         public float LabelWidth = 280f;
         public float Spacing = 12f;
+        // Optional horizontal breathing room added around the requested label width.
+        // Zero preserves the pre-3.1.1 geometry for existing callers.
+        public float LabelHorizontalPadding = 0f;
         public bool PreviousInteractable = true;
         public bool NextInteractable = true;
         public UnityAction OnPrevious;
@@ -92,6 +95,10 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
         public float Spacing = 1f;
         public bool AddBackground = true;
         public bool UseVanillaListIndicator = true;
+        // Scene-derived defaults remain unchanged, while custom popups can place the
+        // native producer-list slider closer to (or farther from) their right edge.
+        public float VanillaIndicatorRightCenterInset = VanillaUiSceneTemplates.ProducerListSliderRightCenterInset;
+        public float VanillaViewportRightInset = VanillaUiSceneTemplates.ProducerListViewportRightInset;
         public IMUiTheme Theme;
     }
 
@@ -238,7 +245,9 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
 
             SetLayoutSize(previous.gameObject, GetPreferredWidth(previous.gameObject, 32.9545f), GetPreferredHeight(previous.gameObject, 29f));
             SetLayoutSize(next.gameObject, GetPreferredWidth(next.gameObject, 32.9545f), GetPreferredHeight(next.gameObject, 29f));
-            SetLayoutSize(label.gameObject, options.LabelWidth, options.Height);
+            float effectiveLabelWidth = Mathf.Max(0f, options.LabelWidth) +
+                Mathf.Max(0f, options.LabelHorizontalPadding) * 2f;
+            SetLayoutSize(label.gameObject, effectiveLabelWidth, options.Height);
 
             RectTransform labelRect = label.GetComponent<RectTransform>();
             if (labelRect != null)
@@ -247,7 +256,7 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
                 labelRect.anchorMax = new Vector2(0.5f, 0.5f);
                 labelRect.pivot = new Vector2(0.5f, 0.5f);
                 labelRect.anchoredPosition = Vector2.zero;
-                labelRect.sizeDelta = new Vector2(options.LabelWidth, options.Height);
+                labelRect.sizeDelta = new Vector2(effectiveLabelWidth, options.Height);
             }
             label.alignment = TextAlignmentOptions.Center;
             label.enableWordWrapping = false;
@@ -340,7 +349,14 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
             if (options.UseVanillaListIndicator)
             {
                 Slider ignored;
-                if (VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(root.transform, scroll, "Slider", out indicator, out ignored))
+                if (VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(
+                        root.transform,
+                        scroll,
+                        "Slider",
+                        options.VanillaIndicatorRightCenterInset,
+                        options.VanillaViewportRightInset,
+                        out indicator,
+                        out ignored))
                 {
                     if (options.Theme != null)
                     {

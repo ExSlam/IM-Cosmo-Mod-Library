@@ -79,6 +79,30 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
             out GameObject instance,
             out Slider slider)
         {
+            return TryCreateProducerListScrollSlider(
+                parent,
+                target,
+                objectName,
+                ProducerListSliderRightCenterInset,
+                ProducerListViewportRightInset,
+                out instance,
+                out slider);
+        }
+
+        /// <summary>
+        /// Clones the native producer-list slider with caller-controlled right-edge geometry.
+        /// Keeping the geometry as parameters lets custom popups align the indicator with their
+        /// own chrome without changing the scene-derived default used by existing mods.
+        /// </summary>
+        public static bool TryCreateProducerListScrollSlider(
+            Transform parent,
+            ScrollRect target,
+            string objectName,
+            float rightCenterInset,
+            float viewportRightInset,
+            out GameObject instance,
+            out Slider slider)
+        {
             instance = null;
             slider = null;
             if (parent == null || target == null)
@@ -126,14 +150,14 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
             target.verticalScrollbar = null;
             target.verticalScrollbarSpacing = 0f;
 
-            ReserveProducerListViewportGutter(target);
+            ReserveProducerListViewportGutter(target, viewportRightInset);
 
             ProducerListScrollBinding binding = instance.GetComponent<ProducerListScrollBinding>();
             if (binding == null)
             {
                 binding = instance.AddComponent<ProducerListScrollBinding>();
             }
-            binding.Initialize(target, slider);
+            binding.Initialize(target, slider, rightCenterInset);
 
             RectTransform rect = instance.GetComponent<RectTransform>();
             if (rect != null)
@@ -151,6 +175,11 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
         /// </summary>
         public static void ReserveProducerListViewportGutter(ScrollRect target)
         {
+            ReserveProducerListViewportGutter(target, ProducerListViewportRightInset);
+        }
+
+        public static void ReserveProducerListViewportGutter(ScrollRect target, float rightInset)
+        {
             if (target == null || target.viewport == null)
             {
                 return;
@@ -158,9 +187,10 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
 
             RectTransform viewport = target.viewport;
             Vector2 offsetMax = viewport.offsetMax;
-            if (offsetMax.x > -ProducerListViewportRightInset)
+            float safeInset = Mathf.Max(0f, rightInset);
+            if (offsetMax.x > -safeInset)
             {
-                offsetMax.x = -ProducerListViewportRightInset;
+                offsetMax.x = -safeInset;
                 viewport.offsetMax = offsetMax;
             }
         }
@@ -210,14 +240,16 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
             private RectTransform scrollRectTransform;
             private bool suppressEvents;
             private float lastTargetHeight = -1f;
+            private float rightCenterInset = ProducerListSliderRightCenterInset;
 
-            internal void Initialize(ScrollRect target, Slider targetSlider)
+            internal void Initialize(ScrollRect target, Slider targetSlider, float targetRightCenterInset)
             {
                 Detach();
                 scrollRect = target;
                 slider = targetSlider;
                 sliderRect = slider != null ? slider.GetComponent<RectTransform>() : null;
                 scrollRectTransform = scrollRect != null ? scrollRect.GetComponent<RectTransform>() : null;
+                rightCenterInset = Mathf.Max(0f, targetRightCenterInset);
 
                 if (scrollRect == null || slider == null)
                 {
@@ -318,7 +350,7 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
                 sliderRect.pivot = new Vector2(0.5f, 0.5f);
                 sliderRect.localScale = new Vector3(scale, scale, 1f);
                 sliderRect.sizeDelta = new Vector2(ProducerListSliderWidth, targetHeight / scale);
-                sliderRect.anchoredPosition = new Vector2(-ProducerListSliderRightCenterInset, 0f);
+                sliderRect.anchoredPosition = new Vector2(-rightCenterInset, 0f);
             }
         }
     }

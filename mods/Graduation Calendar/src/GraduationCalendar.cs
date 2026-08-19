@@ -935,7 +935,8 @@ namespace GraduationCalendar
             const float yearRowWidth = 360f;
             const float rowHeight = 40f;
             const float yearRowVerticalOffset = -56f;
-            const float rowButtonSpacing = 10f;
+            const float rowButtonSpacing = 4f;
+            const float pagerLabelHorizontalPadding = 12f;
             const float yearLabelWidth = 120f;
             const float monthRowWidth = 460f;
             const float monthRowVerticalOffset = -96f;
@@ -995,6 +996,12 @@ namespace GraduationCalendar
             panelRect.anchoredPosition = new Vector2(zeroAnchor, panelVerticalOffset);
             Image panelImage = panel.AddComponent<Image>();
             IMUiTheme calendarTheme = IMUiTheme.Vanilla();
+            // The older calendar presentation used a near-white sheet. Keep the
+            // vanilla sprite/chrome, but restore that brighter paper tone.
+            calendarTheme.SurfaceOuter = new Color32(250, 250, 250, 255);
+            calendarTheme.SurfaceInner = new Color32(255, 255, 255, 255);
+            calendarTheme.SurfaceRaised = new Color32(255, 255, 255, 255);
+            calendarTheme.SurfaceMuted = new Color32(247, 247, 247, 255);
             IMUiPrimitives.TryCopyVanillaPanelVisual(panelImage);
             panelImage.color = calendarTheme.SurfaceOuter;
 
@@ -1036,6 +1043,11 @@ namespace GraduationCalendar
             yearPager.Label.gameObject.name = yearLabelObjectName;
             yearLabel = yearPager.Label;
             yearRowObject = yearPager.Root;
+            FitPagerToLocalizedLabels(
+                yearPager,
+                new string[] { selectedYear.ToString() },
+                pagerLabelHorizontalPadding,
+                rowButtonSpacing);
 
             IMUiMonthPagerOptions monthPagerOptions = new IMUiMonthPagerOptions();
             monthPagerOptions.ObjectName = monthRowName;
@@ -1061,6 +1073,16 @@ namespace GraduationCalendar
             monthPager.Label.gameObject.name = monthLabelObjectName;
             monthLabel = monthPager.Label;
             monthRowObject = monthPager.Root;
+            string[] localizedMonthNames = new string[MonthsInYear];
+            for (int monthIndex = FirstMonthOfYear; monthIndex <= MonthsInYear; monthIndex++)
+            {
+                localizedMonthNames[monthIndex - FirstMonthOfYear] = GetMonthName(monthIndex);
+            }
+            FitPagerToLocalizedLabels(
+                monthPager,
+                localizedMonthNames,
+                pagerLabelHorizontalPadding,
+                rowButtonSpacing);
 
             Button gradOnlyButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1089,6 +1111,11 @@ namespace GraduationCalendar
             scrollOptions.PaddingBottom = contentPaddingBottom;
             scrollOptions.Spacing = contentSpacing;
             scrollOptions.UseVanillaListIndicator = true;
+            scrollOptions.Theme = calendarTheme;
+            // The calendar chrome already reserves a broad right margin, so place
+            // the native slider closer to that edge while preserving a safe content gutter.
+            scrollOptions.VanillaIndicatorRightCenterInset = 7f;
+            scrollOptions.VanillaViewportRightInset = 22f;
             IMUiScrollViewHandle scrollHandle;
             if (!IMUiComposer.TryCreateScrollView(panel.transform, scrollOptions, out scrollHandle))
             {
@@ -2227,10 +2254,10 @@ namespace GraduationCalendar
             const float cellPaddingTop = 24f;
             const float cellPaddingBottom = 4f;
             const float cellSpacing = 4f;
-            const float dayBadgeOffsetX = 4f;
-            const float dayBadgeOffsetY = -2f;
-            const float dayBadgeWidth = 30f;
-            const float dayBadgeHeight = 18f;
+            const float dayBadgeOffsetX = 5f;
+            const float dayBadgeOffsetY = -4f;
+            const float dayBadgeWidth = 26f;
+            const float dayBadgeHeight = 16f;
             const float dayBadgeLeftAnchor = 0f;
             const float dayBadgeTopAnchor = 1f;
             const float dayTextCharacterSpacing = 0f;
@@ -2238,7 +2265,7 @@ namespace GraduationCalendar
             const byte dayBadgeAlpha = 140;
             const int dayDigitFontSize = 14;
             const float dayDigitWidth = 10f;
-            const float dayDigitHeight = 18f;
+            const float dayDigitHeight = 16f;
             const int portraitsPerRow = 4;
             const float portraitGridSpacing = 2f;
             const int visiblePortraitRows = 2;
@@ -2272,6 +2299,7 @@ namespace GraduationCalendar
             badgeRect.anchoredPosition = new Vector2(dayBadgeOffsetX, dayBadgeOffsetY);
             badgeRect.sizeDelta = new Vector2(dayBadgeWidth, dayBadgeHeight);
             Image badgeImage = dayBadge.AddComponent<Image>();
+            IMUiPrimitives.TryCopyRoundedWhiteVisual(badgeImage);
             badgeImage.color = new Color32(dayBadgeColorChannel, dayBadgeColorChannel, dayBadgeColorChannel, dayBadgeAlpha);
             badgeImage.raycastTarget = false;
             LayoutElement badgeLayout = dayBadge.AddComponent<LayoutElement>();
@@ -2451,6 +2479,73 @@ namespace GraduationCalendar
                 return true;
             }
             return date.Year != UnknownGraduationYear;
+        }
+
+        private static void FitPagerToLocalizedLabels(
+            IMUiMonthPagerHandle pager,
+            IEnumerable<string> samples,
+            float horizontalPadding,
+            float spacing)
+        {
+            if (pager == null || pager.Root == null || pager.Label == null)
+            {
+                return;
+            }
+
+            float contentWidth = 0f;
+            if (samples != null)
+            {
+                foreach (string sample in samples)
+                {
+                    if (string.IsNullOrEmpty(sample))
+                    {
+                        continue;
+                    }
+                    Vector2 preferred = pager.Label.GetPreferredValues(sample);
+                    contentWidth = Mathf.Max(contentWidth, preferred.x);
+                }
+            }
+
+            float labelWidth = Mathf.Ceil(contentWidth + Mathf.Max(0f, horizontalPadding) * 2f);
+            LayoutElement labelLayout = pager.Label.GetComponent<LayoutElement>();
+            if (labelLayout == null)
+            {
+                labelLayout = pager.Label.gameObject.AddComponent<LayoutElement>();
+            }
+            labelLayout.preferredWidth = labelWidth;
+            labelLayout.minWidth = labelWidth;
+            labelLayout.flexibleWidth = 0f;
+
+            RectTransform labelRect = pager.Label.GetComponent<RectTransform>();
+            if (labelRect != null)
+            {
+                labelRect.sizeDelta = new Vector2(labelWidth, labelRect.sizeDelta.y);
+            }
+
+            float previousWidth = GetPagerButtonLayoutWidth(pager.PreviousButton);
+            float nextWidth = GetPagerButtonLayoutWidth(pager.NextButton);
+            RectTransform rootRect = pager.Root.GetComponent<RectTransform>();
+            if (rootRect != null)
+            {
+                rootRect.sizeDelta = new Vector2(
+                    previousWidth + labelWidth + nextWidth + Mathf.Max(0f, spacing) * 2f,
+                    rootRect.sizeDelta.y);
+            }
+        }
+
+        private static float GetPagerButtonLayoutWidth(Button button)
+        {
+            if (button == null)
+            {
+                return 0f;
+            }
+            LayoutElement layout = button.GetComponent<LayoutElement>();
+            if (layout != null && layout.preferredWidth > 0f)
+            {
+                return layout.preferredWidth;
+            }
+            RectTransform rect = button.GetComponent<RectTransform>();
+            return rect != null ? rect.rect.width : 0f;
         }
 
         private static string GetMonthName(int month)
