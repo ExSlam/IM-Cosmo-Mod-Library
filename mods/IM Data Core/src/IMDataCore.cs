@@ -131,6 +131,7 @@ namespace IMDataCore
         internal const string EventTypeIdolHired = "idol_hired";
         internal const string EventTypeIdolGraduationAnnounced = "idol_graduation_announced";
         internal const string EventTypeIdolGraduated = "idol_graduated";
+        internal const string EventTypeIdolGraduationOutcome = "idol_graduation_outcome";
         internal const string EventTypeIdolSalaryChanged = "idol_salary_changed";
         internal const string EventTypeLoanAdded = "loan_added";
         internal const string EventTypeLoanInitialized = "loan_initialized";
@@ -421,6 +422,7 @@ namespace IMDataCore
         internal const string IdolLifecycleActionHired = "hired";
         internal const string IdolLifecycleActionGraduationAnnounced = "graduation_announced";
         internal const string IdolLifecycleActionGraduated = "graduated";
+        internal const string IdolLifecycleActionGraduationOutcome = "graduation_outcome";
         internal const string LoanLifecycleActionAdded = "added";
         internal const string LoanLifecycleActionInitialized = "initialized";
         internal const string LoanLifecycleActionPaidOff = "paid_off";
@@ -716,6 +718,7 @@ namespace IMDataCore
         internal const string JsonFieldIdolAge = "idol_age";
         internal const string JsonFieldIdolHiringDate = "idol_hiring_date";
         internal const string JsonFieldIdolGraduationDate = "idol_graduation_date";
+        internal const string JsonFieldIdolGraduationOutcome = "idol_graduation_outcome";
         internal const string JsonFieldIdolTrivia = "idol_trivia";
         internal const string JsonFieldIdolCustomTrivia = "idol_custom_trivia";
         internal const string JsonFieldIdolGraduationWithDialogue = "idol_graduation_with_dialogue";
@@ -4021,6 +4024,7 @@ namespace IMDataCore
                 IdolAge = idol.GetAge(),
                 IdolHiringDate = hiringDate,
                 IdolGraduationDate = graduationDate,
+                IdolGraduationOutcome = idol.Graduation_Trivia_Text ?? string.Empty,
                 IdolTrivia = idol.GetTriviaString() ?? string.Empty,
                 IdolCustomTrivia = customTrivia ?? string.Empty,
                 IdolGraduationWithDialogue = graduatedWithDialogue
@@ -6137,6 +6141,7 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolAge, payload.IdolAge, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolHiringDate, payload.IdolHiringDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolGraduationDate, payload.IdolGraduationDate ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolGraduationOutcome, payload.IdolGraduationOutcome ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolTrivia, payload.IdolTrivia ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolCustomTrivia, payload.IdolCustomTrivia ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldIdolGraduationWithDialogue, payload.IdolGraduationWithDialogue, ref isFirstProperty);
@@ -7961,6 +7966,7 @@ namespace IMDataCore
         public int IdolAge;
         public string IdolHiringDate = string.Empty;
         public string IdolGraduationDate = string.Empty;
+        public string IdolGraduationOutcome = string.Empty;
         public string IdolTrivia = string.Empty;
         public string IdolCustomTrivia = string.Empty;
         public bool IdolGraduationWithDialogue;

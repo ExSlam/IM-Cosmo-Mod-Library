@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 namespace IMDataCore
 {
     /// <summary>
@@ -52,6 +53,8 @@ namespace IMDataCore
                         "save_boundary");
                 CaptureResolvedSingleChartPositionsBeforeSave();
 
+                List<LightweightModSnapshotRecord> enabledMods =
+                    CaptureCurrentModSnapshot(true);
                 LightweightCoreStorageEngine engineForWrite;
                 LightweightPersistenceSnapshot persistenceSnapshot;
                 string errorMessage;
@@ -73,6 +76,7 @@ namespace IMDataCore
                         !storageEngine.AddOrReplaceCheckpoint(
                             stamp,
                             captureSequence,
+                            enabledMods,
                             out errorMessage) ||
                         !storageEngine.TryCreatePersistenceSnapshot(
                             targetScope,
@@ -248,6 +252,21 @@ namespace IMDataCore
                             out errorMessage))
                     {
                         CoreLog.Warn(errorMessage);
+                    }
+                    if (hasExistingSidecarDocument && checkpointFound)
+                    {
+                        List<LightweightModSnapshotRecord> requiredMods;
+                        if (!loadedEngine.TryGetCheckpointModSnapshot(
+                                stamp,
+                                out requiredMods,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(errorMessage);
+                        }
+                        else
+                        {
+                            WarnForCheckpointModDifferences(requiredMods);
+                        }
                     }
                     if (hasExistingSidecarDocument && !checkpointFound)
                     {
@@ -686,5 +705,282 @@ namespace IMDataCore
                 }
             }
         }
+
+        /// <summary>
+        /// Captures the Idol Manager mod registry, not Harmony ownership. This includes
+        /// JSON-only mods and mods that have no dependency on IM Data Core.
+        /// </summary>
+        private static List<LightweightModSnapshotRecord> CaptureCurrentModSnapshot(
+            bool enabledOnly)
+        {
+            List<LightweightModSnapshotRecord> result =
+                new List<LightweightModSnapshotRecord>();
+            if (Mods._Mods == null)
+            {
+                return result;
+            }
+
+            for (int index = 0; index < Mods._Mods.Count; index++)
+            {
+                Mods._mod mod = Mods._Mods[index];
+                if (mod == null || (enabledOnly && !mod.IsEnabled()))
+                {
+                    continue;
+                }
+
+                string modName = (mod.ModName ?? string.Empty).Trim();
+                string title = (mod.Title ?? string.Empty).Trim();
+                if (string.IsNullOrEmpty(modName))
+                {
+                    modName = title;
+                }
+
+                LightweightModSnapshotRecord record =
+                    new LightweightModSnapshotRecord
+                    {
+                        ModName = modName,
+                        Title = title,
+                        Author = (mod.Author ?? string.Empty).Trim(),
+                        Version = (mod.Version ?? string.Empty).Trim(),
+                        DllNames = FindModDllNames(mod.Path)
+                    };
+                result.Add(record);
+            }
+
+            result.Sort(delegate(
+                LightweightModSnapshotRecord left,
+                LightweightModSnapshotRecord right)
+            {
+                return string.Compare(
+                    left != null ? left.ModName : string.Empty,
+                    right != null ? right.ModName : string.Empty,
+                    StringComparison.OrdinalIgnoreCase);
+            });
+            return result;
+        }
+
+        private static List<string> FindModDllNames(string modPath)
+        {
+            List<string> result = new List<string>();
+            if (string.IsNullOrEmpty(modPath) || !Directory.Exists(modPath))
+            {
+                return result;
+            }
+
+            try
+            {
+                string[] dllPaths = Directory.GetFiles(
+                    modPath,
+                    "*.dll",
+                    SearchOption.AllDirectories);
+                HashSet<string> uniqueNames = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+                for (int index = 0; index < dllPaths.Length; index++)
+                {
+                    string name = Path.GetFileName(dllPaths[index]);
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        uniqueNames.Add(name);
+                    }
+                }
+                result.AddRange(uniqueNames);
+                result.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not enumerate DLL names for mod path '" +
+                    modPath + "': " + exception.Message);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Compares the exact save checkpoint's enabled-mod inventory with the current
+        /// registry after main-menu toggles or a later process restart. Differences are
+        /// diagnostic only; vanilla remains authoritative and load is never blocked.
+        /// </summary>
+        private static void WarnForCheckpointModDifferences(
+            IReadOnlyList<LightweightModSnapshotRecord> requiredMods)
+        {
+            if (requiredMods == null || requiredMods.Count == 0)
+            {
+                // Version-3 checkpoints have no mod inventory.
+                return;
+            }
+
+            List<LightweightModSnapshotRecord> installed =
+                CaptureCurrentModSnapshot(false);
+            Dictionary<string, LightweightModSnapshotRecord> installedByName =
+                new Dictionary<string, LightweightModSnapshotRecord>(
+                    StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, bool> enabledByName =
+                new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+            if (Mods._Mods != null)
+            {
+                for (int index = 0; index < Mods._Mods.Count; index++)
+                {
+                    Mods._mod mod = Mods._Mods[index];
+                    if (mod == null)
+                    {
+                        continue;
+                    }
+                    string key = (mod.ModName ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(key))
+                    {
+                        key = (mod.Title ?? string.Empty).Trim();
+                    }
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        enabledByName[key] = mod.IsEnabled();
+                    }
+                }
+            }
+
+            for (int index = 0; index < installed.Count; index++)
+            {
+                LightweightModSnapshotRecord row = installed[index];
+                if (row != null && !string.IsNullOrEmpty(row.ModName))
+                {
+                    installedByName[row.ModName] = row;
+                }
+            }
+
+            List<string> missing = new List<string>();
+            List<string> disabled = new List<string>();
+            List<string> mismatched = new List<string>();
+            for (int index = 0; index < requiredMods.Count; index++)
+            {
+                LightweightModSnapshotRecord required = requiredMods[index];
+                if (required == null || string.IsNullOrEmpty(required.ModName))
+                {
+                    continue;
+                }
+
+                LightweightModSnapshotRecord current;
+                if (!installedByName.TryGetValue(required.ModName, out current) ||
+                    current == null)
+                {
+                    missing.Add(DescribeModSnapshot(required));
+                    continue;
+                }
+
+                bool isEnabled;
+                if (!enabledByName.TryGetValue(required.ModName, out isEnabled) ||
+                    !isEnabled)
+                {
+                    disabled.Add(DescribeModSnapshot(required));
+                    continue;
+                }
+
+                List<string> differences = new List<string>();
+                if (!string.Equals(
+                        required.Author ?? string.Empty,
+                        current.Author ?? string.Empty,
+                        StringComparison.Ordinal))
+                {
+                    differences.Add(
+                        "author '" + (required.Author ?? string.Empty) +
+                        "' -> '" + (current.Author ?? string.Empty) + "'");
+                }
+                if (!string.Equals(
+                        required.Version ?? string.Empty,
+                        current.Version ?? string.Empty,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    differences.Add(
+                        "version '" + (required.Version ?? string.Empty) +
+                        "' -> '" + (current.Version ?? string.Empty) + "'");
+                }
+                if (!StringListsEqualIgnoreCase(required.DllNames, current.DllNames))
+                {
+                    differences.Add(
+                        "DLLs [" + JoinStrings(required.DllNames) + "] -> [" +
+                        JoinStrings(current.DllNames) + "]");
+                }
+
+                if (differences.Count > 0)
+                {
+                    mismatched.Add(
+                        DescribeModSnapshot(required) + " (" +
+                        string.Join("; ", differences.ToArray()) + ")");
+                }
+            }
+
+            if (missing.Count == 0 && disabled.Count == 0 && mismatched.Count == 0)
+            {
+                return;
+            }
+
+            List<string> sections = new List<string>();
+            if (missing.Count > 0)
+            {
+                sections.Add("missing: " + string.Join(", ", missing.ToArray()));
+            }
+            if (disabled.Count > 0)
+            {
+                sections.Add("disabled: " + string.Join(", ", disabled.ToArray()));
+            }
+            if (mismatched.Count > 0)
+            {
+                sections.Add("mismatched: " + string.Join(", ", mismatched.ToArray()));
+            }
+
+            CoreLog.Warn(
+                "The loaded save's IM Data Core checkpoint was created with a different " +
+                "mod set; " + string.Join(" | ", sections.ToArray()) + ".");
+        }
+
+        private static bool StringListsEqualIgnoreCase(
+            IReadOnlyList<string> left,
+            IReadOnlyList<string> right)
+        {
+            int leftCount = left != null ? left.Count : 0;
+            int rightCount = right != null ? right.Count : 0;
+            if (leftCount != rightCount)
+            {
+                return false;
+            }
+            for (int index = 0; index < leftCount; index++)
+            {
+                if (!string.Equals(
+                        left[index] ?? string.Empty,
+                        right[index] ?? string.Empty,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static string DescribeModSnapshot(LightweightModSnapshotRecord mod)
+        {
+            if (mod == null)
+            {
+                return "<unknown mod>";
+            }
+            string title = string.IsNullOrEmpty(mod.Title) ? mod.ModName : mod.Title;
+            string suffix = string.IsNullOrEmpty(mod.Version)
+                ? string.Empty
+                : " v" + mod.Version;
+            return title + suffix;
+        }
+
+        private static string JoinStrings(IReadOnlyList<string> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return string.Empty;
+            }
+            string[] copy = new string[values.Count];
+            for (int index = 0; index < values.Count; index++)
+            {
+                copy[index] = values[index] ?? string.Empty;
+            }
+            return string.Join(", ", copy);
+        }
+
     }
 }

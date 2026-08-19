@@ -74,9 +74,10 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Versioned JSON envelope for the lightweight sidecar. Version 3 stores
-    /// JSON values structurally and omits fields that can be derived at load.
-    /// Runtime dictionaries and read indexes are always rebuilt.
+    /// Versioned JSON envelope for the lightweight sidecar. Version 4 adds an
+    /// enabled-mod inventory to each exact vanilla-save checkpoint while retaining
+    /// the structural JSON representation introduced by version 3. Runtime
+    /// dictionaries and read indexes are always rebuilt.
     /// </summary>
     [Serializable]
     internal sealed class LightweightSidecarDocument
@@ -127,6 +128,16 @@ namespace IMDataCore
     }
 
     [Serializable]
+    internal sealed class LightweightModSnapshotRecord
+    {
+        public string ModName = string.Empty;
+        public string Title = string.Empty;
+        public string Author = string.Empty;
+        public string Version = string.Empty;
+        public List<string> DllNames = new List<string>();
+    }
+
+    [Serializable]
     internal sealed class LightweightCheckpointRecord
     {
         public string RelativeSavePath = string.Empty;
@@ -134,6 +145,8 @@ namespace IMDataCore
         public long PlaytimeSeconds;
         public string GameDateTime = string.Empty;
         public long Sequence;
+        public List<LightweightModSnapshotRecord> EnabledMods =
+            new List<LightweightModSnapshotRecord>();
     }
 
     [Serializable]
@@ -178,7 +191,8 @@ namespace IMDataCore
     internal sealed class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
-        internal const int SidecarFormatVersion = 3;
+        internal const int MinimumSupportedSidecarFormatVersion = 3;
+        internal const int SidecarFormatVersion = 4;
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
@@ -1658,9 +1672,66 @@ namespace IMDataCore
             }
         }
 
+        /// <summary>
+        /// Returns the enabled-mod inventory frozen into the exact vanilla-save
+        /// checkpoint. Version-3 checkpoints legitimately return an empty list.
+        /// </summary>
+        internal bool TryGetCheckpointModSnapshot(
+            VanillaSaveStamp stamp,
+            out List<LightweightModSnapshotRecord> enabledMods,
+            out string errorMessage)
+        {
+            enabledMods = new List<LightweightModSnapshotRecord>();
+            errorMessage = string.Empty;
+            if (stamp == null)
+            {
+                errorMessage = "The vanilla save stamp is missing.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord checkpoint;
+                    if (!durableCheckpointsByIdentity.TryGetValue(
+                            CheckpointIdentity.From(stamp),
+                            out checkpoint) ||
+                        checkpoint == null)
+                    {
+                        return true;
+                    }
+
+                    enabledMods = CloneModSnapshots(checkpoint.EnabledMods);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Reading the IMDC checkpoint mod snapshot failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
         internal bool AddOrReplaceCheckpoint(
             VanillaSaveStamp stamp,
             long sequence,
+            out string errorMessage)
+        {
+            return AddOrReplaceCheckpoint(
+                stamp,
+                sequence,
+                null,
+                out errorMessage);
+        }
+
+        internal bool AddOrReplaceCheckpoint(
+            VanillaSaveStamp stamp,
+            long sequence,
+            IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
             out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -1717,7 +1788,8 @@ namespace IMDataCore
                             LastSave = stamp.LastSave,
                             PlaytimeSeconds = stamp.PlaytimeSeconds,
                             GameDateTime = stamp.GameDateTime,
-                            Sequence = sequence
+                            Sequence = sequence,
+                            EnabledMods = CloneModSnapshots(enabledMods)
                         };
                     activeCheckpoints.Add(newCheckpoint);
                     IndexCheckpointByPathLocked(newCheckpoint);
@@ -3466,14 +3538,14 @@ namespace IMDataCore
                 return false;
             }
 
-            // Current-format only. Older on-disk formats are intentionally not
-            // migrated in this build; keeping one representation removes load-time
-            // normalization branches and makes ordering invariants explicit.
+            // Version 4 extends checkpoints only. Version 3 remains readable so
+            // existing campaigns migrate naturally on their next full sidecar write.
             if (!string.Equals(
                     document.FormatName,
                     SidecarFormatName,
                     StringComparison.Ordinal) ||
-                document.FormatVersion != SidecarFormatVersion)
+                document.FormatVersion < MinimumSupportedSidecarFormatVersion ||
+                document.FormatVersion > SidecarFormatVersion)
             {
                 errorMessage =
                     "The sidecar format is unsupported by this IM Data Core version.";
@@ -5288,6 +5360,39 @@ namespace IMDataCore
             return clone;
         }
 
+        private static List<LightweightModSnapshotRecord> CloneModSnapshots(
+            IReadOnlyList<LightweightModSnapshotRecord> source)
+        {
+            List<LightweightModSnapshotRecord> clone =
+                new List<LightweightModSnapshotRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightModSnapshotRecord row = source[index];
+                if (row == null)
+                {
+                    continue;
+                }
+
+                clone.Add(new LightweightModSnapshotRecord
+                {
+                    ModName = row.ModName ?? string.Empty,
+                    Title = row.Title ?? string.Empty,
+                    Author = row.Author ?? string.Empty,
+                    Version = row.Version ?? string.Empty,
+                    DllNames = row.DllNames != null
+                        ? new List<string>(row.DllNames)
+                        : new List<string>()
+                });
+            }
+
+            return clone;
+        }
+
         private static LightweightCheckpointRecord CloneCheckpoint(
             LightweightCheckpointRecord source)
         {
@@ -5297,7 +5402,8 @@ namespace IMDataCore
                 LastSave = source.LastSave ?? string.Empty,
                 PlaytimeSeconds = source.PlaytimeSeconds,
                 GameDateTime = source.GameDateTime ?? string.Empty,
-                Sequence = source.Sequence
+                Sequence = source.Sequence,
+                EnabledMods = CloneModSnapshots(source.EnabledMods)
             };
         }
 

@@ -33,6 +33,7 @@ namespace IMDataCore
         internal const string DetailKindShow = "show";
         internal const string DetailKindIdolSalary = "idol_salary";
         internal const string DetailKindStaffSalary = "staff_salary";
+        internal const string DetailKindStaffSeverance = "staff_severance";
         internal const string DetailKindTheaterAttendance = "theater_attendance";
         internal const string DetailKindTheaterStreaming = "theater_streaming";
         internal const string DetailKindCafeDaily = "cafe_daily";
@@ -75,6 +76,7 @@ namespace IMDataCore
         internal const string DetailAudition = "audition";
         internal const string DetailResearch = "research";
         internal const string DetailStaffing = "staffing";
+        internal const string DetailStaffSeverance = "staff_severance";
         internal const string DetailLoan = "loan";
         internal const string DetailEvent = "event";
         internal const string DetailStory = "story";

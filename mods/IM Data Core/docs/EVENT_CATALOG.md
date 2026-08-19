@@ -92,6 +92,7 @@ Generation note:
 | idol_dating_status_changed | EventTypeIdolDatingStatusChanged | idol |
 | idol_earnings_recorded | EventTypeIdolEarningsRecorded | idol |
 | idol_graduated | EventTypeIdolGraduated | idol |
+| idol_graduation_outcome | EventTypeIdolGraduationOutcome | idol |
 | idol_graduation_announced | EventTypeIdolGraduationAnnounced | idol |
 | idol_group_transferred | EventTypeIdolGroupTransferred | idol |
 | idol_hired | EventTypeIdolHired | idol |
@@ -342,6 +343,7 @@ Generation note:
 | idol_age | JsonFieldIdolAge | idol |
 | idol_custom_trivia | JsonFieldIdolCustomTrivia | idol |
 | idol_graduation_date | JsonFieldIdolGraduationDate | idol |
+| idol_graduation_outcome | JsonFieldIdolGraduationOutcome | idol |
 | idol_graduation_with_dialogue | JsonFieldIdolGraduationWithDialogue | idol |
 | idol_hiring_date | JsonFieldIdolHiringDate | idol |
 | idol_id | JsonFieldIdolId | idol |

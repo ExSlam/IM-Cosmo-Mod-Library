@@ -355,6 +355,8 @@ namespace IMDataCore
         private static void Prefix(staff._staff __instance, out StaffLifecycleSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateStaffLifecycleSnapshot(__instance);
+            MoneyLedgerAmbientContext.Set(
+                MoneyLedgerCaptureDetails.BuildStaffSeveranceCapture(__instance, __state));
         }
 
         [HarmonyPostfix]
@@ -382,6 +384,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(staff._staff __instance, StaffLifecycleSnapshot __state)
         {
+            MoneyLedgerAmbientContext.Clear();
             IMDataCoreController.Instance.CaptureStaffFiredSeverance(__instance, __state);
         }
     }

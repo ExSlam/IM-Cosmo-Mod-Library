@@ -2,7 +2,7 @@
   "Title": "IM Data Core",
   "Description": "JSON-native persistent data and event ledger backend for Idol Manager mods, with delta-journal saves, exact-checkpoint recovery, and paged timelines.",
   "Author": "Cosmo",
-  "Version": "3.4.4",
+  "Version": "3.4.5",
   "Tags": [
     "framework",
     "library",

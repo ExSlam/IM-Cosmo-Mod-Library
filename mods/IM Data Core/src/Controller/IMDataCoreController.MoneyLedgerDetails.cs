@@ -25,6 +25,8 @@ namespace IMDataCore
         internal const string SourceTypeBusiness = "business";
         internal const string SourceTypeConcertPopup = "Concert_Popup";
         internal const string SourceTypeConcertSystem = "SEvent_Concerts";
+        internal const string SourceTypeStaff = "staff._staff";
+        internal const string SourceMethodStaffFireSeverance = "Fire_Severance";
         internal const string SourceMethodTheaterCompleteDay = "CompleteDay";
         internal const string SourceMethodCafeRender = "RenderCafe";
         internal const string SourceMethodConcertStart = "StartConcert";
@@ -242,6 +244,16 @@ namespace IMDataCore
                 return true;
             }
 
+            if (string.Equals(
+                    sourceType,
+                    MoneyLedgerDetailConstants.SourceTypeStaff,
+                    StringComparison.Ordinal))
+            {
+                snapshot.CategoryCode = MoneyLedgerConstants.CategoryStaffing;
+                snapshot.DetailCode = MoneyLedgerConstants.DetailStaffSeverance;
+                return true;
+            }
+
             return false;
         }
 
@@ -324,6 +336,31 @@ namespace IMDataCore
             {
                 PopulateDailyContractAllocations(snapshot);
             }
+        }
+
+        internal static MoneyLedgerAmbientCapture BuildStaffSeveranceCapture(
+            staff._staff staffer,
+            StaffLifecycleSnapshot snapshotBefore)
+        {
+            if (staffer == null || snapshotBefore == null || !snapshotBefore.CanFireSeveranceBefore)
+            {
+                return null;
+            }
+
+            return new MoneyLedgerAmbientCapture
+            {
+                Details = new MoneyLedgerDetailPayload
+                {
+                    kind = MoneyLedgerConstants.DetailKindStaffSeverance,
+                    staff_name = snapshotBefore.StaffName ?? string.Empty,
+                    staff_role_code = snapshotBefore.StaffType ?? string.Empty,
+                    payment_amount = snapshotBefore.SeveranceCostBefore,
+                    salary_amount = snapshotBefore.StaffSalary,
+                    staff_skills = BuildStaffSkillDetails(staffer)
+                },
+                ExpectedSourceType = MoneyLedgerDetailConstants.SourceTypeStaff,
+                ExpectedSourceMethod = MoneyLedgerDetailConstants.SourceMethodStaffFireSeverance
+            };
         }
 
         internal static MoneyLedgerAmbientCapture BuildProposalCapture(business._proposal proposal)

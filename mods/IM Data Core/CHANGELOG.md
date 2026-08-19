@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.5
+
+- Added sidecar format 4 checkpoint mod inventories. Every vanilla-save checkpoint now records every enabled Idol Manager mod from `Mods._Mods`, including JSON-only/non-Harmony/non-IMDC mods, with mod name, title, author, declared version, and discovered DLL file name(s).
+- On exact-checkpoint load, compares the saved mod inventory with the current registry and warns about required mods that are missing, disabled, or have changed author/version/DLL names. The diagnostic never blocks vanilla loading.
+- Retained read compatibility with sidecar format 3; older checkpoints simply have no mod inventory and migrate to format 4 on a later full sidecar write.
+- Added a dedicated `idol_graduation_outcome` lifecycle milestone carrying vanilla's resolved `Graduation_Trivia_Text`, captured after graduation so JSON-only outcome additions are preserved.
+- Added exact staff-severance money attribution at `staff._staff.Fire_Severance`, including severance amount, role, salary, and staff skill snapshot.
+- Idol weekly salary allocations continue to use the exact final salary in vanilla's weekly deduction, now explicitly consumable as that week's paid amount.
+
 ## 3.4.4
 
 - Added stable portrait identity fields to idol lifecycle events: raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs. This gives profile/history consumers enough vanilla-style references to identify both built-in unique idols and normal/modded portrait compositions without storing rendered images.

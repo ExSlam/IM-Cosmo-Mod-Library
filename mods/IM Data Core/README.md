@@ -2,9 +2,9 @@
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-Version 3.4 intentionally supports only the current v3 sidecar and transactional v2 journal representation. Older sidecar/journal formats are not migrated or replayed by this build.
+IMDC 3.4.5 writes sidecar format 4 and transactional journal format 2. Format-3 sidecars remain readable so existing campaigns can migrate safely; older persistence formats remain unsupported.
 
-IMDC 3.4 keeps sidecar format version 3 while tightening persistence for long campaigns. Append-only save generations are written to a small SHA-256-bound transactional journal and periodically compacted into the atomic v3 snapshot; destructive branch changes still force a complete snapshot.
+IMDC 3.4.5 extends exact-save checkpoints with an enabled-mod inventory while keeping the long-campaign journal design. Append-only save generations are written to a small SHA-256-bound transactional journal and periodically compacted into the atomic v4 snapshot; destructive branch changes still force a complete snapshot.
 
 ## Services
 
@@ -27,14 +27,14 @@ Each physical vanilla save owns one mirrored IMDC sidecar beneath the sibling `I
 
 `global_data.json` is not a game-save scope and never receives an IMDC sidecar.
 
-## Version 3 sidecar
+## Version 4 sidecar
 
 The current private disk format remains:
 
 - `FormatName`: `IMDataCore.LightweightSidecar`
-- `FormatVersion`: `3`
+- `FormatVersion`: `4`
 
-V3 stores actual JSON values rather than JSON encoded inside strings. A built-in event can look like:
+V4 keeps the structural JSON representation introduced by v3 and adds `EnabledMods` to each checkpoint. A built-in event can look like:
 
 ```json
 {
@@ -54,13 +54,15 @@ V3 stores actual JSON values rather than JSON encoded inside strings. A built-in
 }
 ```
 
-A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Older v3 sidecars do not need this field and remain valid.
+A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Older format-3 sidecars remain readable; their checkpoints simply have no saved mod inventory.
 
-The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v3 document so consumers do not need to understand the private sidecar schema.
+The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v4 document so consumers do not need to understand the private sidecar schema.
 
 ## Exact checkpoint loading
 
 A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, and the IMDC sequence watermark.
+
+In format 4, that same checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
 
 When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 

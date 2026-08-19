@@ -1,4 +1,11 @@
-# IM Data Core 3.4.4 patch summary
+# IM Data Core 3.4.5 patch summary
+
+## 3.4.5 checkpoint and lifecycle additions
+
+- Every exact save checkpoint now carries the full enabled vanilla mod registry, including JSON-only mods, with author/version and DLL filenames.
+- Exact-checkpoint load reports missing, disabled, and changed mod requirements without blocking vanilla.
+- Graduation fate text is captured as `idol_graduation_outcome` after vanilla resolves `Graduation_Trivia_Text`.
+- Staff severance receives dedicated money-ledger attribution instead of generic staff cost.
 
 - Restored the missing transient `Dictionary<int, singles._single>` used by unresolved single chart-position backfill.
 
@@ -26,10 +33,10 @@ This revision focuses on persistence correctness under New Save/Overwrite Save b
 ## Compatibility
 
 - Public API retains the uncapped money-transaction totals and reflection-safe `IMDataCoreInteropApi`; existing API entry points remain compatible. Idol lifecycle payload JSON gains additive portrait-identity fields.
-- Sidecar `FormatVersion` remains **3**.
+- Sidecar `FormatVersion` is **4**; format 3 remains readable for migration.
 - Journal `FormatVersion` is **2**.
 - Older sidecar/journal formats are intentionally not supported.
-- Project/mod version is **3.4.4**.
+- Project/mod version is **3.4.5**.
 
 
 ## Election numbering

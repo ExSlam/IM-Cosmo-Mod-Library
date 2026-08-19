@@ -1126,6 +1126,21 @@ namespace IMDataCore
                 CoreConstants.IdolLifecycleActionGraduated,
                 customTrivia,
                 graduatedWithDialogue);
+
+            // Vanilla (and JSON-only graduation_trivia additions) resolves the fate
+            // text before Graduate's postfix runs and stores the final localized text
+            // on Graduation_Trivia_Text. Persist a distinct second milestone so diary
+            // consumers can render the fate after the graduation event itself.
+            if (idol != null && !string.IsNullOrEmpty(idol.Graduation_Trivia_Text))
+            {
+                CaptureIdolLifecycleEvent(
+                    idol,
+                    CoreConstants.EventTypeIdolGraduationOutcome,
+                    CoreConstants.EventSourceDataGirlsGraduatePatch,
+                    CoreConstants.IdolLifecycleActionGraduationOutcome,
+                    customTrivia,
+                    graduatedWithDialogue);
+            }
         }
 
         /// <summary>

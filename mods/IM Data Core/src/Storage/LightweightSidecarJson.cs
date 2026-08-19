@@ -839,7 +839,8 @@ namespace IMDataCore
 
             string formatName = RequireString(root, "FormatName");
             int formatVersion = RequireInt32(root, "FormatVersion");
-            if (formatVersion != LightweightCoreStorageEngine.SidecarFormatVersion)
+            if (formatVersion < LightweightCoreStorageEngine.MinimumSupportedSidecarFormatVersion ||
+                formatVersion > LightweightCoreStorageEngine.SidecarFormatVersion)
             {
                 throw new FormatException(
                     "The lightweight sidecar format is unsupported by this IM Data Core version.");
@@ -927,8 +928,10 @@ namespace IMDataCore
                         case "FormatVersion":
                             document.FormatVersion =
                                 parser.ParseRequiredInt32(propertyName);
-                            if (document.FormatVersion !=
-                                LightweightCoreStorageEngine.SidecarFormatVersion)
+                            if (document.FormatVersion <
+                                    LightweightCoreStorageEngine.MinimumSupportedSidecarFormatVersion ||
+                                document.FormatVersion >
+                                    LightweightCoreStorageEngine.SidecarFormatVersion)
                             {
                                 throw new FormatException(
                                     "The lightweight sidecar format is unsupported by this IM Data Core version.");
@@ -2004,7 +2007,71 @@ namespace IMDataCore
             builder.Append(',');
             AppendPropertyName(builder, "Sequence");
             AppendInt64(builder, record.Sequence);
+            builder.Append(',');
+            AppendPropertyName(builder, "EnabledMods");
+            AppendModSnapshots(builder, record.EnabledMods);
             builder.Append('}');
+        }
+
+        private static void AppendModSnapshots(
+            StringBuilder builder,
+            List<LightweightModSnapshotRecord> records)
+        {
+            builder.Append('[');
+            bool wroteAny = false;
+            if (records != null)
+            {
+                for (int index = 0; index < records.Count; index++)
+                {
+                    LightweightModSnapshotRecord record = records[index];
+                    if (record == null)
+                    {
+                        continue;
+                    }
+                    if (wroteAny)
+                    {
+                        builder.Append(',');
+                    }
+                    wroteAny = true;
+
+                    builder.Append('{');
+                    AppendPropertyName(builder, "ModName");
+                    AppendString(builder, record.ModName ?? string.Empty);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "Title");
+                    AppendString(builder, record.Title ?? string.Empty);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "Author");
+                    AppendString(builder, record.Author ?? string.Empty);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "Version");
+                    AppendString(builder, record.Version ?? string.Empty);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "DllNames");
+                    AppendStringArray(builder, record.DllNames);
+                    builder.Append('}');
+                }
+            }
+            builder.Append(']');
+        }
+
+        private static void AppendStringArray(
+            StringBuilder builder,
+            List<string> values)
+        {
+            builder.Append('[');
+            if (values != null)
+            {
+                for (int index = 0; index < values.Count; index++)
+                {
+                    if (index > 0)
+                    {
+                        builder.Append(',');
+                    }
+                    AppendString(builder, values[index] ?? string.Empty);
+                }
+            }
+            builder.Append(']');
         }
 
         private static void AppendEvents(
@@ -2194,8 +2261,66 @@ namespace IMDataCore
                 LastSave = RequireString(item, "LastSave"),
                 PlaytimeSeconds = RequireInt64(item, "PlaytimeSeconds"),
                 GameDateTime = RequireString(item, "GameDateTime"),
-                Sequence = RequireInt64(item, "Sequence")
+                Sequence = RequireInt64(item, "Sequence"),
+                EnabledMods = ReadOptionalModSnapshots(item)
             };
+        }
+
+        private static List<LightweightModSnapshotRecord> ReadOptionalModSnapshots(
+            Dictionary<string, JsonValue> checkpoint)
+        {
+            List<LightweightModSnapshotRecord> records =
+                new List<LightweightModSnapshotRecord>();
+            JsonValue value;
+            if (checkpoint == null ||
+                !checkpoint.TryGetValue("EnabledMods", out value))
+            {
+                return records;
+            }
+            if (value == null || value.Kind != JsonValueKind.Array)
+            {
+                throw new FormatException(
+                    "The checkpoint field 'EnabledMods' must be a JSON array.");
+            }
+
+            for (int index = 0; index < value.ArrayValue.Count; index++)
+            {
+                Dictionary<string, JsonValue> item = RequireObject(
+                    value.ArrayValue[index],
+                    "An enabled-mod snapshot must be a JSON object.");
+                records.Add(new LightweightModSnapshotRecord
+                {
+                    ModName = RequireString(item, "ModName"),
+                    Title = RequireString(item, "Title"),
+                    Author = RequireString(item, "Author"),
+                    Version = RequireString(item, "Version"),
+                    DllNames = ReadStringArray(RequireArray(item, "DllNames"), "DllNames")
+                });
+            }
+            return records;
+        }
+
+        private static List<string> ReadStringArray(
+            List<JsonValue> values,
+            string fieldName)
+        {
+            List<string> result = new List<string>();
+            if (values == null)
+            {
+                return result;
+            }
+            for (int index = 0; index < values.Count; index++)
+            {
+                JsonValue value = values[index];
+                if (value == null || value.Kind != JsonValueKind.String)
+                {
+                    throw new FormatException(
+                        "The lightweight sidecar field '" + fieldName +
+                        "' must contain only strings.");
+                }
+                result.Add(value.StringValue ?? string.Empty);
+            }
+            return result;
         }
 
 

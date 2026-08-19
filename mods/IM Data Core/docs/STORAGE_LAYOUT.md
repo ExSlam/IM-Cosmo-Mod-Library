@@ -34,14 +34,14 @@ Examples:
 
 All IMDC mutation paths are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before reads, writes, or deletes that could escape containment. The private root is required to remain separate from the vanilla `data` root.
 
-## V3 document identity
+## V4 document identity
 
-IMDC 3.4 uses sidecar format version 3:
+IMDC 3.4.5 writes sidecar format version 4 and reads format 3 for migration:
 
 ```json
 {
   "FormatName": "IMDataCore.LightweightSidecar",
-  "FormatVersion": 3,
+  "FormatVersion": 4,
   "RelativeSavePath": "manual_saves/4060ce4d/save.json",
   "LastIssuedSequence": 421,
   "Checkpoints": [],
@@ -61,11 +61,27 @@ IMDC 3.4 uses sidecar format version 3:
   "LastSave": "2026-08-13 18:22:04",
   "PlaytimeSeconds": 58321,
   "GameDateTime": "2028-04-17T00:00:00.0000000",
-  "Sequence": 421
+  "Sequence": 421,
+  "EnabledMods": [
+    {
+      "ModName": "Example Mod",
+      "Title": "Example Mod",
+      "Author": "Example Author",
+      "Version": "1.2.3",
+      "DllNames": ["example.dll"]
+    },
+    {
+      "ModName": "JSON Outcome Pack",
+      "Title": "JSON Outcome Pack",
+      "Author": "Example Author",
+      "Version": "1.0.0",
+      "DllNames": []
+    }
+  ]
 }
 ```
 
-Checkpoint activation is exact. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.4 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+Checkpoint activation is exact. `EnabledMods` is frozen at that save boundary from Idol Manager's enabled mod registry; JSON-only mods are represented even though `DllNames` is empty. After exact activation IMDC compares this inventory with the current installed/enabled mod set and logs missing, disabled, author/version, and DLL-name mismatches. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.4.5 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
 
 ### Event
 
@@ -146,7 +162,7 @@ Those values are derived from source records or are transient runtime bookkeepin
 
 ## Atomic snapshots, delta journal, and backup
 
-The compact base remains an ordinary v3 sidecar. A normal append-only save may additionally create:
+The compact base is an ordinary v4 sidecar (or a readable v3 base until a later full rewrite). A normal append-only save may additionally create:
 
 ```text
 <sidecar>.imdc.journal

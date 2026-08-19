@@ -1,8 +1,8 @@
-# IM Data Core v3 sidecar schema
+# IM Data Core v3 sidecar schema (historical)
 
-This document describes the current private v3 persisted representation used by IMDC 3.4.3. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
+This document describes the historical format-3 persisted representation. IMDC 3.4.5 writes format 4; see `V4_SIDECAR_SCHEMA.md`. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
 
-The release version is 3.4.3, while the compact sidecar `FormatVersion` remains `3`. This build accepts only the current v3 sidecar and transactional journal format 2. Older sidecar and journal formats are intentionally unsupported; no compatibility migration path is maintained.
+IMDC 3.4.5 still accepts format-3 sidecars and journal format 2 for migration. Format-3 checkpoints do not contain enabled-mod inventories; a later full persistence write upgrades the sidecar to format 4.
 
 ## Root
 
