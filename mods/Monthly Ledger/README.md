@@ -5,13 +5,20 @@ Monthly Ledger adds an Action Hub button that opens a queued, game-style popup c
 ## Dependencies
 
 - Mod Buttons
-- IM Data Core 2.0.0 or newer
-- IM UI Framework 2.0.3 or newer
+- IM Data Core 3.4.3 or newer
+- IM UI Framework 2.1.0 or newer
 
+## 0.2.5 complete monthly totals
+
+The transaction list remains capped at 10,000 visible rows for UI safety, but income, expense, net, and transaction-count totals now come from IM Data Core 3.4.3's uncapped aggregate query. Large months therefore keep complete totals even when the detail list is truncated.
+
+## 0.2.4 producer-list scroll fix
+
+Monthly Ledger now uses IM UI Framework 2.1's scene-native producer-list scroll indicator. `main.unity` shows that Producer Contracts, Producer Salaries, and Producer Loans do **not** use `ScrollRect.verticalScrollbar`; each list uses a separate vertical `Slider` with a fixed circular handle and a thin grey track. The ledger now clones and binds that exact loaded-scene control, so the thumb cannot stretch into Unity's proportional `Scrollbar.size` pill. Months with no positive transactions also render a localized **No income** row with ¥0.
 
 ## 0.2.0 UI overhaul
 
-- Uses IM UI Framework 2.0.2's vanilla asset layer for the real `Resources/scrollbar/Scrollbar` control and the real `Resources/button/basic/Pink` previous/next month buttons.
+- Uses IM UI Framework's vanilla asset layer for the real `Resources/button/basic/Pink` previous/next month buttons; 0.2.4 replaces the older MUIP scrollbar choice with the scene-native producer-list Slider pattern.
 - Stops shrinking the popup close control to 32 px; it now uses the framework/game-standard 36 px height.
 - Applies Idol Manager's currently selected game font to ledger TMP text. Bundled fonts are matched to loaded TMP assets when possible; custom/OS fonts use IM UI Framework's runtime TMP bridge.
 - Income and expense categories can be collapsed independently. Their totals remain visible while details are hidden, and the expanded/collapsed state is retained while navigating months.
@@ -36,9 +43,9 @@ Month and record dates, the close control, and matching finance/category/detail 
 
 
 ## 0.2.1 UI pass
-Monthly Ledger now uses the game's MUIP search input and scrollbar resources, a visible per-instance scrollbar color treatment, vanilla-style rounded panel sprites (preferring the producer Salaries popup), centered month navigation, and fixed idol-group collapse indicators. Search filters the displayed transaction records while leaving the monthly summary totals unchanged.
+Monthly Ledger uses the game's MUIP search input, vanilla-style rounded panel treatment, centered month navigation, and fixed idol-group collapse indicators. As of 0.2.4, scrolling uses the scene-native producer-list Slider rather than the generic MUIP scrollbar resource. Search filters the displayed transaction records while leaving the monthly summary totals unchanged.
 
 
 ## 0.2.3 UI correction pass
 
-The ledger now uses small 4-6 unit rounded radii through Idol Manager's own rounded-corner shader rather than reusing a rounded button sprite. The permanent scrollbar follows the Salaries popup's visual treatment with a pale right gutter and `mainScript.blue32` handle, the search caret is blue instead of white, and all dynamic empty/search-result text is forced through IM UI Framework's selected-game-font bridge.
+The ledger uses small 4-6 unit rounded radii through Idol Manager's own rounded-corner shader rather than reusing a rounded button sprite. The search caret is blue instead of white, and all dynamic empty/search-result text is forced through IM UI Framework's selected-game-font bridge. The 0.2.4 pass supersedes the older hand-styled scrollbar with the actual scene-native producer-list Slider.

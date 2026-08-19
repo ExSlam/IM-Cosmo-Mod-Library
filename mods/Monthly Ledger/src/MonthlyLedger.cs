@@ -16,6 +16,7 @@ using VanillaMuipFontRole = UiFrameworkReference::IMUiFramework.VanillaMuipFontR
 using VanillaUiFonts = UiFrameworkReference::IMUiFramework.VanillaUiFonts;
 using VanillaUiPrefabCatalog = UiFrameworkReference::IMUiFramework.VanillaUiPrefabCatalog;
 using VanillaUiResources = UiFrameworkReference::IMUiFramework.VanillaUiResources;
+using VanillaUiSceneTemplates = UiFrameworkReference::IMUiFramework.VanillaUiSceneTemplates;
 using VanillaUiThemeSettings = UiFrameworkReference::IMUiFramework.VanillaUiThemeSettings;
 
 namespace MonthlyLedger
@@ -34,7 +35,6 @@ namespace MonthlyLedger
         internal const string MonthLabelObjectName = "MonthlyLedger_Month";
         internal const string SearchRowObjectName = "MonthlyLedger_Search";
         internal const string SearchInputObjectName = "MonthlyLedger_SearchInput";
-        internal const string ScrollbarGutterObjectName = "MonthlyLedger_ScrollbarGutter";
         internal const string ResultsRootObjectName = "MonthlyLedger_Results";
         internal const string SummaryRowObjectName = "MonthlyLedger_Summary";
         internal const string IncomeSectionObjectName = "MonthlyLedger_Income";
@@ -134,6 +134,7 @@ namespace MonthlyLedger
         internal const string KeyExpenses = "ui.expenses";
         internal const string KeyNetRevenue = "ui.net_revenue";
         internal const string KeySearchPlaceholder = "ui.search_placeholder";
+        internal const string KeyNoIncome = "state.no_income";
         internal const string KeyNoSearchResults = "state.no_search_results";
         internal const string KeyNoCompleteMonth = "state.no_complete_month";
         internal const string KeyNoTransactions = "state.no_transactions";
@@ -176,16 +177,17 @@ namespace MonthlyLedger
         internal const string FallbackExpenses = "Expenses";
         internal const string FallbackNetRevenue = "Net revenue";
         internal const string FallbackSearchPlaceholder = "Search transactions...";
+        internal const string FallbackNoIncome = "No income";
         internal const string FallbackNoSearchResults = "No transactions match this search.";
         internal const string FallbackNoCompleteMonth = "No fully recorded completed month is available yet.";
         internal const string FallbackNoTransactions = "No transactions were recorded for this month.";
-        internal const string FallbackTruncated = "This month contains more records than can be displayed. Totals shown are incomplete.";
+        internal const string FallbackTruncated = "This month contains more records than can be displayed. The list is truncated, but the totals include the full month.";
         internal const string FallbackLoadFailed = "Monthly ledger data could not be loaded: {0}";
         internal const string FallbackDependencyError = "Monthly Ledger requires an active, compatible installation of {0}.";
         internal const string FallbackCoverageFailed = "Exact monthly ledger coverage has not started for this save.";
         internal const string FallbackOther = "Other";
-        internal const string DataCoreDependencyDisplayName = "IM Data Core 2.0.0+";
-        internal const string MinimumDataCoreAssemblyVersionText = "2.0.0.0";
+        internal const string DataCoreDependencyDisplayName = "IM Data Core 3.4.3+";
+        internal const string MinimumDataCoreAssemblyVersionText = "3.4.3.0";
 
         internal const int PopupTypeValue = 997;
         internal const int FirstDayOfMonth = 1;
@@ -217,7 +219,7 @@ namespace MonthlyLedger
         internal const float PopupScrollRightInset = -16f;
         internal const float PopupScrollBottomInset = 56f;
         internal const float PopupScrollTopInset = -58f;
-        internal const float PopupViewportScrollbarGutter = -24f;
+        internal const float PopupViewportScrollbarGutter = -26f;
         internal const int ContentPaddingLeft = 24;
         internal const int ContentPaddingRight = 8;
         internal const float SearchRowHeight = 42f;
@@ -228,12 +230,6 @@ namespace MonthlyLedger
         internal const float CardCornerRadius = 5f;
         internal const float SearchCornerRadius = 4f;
         internal const float CategoryCornerRadius = 4f;
-        internal const float VanillaScrollbarWidth = 20f;
-        internal const float VanillaScrollbarRightOffset = -3f;
-        internal const float VanillaScrollbarSpacing = 4f;
-        internal const float ScrollbarGutterWidth = 16f;
-        internal const float ScrollbarGutterRightOffset = -2f;
-        internal const float ScrollbarGutterVerticalInset = 8f;
         internal const float CloseButtonWidth = 150f;
         internal const float CloseButtonHeight = 36f;
         internal const float CloseButtonBottomOffset = 10f;
@@ -284,6 +280,7 @@ namespace MonthlyLedger
         internal static string Expenses { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyExpenses, MonthlyLedgerConstants.FallbackExpenses); } }
         internal static string NetRevenue { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNetRevenue, MonthlyLedgerConstants.FallbackNetRevenue); } }
         internal static string SearchPlaceholder { get { return ModLocalization.Get(MonthlyLedgerConstants.KeySearchPlaceholder, MonthlyLedgerConstants.FallbackSearchPlaceholder); } }
+        internal static string NoIncome { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoIncome, MonthlyLedgerConstants.FallbackNoIncome); } }
         internal static string NoSearchResults { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoSearchResults, MonthlyLedgerConstants.FallbackNoSearchResults); } }
         internal static string NoCompleteMonth { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoCompleteMonth, MonthlyLedgerConstants.FallbackNoCompleteMonth); } }
         internal static string NoTransactions { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoTransactions, MonthlyLedgerConstants.FallbackNoTransactions); } }
@@ -548,7 +545,7 @@ namespace MonthlyLedger
             }
 
             ApplyRoundedPopupChrome();
-            EnsureVanillaScrollbar();
+            EnsureVanillaListScrollSlider();
             ApplyGameFont(scaffold.Root);
         }
 
@@ -648,14 +645,23 @@ namespace MonthlyLedger
             currentWasTruncated = wasTruncated;
             CreateSearchBar();
 
-            long incomeTotal = MonthlyLedgerConstants.ZeroMoney;
-            long expenseTotal = MonthlyLedgerConstants.ZeroMoney;
-            for (int transactionIndex = MonthlyLedgerConstants.ZeroIndex; transactionIndex < currentTransactions.Count; transactionIndex++)
+            long incomeTotal;
+            long expenseTotal;
+            int transactionCount;
+            if (!IMDataCoreApi.TryGetMoneyTransactionTotals(
+                    selectedMonth,
+                    endExclusive,
+                    out incomeTotal,
+                    out expenseTotal,
+                    out transactionCount,
+                    out errorMessage))
             {
-                long amount = currentTransactions[transactionIndex].Amount;
-                if (amount > MonthlyLedgerConstants.ZeroMoney) incomeTotal += amount;
-                else expenseTotal += amount;
+                CreateStateText(MonthlyLedgerText.LoadFailed(errorMessage));
+                FinishRender();
+                return;
             }
+            currentWasTruncated = currentWasTruncated ||
+                transactionCount > currentTransactions.Count;
             CreateSummaryRow(incomeTotal, expenseTotal, incomeTotal + expenseTotal);
 
             GameObject body = IMUiKit.CreateVerticalLayoutContainer(
@@ -936,14 +942,62 @@ namespace MonthlyLedger
             SetPreferredSize(headingText.gameObject, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.SectionHeadingHeight);
             IMUiKit.CreateDivider(section.transform);
 
+            bool createdAnyGroup = false;
             for (int groupIndex = MonthlyLedgerConstants.ZeroIndex; groupIndex < groups.Count; groupIndex++)
             {
                 LedgerCategoryGroup group = groups[groupIndex];
                 if (group.IsIncome == income)
                 {
                     CreateCategory(section.transform, group);
+                    createdAnyGroup = true;
                 }
             }
+
+            // A completed month with expenses but no positive transactions used to leave the
+            // Income section looking broken: just a heading and divider. Match the rest of the
+            // ledger's category rows by rendering an explicit zero-income row. Do this only in
+            // the unfiltered month view so a search that merely hides income does not claim the
+            // month itself had none.
+            if (income && !createdAnyGroup && string.IsNullOrEmpty(searchQuery))
+            {
+                CreateNoIncomeRow(section.transform);
+            }
+        }
+
+        private static void CreateNoIncomeRow(Transform parent)
+        {
+            GameObject row = IMUiKit.CreateHorizontalLayoutContainer(
+                parent,
+                MonthlyLedgerConstants.EmptyStateObjectName + "_Income",
+                MonthlyLedgerConstants.LayoutSpacing,
+                MonthlyLedgerConstants.CategoryPadding,
+                MonthlyLedgerConstants.CategoryPadding,
+                MonthlyLedgerConstants.ZeroIndex,
+                MonthlyLedgerConstants.ZeroIndex,
+                false,
+                false,
+                false);
+
+            ApplyRoundedImage(row, CategoryHeaderColor, MonthlyLedgerConstants.CategoryCornerRadius);
+            SetPreferredSize(row, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.CategoryHeaderHeight);
+
+            TextMeshProUGUI label = IMUiKit.CreateText(
+                row.transform,
+                MonthlyLedgerConstants.LabelObjectName,
+                MonthlyLedgerText.NoIncome,
+                MonthlyLedgerConstants.CategoryFontSize,
+                TextAlignmentOptions.Left,
+                mainScript.grey_light32);
+            SetFlexibleWidth(label.gameObject);
+
+            TextMeshProUGUI amount = IMUiKit.CreateText(
+                row.transform,
+                MonthlyLedgerConstants.ValueObjectName,
+                FormatSignedMoney(MonthlyLedgerConstants.ZeroMoney),
+                MonthlyLedgerConstants.CategoryFontSize,
+                TextAlignmentOptions.Right,
+                mainScript.green32);
+            SetPreferredSize(amount.gameObject, MonthlyLedgerConstants.RecordAmountWidth, MonthlyLedgerConstants.CategoryHeaderHeight);
         }
 
         private static void CreateCategory(Transform parent, LedgerCategoryGroup group)
@@ -1290,112 +1344,63 @@ namespace MonthlyLedger
                 onClick);
         }
 
-        private static void EnsureVanillaScrollbar()
+        private static void EnsureVanillaListScrollSlider()
         {
             if (scaffold == null || scaffold.ScrollRect == null) return;
 
             IMUiKit.ApplyVanillaScrollDefaults(scaffold.ScrollRect);
-            Scrollbar scrollbar = scaffold.ScrollRect.verticalScrollbar;
-            bool hasVanillaHierarchy = scrollbar != null
-                && scrollbar.transform.Find("Background") != null
-                && scrollbar.transform.Find("Sliding Area/Handle") != null;
 
-            if (!hasVanillaHierarchy)
+            // IM UI Framework 2.1+ models the actual producer Contracts/Salaries/Loans
+            // list behavior discovered in main.unity: the ScrollRect has NO verticalScrollbar.
+            // A separate vertical Slider with a fixed circular handle is synchronized to the
+            // normalized scroll position. Reuse that framework control instead of forcing the
+            // MUIP Resources/scrollbar prefab into a job vanilla Idol Manager does not use it for.
+            Transform existingSliderTransform = scaffold.ScrollRect.transform.Find("Slider");
+            Slider existingSlider = existingSliderTransform != null
+                ? existingSliderTransform.GetComponent<Slider>()
+                : null;
+
+            if (existingSlider == null)
             {
-                GameObject scrollbarObject;
-                Scrollbar vanillaScrollbar;
-                if (VanillaUiResources.TryCreateScrollbar(
+                GameObject sliderObject;
+                Slider slider;
+                if (VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(
                     scaffold.ScrollRect.transform,
-                    "Scrollbar",
-                    out scrollbarObject,
-                    out vanillaScrollbar,
-                    null,
-                    delegate(VanillaUiThemeSettings theme)
-                    {
-                        theme.scrollbarColor = mainScript.blue32;
-                        Color track = mainScript.grey_light32;
-                        track.a = 0.22f;
-                        theme.scrollbarBackgroundColor = track;
-                    }))
+                    scaffold.ScrollRect,
+                    "Slider",
+                    out sliderObject,
+                    out slider))
                 {
-                    if (scrollbar != null && scrollbar.gameObject != scrollbarObject)
-                    {
-                        UnityEngine.Object.Destroy(scrollbar.gameObject);
-                    }
-                    scrollbar = vanillaScrollbar;
-                    scaffold.ScrollRect.verticalScrollbar = vanillaScrollbar;
+                    existingSlider = slider;
+                    existingSliderTransform = sliderObject != null ? sliderObject.transform : null;
                 }
             }
 
-            EnsureScrollbarGutter();
-            scaffold.ScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
-            scaffold.ScrollRect.verticalScrollbarSpacing = MonthlyLedgerConstants.VanillaScrollbarSpacing;
-
-            RectTransform scrollbarRect = scrollbar != null ? scrollbar.GetComponent<RectTransform>() : null;
-            if (scrollbarRect != null)
+            if (existingSlider != null)
             {
-                scrollbarRect.anchorMin = new Vector2(1f, 0f);
-                scrollbarRect.anchorMax = new Vector2(1f, 1f);
-                scrollbarRect.pivot = new Vector2(1f, 1f);
-                scrollbarRect.sizeDelta = new Vector2(MonthlyLedgerConstants.VanillaScrollbarWidth, 0f);
-                scrollbarRect.anchoredPosition = new Vector2(MonthlyLedgerConstants.VanillaScrollbarRightOffset, 0f);
-                scrollbar.direction = Scrollbar.Direction.BottomToTop;
-                scrollbarRect.SetAsLastSibling();
+                // Remove any older framework/MUIP Scrollbar that may have been created before
+                // the scene-derived Slider pattern was available. The native producer lists leave
+                // this field null so Unity never auto-resizes the handle by viewport/content ratio.
+                Scrollbar oldScrollbar = scaffold.ScrollRect.verticalScrollbar;
+                scaffold.ScrollRect.verticalScrollbar = null;
+                scaffold.ScrollRect.verticalScrollbarSpacing = 0f;
+                if (oldScrollbar != null && oldScrollbar.transform.parent == scaffold.ScrollRect.transform)
+                {
+                    UnityEngine.Object.Destroy(oldScrollbar.gameObject);
+                }
+
+                VanillaUiSceneTemplates.ReserveProducerListViewportGutter(scaffold.ScrollRect);
+                if (existingSliderTransform != null)
+                {
+                    existingSliderTransform.SetAsLastSibling();
+                }
+                return;
             }
 
-            if (scrollbar != null)
-            {
-                UIManagerScrollbar manager = scrollbar.GetComponent<UIManagerScrollbar>();
-                Image handleImage = null;
-                Image backgroundImage = null;
-                if (manager != null)
-                {
-                    handleImage = manager.bar;
-                    backgroundImage = manager.background;
-                    manager.enabled = false;
-                }
-                if (handleImage == null)
-                {
-                    Transform handle = scrollbar.transform.Find("Sliding Area/Handle");
-                    handleImage = handle != null ? handle.GetComponent<Image>() : null;
-                }
-                if (backgroundImage == null)
-                {
-                    Transform background = scrollbar.transform.Find("Background");
-                    backgroundImage = background != null ? background.GetComponent<Image>() : null;
-                }
-
-                if (handleImage != null) handleImage.color = mainScript.blue32;
-                if (backgroundImage != null)
-                {
-                    Color track = mainScript.grey_light32;
-                    track.a = 0.24f;
-                    backgroundImage.color = track;
-                }
-            }
-        }
-
-        private static void EnsureScrollbarGutter()
-        {
-            Transform root = scaffold.ScrollRect.transform;
-            Transform existing = root.Find(MonthlyLedgerConstants.ScrollbarGutterObjectName);
-            GameObject gutter = existing != null ? existing.gameObject : IMUiKit.CreateUiObject(MonthlyLedgerConstants.ScrollbarGutterObjectName, root);
-            Image image = gutter.GetComponent<Image>();
-            if (image == null) image = gutter.AddComponent<Image>();
-            Color gutterColor = mainScript.black32;
-            gutterColor.a = 0.055f;
-            image.color = gutterColor;
-            image.raycastTarget = false;
-
-            RectTransform rect = gutter.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1f, 0f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 0.5f);
-            rect.sizeDelta = new Vector2(
-                MonthlyLedgerConstants.ScrollbarGutterWidth,
-                -(MonthlyLedgerConstants.ScrollbarGutterVerticalInset * 2f));
-            rect.anchoredPosition = new Vector2(MonthlyLedgerConstants.ScrollbarGutterRightOffset, 0f);
-            rect.SetAsLastSibling();
+            // Extremely early initialization/main-menu fallback. The framework's styled scroll
+            // view may have installed the real MUIP Resources scrollbar when producer scene
+            // templates were unavailable. Leave that safe fallback intact rather than inventing
+            // another approximation here.
         }
 
         private static void ApplyRoundedPopupChrome()

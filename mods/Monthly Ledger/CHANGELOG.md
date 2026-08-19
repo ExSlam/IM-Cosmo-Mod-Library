@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.5
+
+- Kept the visible transaction list capped at 10,000 rows while calculating income, expense, and net totals from IM Data Core's complete uncapped month aggregate.
+- Updated the truncation notice to clarify that only the visible list is truncated and raised the IM Data Core requirement to 3.4.3 for the aggregate API.
+
+## 0.2.4
+
+- Switched the ledger from Unity `Scrollbar` sizing to IM UI Framework 2.1's exact scene-derived Producer Contracts/Salaries/Loans `Slider` pattern. The thumb is now the same fixed circular scene sprite instead of a proportional purple pill.
+- Removed the ledger-specific fake scrollbar sizing/binding code and the duplicate custom gutter. The framework now owns the native list-scroll behavior.
+- Added an explicit localized `No income` row with ¥0 for completed months containing no positive transactions.
+- Retained the 0.2.3 game-font, search-caret, rounded-corner, and search-empty-state fixes.
+
 ## 0.2.3
 - Replaced the oversized rounded-button-sprite treatment with IM UI Framework 2.0.3's vanilla rounded-corner shader path and small Salaries-style radii (4-6 UI units).
 - Reworked the ledger scrollbar to match the Salaries popup presentation: permanent right-side gutter, blue game-color handle, visible light track, explicit viewport gutter, and final sibling ordering above the mask.
