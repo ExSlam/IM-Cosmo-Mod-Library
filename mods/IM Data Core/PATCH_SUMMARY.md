@@ -1,4 +1,4 @@
-# IM Data Core 3.4.2 patch summary
+# IM Data Core 3.4.4 patch summary
 
 - Restored the missing transient `Dictionary<int, singles._single>` used by unresolved single chart-position backfill.
 
@@ -18,14 +18,18 @@ This revision focuses on persistence correctness under New Save/Overwrite Save b
 10. **Lower reconciliation allocation:** post-mod show scans reuse scratch `HashSet`/`List` instances.
 11. **Backup crash-window recovery:** `.imdc.bak` can recover with the still-present primary journal when it matches the backup base, and a failed journal-copy attempt keeps that source journal.
 12. **Current-format persistence only:** sidecar format 3 and transactional journal format 2 are accepted; older persistence formats are intentionally unsupported.
+13. **Complete money aggregates:** public monthly/range totals scan the entire exact cash ledger and are independent of the paged display cap.
+14. **Reflection-safe optional integration:** `IMDataCoreInteropApi` lets optional mods explicitly identify their consumer assembly when registering and reading/writing custom JSON through reflection.
+15. **Large archival custom values:** one custom JSON value may consume the namespace’s existing 5 MiB aggregate budget, allowing richer checkpointed companion-mod snapshots without raising the namespace cap.
+16. **Lifecycle portrait identity:** idol lifecycle payloads now record raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs without storing rendered portraits.
 
 ## Compatibility
 
-- Public IM Data Core API surface remains unchanged.
+- Public API retains the uncapped money-transaction totals and reflection-safe `IMDataCoreInteropApi`; existing API entry points remain compatible. Idol lifecycle payload JSON gains additive portrait-identity fields.
 - Sidecar `FormatVersion` remains **3**.
 - Journal `FormatVersion` is **2**.
 - Older sidecar/journal formats are intentionally not supported.
-- Project/mod version is **3.4.2**.
+- Project/mod version is **3.4.4**.
 
 
 ## Election numbering

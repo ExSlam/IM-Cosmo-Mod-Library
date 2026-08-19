@@ -35,7 +35,10 @@ namespace IMDataCore
         internal const int NamespaceBudgetMegabytes = 5;
         internal const int MaximumNamespaceCharacterBudget = NamespaceBudgetMegabytes * OneKilobyteCharacterCount * OneKilobyteCharacterCount;
         internal const int MaximumCustomKeysPerNamespace = 4096;
-        internal const int MaximumCustomValueCharacterCount = 65536;
+        // A single caller snapshot may legitimately contain a complete archival view
+        // (for example Graduation Details). The namespace budget remains the hard
+        // aggregate cap, so permit one value to use that budget instead of the old 64 KiB ceiling.
+        internal const int MaximumCustomValueCharacterCount = MaximumNamespaceCharacterBudget;
 
         internal const int MinimumRecentEventRequestCount = 1;
         internal const int DefaultRecentEventRequestCount = 200;
@@ -709,12 +712,22 @@ namespace IMDataCore
         internal const string JsonFieldIdolId = "idol_id";
         internal const string JsonFieldIdolStatus = "idol_status";
         internal const string JsonFieldIdolType = "idol_type";
+        internal const string JsonFieldIdolTypeRaw = "idol_type_raw";
         internal const string JsonFieldIdolAge = "idol_age";
         internal const string JsonFieldIdolHiringDate = "idol_hiring_date";
         internal const string JsonFieldIdolGraduationDate = "idol_graduation_date";
         internal const string JsonFieldIdolTrivia = "idol_trivia";
         internal const string JsonFieldIdolCustomTrivia = "idol_custom_trivia";
         internal const string JsonFieldIdolGraduationWithDialogue = "idol_graduation_with_dialogue";
+        // Stable portrait identity captured with lifecycle milestones. These are asset
+        // references, not copied images, so consumers can reconstruct normal/modded
+        // portraits and identify vanilla SpriteAtlas-backed unique idols.
+        internal const string JsonFieldIdolPortraitCustomId = "idol_portrait_custom_id";
+        internal const string JsonFieldIdolPortraitSpriteAddress = "idol_portrait_sprite_address";
+        internal const string JsonFieldIdolPortraitBodyAssetId = "idol_portrait_body_asset_id";
+        internal const string JsonFieldIdolPortraitHairAssetId = "idol_portrait_hair_asset_id";
+        internal const string JsonFieldIdolPortraitFaceAssetId = "idol_portrait_face_asset_id";
+        internal const string JsonFieldIdolPortraitAccessoryAssetId = "idol_portrait_accessory_asset_id";
         // Generic staff-credit fields.  Older events simply do not contain these keys.
         internal const string JsonFieldStaffId = "staff_id";
         internal const string JsonFieldStaffName = "staff_name";
@@ -1248,6 +1261,28 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns complete aggregate cash totals for a half-open game-date range.
+        /// Unlike TryReadMoneyTransactions, this query is not capped by display pagination.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyTransactionTotals(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out long incomeTotal,
+            out long expenseTotal,
+            out int transactionCount,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyTransactionTotals(
+                startInclusive,
+                endExclusive,
+                out incomeTotal,
+                out expenseTotal,
+                out transactionCount,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns the first game date covered by the exact money ledger.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1285,6 +1320,77 @@ namespace IMDataCore
         public static bool TryGetActiveSaveKey(out string saveKey, out string errorMessage)
         {
             return IMDataCoreController.Instance.TryGetActiveSaveKey(out saveKey, out errorMessage);
+        }
+    }
+
+    /// <summary>
+    /// Reflection-friendly custom-data facade for optional integrations.
+    /// The consumer passes its own Assembly explicitly so Assembly.GetCallingAssembly()
+    /// cannot be distorted by MethodInfo.Invoke frames.
+    /// </summary>
+    public static class IMDataCoreInteropApi
+    {
+        public static bool TryRegisterNamespace(
+            string namespaceIdentifier,
+            Assembly consumerAssembly,
+            out IMDataCoreSession session,
+            out string errorMessage)
+        {
+            session = null;
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryRegisterNamespace(
+                namespaceIdentifier,
+                consumerAssembly,
+                out session,
+                out errorMessage);
+        }
+
+        public static bool TrySetCustomJson(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            string dataKey,
+            string jsonValue,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TrySetCustomJson(
+                session,
+                consumerAssembly,
+                dataKey,
+                jsonValue,
+                out errorMessage);
+        }
+
+        public static bool TryGetCustomJson(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            string dataKey,
+            out string jsonValue,
+            out string errorMessage)
+        {
+            jsonValue = string.Empty;
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryGetCustomJson(
+                session,
+                consumerAssembly,
+                dataKey,
+                out jsonValue,
+                out errorMessage);
         }
     }
 
@@ -1460,6 +1566,28 @@ namespace IMDataCore
                 maxCount,
                 out transactions,
                 out wasTruncated,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns complete aggregate cash totals for a half-open game-date range.
+        /// Unlike TryReadMoneyTransactions, this query is not capped by display pagination.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyTransactionTotals(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out long incomeTotal,
+            out long expenseTotal,
+            out int transactionCount,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyTransactionTotals(
+                startInclusive,
+                endExclusive,
+                out incomeTotal,
+                out expenseTotal,
+                out transactionCount,
                 out errorMessage);
         }
 
@@ -3889,6 +4017,7 @@ namespace IMDataCore
                 IdolLifecycleAction = lifecycleActionCode ?? string.Empty,
                 IdolStatus = CoreStatusMapping.ToStatusCode(idol.status),
                 IdolType = CoreEnumNameMapping.ToIdolTypeCode(idol.Type),
+                IdolTypeRaw = (int)idol.Type,
                 IdolAge = idol.GetAge(),
                 IdolHiringDate = hiringDate,
                 IdolGraduationDate = graduationDate,
@@ -3897,8 +4026,73 @@ namespace IMDataCore
                 IdolGraduationWithDialogue = graduatedWithDialogue
             };
 
+            ApplyIdolPortraitIdentity(payload, idol);
             ApplyStaffAttribution(payload, staffAttribution);
             return payload;
+        }
+
+        /// <summary>
+        /// Captures stable vanilla-style portrait references without copying rendered images.
+        /// Fail-soft behavior is intentional: lifecycle logging must not break game actions
+        /// if another portrait mod has left an unusual or partially populated texture list.
+        /// </summary>
+        private static void ApplyIdolPortraitIdentity(IdolLifecyclePayload payload, data_girls.girls idol)
+        {
+            if (payload == null || idol == null)
+            {
+                return;
+            }
+
+            try
+            {
+                payload.IdolPortraitCustomId = idol.GetCustomID() ?? string.Empty;
+                payload.IdolPortraitSpriteAddress = idol.GetCustomSpriteAddress() ?? string.Empty;
+            }
+            catch
+            {
+                payload.IdolPortraitCustomId = string.Empty;
+                payload.IdolPortraitSpriteAddress = string.Empty;
+            }
+
+            if (idol.textureAssets == null)
+            {
+                return;
+            }
+            foreach (data_girls.girls._textureAsset texturePart in idol.textureAssets)
+            {
+                if (texturePart == null || texturePart.asset == null)
+                {
+                    continue;
+                }
+                string assetId;
+                try
+                {
+                    assetId = texturePart.asset.GetID() ?? string.Empty;
+                }
+                catch
+                {
+                    continue;
+                }
+                if (string.IsNullOrEmpty(assetId))
+                {
+                    continue;
+                }
+                switch (texturePart.type)
+                {
+                    case data_girls_textures._spriteType.body:
+                        payload.IdolPortraitBodyAssetId = assetId;
+                        break;
+                    case data_girls_textures._spriteType.hair:
+                        payload.IdolPortraitHairAssetId = assetId;
+                        break;
+                    case data_girls_textures._spriteType.face:
+                        payload.IdolPortraitFaceAssetId = assetId;
+                        break;
+                    case data_girls_textures._spriteType.acc:
+                        payload.IdolPortraitAccessoryAssetId = assetId;
+                        break;
+                }
+            }
         }
 
         /// <summary>
@@ -5939,12 +6133,19 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolStatus, payload.IdolStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolType, payload.IdolType ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldIdolTypeRaw, payload.IdolTypeRaw, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolAge, payload.IdolAge, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolHiringDate, payload.IdolHiringDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolGraduationDate, payload.IdolGraduationDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolTrivia, payload.IdolTrivia ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolCustomTrivia, payload.IdolCustomTrivia ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldIdolGraduationWithDialogue, payload.IdolGraduationWithDialogue, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitCustomId, payload.IdolPortraitCustomId ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitSpriteAddress, payload.IdolPortraitSpriteAddress ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitBodyAssetId, payload.IdolPortraitBodyAssetId ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitHairAssetId, payload.IdolPortraitHairAssetId ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitFaceAssetId, payload.IdolPortraitFaceAssetId ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitAccessoryAssetId, payload.IdolPortraitAccessoryAssetId ?? string.Empty, ref isFirstProperty);
             AppendStaffAttributionProperties(builder, payload.StaffId, payload.StaffName, payload.StaffRole, payload.StaffType, payload.StaffTypeRaw, payload.StaffUniqueTypeRaw, payload.StaffIsPro, payload.StaffIsProducer, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -7756,12 +7957,19 @@ namespace IMDataCore
         public string IdolLifecycleAction = string.Empty;
         public string IdolStatus = string.Empty;
         public string IdolType = string.Empty;
+        public int IdolTypeRaw = CoreConstants.InvalidIdValue;
         public int IdolAge;
         public string IdolHiringDate = string.Empty;
         public string IdolGraduationDate = string.Empty;
         public string IdolTrivia = string.Empty;
         public string IdolCustomTrivia = string.Empty;
         public bool IdolGraduationWithDialogue;
+        public string IdolPortraitCustomId = string.Empty;
+        public string IdolPortraitSpriteAddress = string.Empty;
+        public string IdolPortraitBodyAssetId = string.Empty;
+        public string IdolPortraitHairAssetId = string.Empty;
+        public string IdolPortraitFaceAssetId = string.Empty;
+        public string IdolPortraitAccessoryAssetId = string.Empty;
         public int StaffId = CoreConstants.InvalidIdValue;
         public string StaffName = string.Empty;
         public string StaffRole = string.Empty;

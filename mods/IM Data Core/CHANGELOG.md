@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.4.4
+
+- Added stable portrait identity fields to idol lifecycle events: raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs. This gives profile/history consumers enough vanilla-style references to identify both built-in unique idols and normal/modded portrait compositions without storing rendered images.
+- Portrait identity capture is fail-soft so malformed or partially populated portrait data from another mod cannot interrupt hiring, graduation, or other lifecycle capture.
+
+## 3.4.3
+
+- Added an uncapped money-ledger aggregate query so consumers can calculate exact totals even when a month contains more rows than the display-page limit.
+- Added a reflection-safe optional-integration API that accepts the consumer assembly explicitly, allowing Graduation Details to delegate its checkpointed supplemental snapshot to IM Data Core without a hard assembly dependency.
+- Raised the per-value custom JSON ceiling to the existing 5 MiB per-namespace budget so one archival snapshot can carry complete Graduation Details state.
+
 ## 3.4.2
 
 - Made every persisted `election_number` mirror vanilla election numbering directly: finished elections use `_SSK.Count`, while the current unfinished election uses `SEvent_SSK.CountElections() + 1`.

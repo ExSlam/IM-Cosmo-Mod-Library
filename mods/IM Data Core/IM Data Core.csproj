@@ -3,7 +3,7 @@
     <ModName>IM Data Core</ModName>
     <RootNamespace>IMDataCore</RootNamespace>
     <AssemblyName>com.cosmo.imdatacore</AssemblyName>
-    <Version>3.4.2</Version>
+    <Version>3.4.4</Version>
   </PropertyGroup>
 
   <ItemGroup>

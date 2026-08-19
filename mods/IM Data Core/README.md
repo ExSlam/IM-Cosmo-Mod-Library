@@ -10,7 +10,7 @@ IMDC 3.4 keeps sidecar format version 3 while tightening persistence for long ca
 
 - Namespaced custom JSON: `TrySetCustomJson`, `TryGetCustomJson`, `TryRemoveCustomJson`
 - Timeline events: `TryAppendCustomEvent`, `TryAppendCustomEventOnce`, `TryReadRecentEventsForIdol`, `TryReadEventsForIdolPage`
-- Exact cash ledger: `TryReadMoneyTransactions`, `TryGetMoneyLedgerCoverageStart`
+- Exact cash ledger: `TryReadMoneyTransactions`, `TryGetMoneyTransactionTotals`, `TryGetMoneyLedgerCoverageStart`
 - Explicit sidecar persistence: `TryFlushNow`
 - Active physical-save identity: `TryGetActiveSaveKey`
 - Read-only persistence telemetry: `TryGetPersistenceDiagnostics`
@@ -132,7 +132,7 @@ Consumer custom values must be valid JSON documents. IMDC normalizes them before
 Current quotas:
 
 - maximum 4,096 keys per namespace
-- maximum 65,536 characters per individual normalized value
+- an individual normalized value may use up to the namespace budget
 - maximum 5 MiB normalized JSON character budget per namespace
 
 Quota accounting is maintained incrementally rather than rescanning the entire namespace on each SET. A SET to the already-materialized value and a REMOVE of a missing key are logical no-ops and do not grow mutation history.
@@ -160,6 +160,9 @@ bool IMDataCoreApi.TryGetCustomJson(
     string dataKey,
     out string jsonValue,
     out string errorMessage);
+
+// Optional reflection-based integrations can use IMDataCoreInteropApi and pass
+// their own Assembly explicitly when caller identity must survive MethodInfo.Invoke.
 
 bool IMDataCoreApi.TryRemoveCustomJson(
     IMDataCoreSession session,
@@ -223,3 +226,8 @@ dotnet build "mods\IM Data Core\IM Data Core.csproj" -c Release
 ```
 
 The repository's shared `Directory.Build.props` supplies the framework, Harmony, Unity, and Idol Manager references.
+
+
+## Portrait identity
+
+Idol lifecycle events preserve the raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs. Consumers can use these vanilla-style references without persisting rendered portrait images.

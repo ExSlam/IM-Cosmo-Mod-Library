@@ -799,6 +799,41 @@ namespace IMDataCore
             }
         }
 
+        internal bool TryGetMoneyTransactionTotals(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out long incomeTotal,
+            out long expenseTotal,
+            out int transactionCount,
+            out string errorMessage)
+        {
+            incomeTotal = 0L;
+            expenseTotal = 0L;
+            transactionCount = 0;
+            errorMessage = string.Empty;
+            if (endExclusive <= startInclusive)
+            {
+                errorMessage = MoneyLedgerConstants.MessageInvalidDateRange;
+                return false;
+            }
+
+            lock (runtimeLock)
+            {
+                if (!EnsureInitializedLocked(out errorMessage) ||
+                    !FlushLocked(true, out errorMessage))
+                {
+                    return false;
+                }
+                return storageEngine.TryGetMoneyTransactionTotals(
+                    startInclusive,
+                    endExclusive,
+                    out incomeTotal,
+                    out expenseTotal,
+                    out transactionCount,
+                    out errorMessage);
+            }
+        }
+
         internal bool TryGetMoneyLedgerCoverageStart(out DateTime coverageStart, out string errorMessage)
         {
             coverageStart = DateTime.MinValue;

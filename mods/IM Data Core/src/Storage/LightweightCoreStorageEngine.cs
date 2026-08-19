@@ -1482,7 +1482,84 @@ namespace IMDataCore
                     return false;
                 }
             }
-        }        internal bool TryGetMoneyLedgerCoverageStart(
+        }
+
+        internal bool TryGetMoneyTransactionTotals(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out long incomeTotal,
+            out long expenseTotal,
+            out int transactionCount,
+            out string errorMessage)
+        {
+            incomeTotal = 0L;
+            expenseTotal = 0L;
+            transactionCount = 0;
+            errorMessage = string.Empty;
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    int startDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(startInclusive);
+                    int endDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(endExclusive);
+
+                    checked
+                    {
+                        foreach (KeyValuePair<int, List<LightweightEventRecord>> pair
+                            in moneyTransactionsByDateKey)
+                        {
+                            if (pair.Key < startDateKey)
+                            {
+                                continue;
+                            }
+                            if (pair.Key >= endDateKey)
+                            {
+                                break;
+                            }
+
+                            List<LightweightEventRecord> rows = pair.Value;
+                            for (int index = 0;
+                                rows != null && index < rows.Count;
+                                index++)
+                            {
+                                IMDataCoreEvent publicMoneyEvent = ToPublicEvent(rows[index]);
+                                publicMoneyEvent.PayloadJson =
+                                    CorePayloadCompaction
+                                        .ExpandMoneyTransactionPayloadForPublic(rows[index]);
+                                IMDataCoreMoneyTransaction transaction =
+                                    MoneyLedgerPayloadUtility.ToPublicModel(publicMoneyEvent);
+                                if (transaction == null)
+                                {
+                                    continue;
+                                }
+
+                                transactionCount++;
+                                if (transaction.Amount > 0L)
+                                {
+                                    incomeTotal += transaction.Amount;
+                                }
+                                else
+                                {
+                                    expenseTotal += transaction.Amount;
+                                }
+                            }
+                        }
+                    }
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = "Calculating money transaction totals failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        internal bool TryGetMoneyLedgerCoverageStart(
             out DateTime coverageStart,
             out string errorMessage)
         {

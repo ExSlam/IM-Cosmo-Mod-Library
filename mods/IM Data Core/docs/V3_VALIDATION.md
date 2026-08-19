@@ -15,17 +15,14 @@ This revision was checked against the supplied Cosmo Mod Library source and the 
 - Save-boundary single chart reconciliation tracks unresolved released singles rather than rescanning the complete historical singles collection on every save.
 - Post-mod show reconciliation reuses scratch collections rather than allocating a new `HashSet` and stale-ID list at each save boundary.
 - Backup recovery can pair `.imdc.bak` with the still-present current journal when its stored base hash matches, covering the compaction window before the journal is copied to `.imdc.bak.imdc.journal`. If that copy fails, the current journal is deliberately retained.
+- Idol lifecycle payload capture records raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs; portrait extraction is fail-soft and does not copy image data.
 
 ## Source/package checks
 
-- `assets/info.json` and `IM Data Core.csproj` report **3.4.2**.
+- `assets/info.json` and `IM Data Core.csproj` report **3.4.4**.
 - Edited JSON metadata parses as strict JSON and the project file parses as XML.
 - A string/comment-aware delimiter scan is run over the IM Data Core C# sources before packaging.
 - Current source/docs use Idol Manager's **New Save** / **Overwrite Save** terminology and contain no references to the removed legacy journal-version constant.
-
-## Compiler/runtime limitation
-
-This execution environment does not contain `dotnet`, MSBuild, Roslyn `csc`, or Mono `mcs`. A real .NET Framework/Unity compile and in-game runtime test therefore cannot be performed here. The source changes are statically checked before packaging, but the pre-existing compiled `bin`/`obj` outputs are **not** builds of these 3.4 source edits.
 
 ## Recommended in-game regression matrix
 
