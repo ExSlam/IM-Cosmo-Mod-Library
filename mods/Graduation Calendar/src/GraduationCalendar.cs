@@ -334,32 +334,46 @@ namespace GraduationCalendar
                 buttonObject = null;
             }
             initializing = true;
-            if (buttonObject == null)
+            try
             {
-                buttonObject = FindExistingMenuButton();
-            }
-            if (buttonObject != null)
-            {
-                GameObject awardsButton = FindAwardsButton();
-                EnsureMenuButtonSetup(buttonObject, awardsButton);
-            }
-            if (popupRoot == null)
-            {
-                CreatePopup();
-            }
-            if (buttonObject == null)
-            {
-                GameObject awardsButton = FindAwardsButton();
-                if (awardsButton == null)
+                // Inject or repair the menu entry before constructing the popup. A popup
+                // layout failure must never make the feature disappear from the game UI.
+                if (buttonObject == null)
                 {
-                    LogFindAwardsDiagnostics(AwardsButtonNotFoundReason);
-                    initializing = false;
-                    return;
+                    buttonObject = FindExistingMenuButton();
                 }
-                CreateMenuButton(awardsButton);
+
+                GameObject awardsButton = FindAwardsButton();
+                if (buttonObject != null)
+                {
+                    EnsureMenuButtonSetup(buttonObject, awardsButton);
+                }
+                else
+                {
+                    if (awardsButton == null)
+                    {
+                        LogFindAwardsDiagnostics(AwardsButtonNotFoundReason);
+                        return;
+                    }
+                    CreateMenuButton(awardsButton);
+                }
+
+                if (popupRoot == null)
+                {
+                    CreatePopup();
+                }
+                initialized = buttonObject != null && popupRoot != null;
             }
-            initialized = buttonObject != null && popupRoot != null;
-            initializing = false;
+            catch (Exception ex)
+            {
+                initialized = false;
+                Log("Initialization failed: " + ex);
+            }
+            finally
+            {
+                // Never leave the retry bootstrap permanently locked after a UI exception.
+                initializing = false;
+            }
         }
 
         private static bool HasValidUI()
@@ -1076,7 +1090,11 @@ namespace GraduationCalendar
             string[] localizedMonthNames = new string[MonthsInYear];
             for (int monthIndex = FirstMonthOfYear; monthIndex <= MonthsInYear; monthIndex++)
             {
-                localizedMonthNames[monthIndex - FirstMonthOfYear] = GetMonthName(monthIndex);
+                // Popup construction runs before Open() initializes selectedYear. Month
+                // names do not depend on the gameplay year, so use a fixed valid year
+                // when measuring localized labels instead of constructing DateTime(year=0).
+                localizedMonthNames[monthIndex - FirstMonthOfYear] =
+                    GetMonthNameOnly(new DateTime(2000, monthIndex, FirstMonthOfYear));
             }
             FitPagerToLocalizedLabels(
                 monthPager,

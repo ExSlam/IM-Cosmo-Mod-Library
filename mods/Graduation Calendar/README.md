@@ -12,7 +12,7 @@
 
 ## Embedded IM UI Framework v3
 
-Version 0.3.3 vendors the IM UI Framework v3.1.1-compatible source directly into the Graduation Calendar assembly. The calendar therefore does **not** require the standalone IM UI Framework Workshop item to be installed.
+Version 0.3.4 vendors the IM UI Framework v3.1.1-compatible source directly into the Graduation Calendar assembly. The calendar therefore does **not** require the standalone IM UI Framework Workshop item to be installed.
 
 The vendored copy lives under `src/EmbeddedIMUiFramework/` and is compiled into `com.cosmo.graduationcalendar.dll`. Its namespace is changed to `GraduationCalendar.EmbeddedIMUiFramework`, and the framework-global Harmony patches are intentionally omitted. Graduation Calendar initializes the embedded `IMUiKit` from its own existing `PopupManager.Start` patch. This prevents duplicate framework patches or runtime-type collisions when a player also happens to have the standalone IM UI Framework installed for another mod.
 

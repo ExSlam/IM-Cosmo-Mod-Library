@@ -1,5 +1,11 @@
 # Graduation Calendar Changelog
 
+## 0.3.4
+
+- Fixed a bootstrap regression in 0.3.3 that could prevent the Graduation Calendar menu icon from being injected. Localized month-width measurement ran before `selectedYear` was initialized and attempted to construct a `DateTime` with year 0.
+- Made localized month-width measurement independent of gameplay state by using a fixed valid reference year.
+- Hardened initialization so the menu button is injected before popup construction, UI exceptions are logged, and the retry bootstrap cannot remain permanently locked after an exception.
+
 ## 0.3.3
 
 - Moved the scene-native producer-list scroll indicator farther right for the calendar while keeping a safe content gutter.
