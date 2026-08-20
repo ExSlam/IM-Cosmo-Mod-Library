@@ -1,5 +1,14 @@
 # Graduation Calendar Changelog
 
+## 0.3.9
+
+- Changed only the calendar day-number badge surface from the shipped `button/rounded/White` visual to `button/basic/White`, reducing corner rounding while preserving the existing manual badge size and position controls.
+
+## 0.3.8
+
+- Added explicit manual constants for calendar day-number badge width, height, and top-left position within each day cell.
+- Added independent number offsets measured from the badge rectangle's top-left corner, with top-left `RectTransform` anchoring so position edits behave predictably.
+
 ## 0.3.7
 
 - Fixed the remaining rounded-sheet clipping mismatch by nesting the rectangular ScrollRect viewport under an invisible mask that uses the exact same sliced vanilla panel sprite and bounds as the visible white sheet. Scrolled portraits/content can no longer show through the panel sprite's transparent rounded-edge pixels, while the rounded corners remain visible.

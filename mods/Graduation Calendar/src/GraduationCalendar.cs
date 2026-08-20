@@ -2323,12 +2323,13 @@ namespace GraduationCalendar
             const float cellPaddingTop = 24f;
             const float cellPaddingBottom = 4f;
             const float cellSpacing = 4f;
-            const float dayBadgeOffsetX = 5f;
-            const float dayBadgeOffsetY = -4f;
+            // Manual day-number badge tuning. Positive left/top offsets move right/down from the referenced top-left corner.
             const float dayBadgeWidth = 26f;
             const float dayBadgeHeight = 16f;
-            const float dayBadgeLeftAnchor = 2f;
-            const float dayBadgeTopAnchor = 1f;
+            const float dayBadgeOffsetFromCellLeft = 6f;
+            const float dayBadgeOffsetFromCellTop = 7f;
+            const float dayNumberOffsetFromBadgeLeft = 3f;
+            const float dayNumberOffsetFromBadgeTop = 0f;
             const float dayTextCharacterSpacing = 0f;
             const byte dayBadgeColorChannel = 255;
             const byte dayBadgeAlpha = 140;
@@ -2362,13 +2363,25 @@ namespace GraduationCalendar
 
             GameObject dayBadge = CreateUIObject(dayBadgeObjectName, cell.transform);
             RectTransform badgeRect = dayBadge.GetComponent<RectTransform>();
-            badgeRect.anchorMin = new Vector2(dayBadgeLeftAnchor, dayBadgeTopAnchor);
-            badgeRect.anchorMax = new Vector2(dayBadgeLeftAnchor, dayBadgeTopAnchor);
-            badgeRect.pivot = new Vector2(dayBadgeLeftAnchor, dayBadgeTopAnchor);
-            badgeRect.anchoredPosition = new Vector2(dayBadgeOffsetX, dayBadgeOffsetY);
+            badgeRect.anchorMin = new Vector2(0f, 1f);
+            badgeRect.anchorMax = new Vector2(0f, 1f);
+            badgeRect.pivot = new Vector2(0f, 1f);
+            badgeRect.anchoredPosition = new Vector2(dayBadgeOffsetFromCellLeft, -dayBadgeOffsetFromCellTop);
             badgeRect.sizeDelta = new Vector2(dayBadgeWidth, dayBadgeHeight);
             Image badgeImage = dayBadge.AddComponent<Image>();
-            IMUiPrimitives.TryCopyRoundedWhiteVisual(badgeImage);
+            GameObject badgeVisualSource = VanillaUiResources.LoadPrefab(VanillaUiPrefabCatalog.Button.basic_White);
+            if (badgeVisualSource != null)
+            {
+                Image badgeVisualImage = badgeVisualSource.GetComponent<Image>();
+                if (badgeVisualImage == null)
+                {
+                    badgeVisualImage = IMUiCompat.GetComponentInChildren<Image>(badgeVisualSource);
+                }
+                if (badgeVisualImage != null)
+                {
+                    IMUiStyle.CopyImageVisual(badgeVisualImage, badgeImage, false);
+                }
+            }
             badgeImage.color = new Color32(dayBadgeColorChannel, dayBadgeColorChannel, dayBadgeColorChannel, dayBadgeAlpha);
             badgeImage.raycastTarget = false;
             LayoutElement badgeLayout = dayBadge.AddComponent<LayoutElement>();
@@ -2376,12 +2389,17 @@ namespace GraduationCalendar
             badgeLayout.preferredWidth = dayBadgeWidth;
             badgeLayout.ignoreLayout = true;
 
+            string dayText = day.ToString();
+            float dayTextWidth = dayText.Length * dayDigitWidth
+                + Mathf.Max(0, dayText.Length - 1) * dayTextCharacterSpacing;
+
             GameObject dayTextRoot = CreateUIObject(dayTextRootObjectName, dayBadge.transform);
             RectTransform dayRect = dayTextRoot.GetComponent<RectTransform>();
-            dayRect.anchorMin = Vector2.zero;
-            dayRect.anchorMax = Vector2.one;
-            dayRect.offsetMin = Vector2.zero;
-            dayRect.offsetMax = Vector2.zero;
+            dayRect.anchorMin = new Vector2(0f, 1f);
+            dayRect.anchorMax = new Vector2(0f, 1f);
+            dayRect.pivot = new Vector2(0f, 1f);
+            dayRect.anchoredPosition = new Vector2(dayNumberOffsetFromBadgeLeft, -dayNumberOffsetFromBadgeTop);
+            dayRect.sizeDelta = new Vector2(dayTextWidth, dayDigitHeight);
 
             HorizontalLayoutGroup dayLayout = dayTextRoot.AddComponent<HorizontalLayoutGroup>();
             dayLayout.childAlignment = TextAnchor.MiddleCenter;
@@ -2391,7 +2409,6 @@ namespace GraduationCalendar
             dayLayout.childForceExpandHeight = false;
             dayLayout.spacing = dayTextCharacterSpacing;
 
-            string dayText = day.ToString();
             foreach (char c in dayText)
             {
                 Text digit = CreateLegacyText(

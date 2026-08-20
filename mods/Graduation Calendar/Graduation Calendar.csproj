@@ -3,7 +3,7 @@
     <ModName>Graduation Calendar</ModName>
     <RootNamespace>GraduationCalendar</RootNamespace>
     <AssemblyName>com.cosmo.graduationcalendar</AssemblyName>
-    <Version>0.3.7</Version>
+    <Version>0.3.9</Version>
   </PropertyGroup>
 
   <ItemGroup>
