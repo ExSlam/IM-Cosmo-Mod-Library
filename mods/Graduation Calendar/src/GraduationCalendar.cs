@@ -961,7 +961,7 @@ namespace GraduationCalendar
             const float graduationsOnlyOffsetY = -18f;
             const float scrollOffsetLeft = 16f;
             const float scrollOffsetBottom = 56f;
-            const float scrollOffsetRight = -42f;
+            const float scrollOffsetRight = -24f;
             const float scrollOffsetTop = -92f;
             const float scrollSensitivity = 30f;
             const int contentPaddingLeft = 4;
@@ -1129,10 +1129,11 @@ namespace GraduationCalendar
             scrollOptions.Spacing = contentSpacing;
             scrollOptions.UseVanillaListIndicator = true;
             scrollOptions.Theme = calendarTheme;
-            // Keep the scroll indicator outside the white content sheet. A signed
-            // inset lets the fixed-handle vanilla slider sit in the popup chrome rather
-            // than consuming/clipping the rightmost calendar column.
-            scrollOptions.VanillaIndicatorRightCenterInset = -12f;
+            // Keep the scroll indicator outside the white content sheet. The sheet is
+            // widened on the right so the calendar has matching left/right breathing
+            // room, while the signed indicator inset moves the fixed handle farther into
+            // the popup chrome instead of consuming the Saturday column.
+            scrollOptions.VanillaIndicatorRightCenterInset = -8f;
             scrollOptions.VanillaViewportRightInset = 0f;
             scrollOptions.VanillaIndicatorHideFill = true;
             IMUiScrollViewHandle scrollHandle;
@@ -1143,6 +1144,51 @@ namespace GraduationCalendar
             scrollRect = scrollHandle.ScrollRect;
             scrollRect.scrollSensitivity = scrollSensitivity;
             contentRoot = scrollHandle.Content;
+
+            // Keep the framework's strict rectangular viewport, but nest it under an
+            // invisible mask that uses the exact same sliced vanilla panel sprite and
+            // rect as the visible white sheet. This makes the clipping silhouette match
+            // the rounded surface instead of exposing content through the sprite's
+            // transparent corner/top pixels. The native scroll indicator remains a
+            // sibling of this mask, so it can sit outside the sheet without being clipped.
+            const float viewportInsetTop = 7f;
+            const float viewportInsetBottom = 7f;
+            const float viewportInsetLeft = 2f;
+            const float viewportInsetRight = 2f;
+
+            if (scrollHandle.Viewport != null && scrollHandle.Root != null)
+            {
+                GameObject roundedClip = CreateUIObject("RoundedScrollClip", scrollHandle.Root.transform);
+                RectTransform roundedClipRect = roundedClip.GetComponent<RectTransform>();
+                roundedClipRect.anchorMin = Vector2.zero;
+                roundedClipRect.anchorMax = Vector2.one;
+                roundedClipRect.offsetMin = Vector2.zero;
+                roundedClipRect.offsetMax = Vector2.zero;
+
+                Image roundedClipImage = roundedClip.AddComponent<Image>();
+                IMUiPrimitives.TryCopyVanillaPanelVisual(roundedClipImage);
+                roundedClipImage.color = Color.white;
+                roundedClipImage.raycastTarget = false;
+                Mask roundedMask = roundedClip.AddComponent<Mask>();
+                roundedMask.showMaskGraphic = false;
+
+                scrollHandle.Viewport.SetParent(roundedClip.transform, false);
+                scrollHandle.Viewport.anchorMin = Vector2.zero;
+                scrollHandle.Viewport.anchorMax = Vector2.one;
+                scrollHandle.Viewport.offsetMin = new Vector2(viewportInsetLeft, viewportInsetBottom);
+                scrollHandle.Viewport.offsetMax = new Vector2(-viewportInsetRight, -viewportInsetTop);
+                Image viewportImage = scrollHandle.Viewport.GetComponent<Image>();
+                if (viewportImage != null)
+                {
+                    viewportImage.color = new Color(1f, 1f, 1f, 0f);
+                    viewportImage.raycastTarget = false;
+                }
+
+                if (scrollHandle.ScrollIndicator != null)
+                {
+                    scrollHandle.ScrollIndicator.transform.SetAsLastSibling();
+                }
+            }
 
             Button closeButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1822,6 +1868,7 @@ namespace GraduationCalendar
             const float yearlySelectorY = -56f;
             const float monthlySelectorY = -96f;
             const float calendarGridScrollTopOffset = -140f;
+            const float monthlyViewScrollTopOffset = -112f;
             const float listViewScrollTopOffset = -92f;
 
             if (yearRowObject != null)
@@ -1846,7 +1893,9 @@ namespace GraduationCalendar
                 RectTransform rect = scrollRect.GetComponent<RectTransform>();
                 if (rect != null)
                 {
-                    float top = viewMode == ViewMode.CalendarGrid ? calendarGridScrollTopOffset : listViewScrollTopOffset;
+                    float top = viewMode == ViewMode.CalendarGrid
+                        ? calendarGridScrollTopOffset
+                        : (viewMode == ViewMode.Monthly ? monthlyViewScrollTopOffset : listViewScrollTopOffset);
                     rect.offsetMax = new Vector2(rect.offsetMax.x, top);
                 }
             }
@@ -1881,6 +1930,7 @@ namespace GraduationCalendar
                 return;
             }
             ExtensionMethods.destroyChildren(contentRoot);
+            const float monthlyHeaderBottomPadding = 12f;
             List<GirlEntry>[] months = new List<GirlEntry>[MonthsInYear];
             for (int i = 0; i < months.Length; i++)
             {
@@ -1943,7 +1993,7 @@ namespace GraduationCalendar
                     continue;
                 }
                 hasGraduations = true;
-                Transform grid = AddSectionGrid(GetMonthName(month), list.Count);
+                Transform grid = AddSectionGrid(GetMonthName(month), list.Count, monthlyHeaderBottomPadding);
                 foreach (GirlEntry entry in list)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -1957,7 +2007,7 @@ namespace GraduationCalendar
 
             if (unknown.Count > 0)
             {
-                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count);
+                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count, monthlyHeaderBottomPadding);
                 foreach (GirlEntry entry in unknown)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -2026,7 +2076,7 @@ namespace GraduationCalendar
                 const int firstGroupedEntryIndex = 0;
                 DateTime date = list[firstGroupedEntryIndex].Date;
                 string header = GetMonthNameOnly(date) + SpaceSeparator + date.Year;
-                Transform grid = AddSectionGrid(header, list.Count);
+                Transform grid = AddSectionGrid(header, list.Count, 8f);
                 foreach (GirlEntry entry in list)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -2036,7 +2086,7 @@ namespace GraduationCalendar
             if (unknown.Count > 0)
             {
                 unknown.Sort(CompareByName);
-                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count);
+                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count, 8f);
                 foreach (GirlEntry entry in unknown)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -2105,7 +2155,7 @@ namespace GraduationCalendar
                     continue;
                 }
                 list.Sort(CompareByDateAndName);
-                Transform grid = AddSectionGrid(year.ToString(), list.Count);
+                Transform grid = AddSectionGrid(year.ToString(), list.Count, 8f);
                 foreach (GirlEntry entry in list)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -2115,7 +2165,7 @@ namespace GraduationCalendar
             if (unknown.Count > 0)
             {
                 unknown.Sort(CompareByName);
-                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count);
+                Transform grid = AddSectionGrid(GetUnknownLabel(), unknown.Count, 8f);
                 foreach (GirlEntry entry in unknown)
                 {
                     AddGirlTile(grid, entry.Girl);
@@ -2277,7 +2327,7 @@ namespace GraduationCalendar
             const float dayBadgeOffsetY = -4f;
             const float dayBadgeWidth = 26f;
             const float dayBadgeHeight = 16f;
-            const float dayBadgeLeftAnchor = 0f;
+            const float dayBadgeLeftAnchor = 2f;
             const float dayBadgeTopAnchor = 1f;
             const float dayTextCharacterSpacing = 0f;
             const byte dayBadgeColorChannel = 255;
@@ -2680,6 +2730,11 @@ namespace GraduationCalendar
 
         private static Transform AddSectionGrid(string headerText, int itemCount)
         {
+            return AddSectionGrid(headerText, itemCount, 0f);
+        }
+
+        private static Transform AddSectionGrid(string headerText, int itemCount, float headerBottomPadding)
+        {
             const string monthGridObjectName = "MonthGrid";
             const float monthGridSpacingX = 10f;
             const float monthGridSpacingY = 1f;
@@ -2689,6 +2744,13 @@ namespace GraduationCalendar
             const int monthGridPaddingBottom = 0;
 
             AddSectionHeader(headerText);
+            if (headerBottomPadding > 0f)
+            {
+                GameObject spacer = CreateUIObject("SectionHeaderPadding", contentRoot);
+                LayoutElement spacerLayout = spacer.AddComponent<LayoutElement>();
+                spacerLayout.preferredHeight = headerBottomPadding;
+                spacerLayout.minHeight = headerBottomPadding;
+            }
             GameObject grid = CreateUIObject(monthGridObjectName, contentRoot);
             GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
             gridLayout.cellSize = new Vector2(GridCellWidth, GridCellHeight);

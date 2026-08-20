@@ -2,7 +2,7 @@
   "Title": "Graduation Calendar",
   "Description": "Shows graduation dates in Extras and adds a vanilla-styled calendar popup. IM UI Framework v3.1 UI primitives are embedded directly, so no separate UI-framework Workshop dependency is required.",
   "Author": "Cosmo",
-  "Version": "0.3.5",
+  "Version": "0.3.7",
   "Tags": [
     "ui",
     "gameplay"

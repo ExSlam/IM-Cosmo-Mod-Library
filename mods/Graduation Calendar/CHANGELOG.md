@@ -1,5 +1,19 @@
 # Graduation Calendar Changelog
 
+## 0.3.7
+
+- Fixed the remaining rounded-sheet clipping mismatch by nesting the rectangular ScrollRect viewport under an invisible mask that uses the exact same sliced vanilla panel sprite and bounds as the visible white sheet. Scrolled portraits/content can no longer show through the panel sprite's transparent rounded-edge pixels, while the rounded corners remain visible.
+- Moved the fixed circular scroll indicator inward from 16 UI units outside the white sheet to 8 UI units outside it, matching the requested popup-gutter position without consuming content width.
+- Increased Monthly-view spacing between each month heading and its idol portrait grid.
+
+## 0.3.6
+
+- Rebalanced the calendar/list scroll sheet by extending its right edge and moving the native scroll indicator farther into the popup chrome, restoring matching visual breathing room on the left and right of the seven-column calendar.
+- Restored gently rounded corners on the white scroll sheet by leaving the rounded vanilla panel surface visible and making the inner `RectMask2D` viewport a transparent clipper instead of an opaque square overlay.
+- Added a small symmetric inset inside the rounded viewport so scrolled content stays clear of the curved sheet edges.
+- Increased the Monthly-view gap between its year selector and the white results sheet so the selector no longer crowds the content surface.
+- Added extra vertical separation between section headings and idol portrait grids in Graduations Only and Yearly views.
+
 ## 0.3.5
 
 - Aligned the year previous/next controls to the same horizontal rails as the month controls and expanded the year-label center span, improving consistency and adding breathing room around the year number.
