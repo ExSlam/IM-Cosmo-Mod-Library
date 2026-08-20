@@ -3,7 +3,7 @@
     <ModName>IM UI Framework</ModName>
     <RootNamespace>IMUiFramework</RootNamespace>
     <AssemblyName>com.cosmo.imuiframework</AssemblyName>
-    <Version>3.1.1</Version>
+    <Version>3.1.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

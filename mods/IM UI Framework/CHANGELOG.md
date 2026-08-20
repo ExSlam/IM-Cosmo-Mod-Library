@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.2
+
+- Framework scroll-view viewports now use `RectMask2D` for strict rectangular clipping, preventing child UI from leaking past the visible scroll surface because of source-sprite alpha geometry.
+- Producer-list Slider positioning now accepts signed right-edge insets, allowing a custom popup to place the fixed-thumb indicator just outside its content sheet while keeping it bound to the same ScrollRect.
+- Added per-scroll-view `VanillaIndicatorHideFill` so a producer-list Slider can be rendered as a neutral fixed-thumb scroll indicator without exposing its value-fill region. Defaults preserve existing callers.
+
 ## 3.1.1
 
 - Added optional per-scroll-view producer-list Slider right inset and viewport gutter values while preserving the vanilla constants as defaults.

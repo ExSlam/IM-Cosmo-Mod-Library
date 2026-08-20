@@ -950,7 +950,7 @@ namespace GraduationCalendar
             const float rowHeight = 40f;
             const float yearRowVerticalOffset = -56f;
             const float rowButtonSpacing = 4f;
-            const float pagerLabelHorizontalPadding = 12f;
+            const float pagerLabelHorizontalPadding = 14f;
             const float yearLabelWidth = 120f;
             const float monthRowWidth = 460f;
             const float monthRowVerticalOffset = -96f;
@@ -961,7 +961,7 @@ namespace GraduationCalendar
             const float graduationsOnlyOffsetY = -18f;
             const float scrollOffsetLeft = 16f;
             const float scrollOffsetBottom = 56f;
-            const float scrollOffsetRight = -32f;
+            const float scrollOffsetRight = -42f;
             const float scrollOffsetTop = -92f;
             const float scrollSensitivity = 30f;
             const int contentPaddingLeft = 4;
@@ -1057,11 +1057,6 @@ namespace GraduationCalendar
             yearPager.Label.gameObject.name = yearLabelObjectName;
             yearLabel = yearPager.Label;
             yearRowObject = yearPager.Root;
-            FitPagerToLocalizedLabels(
-                yearPager,
-                new string[] { selectedYear.ToString() },
-                pagerLabelHorizontalPadding,
-                rowButtonSpacing);
 
             IMUiMonthPagerOptions monthPagerOptions = new IMUiMonthPagerOptions();
             monthPagerOptions.ObjectName = monthRowName;
@@ -1101,6 +1096,10 @@ namespace GraduationCalendar
                 localizedMonthNames,
                 pagerLabelHorizontalPadding,
                 rowButtonSpacing);
+            // Keep the year navigation arrows on the same horizontal rails as the
+            // month arrows. The year label gets the remaining center width, which
+            // also restores comfortable separation between the digits and buttons.
+            MatchPagerOuterWidth(yearPager, monthPager, rowButtonSpacing);
 
             Button gradOnlyButton = CreateButtonFromTemplate(
                 panel.transform,
@@ -1130,10 +1129,12 @@ namespace GraduationCalendar
             scrollOptions.Spacing = contentSpacing;
             scrollOptions.UseVanillaListIndicator = true;
             scrollOptions.Theme = calendarTheme;
-            // The calendar chrome already reserves a broad right margin, so place
-            // the native slider closer to that edge while preserving a safe content gutter.
-            scrollOptions.VanillaIndicatorRightCenterInset = 7f;
-            scrollOptions.VanillaViewportRightInset = 22f;
+            // Keep the scroll indicator outside the white content sheet. A signed
+            // inset lets the fixed-handle vanilla slider sit in the popup chrome rather
+            // than consuming/clipping the rightmost calendar column.
+            scrollOptions.VanillaIndicatorRightCenterInset = -12f;
+            scrollOptions.VanillaViewportRightInset = 0f;
+            scrollOptions.VanillaIndicatorHideFill = true;
             IMUiScrollViewHandle scrollHandle;
             if (!IMUiComposer.TryCreateScrollView(panel.transform, scrollOptions, out scrollHandle))
             {
@@ -2551,6 +2552,48 @@ namespace GraduationCalendar
             }
         }
 
+        private static void MatchPagerOuterWidth(
+            IMUiMonthPagerHandle target,
+            IMUiMonthPagerHandle reference,
+            float spacing)
+        {
+            if (target == null || reference == null || target.Root == null ||
+                reference.Root == null || target.Label == null)
+            {
+                return;
+            }
+
+            RectTransform targetRoot = target.Root.GetComponent<RectTransform>();
+            RectTransform referenceRoot = reference.Root.GetComponent<RectTransform>();
+            if (targetRoot == null || referenceRoot == null)
+            {
+                return;
+            }
+
+            float outerWidth = referenceRoot.sizeDelta.x;
+            float previousWidth = GetPagerButtonLayoutWidth(target.PreviousButton);
+            float nextWidth = GetPagerButtonLayoutWidth(target.NextButton);
+            float labelWidth = Mathf.Max(
+                0f,
+                outerWidth - previousWidth - nextWidth - Mathf.Max(0f, spacing) * 2f);
+
+            LayoutElement labelLayout = target.Label.GetComponent<LayoutElement>();
+            if (labelLayout == null)
+            {
+                labelLayout = target.Label.gameObject.AddComponent<LayoutElement>();
+            }
+            labelLayout.preferredWidth = labelWidth;
+            labelLayout.minWidth = labelWidth;
+            labelLayout.flexibleWidth = 0f;
+
+            RectTransform labelRect = target.Label.GetComponent<RectTransform>();
+            if (labelRect != null)
+            {
+                labelRect.sizeDelta = new Vector2(labelWidth, labelRect.sizeDelta.y);
+            }
+            targetRoot.sizeDelta = new Vector2(outerWidth, targetRoot.sizeDelta.y);
+        }
+
         private static float GetPagerButtonLayoutWidth(Button button)
         {
             if (button == null)
@@ -2587,6 +2630,7 @@ namespace GraduationCalendar
             const string sectionHeaderObjectName = "SectionHeader";
             const int sectionHeaderFontSize = 24;
             const float sectionHeaderHeight = 22f;
+            const float sectionHeaderHorizontalPadding = 16f;
             TextMeshProUGUI header = CreateText(
                 contentRoot,
                 sectionHeaderObjectName,
@@ -2595,6 +2639,7 @@ namespace GraduationCalendar
                 TextAlignmentOptions.Left,
                 GetPurpleTextColor());
             header.enableWordWrapping = false;
+            header.margin = new Vector4(sectionHeaderHorizontalPadding, 0f, 0f, 0f);
             LayoutElement layout = header.gameObject.AddComponent<LayoutElement>();
             layout.preferredHeight = sectionHeaderHeight;
         }

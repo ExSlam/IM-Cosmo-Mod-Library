@@ -99,6 +99,10 @@ namespace IMUiFramework
         // native producer-list slider closer to (or farther from) their right edge.
         public float VanillaIndicatorRightCenterInset = VanillaUiSceneTemplates.ProducerListSliderRightCenterInset;
         public float VanillaViewportRightInset = VanillaUiSceneTemplates.ProducerListViewportRightInset;
+        // Some custom popups need the producer-list Slider to read as a fixed-thumb
+        // scroll indicator rather than a progress/value control. Default false keeps
+        // existing framework callers scene-exact.
+        public bool VanillaIndicatorHideFill = false;
         public IMUiTheme Theme;
     }
 
@@ -302,7 +306,7 @@ namespace IMUiFramework
             scroll.vertical = true;
             IMUiKit.ApplyVanillaScrollDefaults(scroll);
 
-            GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             viewport.transform.SetParent(root.transform, false);
             viewport.layer = root.layer;
             RectTransform viewportRect = viewport.GetComponent<RectTransform>();
@@ -312,8 +316,9 @@ namespace IMUiFramework
             viewportRect.offsetMax = Vector2.zero;
             Image viewportImage = viewport.GetComponent<Image>();
             viewportImage.color = theme.SurfaceInner;
-            Mask mask = viewport.GetComponent<Mask>();
-            mask.showMaskGraphic = false;
+            // RectMask2D clips strictly to the viewport rectangle without depending
+            // on the alpha/sprite geometry of the surface Image. This prevents child
+            // cards and labels from leaking past the visible sheet while scrolling.
 
             GameObject content = new GameObject(
                 "Content",
@@ -361,6 +366,10 @@ namespace IMUiFramework
                     if (options.Theme != null)
                     {
                         IMUiStyle.ApplyTheme(indicator, theme, IMUiThemeApplication.AccentOnly, true);
+                    }
+                    if (options.VanillaIndicatorHideFill && ignored != null && ignored.fillRect != null)
+                    {
+                        ignored.fillRect.gameObject.SetActive(false);
                     }
                 }
             }

@@ -2,7 +2,7 @@
   "Title": "IM UI Framework",
   "Description": "Composable vanilla-style UI toolkit for Idol Manager mods: exact scene pieces and 218 shipped controls, semantic vanilla/custom color themes, vanilla month pagers, list scrolling, grids, cards, popup helpers, fonts, and low-level popup/scene templates.",
   "Author": "Cosmo",
-  "Version": "3.1.1",
+  "Version": "3.1.2",
   "Tags": [
     "ui",
     "framework",

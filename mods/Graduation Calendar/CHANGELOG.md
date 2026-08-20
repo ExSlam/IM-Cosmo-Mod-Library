@@ -1,5 +1,13 @@
 # Graduation Calendar Changelog
 
+## 0.3.5
+
+- Aligned the year previous/next controls to the same horizontal rails as the month controls and expanded the year-label center span, improving consistency and adding breathing room around the year number.
+- Moved the producer-list scroll indicator outside the white calendar/list viewport, removed the now-unneeded right-side content gutter, and hid the Slider fill graphic so it reads as a fixed-thumb scrollbar rather than a value/progress slider.
+- Switched the embedded framework viewport clipper from sprite-alpha `Mask` clipping to rectangular `RectMask2D` clipping so calendar cells, portraits, and section contents are cleanly cut at the visible sheet boundary instead of partially leaking beyond it.
+- Increased left padding for section headers used by Graduations Only, Yearly, and Monthly views.
+- Preserved the 0.3.4 bootstrap/menu-button injection correction.
+
 ## 0.3.4
 
 - Fixed a bootstrap regression in 0.3.3 that could prevent the Graduation Calendar menu icon from being injected. Localized month-width measurement ran before `selectedYear` was initialized and attempted to construct a `DateTime` with year 0.

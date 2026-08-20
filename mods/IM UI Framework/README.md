@@ -1,4 +1,4 @@
-# IM UI Framework 3.1.1 (Intermediary Mod)
+# IM UI Framework 3.1.2 (Intermediary Mod)
 
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
@@ -9,6 +9,10 @@ It targets three common problems:
 
 
 
+
+## 3.1.2: strict clipping and external scroll indicators
+
+3.1.2 adds strict rectangular viewport clipping plus opt-in scroll-indicator geometry for custom popups that place the fixed-thumb producer-list Slider outside the content sheet. `VanillaIndicatorHideFill` can suppress the Slider value-fill visual while retaining the native track/handle control and two-way ScrollRect synchronization. Existing defaults remain source-compatible.
 
 ## 3.1.1: localized pager and scroll-geometry controls
 

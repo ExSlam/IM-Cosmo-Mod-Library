@@ -1,6 +1,6 @@
 # Embedded IM UI Framework
 
-Graduation Calendar 0.3.3 is self-contained. IM UI Framework v3.1.1-compatible source is vendored under `src/EmbeddedIMUiFramework/` and compiled into the Graduation Calendar DLL.
+Graduation Calendar 0.3.5 is self-contained. IM UI Framework v3.1.2-compatible source is vendored under `src/EmbeddedIMUiFramework/` and compiled into the Graduation Calendar DLL.
 
 ## Why
 

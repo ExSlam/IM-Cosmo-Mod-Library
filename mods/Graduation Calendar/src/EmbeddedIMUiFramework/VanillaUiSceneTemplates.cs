@@ -249,7 +249,10 @@ namespace GraduationCalendar.EmbeddedIMUiFramework
                 slider = targetSlider;
                 sliderRect = slider != null ? slider.GetComponent<RectTransform>() : null;
                 scrollRectTransform = scrollRect != null ? scrollRect.GetComponent<RectTransform>() : null;
-                rightCenterInset = Mathf.Max(0f, targetRightCenterInset);
+                // Signed values are intentional: a negative inset places the fixed
+                // slider just outside the ScrollRect's right edge, useful when the
+                // scrollbar belongs to surrounding popup chrome rather than content.
+                rightCenterInset = targetRightCenterInset;
 
                 if (scrollRect == null || slider == null)
                 {
