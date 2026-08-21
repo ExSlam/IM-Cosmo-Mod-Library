@@ -2,9 +2,9 @@
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-IMDC 3.4.5 writes sidecar format 4 and transactional journal format 2. Format-3 sidecars remain readable so existing campaigns can migrate safely; older persistence formats remain unsupported.
+IMDC 3.4.6 writes sidecar format 5 and transactional journal format 2. This development build intentionally accepts only sidecar format 5; older sidecars are left untouched rather than migrated at runtime.
 
-IMDC 3.4.5 extends exact-save checkpoints with an enabled-mod inventory while keeping the long-campaign journal design. Append-only save generations are written to a small SHA-256-bound transactional journal and periodically compacted into the atomic v4 snapshot; destructive branch changes still force a complete snapshot.
+IMDC 3.4.6 strengthens exact-save checkpoints with a SHA-256 content fingerprint of the vanilla `SavedData` graph, keeps the enabled-mod inventory, anchors newly adopted vanilla careers before any explicit IMDC-only flush, and preserves deleted-save sidecars under `OLD` archive directories. Append-only generations still use the SHA-256-bound transactional journal and periodically compact into the atomic v5 snapshot.
 
 ## Services
 
@@ -27,14 +27,14 @@ Each physical vanilla save owns one mirrored IMDC sidecar beneath the sibling `I
 
 `global_data.json` is not a game-save scope and never receives an IMDC sidecar.
 
-## Version 4 sidecar
+## Version 5 sidecar
 
 The current private disk format remains:
 
 - `FormatName`: `IMDataCore.LightweightSidecar`
-- `FormatVersion`: `4`
+- `FormatVersion`: `5`
 
-V4 keeps the structural JSON representation introduced by v3 and adds `EnabledMods` to each checkpoint. A built-in event can look like:
+V5 keeps JSON-native event/custom-data storage and adds `ContentFingerprint` to every checkpoint. The fingerprint is `sha256:<64 lowercase hex characters>` over Unity's compact JSON representation of that exact vanilla `SavedData` state. A built-in event can look like:
 
 ```json
 {
@@ -54,19 +54,36 @@ V4 keeps the structural JSON representation introduced by v3 and adds `EnabledMo
 }
 ```
 
-A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Older format-3 sidecars remain readable; their checkpoints simply have no saved mod inventory.
+A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Sidecar formats older than 5 are not accepted by this development build.
 
-The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v4 document so consumers do not need to understand the private sidecar schema.
+The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v5 document so consumers do not need to understand the private sidecar schema.
 
 ## Exact checkpoint loading
 
-A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, and the IMDC sequence watermark.
+A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, the vanilla-content SHA-256 fingerprint, and the IMDC sequence watermark. The content fingerprint removes the same-second collision that is possible if timestamp/playtime fields alone are used.
 
-In format 4, that same checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
+Each v5 checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
 
-When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4.6 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
+
+## Adoption of existing vanilla careers
+
+When a vanilla career is loaded for the first time with no IMDC sidecar, IMDC creates an in-memory sequence-0 checkpoint for that exact loaded `SavedData` state. It does not write anything merely because the save was loaded. If a consumer later calls `TryFlushNow`, the new sidecar already contains an exact anchor for the vanilla file and can be matched safely on the next load.
+
+## Deleted-save archives
+
+Vanilla save deletion never deletes IMDC history. After a successful vanilla delete, IMDC archives the mirrored save directory by renaming it in place:
+
+```text
+f294ee32     -> f294ee32OLD
+f294ee32OLD  -> existing archive, so the next deletion becomes f294ee32OLD2
+```
+
+Story-playthrough deletion archives the mirrored playthrough directory as one unit. The archive operation is serialized against IMDC loads, writes, and background compaction so a stale queued writer cannot recreate the deleted path after archival. If the rename fails, the original supplemental directory is left untouched and writes back into that deleted-save directory are blocked for the remainder of the process.
+
+If the deleted path was active, IMDC detaches its physical binding but keeps the logical in-memory history so a later vanilla New Save/Save As can preserve that career branch under a new path.
 
 ## Backup recovery
 
@@ -98,7 +115,7 @@ Use occurrence-specific keys. Do not use a permanent key such as `promotion` if 
 
 IMDC keeps complete source history, so retained disk history still grows with genuine event volume. Version 3.4 avoids reprocessing that complete history on every ordinary save:
 
-- a compact v3 sidecar remains the base snapshot;
+- a compact v5 sidecar remains the base snapshot;
 - append-only generations are written to `<sidecar>.imdc.journal`, whose header contains the SHA-256 of the exact base file it extends;
 - normal save preparation copies only newly appended immutable records, not every historical event;
 - journals use transactional format 2: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; older journal formats are intentionally rejected;
@@ -123,7 +140,7 @@ Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-sub
 
 ## Current-format-only persistence
 
-IMDC 3.4 reads only sidecar format 3 and transactional journal format 2. Older lightweight sidecars and journals are intentionally rejected rather than migrated at runtime.
+IMDC 3.4.6 reads only sidecar format 5 and transactional journal format 2. Older lightweight sidecars and unsupported journals are intentionally rejected rather than migrated at runtime.
 
 Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
 
@@ -228,7 +245,6 @@ dotnet build "mods\IM Data Core\IM Data Core.csproj" -c Release
 ```
 
 The repository's shared `Directory.Build.props` supplies the framework, Harmony, Unity, and Idol Manager references.
-
 
 ## Portrait identity
 

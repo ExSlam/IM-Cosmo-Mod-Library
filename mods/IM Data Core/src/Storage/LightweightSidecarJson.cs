@@ -868,7 +868,7 @@ namespace IMDataCore
 
         /// <summary>
         /// Streams the sidecar from a reader and materializes one history record at
-        /// a time. Normal v3 files therefore never require a second in-memory copy
+        /// a time. Normal v5 files therefore never require a second in-memory copy
         /// of the complete JSON text or a complete JSON DOM for all campaign rows.
         /// </summary>
         internal static LightweightSidecarDocument DeserializeFrom(
@@ -1169,7 +1169,7 @@ namespace IMDataCore
         /// <summary>
         /// Validates and normalizes one arbitrary JSON document. The public API
         /// still exchanges JSON as strings because that is a convenient mod boundary,
-        /// while the v3 sidecar stores the parsed value structurally.
+        /// while the v5 sidecar stores the parsed value structurally.
         /// </summary>
         internal static bool TryNormalizeJsonDocument(
             string json,
@@ -1957,7 +1957,7 @@ namespace IMDataCore
         private static int EstimateCapacity(LightweightSidecarDocument document)
         {
             long estimate = 192L;
-            estimate += (long)document.Checkpoints.Count * 160L;
+            estimate += (long)document.Checkpoints.Count * 256L;
             estimate += (long)document.Events.Count * 320L;
             estimate += (long)document.CustomMutations.Count * 240L;
 
@@ -2004,6 +2004,9 @@ namespace IMDataCore
             builder.Append(',');
             AppendPropertyName(builder, "GameDateTime");
             AppendString(builder, record.GameDateTime ?? string.Empty);
+            builder.Append(',');
+            AppendPropertyName(builder, "ContentFingerprint");
+            AppendString(builder, record.ContentFingerprint ?? string.Empty);
             builder.Append(',');
             AppendPropertyName(builder, "Sequence");
             AppendInt64(builder, record.Sequence);
@@ -2255,38 +2258,27 @@ namespace IMDataCore
 
             return new LightweightCheckpointRecord
             {
-                RelativeSavePath = formatVersion >= 3
-                    ? documentRelativeSavePath ?? string.Empty
-                    : RequireString(item, "RelativeSavePath"),
+                RelativeSavePath = documentRelativeSavePath ?? string.Empty,
                 LastSave = RequireString(item, "LastSave"),
                 PlaytimeSeconds = RequireInt64(item, "PlaytimeSeconds"),
                 GameDateTime = RequireString(item, "GameDateTime"),
+                ContentFingerprint = RequireString(item, "ContentFingerprint"),
                 Sequence = RequireInt64(item, "Sequence"),
-                EnabledMods = ReadOptionalModSnapshots(item)
+                EnabledMods = ReadModSnapshots(item)
             };
         }
 
-        private static List<LightweightModSnapshotRecord> ReadOptionalModSnapshots(
+        private static List<LightweightModSnapshotRecord> ReadModSnapshots(
             Dictionary<string, JsonValue> checkpoint)
         {
             List<LightweightModSnapshotRecord> records =
                 new List<LightweightModSnapshotRecord>();
-            JsonValue value;
-            if (checkpoint == null ||
-                !checkpoint.TryGetValue("EnabledMods", out value))
-            {
-                return records;
-            }
-            if (value == null || value.Kind != JsonValueKind.Array)
-            {
-                throw new FormatException(
-                    "The checkpoint field 'EnabledMods' must be a JSON array.");
-            }
+            List<JsonValue> values = RequireArray(checkpoint, "EnabledMods");
 
-            for (int index = 0; index < value.ArrayValue.Count; index++)
+            for (int index = 0; index < values.Count; index++)
             {
                 Dictionary<string, JsonValue> item = RequireObject(
-                    value.ArrayValue[index],
+                    values[index],
                     "An enabled-mod snapshot must be a JSON object.");
                 records.Add(new LightweightModSnapshotRecord
                 {
@@ -2679,7 +2671,7 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Reconstructs the stable public/runtime payload shape from the native v3
+        /// Reconstructs the stable public/runtime payload shape from the native v5
         /// disk representation. This keeps existing Cosmo consumers source-compatible
         /// without storing JSON or identifier arrays as quoted strings.
         /// </summary>

@@ -248,6 +248,12 @@ namespace IMDataCore
                         "Unity JsonUtility returned a null SavedData snapshot.");
                 }
 
+                // Reuse the JSON that already created this detached graph. The
+                // checkpoint fingerprint therefore adds only the SHA-256 pass here,
+                // not a second full JsonUtility serialization in standalone IMDC.
+                VanillaSavedDataFingerprint.RegisterFrozenFingerprint(
+                    snapshot,
+                    VanillaSavedDataFingerprint.ComputeForJson(json));
                 return snapshot;
             }
             catch (Exception exception)

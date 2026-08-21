@@ -1,5 +1,7 @@
 # IM Data Core 3.2 implementation notes
 
+> **Historical reference only.** IMDC 3.4.6 writes and accepts sidecar format 5 only. Older migration/compatibility behavior described below is not active in the current development build. See `V5_SIDECAR_SCHEMA.md` and `V5_VALIDATION.md` for current behavior.
+
 ## Goals
 
 IMDC 3.2 preserves the JSON-native, memory-first, exact-save-scoped architecture while tightening branch correctness and reducing the memory/lock cost of large histories.

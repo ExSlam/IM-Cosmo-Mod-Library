@@ -110,7 +110,9 @@ namespace IMDataCore
                 lock (runtimeLock)
                 {
                     if (!ReferenceEquals(storageEngine, engineForWrite) ||
-                        !persistenceSnapshotIsCurrent)
+                        !persistenceSnapshotIsCurrent ||
+                        !engineForWrite.IsPersistenceSnapshotStillCurrent(
+                            persistenceSnapshot))
                     {
                         return;
                     }
@@ -201,12 +203,15 @@ namespace IMDataCore
                 // respect to every old/new engine I/O operation on that path. Without
                 // this process-wide lease, an old queued compactor can replace the base
                 // or delete a journal after the replacement engine has already loaded it.
-                object sidecarIoLock =
-                    LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
-                        targetScope.SidecarFilePath);
-                lock (sidecarIoLock)
+                using (LightweightCoreStorageEngine
+                    .AcquirePersistenceTopologyReadLease())
                 {
-                    loadedEngine = new LightweightCoreStorageEngine();
+                    object sidecarIoLock =
+                        LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
+                            targetScope.SidecarFilePath);
+                    lock (sidecarIoLock)
+                    {
+                        loadedEngine = new LightweightCoreStorageEngine();
                     string loadError;
                     bool sidecarLoaded = loadedEngine.Initialize(
                         targetScope,
@@ -244,6 +249,39 @@ namespace IMDataCore
                     long activatedSequence = 0L;
                     bool hasExistingSidecarDocument =
                         sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
+
+                    if (!hasExistingSidecarDocument &&
+                        loadedEngine.HasPhysicalScope &&
+                        !loadedEngine.IsPersistenceBlocked)
+                    {
+                        // A vanilla career created before IMDC has no historical
+                        // sidecar yet. Seed an in-memory sequence-0 checkpoint for
+                        // the exact loaded vanilla state. Nothing is written here,
+                        // but a later TryFlushNow can no longer create an unanchored
+                        // sidecar that fails exact matching on the next load.
+                        List<LightweightModSnapshotRecord> adoptedMods =
+                            CaptureCurrentModSnapshot(true);
+                        if (!loadedEngine.AddOrReplaceCheckpoint(
+                                stamp,
+                                0L,
+                                adoptedMods,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(
+                                "IM Data Core could not anchor this newly adopted " +
+                                "vanilla save: " + errorMessage);
+                            loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                                "The newly adopted vanilla save could not be anchored " +
+                                "safely, so supplemental persistence is disabled for " +
+                                "this physical path.");
+                        }
+                        else
+                        {
+                            checkpointFound = true;
+                            activatedSequence = 0L;
+                        }
+                    }
+
                     if (hasExistingSidecarDocument &&
                         !loadedEngine.TryActivateCheckpoint(
                             stamp,
@@ -284,7 +322,8 @@ namespace IMDataCore
                         loadedEngine,
                         targetScope,
                         loadedGameDate);
-                    engineInstalled = true;
+                        engineInstalled = true;
+                    }
                 }
             }
             catch (Exception exception)
@@ -305,12 +344,16 @@ namespace IMDataCore
         {
             if (targetScope != null && !targetScope.IsTransient)
             {
-                object sidecarIoLock =
-                    LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
-                        targetScope.SidecarFilePath);
-                lock (sidecarIoLock)
+                using (LightweightCoreStorageEngine
+                    .AcquirePersistenceTopologyReadLease())
                 {
-                    InstallSafeEmptyLoadedStateCore(targetScope);
+                    object sidecarIoLock =
+                        LightweightCoreStorageEngine.GetSharedPersistenceIoLock(
+                            targetScope.SidecarFilePath);
+                    lock (sidecarIoLock)
+                    {
+                        InstallSafeEmptyLoadedStateCore(targetScope);
+                    }
                 }
                 return;
             }
@@ -425,6 +468,132 @@ namespace IMDataCore
                 ResetRuntimeCaptureStateLocked();
             }
         }
+        /// <summary>
+        /// Archives supplemental persistence only after vanilla has removed the
+        /// corresponding save directory. The entire mirrored IMDC directory is
+        /// preserved under an OLD/OLD2/... name for future diary export.
+        /// </summary>
+        internal void OnVanillaSaveDirectoryDeleted(string vanillaDirectoryPath)
+        {
+            try
+            {
+                string sidecarDirectoryPath;
+                string errorMessage;
+                if (!CorePaths.TryResolveMirroredDirectoryForVanillaDirectory(
+                        vanillaDirectoryPath,
+                        out sidecarDirectoryPath,
+                        out errorMessage))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not resolve the deleted vanilla save " +
+                        "directory for archival: " + errorMessage);
+                    return;
+                }
+
+                // The topology write lease waits for every load/write/compaction
+                // already touching IMDC persistence and blocks new physical I/O.
+                // runtimeLock prevents a new controller snapshot from crossing the
+                // completion epoch while this deleted-save boundary is finalized.
+                using (LightweightCoreStorageEngine
+                    .AcquirePersistenceTopologyWriteLease())
+                {
+                    LightweightCoreStorageEngine
+                        .BeginPersistenceArchiveBoundaryForDirectory(
+                            sidecarDirectoryPath);
+
+                    lock (runtimeLock)
+                    {
+                        bool archiveSucceeded = false;
+                        bool archiveBoundaryCompleted = false;
+                        string archivedDirectoryPath = string.Empty;
+                        try
+                        {
+                            bool activeVanillaScopeWasDeleted =
+                                activeSaveScope != null &&
+                                !activeSaveScope.IsTransient &&
+                                !string.IsNullOrEmpty(activeSaveScope.SaveFilePath) &&
+                                CorePaths.IsSameOrContainedPath(
+                                    vanillaDirectoryPath,
+                                    activeSaveScope.SaveFilePath);
+
+                            archiveSucceeded =
+                                CorePaths.TryArchiveContainedDirectory(
+                                    sidecarDirectoryPath,
+                                    out archivedDirectoryPath,
+                                    out errorMessage);
+
+                            bool detachedCurrentScope = false;
+                            if (storageEngine != null)
+                            {
+                                bool engineDetached;
+                                string invalidationError;
+                                if (!storageEngine.InvalidatePhysicalDirectoryForArchive(
+                                        sidecarDirectoryPath,
+                                        out engineDetached,
+                                        out invalidationError))
+                                {
+                                    CoreLog.Warn(invalidationError);
+                                }
+                                detachedCurrentScope = engineDetached;
+                            }
+
+                            if (activeVanillaScopeWasDeleted || detachedCurrentScope)
+                            {
+                                // Keep the logical in-memory career/diary branch, but
+                                // remove every physical binding so TryFlushNow cannot
+                                // recreate the save directory vanilla just deleted. A
+                                // later vanilla New Save/Save As can bind this branch to
+                                // its new path normally when archival succeeded.
+                                CorePaths.ResetToTransientSaveScope();
+                                activeSaveScope = CorePaths.GetSaveScope();
+                                activeSaveKey = NormalizeSaveKey(
+                                    activeSaveScope.InternalSaveKey);
+                            }
+
+                            archiveBoundaryCompleted = true;
+                        }
+                        finally
+                        {
+                            // Always close the archive generation, even if an
+                            // unexpected supplemental exception occurs after vanilla
+                            // deletion. This invalidates every snapshot prepared before
+                            // or during archival; a failed rename additionally blocks
+                            // writes beneath the orphaned directory for this process.
+                            LightweightCoreStorageEngine
+                                .CompletePersistenceArchiveBoundaryForDirectory(
+                                    sidecarDirectoryPath,
+                                    archiveSucceeded && archiveBoundaryCompleted);
+                        }
+
+                        if (!archiveSucceeded)
+                        {
+                            CoreLog.Warn(
+                                "IM Data Core could not archive deleted-save " +
+                                "persistence: " + errorMessage +
+                                " Supplemental files were left untouched and writes " +
+                                "to that directory are blocked for this process.");
+                            return;
+                        }
+
+                        if (!string.IsNullOrEmpty(archivedDirectoryPath))
+                        {
+                            CoreLog.Info(
+                                "IM Data Core preserved deleted-save persistence at: " +
+                                archivedDirectoryPath);
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // Vanilla deletion has already completed. Supplemental archival must
+                // never turn a successful vanilla UI action into an exception.
+                CoreLog.Warn(
+                    "IM Data Core deleted-save archival failed without affecting " +
+                    "vanilla: " + exception.Message);
+            }
+        }
+
         internal void OnVanillaLoadCompleted()
         {
             lock (runtimeLock)
@@ -805,7 +974,7 @@ namespace IMDataCore
         {
             if (requiredMods == null || requiredMods.Count == 0)
             {
-                // Version-3 checkpoints have no mod inventory.
+                // A checkpoint without a mod inventory cannot restore one.
                 return;
             }
 

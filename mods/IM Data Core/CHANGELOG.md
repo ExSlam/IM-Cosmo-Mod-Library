@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.4.6
+
+- Added sidecar format 5 `ContentFingerprint` to exact vanilla-save checkpoints. The fingerprint is SHA-256 over Unity's compact serialized `SavedData`, closing same-second identity collisions that could occur when path/`LastSave`/playtime/game-date fields alone matched.
+- Reused IMDC's existing standalone defensive-save JSON when available and streamed UTF-8 into SHA-256 in bounded chunks to avoid a redundant full serialization or save-sized byte-array allocation.
+- Seeded an in-memory sequence-0 checkpoint when adopting an existing vanilla career with no IMDC sidecar, so a subsequent `TryFlushNow` persists an anchored sidecar that can match the vanilla save on reload.
+- Fixed checkpoint date watermarks to parse vanilla checkpoint `GameDateTime` through `ExtensionMethods.ToDateTime` instead of the round-trip event-date parser.
+- Added preservation hooks for vanilla manual-save, story-save, and whole-playthrough deletion. Mirrored IMDC directories are renamed to `OLD`, `OLD2`, `OLD3`, etc. rather than deleted, retaining complete supplemental history for future diary export.
+- Serialized deleted-save archival against IMDC loads/writes/background compaction with a persistence-topology lease and per-path archive epochs so pre-delete snapshots cannot resurrect the deleted path.
+- If an archive rename fails, IMDC leaves the supplemental directory untouched and blocks writes beneath that deleted-save directory for the rest of the process.
+- Deleting the active physical save now detaches that physical binding while retaining the logical in-memory branch for a later New Save/Save As.
+- Development persistence policy is now v5-only: older sidecar formats are not migrated or activated. Transactional journal format remains 2.
+
 ## 3.4.5
 
 - Added sidecar format 4 checkpoint mod inventories. Every vanilla-save checkpoint now records every enabled Idol Manager mod from `Mods._Mods`, including JSON-only/non-Harmony/non-IMDC mods, with mod name, title, author, declared version, and discovered DLL file name(s).

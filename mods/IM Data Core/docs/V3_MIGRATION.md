@@ -1,5 +1,7 @@
 # IM Data Core 3.2 migration
 
+> **Historical reference only.** IMDC 3.4.6 writes and accepts sidecar format 5 only. Older migration/compatibility behavior described below is not active in the current development build. See `V5_SIDECAR_SCHEMA.md` and `V5_VALIDATION.md` for current behavior.
+
 ## From IMDC 3.0 / sidecar v3
 
 No migration step is required.

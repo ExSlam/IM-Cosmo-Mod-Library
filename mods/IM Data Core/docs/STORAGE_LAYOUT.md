@@ -1,8 +1,8 @@
-# IM Data Core 3.4 storage layout
+# IM Data Core 3.4.6 storage layout
 
 ## Physical mapping
 
-IMDC mirrors each supported vanilla save path below the sibling `IMDataCore` root.
+IMDC mirrors each supported vanilla save path below the sibling `IMDataCore` root. It never writes supplemental state into vanilla's `data` tree.
 
 If the persistent root is:
 
@@ -32,16 +32,16 @@ Examples:
 
 ## Containment safety
 
-All IMDC mutation paths are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before reads, writes, or deletes that could escape containment. The private root is required to remain separate from the vanilla `data` root.
+All IMDC mutation paths are canonicalized and required to remain beneath the private `IMDataCore` root. Existing path chains are checked for reparse points before physical mutation. The private root is required to remain separate from vanilla's `data` root.
 
-## V4 document identity
+## V5 document identity
 
-IMDC 3.4.5 writes sidecar format version 4 and reads format 3 for migration:
+IMDC 3.4.6 writes and accepts sidecar format version 5 only. Transactional journals remain format version 2.
 
 ```json
 {
   "FormatName": "IMDataCore.LightweightSidecar",
-  "FormatVersion": 4,
+  "FormatVersion": 5,
   "RelativeSavePath": "manual_saves/4060ce4d/save.json",
   "LastIssuedSequence": 421,
   "Checkpoints": [],
@@ -50,7 +50,7 @@ IMDC 3.4.5 writes sidecar format version 4 and reads format 3 for migration:
 }
 ```
 
-`RelativeSavePath` belongs to the document. Child checkpoints do not repeat it.
+`RelativeSavePath` belongs to the document. Child checkpoints inherit that path and do not repeat it on disk.
 
 ## Source records
 
@@ -60,7 +60,8 @@ IMDC 3.4.5 writes sidecar format version 4 and reads format 3 for migration:
 {
   "LastSave": "2026-08-13 18:22:04",
   "PlaytimeSeconds": 58321,
-  "GameDateTime": "2028-04-17T00:00:00.0000000",
+  "GameDateTime": "2028-04-17 00:00:00",
+  "ContentFingerprint": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "Sequence": 421,
   "EnabledMods": [
     {
@@ -81,7 +82,19 @@ IMDC 3.4.5 writes sidecar format version 4 and reads format 3 for migration:
 }
 ```
 
-Checkpoint activation is exact. `EnabledMods` is frozen at that save boundary from Idol Manager's enabled mod registry; JSON-only mods are represented even though `DllNames` is empty. After exact activation IMDC compares this inventory with the current installed/enabled mod set and logs missing, disabled, author/version, and DLL-name mismatches. If an existing valid sidecar contains no checkpoint matching the loaded vanilla save stamp, IMDC 3.4.5 does not use an in-game-date approximation. Supplemental state is detached read-only and the sidecar is protected from overwrite.
+Checkpoint identity is the tuple of normalized relative save path, vanilla `LastSave`, vanilla playtime seconds, vanilla game date/time, and `ContentFingerprint`. `Sequence` is the IMDC branch watermark activated by that checkpoint; it is not part of the vanilla-content identity.
+
+`ContentFingerprint` is SHA-256 over Unity's compact `JsonUtility.ToJson(savedData, false)` representation of the exact vanilla `SavedData` state. It is stored as `sha256:` followed by 64 lowercase hexadecimal characters. This prevents two distinct vanilla states that happen to share second-resolution timestamp/playtime fields from being treated as the same checkpoint.
+
+Checkpoint `GameDateTime` intentionally uses vanilla's own `yyyy-MM-dd HH:mm:ss` representation. IMDC parses checkpoint dates through vanilla's `ExtensionMethods.ToDateTime`. Event and custom-mutation dates use IMDC's round-trip representation instead.
+
+`EnabledMods` is frozen at the save boundary from Idol Manager's enabled mod registry. JSON-only mods are represented even when `DllNames` is empty. After exact activation, IMDC compares the saved inventory with the current installed/enabled mod set and logs missing, disabled, author/version, and DLL-name mismatches. These diagnostics do not block vanilla loading.
+
+If an existing valid sidecar contains no checkpoint matching the loaded vanilla state exactly, IMDC fails closed: supplemental state is detached read-only and the sidecar is protected from overwrite. There is no date-only fallback.
+
+### Existing vanilla career with no sidecar
+
+A missing sidecar is different from an existing unmatched sidecar. When IMDC first loads a vanilla career that has never had IMDC persistence, it seeds an in-memory sequence-0 checkpoint for that exact loaded vanilla state. Loading alone does not create a file. If a consumer later calls `TryFlushNow`, the first sidecar is therefore anchored to the vanilla save and remains matchable on the next load.
 
 ### Event
 
@@ -110,9 +123,7 @@ A custom event written through `TryAppendCustomEventOnce` may also contain:
 "IdempotencyKey": "promotion.14.2031-05-03.2"
 ```
 
-`IdempotencyKey` is optional and only meaningful for namespaced custom events. Older v3 documents without it remain valid.
-
-`Sequence` is the stored event identity. Public `EventId` is derived from it. `GameDateKey` is derived from `GameDateTime` and is not serialized.
+`IdempotencyKey` is optional and only meaningful for namespaced custom events. `Sequence` is the stored event identity. Public `EventId` is derived from it. `GameDateKey` is derived from `GameDateTime` and is not serialized.
 
 Built-in IMDC payloads use native arrays for known ID-list fields. Built-in money `detail_json` is stored as nested `detail` JSON. These transformations are reversed when producing the stable public `PayloadJson` view. Namespaced custom-event payloads are stored structurally but are otherwise semantically untouched.
 
@@ -146,64 +157,72 @@ Built-in IMDC payloads use native arrays for known ID-list fields. Built-in mone
 
 ## What is intentionally not persisted
 
-The sidecar does not persist runtime-derived structures such as:
-
-- timeline indexes by idol
-- global timeline index
-- custom-data materialized dictionary
-- per-namespace quota counters
-- custom-event idempotency lookup sets
-- active mutation-sequence set
-- `GameDateKey`
-- duplicated public `EventId`
-- legacy database or fallback-file state
-
-Those values are derived from source records or are transient runtime bookkeeping.
+The sidecar does not persist runtime-derived structures such as timeline indexes, custom-data materialized dictionaries, quota counters, custom-event idempotency lookup sets, active mutation-sequence sets, `GameDateKey`, duplicated public `EventId`, or persistence synchronization epochs. Those values are derived from source records or are process-local bookkeeping.
 
 ## Atomic snapshots, delta journal, and backup
 
-The compact base is an ordinary v4 sidecar (or a readable v3 base until a later full rewrite). A normal append-only save may additionally create:
+The compact base is a v5 sidecar. A normal append-only save may additionally create:
 
 ```text
 <sidecar>.imdc.journal
 ```
 
-The first journal line is a small header containing `FormatName = IMDataCore.LightweightJournal`, the journal format version, and the SHA-256 of the exact base sidecar. Journal format 2 writes each save delta as a bounded NDJSON transaction: a `BEGIN` row declares base/target counts, record rows carry individual checkpoints/events/custom mutations, and a `COMMIT` row makes the transaction logically visible. This keeps replay memory proportional to an individual record instead of one potentially enormous save delta. Only transactional journal format 2 is accepted by this build.
+The first journal line contains `FormatName = IMDataCore.LightweightJournal`, journal `FormatVersion = 2`, and the SHA-256 of the exact compact base it extends. Each save delta is a bounded NDJSON transaction: `BEGIN`, record rows, then `COMMIT`. A transaction is visible only after its valid commit row.
 
-The journal writer flushes its buffered writer and then calls `FileStream.Flush(true)`. Replay ignores any v2 transaction that does not reach a valid `COMMIT`, even if some complete record rows reached disk. Base/target counts also make a completely written retry idempotent. A journal whose base hash does not equal the current compact sidecar is ignored rather than replayed.
+The journal writer flushes its buffered writer and then calls `FileStream.Flush(true)`. Replay ignores a transaction that does not reach a valid `COMMIT`. Base/target counts make a fully written retry idempotent, and a journal whose base hash does not match the current compact sidecar is never replayed onto that base.
 
-A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then atomically promotes it. Destructive branch changes, recovery writes, New Save, and incompatible baselines use a synchronous full boundary. Routine journal-size compaction is queued after the triggering delta is durable so the vanilla save boundary does not pay the O(history) rewrite cost. The worker shallow-copies already-loaded immutable persisted prefixes rather than deserializing the complete base+journal into a second object graph, then verifies the physical base hash and journal length before replacement.
+A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then promotes it. Destructive branch changes, recovery writes, New Save, incompatible baselines, and compaction use a full snapshot. Routine compaction is queued after the triggering delta is durable so an ordinary save boundary does not pay the complete O(history) rewrite cost.
 
 When replacing a healthy compact base, IMDC retains:
 
 ```text
 <sidecar>.imdc.bak
-<sidecar>.imdc.bak.imdc.journal   # present when the previous generation used a journal
+<sidecar>.imdc.bak.imdc.journal   # when the previous generation used a journal
 ```
 
-The backup journal is tied to the backup base by its own stored base hash. This keeps the backup equal to the complete previous logical generation. If backup-journal publication is interrupted, recovery may also test the still-present current journal against the backup base hash before falling back to the normal backup-journal name. When recovery starts from a damaged primary, the known-good backup generation is preserved until a successful replacement.
+The backup journal is tied to the backup base by its stored base hash. Recovery may also pair a still-present current journal with the backup base if that journal's stored base hash matches, covering an interrupted backup-journal publication window.
+
+## Deleted-save archival
+
+Vanilla deletion does not delete IMDC history. After a successful vanilla save-directory deletion, IMDC maps that deleted vanilla directory to the corresponding mirrored IMDC directory and renames the entire supplemental directory in place:
+
+```text
+<name>      -> <name>OLD
+<name>OLD   -> existing archive
+<name>      -> <name>OLD2   # next collision-safe archive
+```
+
+Further collisions use `OLD3`, `OLD4`, and so on. No file inside the archived directory is deleted. Deleting an entire story playthrough archives the mirrored playthrough directory as one unit, preserving all chapter/manual-save sidecars beneath it for later diary export.
+
+Archival takes an exclusive persistence-topology lease. Loads, writes, and background compaction take shared leases, so archival waits for already-running physical IMDC I/O and prevents new I/O from crossing the rename. Every prepared snapshot also carries a per-path archive epoch; a snapshot prepared before the archive becomes stale afterward and cannot recreate the deleted path.
+
+If archival rename fails, the existing supplemental directory is left untouched. IMDC blocks subsequent writes beneath that deleted-save directory for the rest of the process rather than risk overwriting the historical material that was supposed to be preserved.
+
+If the deleted save was the active scope, IMDC detaches the physical binding but retains the logical in-memory branch. A later vanilla New Save/Save As can bind that branch to a new physical path.
 
 ## Missing, unreadable, and unmatched sidecars
 
 These states deliberately differ:
 
-- **Missing sidecar:** ordinary empty writable IMDC branch.
-- **Unreadable/invalid/newer primary with valid backup:** recover from backup, then still require an exact vanilla checkpoint.
-- **Unreadable/invalid/newer primary and unusable backup:** expose safe empty supplemental state and block writes to that physical sidecar path.
+- **Missing sidecar:** writable empty/adopted IMDC branch; if a vanilla save was loaded, a sequence-0 exact checkpoint is held in memory.
+- **Unreadable/invalid/unsupported primary with valid backup:** recover from backup, then still require an exact v5 vanilla checkpoint.
+- **Unreadable/invalid/unsupported primary and unusable backup:** expose safe empty supplemental state and block writes to that physical sidecar path.
 - **Valid existing sidecar with no exact checkpoint for the loaded vanilla save:** fail closed, expose detached supplemental state, and protect the sidecar from overwrite.
 
 A New Save to a different valid physical vanilla save path may establish a new writable branch.
 
 ## Long-campaign characteristics
 
-Complete event history remains complete, but an ordinary append-only save no longer walks, copies, or serializes that complete history. Active checkpoints are indexed by normalized save path, and IMDC snapshots only the immutable event, custom-mutation, and checkpoint suffix beyond the durable counts before appending that suffix to the journal. Full O(history) snapshot work is reserved for compaction, recovery, New Save, or destructive branch boundaries.
+Complete event history remains complete, but an ordinary append-only save does not rewrite complete history. Active checkpoints are indexed by normalized save path, and IMDC snapshots only immutable event, custom-mutation, and checkpoint suffixes beyond durable counts before appending them to the journal. Full O(history) work is reserved for compaction, recovery, New Save, or destructive branch boundaries.
 
-Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks also avoid complete trim scans when no active record can exceed the checkpoint.
+Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks avoid complete trim scans when no active record can exceed the checkpoint.
 
-Background journal compaction is normally requested when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. Transaction count is only a replay-depth ceiling and scales with base size from 2,048 to 32,768 committed transactions, avoiding full-history rewrites merely because a large sidecar accumulated a few hundred tiny checkpoint-only saves.
+The checkpoint content fingerprint is computed only at vanilla save/load boundaries. In standalone IMDC, the defensive save freeze already produces compact JSON, so the fingerprint reuses that JSON rather than performing a second serialization. The SHA-256 input is encoded in bounded UTF-8 chunks to avoid another save-sized byte-array allocation. When Save Write Ordering Fix is positively verified and IMDC skips its own defensive clone, one compact `JsonUtility.ToJson` call is required to obtain the exact checkpoint fingerprint.
+
+Background journal compaction is normally requested when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. Transaction count is only a replay-depth ceiling and scales with base size from 2,048 to 32,768 committed transactions.
 
 ## Persistence format policy
 
-This build accepts only `IMDataCore.LightweightSidecar` format version 3 and transactional journal format 2. Older sidecar/journal formats are intentionally not migrated or replayed by the runtime.
+This development build accepts only `IMDataCore.LightweightSidecar` format version 5 and transactional journal format 2. Earlier sidecar formats are intentionally unsupported and are left untouched. No runtime migration path is provided.
 
-Pre-2.0 database persistence is also outside the runtime migration path. IMDC 3.4 does not discover or import historical databases or flat fallback files.
+Pre-2.0 database persistence is also outside the runtime path. Historical documents remain in `docs/` only as implementation history and do not describe accepted current persistence inputs.

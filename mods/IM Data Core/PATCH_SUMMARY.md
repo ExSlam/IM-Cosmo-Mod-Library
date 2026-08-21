@@ -1,45 +1,43 @@
-# IM Data Core 3.4.5 patch summary
+# IM Data Core 3.4.6 patch summary
 
-## 3.4.5 checkpoint and lifecycle additions
+## 3.4.6 persistence-correctness changes
 
-- Every exact save checkpoint now carries the full enabled vanilla mod registry, including JSON-only mods, with author/version and DLL filenames.
-- Exact-checkpoint load reports missing, disabled, and changed mod requirements without blocking vanilla.
-- Graduation fate text is captured as `idol_graduation_outcome` after vanilla resolves `Graduation_Trivia_Text`.
-- Staff severance receives dedicated money-ledger attribution instead of generic staff cost.
+This revision closes four persistence/lifecycle defects found by static comparison with the supplied decompiled Idol Manager code and hardens the new deletion archive path against concurrent IMDC I/O.
 
-- Restored the missing transient `Dictionary<int, singles._single>` used by unresolved single chart-position backfill.
+1. **Collision-resistant exact checkpoints:** sidecar format 5 adds `ContentFingerprint`, a SHA-256 fingerprint of Unity's compact serialized vanilla `SavedData`. Exact checkpoint identity now includes normalized save path, vanilla `LastSave`, playtime seconds, vanilla game date/time, and this content fingerprint. Distinct vanilla saves can no longer collapse merely because their timestamp/playtime fields collide within the same second.
+2. **Low-overhead fingerprinting:** standalone IMDC reuses the compact JSON already produced by its defensive `SavedData` freeze. SHA-256 consumes UTF-8 in bounded chunks so fingerprinting does not allocate a second save-sized byte array. When Save Write Ordering Fix is positively verified and IMDC skips its own freeze, one compact serialization is performed to obtain the fingerprint.
+3. **Anchored adoption:** loading a vanilla career with no existing IMDC sidecar seeds an in-memory sequence-0 exact checkpoint. Loading alone still performs no unsolicited write, but a later `TryFlushNow` cannot create an unanchored sidecar that fails exact matching on the next load.
+4. **Checkpoint watermark parser fix:** checkpoint `GameDateTime` is parsed through vanilla `ExtensionMethods.ToDateTime`, matching the persisted vanilla `yyyy-MM-dd HH:mm:ss` representation. Event/custom-mutation round-trip timestamp parsing remains unchanged.
+5. **Deleted-save preservation:** successful vanilla deletion archives the matching mirrored IMDC directory instead of deleting it. `<name>` becomes `<name>OLD`; collisions use `<name>OLD2`, `<name>OLD3`, and so on. Whole story-playthrough deletion archives the corresponding mirrored playthrough tree as one unit.
+6. **Archive/write serialization:** an exclusive persistence-topology lease serializes archival against sidecar load, write, and background compaction. Prepared snapshots carry per-path archive epochs, so a snapshot prepared before deletion cannot recreate the old path after archival.
+7. **Archive-failure safety:** if the preservation rename fails, existing supplemental files are left untouched and writes beneath that deleted-save directory are blocked for the remainder of the process.
+8. **Active-scope deletion:** deleting the currently active save detaches the physical scope while preserving the logical in-memory branch, allowing a later vanilla New Save/Save As to carry that history to a new path.
+9. **Current-format-only development policy:** sidecar format 5 is the only accepted sidecar format. Older sidecars are preserved on disk but are not migrated or activated by this build. Transactional journal format remains 2.
 
-This revision focuses on persistence correctness under New Save/Overwrite Save branching, cross-engine compaction safety, and long-campaign save/load cost.
+## Retained 3.4.x behavior
 
-## Applied changes
+- Exact checkpoints still capture the enabled Idol Manager mod inventory and emit diagnostic missing/disabled/metadata/DLL mismatch warnings without blocking vanilla load.
+- Existing unmatched sidecars still fail closed rather than activating by in-game date alone.
+- New Save/Overwrite Save keeps the active multi-path checkpoint ledger consistent while each physical sidecar serializes only checkpoints for its own target path.
+- Process-wide per-path I/O locks, journal hashing, transactional journal replay, atomic compact-base replacement, backup recovery, and background compaction verification remain in place.
+- Vanilla remains canonical: IMDC failures are fail-soft/fail-open at Harmony boundaries and do not intentionally prevent a vanilla save or load action.
+- Public API behavior, money-ledger aggregation, reflection-safe interop, custom-event idempotency, portrait identity capture, graduation outcome capture, and staff-severance attribution remain unchanged.
 
-1. **New Save checkpoint correctness:** a full New Save snapshot no longer prunes checkpoints belonging to other physical save paths from the active ledger, preserving incremental-prefix validity when a later Overwrite Save returns to an older path.
-2. **Process-wide path serialization:** sidecar I/O locks are shared across engine instances, and same-path load replacement holds that lease through old-engine disposal and new-engine installation.
-3. **Fail-open vanilla protection:** standalone `SavedData` snapshot cloning logs and returns the original object if Unity serialization fails, so IMDC cannot abort vanilla saving.
-4. **Scaled compaction policy:** byte/base-ratio thresholds are primary; transaction count is only a scaled 2,048-32,768 replay-cost ceiling.
-5. **Low-allocation compaction:** background compaction uses a shallow immutable-prefix snapshot of loaded records rather than deserializing the complete base+journal into duplicate event/mutation objects.
-6. **Compaction generation verification:** the worker rechecks the physical base SHA-256 and journal length before committing.
-7. **Incremental journal validation:** the base is fully validated once; replayed journal suffix rows reuse the same sequence/idempotency/checkpoint sets instead of validating the whole history again.
-8. **Conditional sorting:** runtime index rebuilds sort only if a linear monotonicity check finds disorder.
-9. **Dirty chart backfill:** save boundaries revisit only unresolved released singles, not the full historical singles list.
-10. **Lower reconciliation allocation:** post-mod show scans reuse scratch `HashSet`/`List` instances.
-11. **Backup crash-window recovery:** `.imdc.bak` can recover with the still-present primary journal when it matches the backup base, and a failed journal-copy attempt keeps that source journal.
-12. **Current-format persistence only:** sidecar format 3 and transactional journal format 2 are accepted; older persistence formats are intentionally unsupported.
-13. **Complete money aggregates:** public monthly/range totals scan the entire exact cash ledger and are independent of the paged display cap.
-14. **Reflection-safe optional integration:** `IMDataCoreInteropApi` lets optional mods explicitly identify their consumer assembly when registering and reading/writing custom JSON through reflection.
-15. **Large archival custom values:** one custom JSON value may consume the namespace’s existing 5 MiB aggregate budget, allowing richer checkpointed companion-mod snapshots without raising the namespace cap.
-16. **Lifecycle portrait identity:** idol lifecycle payloads now record raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs without storing rendered portraits.
+## Compatibility and versions
 
-## Compatibility
+- Project/mod version: **3.4.6**.
+- Sidecar `FormatName`: `IMDataCore.LightweightSidecar`.
+- Sidecar `FormatVersion`: **5 only**.
+- Journal `FormatName`: `IMDataCore.LightweightJournal`.
+- Journal `FormatVersion`: **2**.
+- No runtime backwards-compatibility or migration path is provided for older sidecar formats in this development build.
 
-- Public API retains the uncapped money-transaction totals and reflection-safe `IMDataCoreInteropApi`; existing API entry points remain compatible. Idol lifecycle payload JSON gains additive portrait-identity fields.
-- Sidecar `FormatVersion` is **4**; format 3 remains readable for migration.
-- Journal `FormatVersion` is **2**.
-- Older sidecar/journal formats are intentionally not supported.
-- Project/mod version is **3.4.5**.
+## Vanilla deletion targets verified
 
+The preservation hooks correspond to the three game-save directory deletion methods in the supplied decompilation:
 
-## Election numbering
+- `Popup_Save.Delete()` for legacy/freeplay manual saves.
+- `Popup_Load_Story.Delete_Save(save_info)` for a story save directory.
+- `Popup_Load_Story.Delete_Playthrough(playthrough_info)` for a complete story playthrough directory.
 
-- `election_number` now follows vanilla `SEvent_SSK` display semantics exactly: finished elections use `_SSK.Count`; the current unfinished election uses `SEvent_SSK.CountElections() + 1`.
-- Election `ID` / event `EntityId` remains an internal lookup identity and is never the election ordinal.
+Autosave UI does not expose the story save delete button, and unrelated `Directory.Delete` uses such as portrait/temp cleanup are intentionally not patched.

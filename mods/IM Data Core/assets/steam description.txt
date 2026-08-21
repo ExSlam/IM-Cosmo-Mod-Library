@@ -1,24 +1,27 @@
 [h1]IM Data Core[/h1]
-A shared data and history backend for Idol Manager mods in the Cosmo Mod Library including Idol Career Diary, and Monthly Ledger mods.
+A shared data and history backend for Idol Manager mods in the Cosmo Mod Library, including Idol Career Diary and Monthly Ledger mods.
 
 IM Data Core is primarily a framework dependency. Other mods use it to keep save-scoped custom state, historical timeline events, and an exact money ledger without modifying Idol Manager's vanilla save JSON.
 
-[h1]Version 3[/h1]
+[h1]Version 3.4.6[/h1]
 [list]
 [*] JSON-native sidecar storage
+[*] SHA-256 content-fingerprinted exact save checkpoints
 [*] Exact per-save-file persistence and rollback checkpoints
+[*] Anchored adoption of existing vanilla careers before explicit IMDC-only flushes
 [*] Namespaced custom JSON for consumer mods
 [*] Shared historical event ledger
 [*] Exact cash transaction history
-[*] Memory-first writes synchronized to vanilla save boundaries
-[*] Safer handling of corrupt or newer sidecars
+[*] Transactional delta-journal persistence and backup recovery
+[*] Deleted vanilla save histories preserved as OLD/OLD2/... IMDC archive directories
+[*] Safer handling of corrupt, unsupported, or unmatched sidecars
 [/list]
 
-Version 3 stores nested payloads as real JSON objects/arrays instead of JSON encoded inside strings, removes redundant derived fields from disk, and keeps one previous sidecar generation as a recovery backup.
+The current development persistence format is IMDC sidecar format 5 with transactional journal format 2. Older sidecar formats are intentionally not migrated by this build and are left untouched.
 
-Existing lightweight IM Data Core v1/v2 sidecars are readable and upgrade to v3 on a later successful save.
+When a vanilla save is deleted, IM Data Core preserves its mirrored supplemental directory instead of deleting it. This retained history is intended to support later career-diary export tooling.
 
 Pre-2.0 database persistence is not automatically migrated by the runtime mod.
 
 [h1]For mod authors[/h1]
-Use the public [code]IMDataCoreApi[/code] surface. The included documentation and template mod show namespace registration, custom JSON state, custom events, history reads, and explicit flushes.
+Use the public [code]IMDataCoreApi[/code] surface. The included documentation and template mod cover namespace registration, custom JSON state, custom events, history reads, and explicit flushes.

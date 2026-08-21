@@ -7,6 +7,7 @@ If you are unsure whether a rename is safe, use this document before refactoring
 ## Why this matters
 
 Mod integrations break most often because one of these changes happened unintentionally:
+
 - API method name changed
 - Harmony patch target symbol changed
 - Required token format violated
@@ -37,9 +38,11 @@ This guide helps prevent those breakages.
 ## Token rules (what string values must satisfy)
 
 Allowed characters:
+
 - `a-z`, `A-Z`, `0-9`, `_`, `-`, `.`
 
 Length rules:
+
 - Namespace: `3..64`
 - Data key: `1..128`
 - Entity kind: `1..64`
@@ -47,6 +50,7 @@ Length rules:
 - Source patch: sanitized, max `128`
 
 Practical recommendation:
+
 - Use lowercase snake_case for most keys and event names.
 - Use reverse-domain namespace IDs (`com.author.mod`).
 
@@ -100,6 +104,7 @@ Here callback method name is flexible.
 - Source patch: `mod.<harmony_id>.<class>.<method>.<prefix_or_postfix>`
 
 Examples:
+
 - `idol_42_snapshot_v2`
 - `contract_liability_applied`
 - `mod.com.example.my_mod.ContractPatch.Apply.Postfix`
@@ -107,11 +112,13 @@ Examples:
 ## Refactor checklist
 
 Before renaming:
+
 1. Identify whether symbol is contract or implementation detail.
 2. For Harmony callbacks, verify whether role is convention- or attribute-bound.
 3. Validate string token values against allowed format.
 
 After renaming:
+
 1. Build mod project.
 2. Confirm Harmony patch still applies at runtime.
 3. Verify IM Data Core calls still succeed.

@@ -1,8 +1,8 @@
-# IM Data Core v4 sidecar schema
+# IM Data Core v4 sidecar schema (historical)
 
-This document describes the private sidecar representation written by IMDC 3.4.5. Consumer mods should use `IMDataCoreApi`, not depend on these field names.
+> Historical reference only. IMDC 3.4.6 writes and accepts sidecar format 5 only. See [`V5_SIDECAR_SCHEMA.md`](V5_SIDECAR_SCHEMA.md) for the current schema. The runtime does not migrate or activate v4 sidecars in this development build.
 
-The release writes `FormatVersion` 4 and journal `FormatVersion` 2. Sidecar format 3 remains readable for campaign migration.
+This document records the private sidecar representation formerly written by IMDC 3.4.5. Consumer mods should use `IMDataCoreApi`, not depend on historical field names.
 
 ## Root
 

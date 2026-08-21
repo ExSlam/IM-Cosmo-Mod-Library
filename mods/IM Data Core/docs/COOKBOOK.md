@@ -60,6 +60,7 @@ internal static class PopupManager_Start_DataCoreInit_Patch
 ```
 
 Why this helps:
+
 - Avoids duplicate namespace registration attempts.
 - Avoids log spam when readiness is delayed.
 
@@ -68,6 +69,7 @@ Why this helps:
 A good key strategy prevents collisions and makes debugging easier.
 
 Recommended pattern:
+
 - Per-entity: `idol_<id>_snapshot`
 - Per-feature: `feature_<name>_state`
 - Indexed collections: `index_<name>_v1`
@@ -82,6 +84,7 @@ internal static string BuildIdolSnapshotKey(int idolId)
 ```
 
 Versioning tip:
+
 - Include version suffix if schema evolves (`_v2`).
 
 ## Recipe 3: Save snapshot with explicit error handling
@@ -106,6 +109,7 @@ internal static bool TrySaveSnapshot(string dataKey, string payloadJson)
 ```
 
 Failure classes to expect:
+
 - Invalid key token format
 - Namespace quota exceeded
 - Value too large
@@ -138,12 +142,14 @@ internal static string LoadSnapshotOrDefault(string dataKey, string defaultJson)
 ```
 
 Why this helps:
+
 - Keeps game flow stable when data is missing/corrupt.
 - Avoids null handling complexity in higher layers.
 
 ## Recipe 5: Append immutable events + maintain mutable snapshot
 
 This is the recommended dual-write model:
+
 - Event log for history
 - Snapshot for latest state
 
@@ -218,6 +224,7 @@ internal static void RecordSceneCompletionOnce(
 ```
 
 Semantics:
+
 - identity is registered namespace + `idempotencyKey`;
 - a repeated key on the active branch is a successful no-op;
 - the key is persisted with the event, so dedupe survives reload;
@@ -248,12 +255,14 @@ internal static List<IMDataCoreEvent> GetTimelineRows(int idolId)
 For a complete career/history browser, prefer `TryReadEventsForIdolPage` and pass `page[page.Count - 1].EventId` as the exclusive cursor for the next page. This avoids a hard dependency on any single recent-event request size while preserving newest-to-oldest ordering.
 
 Ordering note:
+
 - API returns newest-first ordering scoped to idol + global relevant events.
 
 ## Recipe 8: Flush before irreversible transitions
 
 Use when a physical vanilla save scope already exists and you need the current
 IMDC branch on disk before the next vanilla save:
+
 - major scene unloads
 - external export workflows
 - manual "save now" UI in your mod
@@ -270,7 +279,10 @@ internal static void FlushWithLog()
 ```
 
 This writes only IMDC's sidecar. It neither invokes nor modifies vanilla save
-handling, and it fails cleanly before the first real vanilla save.
+handling, and it fails cleanly when no physical vanilla save scope exists. If
+IMDC has just adopted an existing vanilla career with no sidecar, the load has
+already seeded a sequence-0 exact checkpoint in memory, so this explicit flush
+cannot create an unanchored sidecar.
 
 ## Recipe 9: Defensive shutdown
 
@@ -312,18 +324,27 @@ internal static void EnsureDataCoreReady()
 ## Recipe 11: Event naming conventions for long-term maintainability
 
 Use predictable naming:
+
 - `entityKind`: object type (`idol`, `contract`, `show`, `tour`)
 - `eventType`: specific mutation (`contract_liability_applied`)
 - `sourcePatch`: explicit provenance (`mod.<harmony_id>.<class>.<method>.Postfix`)
 
 Benefits:
+
 - Easier analytics queries
 - Better debugging
 - Safer cross-mod reasoning
 
+## Deleted-save archives
+
+Consumer mods do not need to intercept save deletion. IMDC patches the vanilla deletion paths itself and preserves the mirrored supplemental directory by renaming it to `<name>OLD`, then `<name>OLD2`, and so on if archives already exist. Whole story-playthrough deletion preserves the entire mirrored playthrough tree.
+
+Do not treat an `OLD` directory as the active save scope. It is retained historical material intended for later export/recovery tooling. If archival fails, IMDC leaves the directory untouched and blocks writes back into that deleted scope for the remainder of the process.
+
 ## Recipe 12: JSON schema migration strategy
 
 For custom JSON snapshots:
+
 1. Store schema version in payload (`"schema":2`)
 2. On load, migrate old versions to current in-memory model
 3. Save back migrated payload with current schema
@@ -333,6 +354,7 @@ This avoids breaking old save histories when your mod evolves.
 ## Recipe 13: Error triage checklist
 
 When an API call fails:
+
 1. Verify `Session` is not null
 2. Validate token format/length (`namespace`, `dataKey`, `entityKind`, `eventType`)
 3. Check payload size/quota
@@ -356,5 +378,5 @@ When an API call fails:
 - `docs/START_HERE.md` for first integration
 - `docs/NAMING_CONVENTIONS.md` for rename safety rules
 - `docs/EVENT_CATALOG.md` for built-in event and payload constants
-- `docs/V3_SIDECAR_SCHEMA.md` for the private v3 disk schema
-- `docs/V3_MIGRATION.md` for lightweight-sidecar upgrade behavior
+- `docs/V5_SIDECAR_SCHEMA.md` for the current private v5 disk schema
+- `docs/STORAGE_LAYOUT.md` for exact checkpoint identity, journaling, and deleted-save archives

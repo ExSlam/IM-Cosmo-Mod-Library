@@ -1,5 +1,6 @@
 # IM Data Core 2.0 implementation notes
 
+> **Historical reference only.** IMDC 3.4.6 writes and accepts sidecar format 5 only. Older migration/compatibility behavior described below is not active in the current development build. See `V5_SIDECAR_SCHEMA.md` and `V5_VALIDATION.md` for current behavior.
 > Historical document only. It records decisions and abandoned migration ideas from the 2.0 development cycle. It is not a description of IM Data Core 3.2 runtime behavior. Current IMDC uses the v3 JSON sidecar only and contains no SQL/database runtime path or pre-2.0 flat-file importer.
 
 This file is the durable implementation contract and progress log for the

@@ -1,14 +1,16 @@
 # IM Data Core - Start Here (Beginner-Friendly)
 
-This guide explains exactly how to use IM Data Core 3 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
+This guide explains exactly how to use IM Data Core 3.4.6 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
 
 IM Data Core stores each sidecar under a mirrored representation of its exact
-vanilla save path. For path examples and v1/v2 sidecar compatibility rules,
+vanilla save path. This development build accepts sidecar format 5 only. For
+path mapping, checkpoint identity, deleted-save archival, and journal details,
 see [`STORAGE_LAYOUT.md`](STORAGE_LAYOUT.md).
 
 ## What you are building
 
 You will build a mod integration that can:
+
 1. Register with IM Data Core
 2. Save custom JSON state
 3. Read custom JSON state
@@ -23,6 +25,7 @@ You will build a mod integration that can:
 - You can build your own mod DLL
 
 If you are new to Harmony:
+
 - Harmony patches let your code run before or after a game method.
 - A `Postfix` runs after the original method.
 - You can call IM Data Core API methods from inside those callbacks.
@@ -41,6 +44,7 @@ Add this reference to your mod `.csproj`:
 ```
 
 Why this matters:
+
 - Without this reference, your mod cannot call `IMDataCoreApi`.
 
 ## Step 2: Create shared bridge state
@@ -58,6 +62,7 @@ internal static class DataCoreBridge
 ```
 
 Why one shared session:
+
 - Registration is namespace-scoped and assembly-bound.
 - Reusing one session avoids duplicate registration logic.
 
@@ -97,6 +102,7 @@ internal static class PopupManager_Start_YourModInit_Patch
 ```
 
 Important:
+
 - `NamespaceId` must be unique and token-safe.
 - Recommended format: reverse-domain (`com.author.modname`).
 
@@ -156,6 +162,7 @@ internal static bool TryLoadIdolSnapshot(int idolId, out string json)
 ```
 
 Interpretation tip:
+
 - `false` + empty error usually means key not found.
 
 ## Step 6: Append a custom timeline event
@@ -188,6 +195,7 @@ internal static void AppendPromotionEvent(int idolId, int fanGain)
 ```
 
 When to use this:
+
 - You care about historical sequence, not only latest state.
 
 ### Step 6A: Make replay-prone callbacks idempotent
@@ -309,8 +317,10 @@ internal static void FlushNow()
 ```
 
 `TryFlushNow` writes only the IMDC sidecar. It does not trigger or modify a
-vanilla save, and it returns a clean failure before the first real vanilla save
-has established a physical scope.
+vanilla save, and it returns a clean failure before any physical vanilla save
+scope exists. If IMDC has just adopted an existing vanilla career that had no
+sidecar, the load seeds an in-memory sequence-0 exact checkpoint first, so an
+explicit flush cannot create an unanchored sidecar.
 
 ## Step 9: Optional shutdown cleanup
 
@@ -327,6 +337,10 @@ internal static void Shutdown()
     DataCoreBridge.Session = null;
 }
 ```
+
+## Save deletion behavior
+
+When the player deletes a vanilla save through the supported vanilla UI, IMDC preserves the matching supplemental directory by renaming it with an `OLD` suffix rather than deleting it. Name collisions use `OLD2`, `OLD3`, and so on. This is automatic; consumer mods should not rename or delete IMDC sidecars themselves.
 
 ## Common mistakes and fixes
 

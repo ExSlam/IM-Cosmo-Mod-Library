@@ -4,11 +4,185 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 
 namespace IMDataCore
 {
+    /// <summary>
+    /// Computes a stable content identity for one vanilla SavedData graph. The
+    /// fingerprint is based on Unity's compact JSON representation, which provides
+    /// a deterministic semantic identity across the save and later load boundary.
+    /// A detached snapshot may register the fingerprint of the JSON that created it
+    /// so checkpoint construction never performs a redundant full serialization.
+    /// </summary>
+    internal static class VanillaSavedDataFingerprint
+    {
+        internal const string Prefix = "sha256:";
+        private const int Utf8ChunkCharacterCount = 4096;
+        private const int Utf8ChunkByteCount = Utf8ChunkCharacterCount * 4;
+
+        private sealed class CachedFingerprint
+        {
+            internal string Value = string.Empty;
+        }
+
+        private static readonly object CacheLock = new object();
+        private static readonly ConditionalWeakTable<SaveManager.SavedData, CachedFingerprint>
+            FrozenFingerprintCache =
+                new ConditionalWeakTable<SaveManager.SavedData, CachedFingerprint>();
+
+        internal static bool TryComputeForSavedData(
+            SaveManager.SavedData savedData,
+            out string fingerprint,
+            out string errorMessage)
+        {
+            fingerprint = string.Empty;
+            errorMessage = string.Empty;
+            if (savedData == null)
+            {
+                errorMessage = "Vanilla SavedData is null.";
+                return false;
+            }
+
+            lock (CacheLock)
+            {
+                CachedFingerprint cached;
+                if (FrozenFingerprintCache.TryGetValue(savedData, out cached) &&
+                    cached != null &&
+                    IsValid(cached.Value))
+                {
+                    fingerprint = cached.Value;
+                    FrozenFingerprintCache.Remove(savedData);
+                    return true;
+                }
+            }
+
+            try
+            {
+                string json = UnityEngine.JsonUtility.ToJson(savedData, false);
+                fingerprint = ComputeForJson(json);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                errorMessage =
+                    "Computing the vanilla SavedData fingerprint failed: " +
+                    exception.Message;
+                return false;
+            }
+        }
+
+        internal static string ComputeForJson(string json)
+        {
+            string value = json ?? string.Empty;
+            Encoding utf8 = Encoding.UTF8;
+            byte[] byteBuffer = new byte[Utf8ChunkByteCount];
+
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                int characterIndex = 0;
+                while (characterIndex < value.Length)
+                {
+                    int characterCount = Math.Min(
+                        Utf8ChunkCharacterCount,
+                        value.Length - characterIndex);
+
+                    // Encoding.GetBytes(string, ...) is stateless. Keep UTF-16
+                    // surrogate pairs in the same chunk so a boundary can never
+                    // change the UTF-8 byte sequence being hashed.
+                    int finalCharacterIndex = characterIndex + characterCount - 1;
+                    if (characterCount > 0 &&
+                        finalCharacterIndex + 1 < value.Length &&
+                        char.IsHighSurrogate(value[finalCharacterIndex]) &&
+                        char.IsLowSurrogate(value[finalCharacterIndex + 1]))
+                    {
+                        characterCount--;
+                    }
+
+                    int byteCount = utf8.GetBytes(
+                        value,
+                        characterIndex,
+                        characterCount,
+                        byteBuffer,
+                        0);
+                    if (byteCount > 0)
+                    {
+                        sha256.TransformBlock(
+                            byteBuffer,
+                            0,
+                            byteCount,
+                            byteBuffer,
+                            0);
+                    }
+                    characterIndex += characterCount;
+                }
+
+                sha256.TransformFinalBlock(new byte[0], 0, 0);
+                return Prefix + ToLowerHex(sha256.Hash);
+            }
+        }
+
+        internal static void RegisterFrozenFingerprint(
+            SaveManager.SavedData savedData,
+            string fingerprint)
+        {
+            if (savedData == null || !IsValid(fingerprint))
+            {
+                return;
+            }
+
+            lock (CacheLock)
+            {
+                FrozenFingerprintCache.Remove(savedData);
+                FrozenFingerprintCache.Add(
+                    savedData,
+                    new CachedFingerprint { Value = fingerprint });
+            }
+        }
+
+        internal static bool IsValid(string fingerprint)
+        {
+            if (string.IsNullOrEmpty(fingerprint) ||
+                fingerprint.Length != Prefix.Length + 64 ||
+                !fingerprint.StartsWith(Prefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            for (int index = Prefix.Length; index < fingerprint.Length; index++)
+            {
+                char value = fingerprint[index];
+                if (!((value >= '0' && value <= '9') ||
+                      (value >= 'a' && value <= 'f')))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string ToLowerHex(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            char[] chars = new char[bytes.Length * 2];
+            const string Hex = "0123456789abcdef";
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                byte value = bytes[index];
+                chars[index * 2] = Hex[value >> 4];
+                chars[(index * 2) + 1] = Hex[value & 0x0F];
+            }
+            return new string(chars);
+        }
+    }
+
     /// <summary>
     /// Immutable scalar identity copied from one vanilla SavedData instance. The
     /// relative path selects the physical sidecar; the remaining values select a
@@ -20,6 +194,7 @@ namespace IMDataCore
         internal string LastSave = string.Empty;
         internal long PlaytimeSeconds;
         internal string GameDateTime = string.Empty;
+        internal string ContentFingerprint = string.Empty;
 
         internal static bool TryCreate(
             SaveManager.SavedData savedData,
@@ -42,12 +217,22 @@ namespace IMDataCore
                 return false;
             }
 
+            string contentFingerprint;
+            if (!VanillaSavedDataFingerprint.TryComputeForSavedData(
+                    savedData,
+                    out contentFingerprint,
+                    out errorMessage))
+            {
+                return false;
+            }
+
             stamp = new VanillaSaveStamp
             {
                 RelativeSavePath = normalizedRelativePath,
                 LastSave = savedData.staticVars__PlayerData.LastSave ?? string.Empty,
                 PlaytimeSeconds = savedData.staticVars__PlayerData.Playtime_Seconds,
-                GameDateTime = savedData.staticVars__dateTime ?? string.Empty
+                GameDateTime = savedData.staticVars__dateTime ?? string.Empty,
+                ContentFingerprint = contentFingerprint
             };
             return true;
         }
@@ -61,7 +246,11 @@ namespace IMDataCore
                     CorePaths.PathComparison) &&
                 string.Equals(checkpoint.LastSave, LastSave, StringComparison.Ordinal) &&
                 checkpoint.PlaytimeSeconds == PlaytimeSeconds &&
-                string.Equals(checkpoint.GameDateTime, GameDateTime, StringComparison.Ordinal);
+                string.Equals(checkpoint.GameDateTime, GameDateTime, StringComparison.Ordinal) &&
+                string.Equals(
+                    checkpoint.ContentFingerprint,
+                    ContentFingerprint,
+                    StringComparison.Ordinal);
         }
 
         internal static string NormalizeRelativePath(string value)
@@ -74,9 +263,9 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Versioned JSON envelope for the lightweight sidecar. Version 4 adds an
-    /// enabled-mod inventory to each exact vanilla-save checkpoint while retaining
-    /// the structural JSON representation introduced by version 3. Runtime
+    /// Versioned JSON envelope for the lightweight sidecar. Version 5 gives every
+    /// vanilla-save checkpoint a SHA-256 content fingerprint so exact checkpoint
+    /// identity no longer depends on second-resolution timestamps. Runtime
     /// dictionaries and read indexes are always rebuilt.
     /// </summary>
     [Serializable]
@@ -104,6 +293,7 @@ namespace IMDataCore
         internal string TargetPath = string.Empty;
         internal string RelativeSavePath = string.Empty;
         internal long Generation;
+        internal long PathArchiveEpoch;
         internal bool PreserveExistingBackup;
         internal long StateRevision;
         internal bool IsIncremental;
@@ -144,6 +334,7 @@ namespace IMDataCore
         public string LastSave = string.Empty;
         public long PlaytimeSeconds;
         public string GameDateTime = string.Empty;
+        public string ContentFingerprint = string.Empty;
         public long Sequence;
         public List<LightweightModSnapshotRecord> EnabledMods =
             new List<LightweightModSnapshotRecord>();
@@ -163,7 +354,7 @@ namespace IMDataCore
         public string NamespaceIdentifier = string.Empty;
         public string IdempotencyKey = string.Empty;
         public string PayloadJson = CoreConstants.EmptyJsonObject;
-        // Pre-transformed v3 storage representation. This is deliberately not a
+        // Pre-transformed native sidecar storage representation. This is deliberately not a
         // public sidecar field; the manual codec writes it as the structural Payload
         // value. Records are immutable after insertion, so the expensive transform
         // only needs to happen once.
@@ -191,8 +382,8 @@ namespace IMDataCore
     internal sealed class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
-        internal const int MinimumSupportedSidecarFormatVersion = 3;
-        internal const int SidecarFormatVersion = 4;
+        internal const int MinimumSupportedSidecarFormatVersion = 5;
+        internal const int SidecarFormatVersion = 5;
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
@@ -207,8 +398,16 @@ namespace IMDataCore
         // compaction is queued. The lock therefore belongs to the process/path,
         // not to one LightweightCoreStorageEngine object.
         private static readonly object PersistenceIoRegistryLock = new object();
+        private static readonly ReaderWriterLockSlim PersistenceTopologyLock =
+            new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
         private static readonly Dictionary<string, object> PersistenceIoLocksByPath =
             new Dictionary<string, object>(CorePaths.PathComparer);
+        private static readonly Dictionary<string, long> PersistenceArchiveEpochByPath =
+            new Dictionary<string, long>(CorePaths.PathComparer);
+        private static readonly HashSet<string> PersistenceArchiveBlockedDirectories =
+            new HashSet<string>(CorePaths.PathComparer);
+        private static readonly HashSet<string> PersistenceArchiveInProgressDirectories =
+            new HashSet<string>(CorePaths.PathComparer);
 
         private sealed class HashingReadStream : Stream
         {
@@ -752,6 +951,155 @@ namespace IMDataCore
                 blockedPersistenceReason = string.IsNullOrEmpty(reason)
                     ? "The existing IM Data Core sidecar is protected from overwrite."
                     : reason;
+            }
+        }
+
+
+        /// <summary>
+        /// Invalidates every in-memory physical baseline/checkpoint that belongs to
+        /// an IMDC directory being archived after vanilla deleted the matching save.
+        /// Event/custom-data history is intentionally retained so a still-running
+        /// career can later be saved under a new physical path.
+        /// </summary>
+        internal bool InvalidatePhysicalDirectoryForArchive(
+            string sidecarDirectoryPath,
+            out bool detachedCurrentScope,
+            out string errorMessage)
+        {
+            detachedCurrentScope = false;
+            errorMessage = string.Empty;
+
+            string normalizedDirectory;
+            if (!CorePaths.TryValidateContainedMutationPath(
+                    sidecarDirectoryPath,
+                    false,
+                    out normalizedDirectory,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+
+                    detachedCurrentScope = PathIsSameOrContained(
+                        normalizedDirectory,
+                        currentSidecarPath);
+
+                    RemovePathStateRowsInsideDirectoryLocked(
+                        latestCommittedPersistenceGenerationByPath,
+                        normalizedDirectory);
+                    RemovePathStateRowsInsideDirectoryLocked(
+                        committedPathStates,
+                        normalizedDirectory);
+
+                    int activeCheckpointCountBefore = activeCheckpoints.Count;
+                    activeCheckpoints.RemoveAll(
+                        checkpoint => CheckpointTargetsDirectory(
+                            checkpoint,
+                            normalizedDirectory));
+                    if (activeCheckpoints.Count != activeCheckpointCountBefore)
+                    {
+                        activeStateRevision++;
+                        RecomputeCheckpointWatermarkLocked();
+                    }
+
+                    int durableCheckpointCountBefore = durableCheckpoints.Count;
+                    durableCheckpoints.RemoveAll(
+                        checkpoint => CheckpointTargetsDirectory(
+                            checkpoint,
+                            normalizedDirectory));
+                    if (durableCheckpoints.Count != durableCheckpointCountBefore)
+                    {
+                        RebuildDurableCheckpointIdentityIndexLocked();
+                    }
+
+                    if (!string.IsNullOrEmpty(blockedPersistencePath) &&
+                        PathIsSameOrContained(
+                            normalizedDirectory,
+                            blockedPersistencePath))
+                    {
+                        blockedPersistencePath = string.Empty;
+                        blockedPersistenceReason = string.Empty;
+                    }
+
+                    if (detachedCurrentScope)
+                    {
+                        currentSidecarPath = string.Empty;
+                        currentRelativeSavePath = string.Empty;
+                        blockedPersistencePath = string.Empty;
+                        blockedPersistenceReason = string.Empty;
+                        recoveredFromBackup = false;
+                        loadedExistingSidecarDocument = false;
+                        lastPersistenceMode = "archived_detached";
+                        lastBaseSnapshotBytes = 0L;
+                        lastJournalBytes = 0L;
+                        lastJournalEntryCount = 0;
+                    }
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Invalidating the archived IMDC persistence directory failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        private static void RemovePathStateRowsInsideDirectoryLocked<T>(
+            Dictionary<string, T> rows,
+            string directoryPath)
+        {
+            if (rows == null || rows.Count == 0)
+            {
+                return;
+            }
+
+            List<string> keys = new List<string>(rows.Keys);
+            for (int index = 0; index < keys.Count; index++)
+            {
+                if (PathIsSameOrContained(directoryPath, keys[index]))
+                {
+                    rows.Remove(keys[index]);
+                }
+            }
+        }
+
+        private static bool CheckpointTargetsDirectory(
+            LightweightCheckpointRecord checkpoint,
+            string directoryPath)
+        {
+            if (checkpoint == null || string.IsNullOrEmpty(directoryPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string relativePath = VanillaSaveStamp.NormalizeRelativePath(
+                    checkpoint.RelativeSavePath);
+                if (string.IsNullOrEmpty(relativePath))
+                {
+                    return false;
+                }
+
+                string checkpointPath = Path.GetFullPath(
+                    Path.Combine(
+                        CorePaths.GetRootDirectory(),
+                        relativePath));
+                return PathIsSameOrContained(
+                    directoryPath,
+                    checkpointPath);
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -1674,7 +2022,7 @@ namespace IMDataCore
 
         /// <summary>
         /// Returns the enabled-mod inventory frozen into the exact vanilla-save
-        /// checkpoint. Version-3 checkpoints legitimately return an empty list.
+        /// checkpoint.
         /// </summary>
         internal bool TryGetCheckpointModSnapshot(
             VanillaSaveStamp stamp,
@@ -1788,6 +2136,7 @@ namespace IMDataCore
                             LastSave = stamp.LastSave,
                             PlaytimeSeconds = stamp.PlaytimeSeconds,
                             GameDateTime = stamp.GameDateTime,
+                            ContentFingerprint = stamp.ContentFingerprint,
                             Sequence = sequence,
                             EnabledMods = CloneModSnapshots(enabledMods)
                         };
@@ -1838,6 +2187,15 @@ namespace IMDataCore
                             out normalizedSidecarPath,
                             out errorMessage))
                     {
+                        return false;
+                    }
+
+                    string archiveBlockReason;
+                    if (TryGetPersistenceArchiveBlockReason(
+                            normalizedSidecarPath,
+                            out archiveBlockReason))
+                    {
+                        errorMessage = archiveBlockReason;
                         return false;
                     }
 
@@ -1903,6 +2261,15 @@ namespace IMDataCore
                         return false;
                     }
 
+                    string archiveBlockReason;
+                    if (TryGetPersistenceArchiveBlockReason(
+                            normalizedSidecarPath,
+                            out archiveBlockReason))
+                    {
+                        errorMessage = archiveBlockReason;
+                        return false;
+                    }
+
                     long generation = ++nextPersistenceGeneration;
                     snapshot = BuildPersistenceSnapshotLocked(
                         normalizedSidecarPath,
@@ -1945,11 +2312,32 @@ namespace IMDataCore
                 return false;
             }
 
-            object pathIoLock = GetPersistenceIoLock(snapshot.TargetPath);
-            lock (pathIoLock)
+            using (AcquirePersistenceTopologyReadLease())
             {
-                CommittedPathState baselineState = null;
-                bool canAppendJournal = false;
+                object pathIoLock = GetPersistenceIoLock(snapshot.TargetPath);
+                lock (pathIoLock)
+                {
+                    if (!IsPersistenceArchiveEpochCurrent(
+                            snapshot.TargetPath,
+                            snapshot.PathArchiveEpoch))
+                    {
+                        // The vanilla directory was deleted/archived after this
+                        // snapshot was prepared. Treat the write as superseded so a
+                        // queued persistence operation cannot resurrect that path.
+                        return true;
+                    }
+
+                    string archiveBlockReason;
+                    if (TryGetPersistenceArchiveBlockReason(
+                            snapshot.TargetPath,
+                            out archiveBlockReason))
+                    {
+                        errorMessage = archiveBlockReason;
+                        return false;
+                    }
+
+                    CommittedPathState baselineState = null;
+                    bool canAppendJournal = false;
                 bool noPhysicalWriteRequired = false;
                 int eventDeltaStartIndex = 0;
                 int customMutationDeltaStartIndex = 0;
@@ -2217,7 +2605,32 @@ namespace IMDataCore
                     ", elapsed_ms=" +
                     stopwatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture) +
                     ".");
-                return true;
+                    return true;
+                }
+            }
+        }
+
+
+        internal bool IsPersistenceSnapshotStillCurrent(
+            LightweightPersistenceSnapshot snapshot)
+        {
+            if (snapshot == null ||
+                string.IsNullOrEmpty(snapshot.TargetPath) ||
+                !IsPersistenceArchiveEpochCurrent(
+                    snapshot.TargetPath,
+                    snapshot.PathArchiveEpoch))
+            {
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                return !disposed &&
+                    snapshot.Generation == nextPersistenceGeneration &&
+                    string.Equals(
+                        currentSidecarPath,
+                        snapshot.TargetPath,
+                        CorePaths.PathComparison);
             }
         }
 
@@ -2308,10 +2721,19 @@ namespace IMDataCore
             string targetPath = persistenceSnapshot.TargetPath;
             string relativeSavePath = persistenceSnapshot.RelativeSavePath;
             long generation = persistenceSnapshot.Generation;
-            object pathIoLock = GetPersistenceIoLock(targetPath);
-            lock (pathIoLock)
+            using (AcquirePersistenceTopologyReadLease())
             {
-                CommittedPathState expectedState;
+                object pathIoLock = GetPersistenceIoLock(targetPath);
+                lock (pathIoLock)
+                {
+                    if (!IsPersistenceArchiveEpochCurrent(
+                            targetPath,
+                            persistenceSnapshot.PathArchiveEpoch))
+                    {
+                        return;
+                    }
+
+                    CommittedPathState expectedState;
                 lock (storageLock)
                 {
                     long latestGeneration;
@@ -2369,6 +2791,8 @@ namespace IMDataCore
                         TargetPath = targetPath,
                         RelativeSavePath = relativeSavePath,
                         Generation = generation,
+                        PathArchiveEpoch =
+                            persistenceSnapshot.PathArchiveEpoch,
                         PreserveExistingBackup = false,
                         StateRevision = expectedState.StateRevision,
                         IsIncremental = false,
@@ -2436,9 +2860,10 @@ namespace IMDataCore
                     lastJournalEntryCount = 0;
                 }
 
-                CoreLog.Info(
-                    "IM Data Core compacted its journal in the background: base_bytes=" +
-                    baseBytes.ToString(CultureInfo.InvariantCulture) + ".");
+                    CoreLog.Info(
+                        "IM Data Core compacted its journal in the background: base_bytes=" +
+                        baseBytes.ToString(CultureInfo.InvariantCulture) + ".");
+                }
             }
         }
 
@@ -3053,7 +3478,252 @@ namespace IMDataCore
                 out errorMessage);
         }
 
+        private sealed class PersistenceTopologyLease : IDisposable
+        {
+            private readonly bool write;
+            private bool disposedLease;
+
+            internal PersistenceTopologyLease(bool writeLease)
+            {
+                write = writeLease;
+                if (write)
+                {
+                    PersistenceTopologyLock.EnterWriteLock();
+                }
+                else
+                {
+                    PersistenceTopologyLock.EnterReadLock();
+                }
+            }
+
+            public void Dispose()
+            {
+                if (disposedLease)
+                {
+                    return;
+                }
+
+                disposedLease = true;
+                if (write)
+                {
+                    PersistenceTopologyLock.ExitWriteLock();
+                }
+                else
+                {
+                    PersistenceTopologyLock.ExitReadLock();
+                }
+            }
+        }
+
+        internal static IDisposable AcquirePersistenceTopologyReadLease()
+        {
+            return new PersistenceTopologyLease(false);
+        }
+
+        internal static IDisposable AcquirePersistenceTopologyWriteLease()
+        {
+            return new PersistenceTopologyLease(true);
+        }
+
         internal static object GetSharedPersistenceIoLock(string targetPath)
+        {
+            string key = NormalizePersistenceRegistryPath(targetPath);
+            lock (PersistenceIoRegistryLock)
+            {
+                object pathLock;
+                if (!PersistenceIoLocksByPath.TryGetValue(key, out pathLock))
+                {
+                    pathLock = new object();
+                    PersistenceIoLocksByPath[key] = pathLock;
+                }
+
+                if (!PersistenceArchiveEpochByPath.ContainsKey(key))
+                {
+                    PersistenceArchiveEpochByPath[key] = 0L;
+                }
+                return pathLock;
+            }
+        }
+
+        private static object GetPersistenceIoLock(string targetPath)
+        {
+            return GetSharedPersistenceIoLock(targetPath);
+        }
+
+        private static long GetPersistenceArchiveEpoch(string targetPath)
+        {
+            string key = NormalizePersistenceRegistryPath(targetPath);
+            lock (PersistenceIoRegistryLock)
+            {
+                long epoch;
+                if (!PersistenceArchiveEpochByPath.TryGetValue(key, out epoch))
+                {
+                    epoch = 0L;
+                    PersistenceArchiveEpochByPath[key] = epoch;
+                }
+
+                if (!PersistenceIoLocksByPath.ContainsKey(key))
+                {
+                    PersistenceIoLocksByPath[key] = new object();
+                }
+
+                foreach (string archiveDirectory in
+                    PersistenceArchiveInProgressDirectories)
+                {
+                    if (PathIsSameOrContained(archiveDirectory, key))
+                    {
+                        // A snapshot prepared while archival owns the topology write
+                        // lease must never become writable after the rename. This
+                        // sentinel can never equal a registered non-negative epoch.
+                        return long.MinValue;
+                    }
+                }
+                return epoch;
+            }
+        }
+
+        private static bool IsPersistenceArchiveEpochCurrent(
+            string targetPath,
+            long expectedEpoch)
+        {
+            string key = NormalizePersistenceRegistryPath(targetPath);
+            lock (PersistenceIoRegistryLock)
+            {
+                long currentEpoch;
+                return PersistenceArchiveEpochByPath.TryGetValue(
+                        key,
+                        out currentEpoch) &&
+                    currentEpoch == expectedEpoch;
+            }
+        }
+
+        internal static void BeginPersistenceArchiveBoundaryForDirectory(
+            string sidecarDirectoryPath)
+        {
+            if (!PersistenceTopologyLock.IsWriteLockHeld)
+            {
+                throw new InvalidOperationException(
+                    "The IMDC persistence topology write lease is required before " +
+                    "beginning an archive boundary.");
+            }
+
+            string normalizedDirectory = NormalizePersistenceRegistryPath(
+                sidecarDirectoryPath);
+            if (string.IsNullOrEmpty(normalizedDirectory))
+            {
+                throw new ArgumentException(
+                    "The IMDC archive directory path is empty.",
+                    "sidecarDirectoryPath");
+            }
+
+            lock (PersistenceIoRegistryLock)
+            {
+                PersistenceArchiveInProgressDirectories.Add(normalizedDirectory);
+            }
+        }
+
+        internal static void CompletePersistenceArchiveBoundaryForDirectory(
+            string sidecarDirectoryPath,
+            bool archiveSucceeded)
+        {
+            if (!PersistenceTopologyLock.IsWriteLockHeld)
+            {
+                throw new InvalidOperationException(
+                    "The IMDC persistence topology write lease is required before " +
+                    "completing an archive boundary.");
+            }
+
+            string normalizedDirectory = NormalizePersistenceRegistryPath(
+                sidecarDirectoryPath);
+            if (string.IsNullOrEmpty(normalizedDirectory))
+            {
+                throw new ArgumentException(
+                    "The IMDC archive directory path is empty.",
+                    "sidecarDirectoryPath");
+            }
+
+            lock (PersistenceIoRegistryLock)
+            {
+                // Increment only at the end of the archive boundary. Snapshot
+                // preparation is allowed to run without the topology lease, so any
+                // path registered while archival is in progress must receive the old
+                // epoch and become stale here. A genuinely later save then receives
+                // the new epoch and may reuse the vanilla path safely.
+                List<string> keys = new List<string>(
+                    PersistenceArchiveEpochByPath.Keys);
+                for (int index = 0; index < keys.Count; index++)
+                {
+                    string key = keys[index];
+                    if (!PathIsSameOrContained(
+                            normalizedDirectory,
+                            key))
+                    {
+                        continue;
+                    }
+
+                    long epoch = PersistenceArchiveEpochByPath[key];
+                    PersistenceArchiveEpochByPath[key] =
+                        epoch == long.MaxValue ? 0L : epoch + 1L;
+                }
+
+                if (archiveSucceeded)
+                {
+                    List<string> blocked = new List<string>(
+                        PersistenceArchiveBlockedDirectories);
+                    for (int index = 0; index < blocked.Count; index++)
+                    {
+                        if (PathIsSameOrContained(
+                                normalizedDirectory,
+                                blocked[index]))
+                        {
+                            PersistenceArchiveBlockedDirectories.Remove(
+                                blocked[index]);
+                        }
+                    }
+                }
+                else
+                {
+                    // The vanilla save is already gone, but the IMDC directory could
+                    // not be renamed. Preserve that orphan verbatim: later persistence
+                    // into the same directory is blocked for this process rather than
+                    // risking destruction of the diary the archive was meant to keep.
+                    PersistenceArchiveBlockedDirectories.Add(normalizedDirectory);
+                }
+
+                PersistenceArchiveInProgressDirectories.Remove(normalizedDirectory);
+            }
+        }
+
+        private static bool TryGetPersistenceArchiveBlockReason(
+            string targetPath,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            string normalizedTarget = NormalizePersistenceRegistryPath(targetPath);
+            lock (PersistenceIoRegistryLock)
+            {
+                foreach (string blockedDirectory in
+                    PersistenceArchiveBlockedDirectories)
+                {
+                    if (!PathIsSameOrContained(
+                            blockedDirectory,
+                            normalizedTarget))
+                    {
+                        continue;
+                    }
+
+                    errorMessage =
+                        "IM Data Core persistence is blocked for this deleted-save " +
+                        "directory because its preservation rename failed earlier " +
+                        "in this process. The existing supplemental files were left " +
+                        "untouched.";
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string NormalizePersistenceRegistryPath(string targetPath)
         {
             string key = targetPath ?? string.Empty;
             if (!string.IsNullOrEmpty(key))
@@ -3065,25 +3735,41 @@ namespace IMDataCore
                 catch
                 {
                     // Callers validate physical mutation paths before I/O. Keep a
-                    // stable fallback key here so lock acquisition itself never
-                    // turns a supplemental persistence failure into a vanilla one.
+                    // stable fallback key here so synchronization itself never turns
+                    // a supplemental persistence failure into a vanilla one.
                 }
             }
-            lock (PersistenceIoRegistryLock)
-            {
-                object pathLock;
-                if (!PersistenceIoLocksByPath.TryGetValue(key, out pathLock))
-                {
-                    pathLock = new object();
-                    PersistenceIoLocksByPath[key] = pathLock;
-                }
-                return pathLock;
-            }
+            return key;
         }
 
-        private static object GetPersistenceIoLock(string targetPath)
+        private static bool PathIsSameOrContained(
+            string parentDirectory,
+            string candidatePath)
         {
-            return GetSharedPersistenceIoLock(targetPath);
+            if (string.IsNullOrEmpty(parentDirectory) ||
+                string.IsNullOrEmpty(candidatePath))
+            {
+                return false;
+            }
+
+            string normalizedParent = NormalizePersistenceRegistryPath(
+                parentDirectory);
+            string normalizedCandidate = NormalizePersistenceRegistryPath(
+                candidatePath);
+            if (string.Equals(
+                    normalizedParent,
+                    normalizedCandidate,
+                    CorePaths.PathComparison))
+            {
+                return true;
+            }
+
+            string prefix = normalizedParent.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return normalizedCandidate.StartsWith(
+                prefix,
+                CorePaths.PathComparison);
         }
 
         internal IMDataCorePersistenceDiagnostics GetPersistenceDiagnostics(
@@ -3538,8 +4224,8 @@ namespace IMDataCore
                 return false;
             }
 
-            // Version 4 extends checkpoints only. Version 3 remains readable so
-            // existing campaigns migrate naturally on their next full sidecar write.
+            // Version 5 requires content-fingerprinted checkpoints. Older sidecar
+            // schemas are intentionally unsupported during this development phase.
             if (!string.Equals(
                     document.FormatName,
                     SidecarFormatName,
@@ -3742,6 +4428,8 @@ namespace IMDataCore
                 if (checkpoint == null ||
                     checkpoint.Sequence < 0L ||
                     checkpoint.Sequence > document.LastIssuedSequence ||
+                    !VanillaSavedDataFingerprint.IsValid(
+                        checkpoint.ContentFingerprint) ||
                     string.IsNullOrEmpty(
                         VanillaSaveStamp.NormalizeRelativePath(
                             checkpoint.RelativeSavePath)))
@@ -3977,7 +4665,7 @@ namespace IMDataCore
             latestTourStateByTourId.Clear();
             ResetActiveWatermarksLocked();
 
-            // Current v3 persistence is written in ascending sequence order.
+            // Current v5 persistence is written in ascending sequence order.
             // Runtime appends/rollback preserve that order, so avoid O(N log N)
             // sorting on every load/rebuild unless a defensive monotonic scan finds
             // that an in-memory transform actually disturbed it.
@@ -4126,10 +4814,18 @@ namespace IMDataCore
             {
                 gameDate = knownGameDate.Value;
             }
-            else if (!TryParseRoundTripDate(checkpoint.GameDateTime, out gameDate))
+            else
             {
-                maxActiveCheckpointGameDate = DateTime.MaxValue;
-                return;
+                try
+                {
+                    gameDate = ExtensionMethods.ToDateTime(
+                        checkpoint.GameDateTime);
+                }
+                catch
+                {
+                    maxActiveCheckpointGameDate = DateTime.MaxValue;
+                    return;
+                }
             }
 
             if (gameDate > maxActiveCheckpointGameDate)
@@ -4505,6 +5201,8 @@ namespace IMDataCore
         {
             string normalizedRelativePath =
                 VanillaSaveStamp.NormalizeRelativePath(relativeSavePath);
+            long pathArchiveEpoch = GetPersistenceArchiveEpoch(
+                normalizedTargetPath);
             IReadOnlyList<LightweightCheckpointRecord> pathCheckpointRows =
                 GetActiveCheckpointsForPathLocked(normalizedRelativePath);
 
@@ -4530,6 +5228,7 @@ namespace IMDataCore
                     TargetPath = normalizedTargetPath,
                     RelativeSavePath = normalizedRelativePath,
                     Generation = generation,
+                    PathArchiveEpoch = pathArchiveEpoch,
                     PreserveExistingBackup = false,
                     StateRevision = activeStateRevision,
                     IsIncremental = true,
@@ -4568,6 +5267,7 @@ namespace IMDataCore
                 TargetPath = normalizedTargetPath,
                 RelativeSavePath = normalizedRelativePath,
                 Generation = generation,
+                PathArchiveEpoch = pathArchiveEpoch,
                 PreserveExistingBackup = preserveExistingBackup,
                 StateRevision = activeStateRevision,
                 IsIncremental = false,
@@ -4946,17 +5646,20 @@ namespace IMDataCore
             private readonly string lastSave;
             private readonly long playtimeSeconds;
             private readonly string gameDateTime;
+            private readonly string contentFingerprint;
 
             private CheckpointIdentity(
                 string relativeSavePath,
                 string lastSave,
                 long playtimeSeconds,
-                string gameDateTime)
+                string gameDateTime,
+                string contentFingerprint)
             {
                 this.relativeSavePath = relativeSavePath ?? string.Empty;
                 this.lastSave = lastSave ?? string.Empty;
                 this.playtimeSeconds = playtimeSeconds;
                 this.gameDateTime = gameDateTime ?? string.Empty;
+                this.contentFingerprint = contentFingerprint ?? string.Empty;
             }
 
             internal static CheckpointIdentity From(VanillaSaveStamp stamp)
@@ -4968,7 +5671,8 @@ namespace IMDataCore
                         : string.Empty,
                     stamp != null ? stamp.LastSave : string.Empty,
                     stamp != null ? stamp.PlaytimeSeconds : 0L,
-                    stamp != null ? stamp.GameDateTime : string.Empty);
+                    stamp != null ? stamp.GameDateTime : string.Empty,
+                    stamp != null ? stamp.ContentFingerprint : string.Empty);
             }
 
             internal static CheckpointIdentity From(
@@ -4981,7 +5685,10 @@ namespace IMDataCore
                         : string.Empty,
                     checkpoint != null ? checkpoint.LastSave : string.Empty,
                     checkpoint != null ? checkpoint.PlaytimeSeconds : 0L,
-                    checkpoint != null ? checkpoint.GameDateTime : string.Empty);
+                    checkpoint != null ? checkpoint.GameDateTime : string.Empty,
+                    checkpoint != null
+                        ? checkpoint.ContentFingerprint
+                        : string.Empty);
             }
 
             public bool Equals(CheckpointIdentity other)
@@ -4995,7 +5702,10 @@ namespace IMDataCore
                     playtimeSeconds == other.playtimeSeconds &&
                     StringComparer.Ordinal.Equals(
                         gameDateTime,
-                        other.gameDateTime);
+                        other.gameDateTime) &&
+                    StringComparer.Ordinal.Equals(
+                        contentFingerprint,
+                        other.contentFingerprint);
             }
 
             public override bool Equals(object obj)
@@ -5019,6 +5729,9 @@ namespace IMDataCore
                     hash = (hash * 31) +
                         StringComparer.Ordinal.GetHashCode(
                             gameDateTime ?? string.Empty);
+                    hash = (hash * 31) +
+                        StringComparer.Ordinal.GetHashCode(
+                            contentFingerprint ?? string.Empty);
                     return hash;
                 }
             }
@@ -5044,6 +5757,10 @@ namespace IMDataCore
                 string.Equals(
                     left.GameDateTime,
                     right.GameDateTime,
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    left.ContentFingerprint,
+                    right.ContentFingerprint,
                     StringComparison.Ordinal);
         }
 
@@ -5402,6 +6119,7 @@ namespace IMDataCore
                 LastSave = source.LastSave ?? string.Empty,
                 PlaytimeSeconds = source.PlaytimeSeconds,
                 GameDateTime = source.GameDateTime ?? string.Empty,
+                ContentFingerprint = source.ContentFingerprint ?? string.Empty,
                 Sequence = source.Sequence,
                 EnabledMods = CloneModSnapshots(source.EnabledMods)
             };

@@ -129,6 +129,190 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Mirrors one vanilla save directory into IMDC's private sibling tree. The
+        /// vanilla directory itself may already have been deleted; only its canonical
+        /// location beneath the vanilla data root is used. The data root itself is
+        /// never accepted as an archive target.
+        /// </summary>
+        internal static bool TryResolveMirroredDirectoryForVanillaDirectory(
+            string vanillaDirectoryPath,
+            out string sidecarDirectoryPath,
+            out string errorMessage)
+        {
+            return TryResolveMirroredDirectoryForVanillaDirectory(
+                Application.persistentDataPath,
+                vanillaDirectoryPath,
+                out sidecarDirectoryPath,
+                out errorMessage);
+        }
+
+        internal static bool TryResolveMirroredDirectoryForVanillaDirectory(
+            string persistentDataRoot,
+            string vanillaDirectoryPath,
+            out string sidecarDirectoryPath,
+            out string errorMessage)
+        {
+            sidecarDirectoryPath = string.Empty;
+            errorMessage = string.Empty;
+            if (string.IsNullOrWhiteSpace(vanillaDirectoryPath))
+            {
+                errorMessage = "The vanilla save directory path is empty.";
+                return false;
+            }
+
+            string normalizedPersistentRoot;
+            string dataRootDirectory;
+            string dataCoreRootDirectory;
+            if (!TryResolveSeparatedRoots(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot,
+                    out dataRootDirectory,
+                    out dataCoreRootDirectory))
+            {
+                errorMessage =
+                    "The IM Data Core and vanilla data roots are invalid.";
+                return false;
+            }
+
+            string normalizedVanillaDirectory;
+            try
+            {
+                normalizedVanillaDirectory = Path.GetFullPath(
+                    vanillaDirectoryPath);
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            if (!IsStrictlyContainedPath(
+                    dataRootDirectory,
+                    normalizedVanillaDirectory))
+            {
+                errorMessage =
+                    "Refused to archive IM Data Core state for a directory outside " +
+                    "the vanilla save-data tree.";
+                return false;
+            }
+
+            string pathSafetyError;
+            if (!TryValidateExistingPathChain(
+                    dataRootDirectory,
+                    normalizedVanillaDirectory,
+                    out pathSafetyError))
+            {
+                errorMessage = pathSafetyError;
+                return false;
+            }
+
+            string relativeDirectory = normalizedVanillaDirectory.Substring(
+                BuildDirectoryPrefix(dataRootDirectory).Length);
+            string candidate;
+            try
+            {
+                candidate = Path.GetFullPath(
+                    Path.Combine(dataCoreRootDirectory, relativeDirectory));
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            return TryValidateContainedMutationPath(
+                persistentDataRoot,
+                candidate,
+                false,
+                out sidecarDirectoryPath,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Preserves one private IMDC directory by appending OLD to its directory
+        /// name. Existing archives are never overwritten: collisions become OLD2,
+        /// OLD3, and so on. No file beneath the source directory is deleted.
+        /// </summary>
+        internal static bool TryArchiveContainedDirectory(
+            string sourceDirectoryPath,
+            out string archivedDirectoryPath,
+            out string errorMessage)
+        {
+            archivedDirectoryPath = string.Empty;
+            errorMessage = string.Empty;
+
+            string normalizedSource;
+            if (!TryValidateContainedMutationPath(
+                    sourceDirectoryPath,
+                    true,
+                    out normalizedSource,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            if (!Directory.Exists(normalizedSource))
+            {
+                return true;
+            }
+
+            string parentDirectory = Path.GetDirectoryName(normalizedSource);
+            string sourceName = Path.GetFileName(
+                normalizedSource.TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar));
+            if (string.IsNullOrEmpty(parentDirectory) ||
+                string.IsNullOrEmpty(sourceName))
+            {
+                errorMessage =
+                    "The IM Data Core archive directory name is invalid.";
+                return false;
+            }
+
+            try
+            {
+                for (int suffix = 1; suffix < int.MaxValue; suffix++)
+                {
+                    string archiveName = sourceName + "OLD" +
+                        (suffix == 1
+                            ? string.Empty
+                            : suffix.ToString(CultureInfo.InvariantCulture));
+                    string candidate = Path.Combine(
+                        parentDirectory,
+                        archiveName);
+                    string normalizedCandidate;
+                    if (!TryValidateContainedMutationPath(
+                            candidate,
+                            false,
+                            out normalizedCandidate,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    if (Directory.Exists(normalizedCandidate) ||
+                        File.Exists(normalizedCandidate))
+                    {
+                        continue;
+                    }
+
+                    Directory.Move(normalizedSource, normalizedCandidate);
+                    archivedDirectoryPath = normalizedCandidate;
+                    return true;
+                }
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.Message;
+                return false;
+            }
+
+            errorMessage =
+                "IM Data Core could not allocate an OLD archive directory name.";
+            return false;
+        }
+
+        /// <summary>
         /// Reconstructs the exact path selection performed around DataSaver calls,
         /// then accepts it only when it is a supported game-save scope.
         /// </summary>
@@ -1613,7 +1797,7 @@ namespace IMDataCore
             }
         }
 
-        private static bool IsSameOrContainedPath(
+        internal static bool IsSameOrContainedPath(
             string rootDirectory,
             string candidatePath)
         {
