@@ -1,6 +1,6 @@
-# IM UI Framework 2.1.0: Vanilla UI Sources
+# Vanilla UI Sources
 
-IM UI Framework 2.1 distinguishes two equally real vanilla sources: **Unity `Resources` prefabs** (largely the bundled Michsky Modern UI Pack controls) and **scene-serialized Idol Manager composites** (game-specific arrangements such as the producer-list scroll slider). Resources remain preferred for controls that actually live in `Resources`; scene-native patterns are used where the game itself wires a composite directly in `main.unity`.
+IM UI Framework uses two equally real vanilla sources: **Unity `Resources` prefabs** (largely the bundled Michsky Modern UI Pack controls) and **scene-serialized Idol Manager composites** (game-specific arrangements such as the producer-list scroll slider). Resources remain preferred for controls that actually live in `Resources`; scene-native patterns are used where the game itself wires a composite directly in `main.unity`.
 
 This is based on the shipped Idol Manager assets recovered from `Idol Manager/IM_Data` and the game's decompiled Modern UI Pack code. The game's `UIManager*` components themselves load `Resources.Load<UIManager>("MUIP Manager")`, so the same runtime resource mechanism is used here.
 
@@ -15,7 +15,7 @@ At runtime the framework deliberately does **not** open or parse `IM_Data` files
 `VanillaUiPrefabCatalog` contains every runtime-loadable UI prefab found in the exported `Resources` tree: **218 prefabs**.
 
 | Family | Count |
-|---|---:|
+| --- | ---: |
 | Animated icons | 11 |
 | Buttons | 150 |
 | Context menus | 2 |
@@ -78,10 +78,10 @@ Typed convenience methods are provided for scrollbar, all six MUIP button-manage
 
 ## Button prefab manager families
 
-The exported prefab scripts show six distinct MUIP manager families. Version 2.0.0 maps each family only to compatible resource variants:
+The exported prefab scripts show six distinct MUIP manager families. The framework maps each family only to compatible resource variants:
 
 | Manager | Vanilla resource families |
-|---|---|
+| --- | --- |
 | `ButtonManager` | basic outline, basic outline gradient, rounded outline, rounded outline gradient |
 | `ButtonManagerBasic` | basic, basic gradient, rounded, rounded gradient |
 | `ButtonManagerBasicIcon` | basic-only-icon, radial-only-icon |
@@ -228,7 +228,6 @@ Existing 1.x APIs remain available. `IMUiBridges.TryCloneModernControl<T>` now s
 ## Why `GameObject/*.prefab` from AssetRipper is not in this catalog
 
 AssetRipper can reconstruct prefab-like files for serialized scene GameObjects. Those exported paths do not prove that the original build registered them under Unity `Resources`, so `Resources.Load("that reconstructed path")` is not safe to assume. Version 2.0.0 deliberately catalogs only the prefab files proven to live in the exported `Resources` tree. Scene/popup cloning remains the fallback for non-Resources UI.
-
 
 ### Vanilla rounded-corner shader
 

@@ -4,27 +4,20 @@
 
 ## Dependencies
 
-- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.5` or higher
+- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.7` or higher
 - `IM UI Framework` (`com.cosmo.imuiframework`) version `2.0.3` or higher
 
-This mod does not ship a separate persistence backend. It reads timeline events from IM Data Core and renders UI with IM UI Framework.
+This mod does not ship a separate persistence backend. It reads timeline events and supplemental state through IM Data Core and renders UI with IM UI Framework.
 
-## 1.2.4 graduation, election, and concert detail pass
+## Current data contract
 
-- Timeline source rows are career-windowed before aggregation/deduplication: events before the idol's hiring date and events after an actually completed graduation are excluded from that idol's diary. The graduation day itself remains included.
-- IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Graduation** using vanilla's final `Graduation_Trivia_Text`, so JSON-only graduation-trivia additions are preserved without a hard dependency on their mod.
-- Election rankings use compact rows in `rank → portrait → idol name → votes → points` order. Both the portrait and idol name open that ranked idol's profile, including the existing Graduation Details bridge for graduated idols.
-- Concert details retain the ordered setlist snapshot with song/group, satisfaction, sales, center portrait/name, stamina/skill, numbered talk breaks with up to three MC portraits/names, cards used, and chronological disaster outcomes. The unrelated generic **With whom** field is no longer populated for concert entries.
+Idol Career Diary uses IM Data Core's public API only. Current timeline data uses the canonical `single_released`, `show_episode_released`, `contract_cancelled`, and `idol_status_changed` event names, while readers for older aliases remain so imported or third-party events can still be displayed.
 
-Idol Career Diary uses IM Data Core's public API only. With IM Data Core 3.4.5,
-entity identifiers are read from the event's `EntityId`, and new timeline data
-uses the canonical `single_released`, `show_episode_released`,
-`contract_cancelled`, and `idol_status_changed` event names. Readers for their
-old aliases remain so imported or third-party events can still be displayed.
+Timeline source rows are career-windowed before aggregation/deduplication: events before the idol's hiring date and events after an actually completed graduation are excluded from that idol's diary. The graduation day itself remains included.
 
-The last-selected diary entry is supplemental state stored through IM Data
-Core. It is immediately visible in the active session and becomes durable at
-the next vanilla save boundary, following IM Data Core 3.4.5's persistence model.
+IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Graduation** using vanilla's resolved `Graduation_Trivia_Text`, preserving JSON-only graduation-trivia additions without a hard dependency on the mod that supplied them. Election rankings use IM Data Core's persisted `election_number`, not event identity, and concert details retain the captured ordered setlist/talk-break snapshot.
+
+The last-selected diary entry is supplemental state stored through IM Data Core. It is immediately visible in the active session and becomes durable at the next vanilla save boundary.
 
 ## Player-facing behavior
 
@@ -108,16 +101,10 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 
 ## Installation
 
-1. Install `IM Data Core` 3.2 or newer first.
-2. Install `IM UI Framework` second.
+1. Install `IM Data Core` 3.4.7 or newer.
+2. Install `IM UI Framework` 2.0.3 or newer.
 3. Install `Idol Career Diary`.
-4. Launch game and open an idol profile to verify diary UI appears.
-
-## 1.0 release contract
-
-- Runtime behavior and user-facing diary feature set are considered stable in `1.x`.
-- Dependency requirement remains hard: missing IM Data Core or IM UI Framework is an install error.
-- Timeline and supplemental-state rollback follow the vanilla save selected by IM Data Core 3.2.
+4. Launch the game and open an idol profile to verify the diary UI appears.
 
 ## Troubleshooting
 
@@ -128,18 +115,9 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 ## Build
 
 Project file:
+
 - `mods/Idol Career Diary/Idol Career Diary.csproj`
 
 Example command:
+
 - `dotnet build "mods/Idol Career Diary/Idol Career Diary.csproj" -c Release`
-
-
-## 1.2.2 election numbering
-
-- Election labels now always use IM Data Core's persisted `election_number`, never the event `EntityId`/vanilla `_SSK.ID`.
-- Removed the partial-cache ordinal clamp that could turn a later election into `Election #1` when older diary pages had not been loaded yet.
-- Rows missing `election_number` fall back to another row for the same election or to vanilla `_SSK.Count` / `SEvent_SSK.CountElections() + 1`; the number of loaded diary pages no longer affects election numbering.
-
-## 1.2.1 font consistency
-
-Timeline toolbar buttons and the manually-created TMP search field now ask IM UI Framework 2.0.3 to apply Idol Manager's currently selected game font after they are constructed. This fixes the mixed-font timeline UI that could otherwise leave framework/fallback button labels and search text on a MUIP/TMP default while the rest of the diary followed the game font.

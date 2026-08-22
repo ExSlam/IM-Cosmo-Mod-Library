@@ -1,6 +1,6 @@
 # Embedded IM UI Framework
 
-Graduation Calendar 0.3.5 is self-contained. IM UI Framework v3.1.2-compatible source is vendored under `src/EmbeddedIMUiFramework/` and compiled into the Graduation Calendar DLL.
+Graduation Calendar 0.3.9 is self-contained. IM UI Framework 3.1.2-compatible source is vendored under [`../src/EmbeddedIMUiFramework/`](../src/EmbeddedIMUiFramework/) and compiled into the Graduation Calendar DLL.
 
 ## Why
 
@@ -16,8 +16,6 @@ This avoids relying on Steam Workshop dependency propagation for players who sub
 
 ## Updating the embedded framework
 
-When adopting a newer IM UI Framework release, replace the files in `src/EmbeddedIMUiFramework/`, change their namespace from `IMUiFramework` to `GraduationCalendar.EmbeddedIMUiFramework`, and keep the framework-global Harmony patch classes omitted. Then rebuild Graduation Calendar and test both with and without the standalone IM UI Framework installed.
+When adopting a newer IM UI Framework release, replace the files in [`../src/EmbeddedIMUiFramework/`](../src/EmbeddedIMUiFramework/), change their namespace from `IMUiFramework` to `GraduationCalendar.EmbeddedIMUiFramework`, and keep the framework-global Harmony patch classes omitted. Then rebuild Graduation Calendar and test both with and without the standalone IM UI Framework installed.
 
-## 0.3.3 embedded geometry additions
-
-The vendored composer exposes per-scroll-view producer-slider right inset and viewport gutter values, month-pager label padding, and the shipped rounded-white visual helper. Graduation Calendar uses those options locally, so the standalone framework keeps vanilla defaults unless another caller opts into custom geometry.
+Graduation Calendar-specific geometry changes belong in [`../CHANGELOG.md`](../CHANGELOG.md), not in this embedding contract.

@@ -1,6 +1,6 @@
 # Vanilla Prefab Catalog
 
-This catalog is generated from the prefab files actually exported beneath Idol Manager's Unity `Resources` tree. Paths below are passed to `Resources.Load<GameObject>(path)` without the `Resources/` prefix or `.prefab` suffix. Version 2.0.0 exposes the same set through `VanillaUiPrefabCatalog.AllPrefabPaths`.
+This catalog is generated from the prefab files actually exported beneath Idol Manager's Unity `Resources` tree. Paths below are passed to `Resources.Load<GameObject>(path)` without the `Resources/` prefix or `.prefab` suffix. The framework exposes the same set through `VanillaUiPrefabCatalog.AllPrefabPaths`.
 
 **Total runtime-loadable UI prefabs: 218.**
 
@@ -280,4 +280,3 @@ For per-instance colors, fonts, sizes, and MUIP theme variants, combine any path
 ## window manager (1)
 
 - `window manager/Window Manager`
-

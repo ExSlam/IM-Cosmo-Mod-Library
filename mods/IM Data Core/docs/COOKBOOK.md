@@ -381,8 +381,8 @@ When an API call fails:
 
 ## Related docs
 
-- `docs/START_HERE.md` for first integration
-- `docs/NAMING_CONVENTIONS.md` for rename safety rules
-- `docs/EVENT_CATALOG.md` for built-in event and payload constants
-- `docs/V5_SIDECAR_SCHEMA.md` for the current private v5 disk schema
-- `docs/STORAGE_LAYOUT.md` for exact checkpoint identity, journaling, and deleted-save archives
+- [`START_HERE.md`](START_HERE.md) for first integration
+- [`NAMING_CONVENTIONS.md`](NAMING_CONVENTIONS.md) for rename safety rules
+- [`EVENT_CATALOG.md`](EVENT_CATALOG.md) for built-in event and payload constants
+- [`V5_SIDECAR_SCHEMA.md`](V5_SIDECAR_SCHEMA.md) for the current private v5 disk schema
+- [`STORAGE_LAYOUT.md`](STORAGE_LAYOUT.md) for exact checkpoint identity, journaling, and deleted-save archives

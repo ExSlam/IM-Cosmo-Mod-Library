@@ -34,7 +34,7 @@ Named helpers are conveniences, not a coverage limit. `IMUiElementBuilder.FromPo
 The supplied game assets contain 218 UI prefabs under `Resources`, and `VanillaUiPrefabCatalog` contains 218 matching runtime paths:
 
 | Resource family | Prefabs |
-|---|---:|
+| --- | ---: |
 | Animated icon | 11 |
 | Button | 150 |
 | Context menu | 2 |
@@ -80,3 +80,16 @@ A custom mod can therefore choose among:
 6. or, as a last resort, an exact whole popup template.
 
 The source is independent from the theme. That is what allows a pink or green custom calendar, ledger, chart, settings screen, etc. to retain vanilla sprites, geometry and interaction behavior instead of becoming a recolored screenshot of an existing popup.
+
+## Coverage
+
+- `PopupManager._type`: **60 / 60** enum entries represented.
+- Materialized popup roots in the supplied scenes: **58 / 60**; `show_release` and `main_menu_load` are explicitly recorded as unmaterialized rather than given invented templates.
+- Gameplay `main.unity`: **9,651** RectTransforms indexed.
+- `Main Menu.unity`: **508** RectTransforms indexed.
+- Runtime-loadable UI prefabs under exported `Resources`: **218**, matching `VanillaUiPrefabCatalog.AllPrefabPaths` with no missing or extra catalog paths in the audited asset set.
+- Decompiled public `GameObject` fields named `prefab*`: **226** across **90** source files, handled through serialized-reference resolution rather than assumed `Resources.Load` paths.
+
+Duplicate hierarchy paths are retained through occurrence-indexed lookup, and inactive descendants are included. Producer Contracts, Salaries, and Loans were also verified to use the same separate vertical `Slider`/`SliderDefault` list-scroll pattern rather than `ScrollRect.verticalScrollbar`.
+
+These counts describe the supplied Idol Manager source/assets used to build the catalogs.

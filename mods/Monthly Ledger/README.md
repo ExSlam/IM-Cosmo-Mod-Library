@@ -8,48 +8,44 @@ Monthly Ledger adds an Action Hub button that opens a queued, game-style popup c
 - IM Data Core 3.4.5 or newer
 - IM UI Framework 2.1.0 or newer
 
-## 0.2.6 transaction-detail correction
+## Current behavior
 
-Month navigation now uses the same scene-derived previous/next arrow buttons as Graduation Calendar, with a red per-instance theme instead of red `<` / `>` text. Staff severance is captured at `staff._staff.Fire_Severance` and rendered as a severance payment with the staff member, role, payment, and skill snapshot rather than generic staff cost. Weekly idol salary rows say **Paid this week** and retain the exact salary included in vanilla's weekly deduction after automatic salary-policy adjustments have finished.
+Month navigation uses the same scene-derived previous/next controls as the Singles chart/Graduation Calendar, with a red per-instance theme. The ledger uses the scene-native Producer Contracts/Salaries/Loans list-scroll pattern: a separate vertical `Slider` with a fixed circular handle and thin track, not `ScrollRect.verticalScrollbar`.
 
-## 0.2.5 complete monthly totals
+The visible transaction list is capped at 10,000 rows for UI safety. Income, expense, net, and transaction-count totals come from IM Data Core's uncapped monthly aggregate, so large months retain complete totals even when the detail list is truncated. Search filters only the displayed transaction records and does not change summary totals.
 
-The transaction list remains capped at 10,000 visible rows for UI safety, but income, expense, net, and transaction-count totals now come from IM Data Core 3.4.3's uncapped aggregate query. Large months therefore keep complete totals even when the detail list is truncated.
+The UI uses Idol Manager's selected game font, the game's small rounded-corner shader treatment, a MUIP search input with game-font text, and vanilla-style collapse indicators for income/expense categories. The current unfinished month is never shown, and the first selectable month is the first complete calendar month after exact capture began.
 
-## 0.2.4 producer-list scroll fix
+Months with no positive transactions render a localized **No income** row with ¥0.
 
-Monthly Ledger now uses IM UI Framework 2.1's scene-native producer-list scroll indicator. `main.unity` shows that Producer Contracts, Producer Salaries, and Producer Loans do **not** use `ScrollRect.verticalScrollbar`; each list uses a separate vertical `Slider` with a fixed circular handle and a thin grey track. The ledger now clones and binds that exact loaded-scene control, so the thumb cannot stretch into Unity's proportional `Scrollbar.size` pill. Months with no positive transactions also render a localized **No income** row with ¥0.
+## Captured detail
 
-## 0.2.0 UI overhaul
+The ledger records company-money mutations and keeps source-specific detail when IM Data Core captured it:
 
-- Uses IM UI Framework's vanilla asset layer for the real `Resources/button/basic/Pink` previous/next month buttons; 0.2.4 replaces the older MUIP scrollbar choice with the scene-native producer-list Slider pattern.
-- Stops shrinking the popup close control to 32 px; it now uses the framework/game-standard 36 px height.
-- Applies Idol Manager's currently selected game font to ledger TMP text. Bundled fonts are matched to loaded TMP assets when possible; custom/OS fonts use IM UI Framework's runtime TMP bridge.
-- Income and expense categories can be collapsed independently. Their totals remain visible while details are hidden, and the expanded/collapsed state is retained while navigating months.
-- Category headers reuse the vanilla idol-group list's exported Open/Closed collapse control when the game's `data_girls.prefab_group` reference is available, with a font-based fallback if it is not.
-- Scroll behavior follows the base game's `ScrollRectDefault`: clamped movement, sensitivity 25 on Windows/Linux, and the game's macOS sensitivity/deceleration values.
+- business contracts: contract type, contractor, product, selected idol, payment, stamina, liability, multiplier, and negotiations;
+- singles: title, group, participating idols, creative parameters, marketing, gross revenue, and production cost;
+- shows: title, medium, genre, host, cast, episode, audience, revenue, weekly budget, and compatible fan/fatigue details;
+- theaters: chronological attendance detail, schedule, audience type, ticket price, and income;
+- streaming: subscription price, subscriber change/total, and monthly streaming income;
+- cafes: dish of the day, staffing, profit/loss, fans, and appeal;
+- concerts: title, venue, ticket price, projected/final hype and attendance, revenue/profit, accident outcomes, and ordered song/talk setlist details;
+- weekly deductions: separate idol salary, staff salary, rent, and loan-payment rows;
+- staff severance: staff member, localized role, payment, and skill snapshot.
 
-The ledger records every company-money mutation. Business-contract entries retain the contract type, contractor, product, selected idol, payment, stamina, liability, multiplier, and negotiation count. Singles retain their title, group, participating idols, creative parameters, marketing, gross revenue, and production cost. Shows retain their title, medium, genre, host, cast, episode, audience, revenue, and weekly budget; when Fans Watch is active they also retain fan audience and fatigue.
+Weekly idol salary rows report **Paid this week** and retain the exact salary included in vanilla's weekly deduction after automatic policy-driven salary adjustments. Idol entries also retain fame/scandal context; staff entries retain localized role and skill information.
 
-Theater records retain a chronological daily attendance breakdown with theater name, performed schedule, audience type, attendance percentage, ticket price, and income. First-of-month streaming records retain subscription price, subscriber change, subscriber total, and monthly streaming income. Cafe records retain the dish of the day, working idols or unstaffed state, profit or loss, new fans, and appeal. Concert cost and revenue records retain the concert title, venue, ticket price, projected hype and attendance, final hype, revenue and profit, accident outcomes, and the ordered song/talk setlist with centers and talk participants.
-
-The base game's combined weekly deduction is split into one snapshot per idol salary, one snapshot per staff salary, rent, and loan payments. Idol entries retain fame and scandal points; staff entries retain their localized job role and every skill's localized name, level, and progress. Financing, story adjustments, cheats, and money changes from other mods remain visible so each month's net value reconciles with the company balance.
+Financing, story adjustments, cheats, and money changes from other mods remain visible so each month's net value reconciles with the company balance.
 
 When Assistant Manager is active, its custom staff types use the role title returned by that mod's Harmony-patched job-title lookup and retain both Production and Influence skill snapshots.
 
-Historical values are not estimated. The first selectable month is the first complete calendar month after exact capture began, and the current unfinished month is never shown.
+## Localization
 
-Month and record dates, the close control, and matching finance/category/detail labels are resolved from Idol Manager's active `Language.Data` table. Monthly Ledger's embedded localization provides mod-specific text and fallbacks where the base game has no semantically equivalent label.
+Month and record dates, the close control, and matching finance/category/detail labels are resolved from Idol Manager's active `Language.Data` table. Monthly Ledger's embedded localization supplies mod-specific strings and English fallback when the base game has no semantically equivalent label.
 
 ## Build
 
-`dotnet build "mods/Monthly Ledger/Monthly Ledger.csproj" -c Release`
+```powershell
+dotnet build "mods/Monthly Ledger/Monthly Ledger.csproj" -c Release
+```
 
-
-## 0.2.1 UI pass
-Monthly Ledger uses the game's MUIP search input, vanilla-style rounded panel treatment, centered month navigation, and fixed idol-group collapse indicators. As of 0.2.4, scrolling uses the scene-native producer-list Slider rather than the generic MUIP scrollbar resource. Search filters the displayed transaction records while leaving the monthly summary totals unchanged.
-
-
-## 0.2.3 UI correction pass
-
-The ledger uses small 4-6 unit rounded radii through Idol Manager's own rounded-corner shader rather than reusing a rounded button sprite. The search caret is blue instead of white, and all dynamic empty/search-result text is forced through IM UI Framework's selected-game-font bridge. The 0.2.4 pass supersedes the older hand-styled scrollbar with the actual scene-native producer-list Slider.
+Release history belongs in [`CHANGELOG.md`](CHANGELOG.md).

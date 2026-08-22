@@ -356,6 +356,6 @@ When the player deletes a vanilla save through the supported vanilla UI, IMDC pr
 
 ## What to read next
 
-- `docs/COOKBOOK.md`: deeper patterns and production-grade usage
-- `docs/NAMING_CONVENTIONS.md`: rename safety and contract boundaries
-- `docs/EVENT_CATALOG.md`: built-in event names and payload fields
+- [`COOKBOOK.md`](COOKBOOK.md): deeper patterns and production-grade usage
+- [`NAMING_CONVENTIONS.md`](NAMING_CONVENTIONS.md): rename safety and contract boundaries
+- [`EVENT_CATALOG.md`](EVENT_CATALOG.md): built-in event names and payload fields

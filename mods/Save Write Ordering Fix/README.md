@@ -132,18 +132,8 @@ IM Data Core uses this boundary around vanilla save-directory deletion so neithe
 
 ## Build
 
-Place the project at:
-
-`mods/Save Write Ordering Fix/`
-
-Then add it to the solution if needed:
+From the Cosmo Mod Library root:
 
 ```powershell
-dotnet sln "Cosmo Mod Library.sln" add "mods\Save Write Ordering Fix\Save Write Ordering Fix.csproj"
-```
-
-Build:
-
-```powershell
-dotnet build "Cosmo Mod Library.sln" -c Release
+dotnet build "mods\Save Write Ordering Fix\Save Write Ordering Fix.csproj" -c Release
 ```

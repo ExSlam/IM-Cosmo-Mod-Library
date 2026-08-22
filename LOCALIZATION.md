@@ -1,131 +1,56 @@
 # Localization Guide
 
-This guide explains how to create a new translation for both the base game `Idol Manager` and Cosmo Mod Library mods, including languages that are not shipped with the game by default.
+Cosmo Mod Library localization follows the language selected in Idol Manager itself.
 
-Most Cosmo mods use the language currently selected in the base game. Korean and French are additionally supported as **mod-only languages** through the Cosmo Mod Language selector described below. That selector changes Cosmo mod text only; it does not try to translate the base game.
+The shared localization code reads Idol Manager's current language (`staticVars.Settings.Language`), resolves compatible folder aliases, loads English as the fallback, and then overlays the best matching translation when one exists.
 
-## Mod-only Korean and French
+For implementation details, see [`mods/Mod Localization System/README.md`](mods/Mod%20Localization%20System/README.md).
 
-Korean and French do not need an `Idol Manager` language folder. Install **Mod Localization System** and the current **Mod Buttons** mod, then:
+## Current repository language folders
 
-1. Open the game's **Settings** tab.
-2. Select **Action Hub**.
-3. In the **Mod Buttons** section, select **Cosmo mod language**.
-4. Choose **Korean (한국어)** or **French (Français)** and apply it.
-5. Restart `Idol Manager`.
+The established Cosmo localization folders are:
 
-The choice is saved to:
-
-```text
-%USERPROFILE%\AppData\LocalLow\Glitch Pitch\Idol Manager\Mods\Mod Localization System\localization.ini
-```
-
-Choose **Game's Selected Language** to remove the mod-only override and return to the game's selected language. The selector uses `kr` for Korean and `fr` for French. `kr` is an intentional compatibility folder name for the bundled Cosmo packs, even though the BCP 47 tag for Korean is `ko`.
-
-For Korean, the loader also tries to register the Windows fonts `Malgun Gothic`, `NanumGothic`, or `Nanum Gothic` as a TextMeshPro fallback. If none is installed, some Korean text may render as missing glyphs; install one of those fonts and restart the game.
-
-All localized Cosmo mods load English first and then overlay the selected pack. A missing future key therefore falls back safely to English rather than leaving blank text.
-
-## 1. Find the `Idol Manager` install folder
-
-The default Steam install path is:
-
-```text
-C:\Program Files (x86)\Steam\steamapps\common\Idol Manager
-```
-
-If your Steam library is in a different location:
-
-1. Open Steam.
-2. Open your Library.
-3. Right-click `Idol Manager`.
-4. Click `Manage`.
-5. Click `Browse local files`.
-
-That opens the game install folder.
-
-## 2. Important rule
-
-To make `Idol Career Diary` use a language, you must do both of these:
-
-1. Add that language to the base game and select it in the game's `Settings` menu.
-2. Add the matching translation file to `Idol Career Diary`.
-
-The base game settings menu discovers languages by scanning:
-
-```text
-Idol Manager\IM_Data\StreamingAssets\Languages
-```
-
-The base game does not automatically detect arbitrary custom languages on first launch. New languages such as German, Croatian, Latvian, or custom `zh-Hans` / `zh-Hant` folders must be selected manually in the `Settings` menu after you add them.
-
-## 3. Folder naming standard
-
-For new translations, use BCP 47 language tags.
-
-Examples:
-
-| Language name in English | Recommended folder name |
+| Language | Repository folder |
 | --- | --- |
 | English | `en` |
-| German | `de` |
-| Croatian | `hr` |
-| Japanese | `ja` |
+| French | `fr` |
+| Korean | `kr` |
+| Chinese (game-compatible Simplified Chinese) | `cn` |
+| Japanese | `jp` |
 | Russian | `ru` |
-| Korean | `ko` |
-| Portuguese (Brazil) | `pt-BR` |
-| Chinese, Simplified | `zh-Hans` |
-| Chinese, Traditional | `zh-Hant` |
-| Spanish (Latin America) | `es-419` |
+| Portuguese (Brazil) | `ptbr` |
 
-Formatting rules:
+Keep those established names for existing bundled translations. Renaming only one mod from `jp` to `ja`, `cn` to `zh-Hans`, or `ptbr` to `pt-BR` creates two competing conventions without improving runtime behavior.
 
-- language subtag: lowercase, for example `en`, `de`, `hr`, `lv`, `zh`
-- script subtag: Title Case, for example `Hans`, `Hant`, `Latn`, `Cyrl`
-- region subtag: uppercase, for example `US`, `BR`, `TW`
+The resolver also understands common aliases and parent tags. Examples include:
 
-Chinese note:
+- `ja` and `jp`
+- `ko` and `kr`
+- `zh-Hans` / Simplified Chinese and `cn`
+- `zh-Hant` / Traditional Chinese forms
+- `pt-BR` and `ptbr`
+- regional tags such as `fr-CA`, which can fall back to `fr`
 
-- `Hans` and `Hant` are script codes, not language names.
-- `zh-Hans` means Chinese written in Simplified characters.
-- `zh-Hant` means Chinese written in Traditional characters.
+For a genuinely new language, use the exact language code selected by Idol Manager and provide a matching localization folder. A BCP 47-style tag such as `de`, `hr`, `fr-CA`, or `zh-Hant` is appropriate when you are creating a new custom language rather than renaming an established repository pack.
 
-Use these references when you need the correct code for a language or script:
+## How language selection works
 
-- IANA Script codes: [Language and script code examples, including `zh-Hans` and `zh-Hant`](https://www.iana.org/help/idn-repository-procedure)
-- Unicode CLDR: [Languages and Scripts table](https://www.unicode.org/cldr/charts/latest/supplemental/languages_and_scripts.html)
-- IANA Language Codes: [Language Subtag Registry](https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry)
+Cosmo mods do not choose a language independently. To make a translation active:
 
-Important details:
+1. Add or install the language in Idol Manager if the base game does not already provide it.
+2. Select that language in Idol Manager's **Settings** menu.
+3. Provide the matching Cosmo localization folder for the mod.
+4. Restart the game if the language or font was added while the game was running.
 
-- The folder name and the base game's `info.json` `ID` must match exactly.
-- For new translations submitted to this repository, use the recommended BCP 47 folder names shown in this guide.
-- The base game ships with a few older folder names such as `jp`, `cn`, and `ptbr`. Those are legacy game folders, not the naming standard for new mod translation pull requests.
-
-## 4. Add the language to the base game
-
-Open this folder inside the `Idol Manager` install directory:
+The base game's language folders are under:
 
 ```text
 Idol Manager\IM_Data\StreamingAssets\Languages
 ```
 
-You will see the shipped base game language folders there, such as `en`, `jp`, `cn`, `ru`, and `ptbr`.
+The game ships with legacy folder IDs including `en`, `jp`, `cn`, `ru`, and `ptbr`. A custom language folder must contain an `info.json` whose `ID` matches that folder name exactly so Idol Manager can select it.
 
-### Step-by-step
-
-1. Copy the existing language folder that is closest to your target language.
-2. Paste it in the same `Languages` directory.
-3. Rename the copied folder to your target language code.
-4. Open the copied folder and edit `info.json`.
-5. Change the `ID` value so it exactly matches the folder name.
-6. Change the `Language` value to the display name you want the game to show in the settings menu.
-7. Translate the JSON files under the `JSON` subfolder.
-8. Start the game.
-9. Open `Settings`.
-10. Select your new language from the language list.
-
-Example for a German base-game language folder:
+Example custom German base-game folder:
 
 ```text
 Idol Manager\IM_Data\StreamingAssets\Languages\de
@@ -143,196 +68,102 @@ Example `info.json`:
 }
 ```
 
-Notes:
+After adding a new custom language, select it manually in Idol Manager's Settings. First-launch Steam-language auto-selection is limited to the game's own hardcoded mappings and should not be treated as discovery for new custom languages.
 
-- For Latin-alphabet languages, `Linotte` is a reasonable starting point because the shipped English folder already uses it.
-- For Japanese, Chinese, or other scripts that need different glyph coverage, copy `info.json` from a shipped language that already renders that script correctly and keep or adapt its `Font` value.
-- Shipped examples:
-  - Japanese uses `Rounded M+ 1p`
-  - Chinese uses `WenQuanYi Micro Hei`
-  - Russian uses `Hero Light`
-- If the game does not show your new language in `Settings`, the usual problem is that the folder name and `info.json` `ID` do not match.
+## UI-string localization in Cosmo mods
 
-## 5. Add the language to `Idol Career Diary`
+Cosmo projects that contain `assets/Localization` compile the shared localization helper into their DLL. Their UI strings therefore retain English fallback and language resolution even when the standalone Mod Localization System is not installed.
 
-For `Idol Career Diary`, the translation file lives in this repository at:
+The current projects with embedded localization assets include:
 
-```text
-mods\Idol Career Diary\assets\Localization\<language-tag>\strings.txt
-```
+- Assistant Manager
+- Cheats Mod
+- Graduation Calendar
+- Graduation Details
+- Graduation Rebalances
+- IM UI Framework
+- Idol Career Diary
+- Mod Buttons
+- Monthly Ledger
+- No Bullying Policy
+- UI Recovery Tools
+- Unavailable Idols Fix
 
-### Step-by-step
-
-1. Go to this folder in the repository:
-
-```text
-mods\Idol Career Diary\assets\Localization
-```
-
-2. Copy the English source file:
+String files use this layout:
 
 ```text
-mods\Idol Career Diary\assets\Localization\en\strings.txt
+mods\<Mod Name>\assets\Localization\<language>\strings.txt
 ```
 
-3. Create a new folder using the recommended BCP 47 language tag.
-4. Paste the copied file into that folder.
-5. Translate only the text on the right side of each `=` line.
-6. Do not change the keys on the left side of `=`.
-7. Preserve numbered placeholders such as `{0}` exactly, and move them as needed for your language's word order.
-8. Save the file as:
+English is the required fallback:
 
 ```text
-mods\Idol Career Diary\assets\Localization\<language-tag>\strings.txt
+mods\<Mod Name>\assets\Localization\en\strings.txt
 ```
 
-Examples:
+To add a translation:
+
+1. Copy the mod's `assets/Localization/en/strings.txt`.
+2. Create the target language folder.
+3. Translate only the values on the right side of each `=`.
+4. Keep the keys on the left unchanged.
+5. Preserve numbered placeholders such as `{0}` exactly, moving them only as required by grammar.
+6. Leave intentional empty values empty. An explicit empty translation is not the same as a missing key.
+
+Missing translated keys fall back to English.
+
+## Localized JSON assets
+
+The standalone **Mod Localization System** is required for automatic language-specific JSON interception, especially for data-only mods.
+
+Localized JSON copies live under `Localization/<language>/` while preserving the original relative path. Example:
 
 ```text
-mods\Idol Career Diary\assets\Localization\de\strings.txt
-mods\Idol Career Diary\assets\Localization\hr\strings.txt
-mods\Idol Career Diary\assets\Localization\lv\strings.txt
-mods\Idol Career Diary\assets\Localization\zh-Hans\strings.txt
-mods\Idol Career Diary\assets\Localization\zh-Hant\strings.txt
-mods\Idol Career Diary\assets\Localization\pt-BR\strings.txt
+My Event Mod/
+├── info.json
+└── Localization/
+    ├── en/
+    │   └── JSON/
+    │       └── Events/
+    │           └── dialogues.json
+    └── fr/
+        └── JSON/
+            └── Events/
+                └── dialogues.json
 ```
 
-Important details:
+`Localization/en/<relative path>` is required for each automatically localized JSON asset. The framework tries the selected Idol Manager language, compatible aliases/parent language folders, and finally English.
 
-- For new translation pull requests, use `ja`, `zh-Hans`, `zh-Hant`, and `pt-BR` for the mod, not `jp`, `cn`, or `ptbr`.
-- If you are translating the game's existing shipped Chinese folder `cn`, the mod treats that legacy code as Simplified Chinese and will look for `zh-Hans`.
-- If you want a separate Traditional Chinese translation, create and select a separate base-game language such as `zh-Hant`, then add `mods\Idol Career Diary\assets\Localization\zh-Hant\strings.txt`.
-- Missing mod keys fall back to English, so partial translations are safe while you work.
+Localized JSON files are **whole-file replacements**, not key-level merges. Keep IDs, conditions, actions, and other non-text data synchronized across every language copy.
 
-## 6. Publish a translation to GitHub
+If a mod has only vanilla root `JSON/...` files and no matching English copy under `Localization/en/`, Mod Localization System leaves that mod alone rather than guessing that it is localized.
 
-To contribute a translation back to the repository:
+## Custom-language naming guidance
 
-1. Go to the repository on GitHub: `https://github.com/ExSlam/IM-Cosmo-Mod-Library`
-2. Fork the repository to your own GitHub account.
-3. Clone your fork.
-4. Add or update the translation files in your fork.
-5. Commit your changes.
-6. Push your branch.
-7. Open a pull request against `ExSlam/IM-Cosmo-Mod-Library`.
+Use one convention consistently within a translation pack:
 
-What to include in the pull request description:
+- For the repository's existing bundled languages, keep the established folder names (`jp`, `cn`, `ptbr`, `kr`, and so on).
+- For a new custom language, use the language code Idol Manager actually selects and use that same code for the new mod folder when possible.
+- Do not create duplicate alias folders solely because the resolver understands both spellings.
 
-- The language in English
-- The folder name you used
-- Whether the base game language is one of the shipped folders or a new custom folder
-- Any known missing or untranslated strings
+The loader's alias support is for compatibility, not an invitation to maintain duplicate copies of the same translation.
 
-## 7. Exhaustive reference: fixed base game behavior
+## Fonts and script support
 
-This table is exhaustive for the language folders currently shipped with the base game.
+A correct language code does not guarantee that every script renders correctly. Font coverage and text-layout support still come from Idol Manager/Unity.
 
-| Language name in English | Base game folder name |
-| --- | --- |
-| English | `en` |
-| Japanese | `jp` |
-| Chinese | `cn` |
-| Russian | `ru` |
-| Portuguese (Brazil) | `ptbr` |
+The shipped game already demonstrates working Latin, Cyrillic, Japanese, and Chinese font paths. Cosmo's shared localization helper also attempts to register a Korean TextMeshPro fallback from installed Windows fonts such as `Malgun Gothic`, `NanumGothic`, or `Nanum Gothic` when Korean is selected.
 
-This table is exhaustive for the base game's hardcoded first-launch Steam language mapping.
+Right-to-left and shaping-heavy scripts require more than glyph coverage. Do not assume a font alone will provide correct bidirectional layout or contextual shaping in Idol Manager's existing UI.
 
-| Steam language reported by the game | Base game folder selected automatically |
-| --- | --- |
-| English and everything not matched below | `en` |
-| Japanese | `jp` |
-| Chinese, Simplified | `cn` |
-| Chinese, Traditional | `cn` |
-| Russian | `ru` |
-| Ukrainian | `ru` |
-| Portuguese | `ptbr` |
-| Portuguese (Brazil) | `ptbr` |
+## Contributing a translation
 
-Important:
+When submitting a translation:
 
-- New custom languages such as `de`, `hr`, `lv`, `ja`, `zh-Hans`, or `zh-Hant` can still be added manually by creating a folder in `IM_Data\StreamingAssets\Languages` with a matching `info.json`.
-- Custom languages must be selected manually in the base game settings menu.
-- The base game's language menu is dynamic.
-- The base game's first-launch auto-selection is not dynamic.
+1. Start from the current English strings/JSON so every current key is represented.
+2. Keep placeholders, IDs, conditions, actions, and non-text data intact.
+3. Use the repository's established folder name for an existing bundled language, or a consistent new language tag for a genuinely new language.
+4. Test with that language selected in Idol Manager itself.
+5. Mention the language code and any known missing strings or font limitations in the pull request.
 
-## 8. Practical script support
-
-The base game and `Idol Career Diary` are not limited to a fixed list of languages, but they are limited by text rendering behavior and available fonts.
-
-What is clearly supported by the shipped game setup:
-
-- Latin-script languages, because the shipped game already includes Latin fonts such as `Linotte`
-- Cyrillic-script languages, because the shipped game already includes Russian with `Hero Light`
-- Japanese, because the shipped game already includes Japanese with `Rounded M+ 1p`
-- Chinese, because the shipped game already includes Chinese with `WenQuanYi Micro Hei`
-
-What this means in practice:
-
-- Languages that use Latin script are the safest to add
-- Languages that use Cyrillic script are also likely to work well
-- Simplified and Traditional Chinese can be supported with separate folders such as `zh-Hans` and `zh-Hant`
-- Japanese is already supported by the shipped font setup
-
-What is not reliably supported as shipped:
-
-- Arabic-script languages such as Arabic, Persian, and Urdu
-- Other scripts that need right-to-left layout, bidirectional text handling, or contextual shaping
-
-Why:
-
-- The game can load a language-selected font from `info.json`
-- The game can also fall back to an OS-installed font if the named font exists on the user's system
-- But complex-script support is not just a font problem
-- Arabic-style scripts usually need right-to-left handling and character shaping support in addition to glyph coverage
-- No right-to-left, bidirectional, Arabic, or text-shaping support exists in this game
-
-Safe guidance for translators:
-
-- If your language uses Latin, Cyrillic, Japanese, or Chinese characters, it is a reasonable candidate for a translation pack
-- If your language uses Arabic script or another complex right-to-left script, do not assume it will most likely not work
-
-## 9. Dynamic support beyond the hardcoded alias table
-
-`Idol Career Diary` is dynamic.
-
-There is no finite language list for the mod, because the loader accepts syntactically valid BCP 47-style tags and then tries exact and fallback folders.
-
-Examples that work even though they are not explicitly hardcoded in the alias table:
-
-- `hr`
-- `lv`
-- `ca`
-- `ga`
-- `sr-Latn`
-- `fr-CA`
-- `pt-PT`
-- `zh-Hant-HK`
-
-What the loader does:
-
-- it tries the exact selected tag first
-- then it tries sensible fallback folders
-- for example `fr-CA` falls back to `fr`
-- for example `zh-TW` falls back through Traditional Chinese forms such as `zh-Hant`
-
-What this means in practice:
-
-- You can add Croatian with base game folder `hr` and mod folder `hr`.
-- You can add other languages the same way by using the correct BCP 47 tag in both places.
-
-Do not use folder names such as `german` or `croatian` for new base-game translations. Use the actual tag, such as `de` or `hr`.
-
-## 10. Recommended mapping for common cases
-
-Use this table when you want the simplest answer for where to put files.
-
-| Language name in English | Base game folder if editing the shipped game translation | Base game folder if creating a new translation | `Idol Career Diary` folder |
-| --- | --- | --- | --- |
-| English | `en` | `en` | `en` |
-| Japanese | `jp` | `ja` | `ja` |
-| Chinese, Simplified | `cn` | `zh-Hans` | `zh-Hans` |
-| Chinese, Traditional | not shipped separately | `zh-Hant` | `zh-Hant` |
-| Russian | `ru` | `ru` | `ru` |
-| Portuguese (Brazil) | `ptbr` | `pt-BR` | `pt-BR` |
-
-If your language is not in the table above, use the correct BCP 47 language tag for both the new base-game folder and the new `Idol Career Diary` folder.
+Repository: `https://github.com/ExSlam/IM-Cosmo-Mod-Library`

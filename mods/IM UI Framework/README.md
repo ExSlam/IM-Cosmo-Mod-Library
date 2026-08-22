@@ -3,28 +3,20 @@
 `IM UI Framework` is a reusable helper layer for Idol Manager modders.
 
 It targets three common problems:
+
 - Modifying existing UI safely.
 - Adding new buttons that match game style.
 - Building fully custom popups that still look and behave like base game UI.
 
+## Current 3.1.2 behavior
 
+The current release keeps the v3 composable/custom-UI API source-compatible while tightening behavior around Idol Manager's older Unity API surface. Scroll-view viewports use strict rectangular clipping, producer-list indicators can be positioned outside a custom content sheet with signed right-edge insets, and callers can hide the indicator fill while retaining the native track/handle and two-way ScrollRect synchronization.
 
+Per-instance composition options also cover producer-list indicator inset/gutter values, localized month-pager label padding, and copying the shipped rounded-white visual onto compact custom surfaces. These options do not globally rewrite vanilla scene geometry.
 
-## 3.1.2: strict clipping and external scroll indicators
+## Composable vanilla UI
 
-3.1.2 adds strict rectangular viewport clipping plus opt-in scroll-indicator geometry for custom popups that place the fixed-thumb producer-list Slider outside the content sheet. `VanillaIndicatorHideFill` can suppress the Slider value-fill visual while retaining the native track/handle control and two-way ScrollRect synchronization. Existing defaults remain source-compatible.
-
-## 3.1.1: localized pager and scroll-geometry controls
-
-3.1.1 keeps every 3.1.0 default intact but lets a custom screen opt into a different producer-list indicator inset/gutter, add explicit horizontal padding around month-pager labels, and copy the shipped rounded-white button visual onto compact custom badges. These are per-instance composition options rather than global scene changes.
-
-## 3.1.0: Idol Manager Unity compatibility pass
-
-Version 3.1 keeps the v3 composable/custom-UI API intact while making the implementation compile against Idol Manager's older Unity API surface. Scene discovery, inactive-child lookup, UnityEvent inspection, TMP dropdown detection, and ColorBlock mutation now go through compatibility shims instead of relying on newer Unity convenience members.
-
-## 3.0.0: composable vanilla UI, not just popup cloning
-
-Version 3's main job is to let a mod build **new UI that looks like Idol Manager**, while still choosing its own layout, content, dimensions and colors. Whole-popup cloning remains available as a low-level fidelity tool, but it is no longer the recommended starting point for custom interfaces.
+The framework lets a mod build **new UI that looks like Idol Manager** while choosing its own layout, content, dimensions and colors. Whole-popup cloning remains available as a low-level fidelity tool, but it is not the recommended starting point for custom interfaces.
 
 The v3 stack is deliberately split into **source**, **style**, **primitive**, and **pattern** layers:
 
@@ -114,62 +106,6 @@ VanillaUiControlFactory.TryCreate(parent, control, out dropdown);
 
 See [`docs/V3 Composable Custom UI.md`](docs/V3%20Composable%20Custom%20UI.md) for the design and examples, and [`docs/V3 Custom Component Coverage.md`](docs/V3%20Custom%20Component%20Coverage.md) for the concrete coverage inventory. The exhaustive scene/popup APIs are documented separately in [`docs/V3 Scene Template API.md`](docs/V3%20Scene%20Template%20API.md), [`docs/Vanilla Popup Catalog.md`](docs/Vanilla%20Popup%20Catalog.md), and [`docs/Serialized UI Reference Templates.md`](docs/Serialized%20UI%20Reference%20Templates.md).
 
-## 2.1.0: scene-native UI patterns + Modern UI Pack resources
-
-The framework now treats Idol Manager UI as two complementary sources instead of assuming every vanilla-looking control should come from Michsky Modern UI Pack `Resources`:
-
-- **Scene-native game patterns** are resolved through `PopupManager` and cloned from inactive serialized popup hierarchies. The source popup does not need to be opened.
-- **Michsky Modern UI Pack controls** remain available through `VanillaUiResources` and the complete `Resources` prefab catalog.
-
-The first scene-native control is the producer-list scroll indicator used identically by **Producer Contracts**, **Producer Salaries**, and **Producer Loans**. Those screens do not assign a Unity `Scrollbar` to `ScrollRect.verticalScrollbar`; they use a separate vertical `Slider` with `SliderDefault`, a fixed circular handle, and two-way normalized-position events. `TryCreateStyledScrollView` now prefers that exact pattern in the gameplay scene and falls back to the genuine MUIP `Resources/scrollbar/Scrollbar` only when the scene template is unavailable.
-
-New public scene APIs:
-- `VanillaUiSceneTemplates.TryGetPopupRoot(...)`
-- `VanillaUiSceneTemplates.TryFindPopupChild(...)`
-- `VanillaUiSceneTemplates.TryClonePopupChild(...)`
-- `VanillaUiSceneTemplates.TryCreateProducerListScrollSlider(...)`
-- `VanillaUiSceneTemplates.ReserveProducerListViewportGutter(...)`
-
-See [`docs/Scene UI Patterns.md`](docs/Scene%20UI%20Patterns.md) for the scene-derived measurements and event wiring.
-
-## 2.0.3: selected game font and vanilla corner shader
-
-- `IMUiKit.CreateText` now uses Idol Manager's currently selected game font by default, including runtime OS fonts through the TMP bridge.
-- `IMUiKit.ApplyGameFont(root)` normalizes TMP and legacy text in cloned/custom UI and keeps legacy `Text` tied to `Font_Replacer`.
-- Framework-created/cloned button labels now follow the selected game font unless a caller explicitly overrides the framework default.
-- `IMUiKit.TryApplyVanillaRoundedCorners` uses the shipped `UI/RoundedCorners/RoundedCorners` shader with live RectTransform dimensions, avoiding oversized rounded-button sprites for panel chrome.
-
-
-## 2.0.2: Idol Manager Unity compatibility fixes
-
-- Uses the parent library's shared `dll` directory for the additional `UnityEngine.TextCoreModule.dll` reference required by TMP `FaceInfo`.
-- Enumerates loaded fonts through a version-compatible reflection bridge instead of requiring the unavailable generic `Resources.FindObjectsOfTypeAll<T>()` overload.
-- Uses the correct `Dropdown.Dropdown_Multi_Select` catalog constant for the vanilla multi-select prefab.
-- Preserves the vanilla emergency-scrollbar ColorBlock values on Idol Manager's older UnityEngine.UI build even though several ColorBlock properties are read-only there.
-
-## 2.0.1: catalog compile fix
-
-- Fixed three C# CS0542 naming collisions in `VanillaUiPrefabCatalog`.
-- `Dropdown.Dropdown` is now `Dropdown.Standard`.
-- `Scrollbar.Scrollbar` is now `Scrollbar.Standard`.
-- `Tooltip.Tooltip` is now `Tooltip.Standard`.
-- Resource paths and runtime behavior are unchanged.
-
-## 2.0.0: vanilla-first asset layer
-
-Version 2.0.0 adds a resource-backed UI layer built from Idol Manager's shipped Unity assets and decompiled UI code. The framework now prefers the game's actual `Resources` prefabs over cloning whichever control happens to be instantiated in a popup.
-
-New public APIs:
-- `VanillaUiPrefabCatalog`: complete catalog of all 218 UI prefabs found under the game's exported `Resources` tree, including all 150 button variants.
-- `VanillaUiResources`: `Resources.Load`/instantiate helpers, typed control creators, per-instance MUIP theme assignment, and generic component/theme configuration callbacks.
-- `VanillaUiThemeSettings`: typed snapshot of every public setting on the shipped `MUIP Manager` `UIManager` ScriptableObject.
-- `VanillaUiFonts`: access to the game's selected/bundled legacy fonts, the TMP equivalent of the currently selected game font, loaded TMP fonts, MUIP role fonts, OS/external dynamic fonts, and runtime TMP font creation.
-- `IMUiBridges.TryCloneModernControl<T>(resourcePath, ...)`: explicit prefab-variant loading while retaining the old generic API.
-
-Existing 1.x APIs remain source-compatible. Known Modern UI Pack controls now load their real vanilla prefab first and only fall back to scene/popup template discovery if the resource is unavailable.
-
-See [`docs/Vanilla UI Asset Layer.md`](docs/Vanilla%20UI%20Asset%20Layer.md) for the 2.0.0 behavior, [`docs/Vanilla Prefab Catalog.md`](docs/Vanilla%20Prefab%20Catalog.md) for every resource prefab path, and [`docs/MUIP Vanilla Defaults.md`](docs/MUIP%20Vanilla%20Defaults.md) for every shipped `MUIP Manager` setting and default.
-
 ## Included API
 
 Namespace: `IMUiFramework`
@@ -177,6 +113,7 @@ Namespace: `IMUiFramework`
 Main class: `IMUiKit`
 
 Composable custom-UI layer:
+
 - `IMUiTheme` / `IMUiThemePreset` / `IMUiVanillaColors` / `IMUiColorRole`
 - `IMUiPrimitives.CreateSurface(...)` / `CreateText(...)` / `TryCreateButton(...)` / `CreateGrid(...)`
 - `IMUiElementBuilder` / `IMUiElementHandle`
@@ -186,6 +123,7 @@ Composable custom-UI layer:
 - `IMUiComposer.TryCreateRegisteredPopup(...)`
 
 Vanilla scene/popup layer:
+
 - `VanillaUiSceneCatalog.TryFindSceneObject(...)` / `TryCloneSceneObject(...)`
 - `VanillaUiSceneCatalog.DescribeCurrentSceneUi(...)` / `DescribeCurrentPopups()`
 - `VanillaUiSceneCatalog.TryGetPopupRoot(...)` / `TryClonePopup(...)` / `TryClonePopupChild(...)`
@@ -197,16 +135,19 @@ Vanilla scene/popup layer:
 - `VanillaUiSceneTemplates.ReserveProducerListViewportGutter(...)`
 
 Serialized-reference template layer:
+
 - `VanillaUiReferenceTemplates.TryGetTemplate(...)` / `TryCloneTemplate(...)`
 - `VanillaUiReferenceTemplates.TryGetPopupTemplate(...)` / `TryClonePopupTemplate(...)`
 - `VanillaUiReferenceTemplates.DescribeCurrentSerializedUiTemplates(...)`
 - `VanillaUiReferenceTemplates.DescribePopupSerializedUiTemplates(...)`
 
 Universal Resources control layer:
+
 - `VanillaUiControlFactory.TryCreate(...)` / `TryCreateResource(...)`
 - `VanillaUiPrefabCatalog.AllPrefabPaths`
 
 Vanilla asset layer:
+
 - `VanillaUiResources.GetMuipManager()` / `CloneMuipManager()`
 - `VanillaUiResources.LoadPrefab(...)` / `InstantiatePrefab(...)`
 - `VanillaUiResources.TryInstantiatePrefab<T>(...)`
@@ -235,6 +176,7 @@ Vanilla asset layer:
 - `VanillaUiFonts.LoadExternalOrOsTmpFont(...)`
 
 Core methods:
+
 - `TryAddTopMenuButton(...)`
 - `TryAddSettingsButton(...)`
 - `QueueSettingsButton(...)`
@@ -275,6 +217,7 @@ Core methods:
 - `ApplyLayerRecursively(...)`
 
 `PopupScaffold` provides:
+
 - `Root`
 - `Popup`
 - `PanelRect`
@@ -289,6 +232,7 @@ Core methods:
 Bridge class: `IMUiBridges`
 
 Dedicated bridge/helper UI methods:
+
 - `TryCreateBridgeShowcasePopup(...)`
 - `TryCreateBridgeShowcaseContent(...)`
 - `TryCreateCameraEffectsHelperPanel(...)`
@@ -297,6 +241,7 @@ Dedicated bridge/helper UI methods:
 - `TryCreateGradientPreviewHelperPanel(...)`
 
 Low-level bridge methods:
+
 - `EnsureCinematicBloom(...)`
 - `EnsureCinematicLensAberrations(...)`
 - `EnsureImageEffectsAntialiasing(...)`
@@ -331,6 +276,7 @@ DOTween UI animation class: `IMUiTween`
 - `Kill(...)`
 
 Supported namespaces:
+
 - `UnityStandardAssets.CinematicEffects`
 - `UnityStandardAssets.ImageEffects`
 - `Michsky.UI.ModernUIPack`
@@ -580,11 +526,23 @@ internal static class BridgeShowcasePatch
 }
 ```
 
-## 1.x API stability contract
+## Unity compatibility
 
-- `IMUiKit`, `IMUiBridges`, `IMUiTween`, `PopupScaffold`, `ToolTipTriggerBridge`, and `HoverTooltipTriggerBridge` public members are the supported API for `1.x`.
-- Method names and signatures in that public surface are treated as stable across `1.x` patch/minor updates.
-- Internal classes (`internal` visibility) are runtime implementation details and may change without notice.
+Idol Manager exposes an older/stripped Unity API surface through its shipped reference assemblies. The framework centralizes those differences in `src/IMUiCompat.cs` so consumers do not need version-specific workarounds:
+
+- inactive child lookup uses the supported plural include-inactive API;
+- loaded-scene discovery avoids newer `SceneManager.GetActiveScene`, `Scene.IsValid`, `Scene.GetRootGameObjects`, and `Scene.name` compile-time dependencies;
+- persistent UnityEvent targets fall back to serialized persistent-call fields when newer inspection methods are unavailable;
+- semantic `ColorBlock` states are written through serialized backing fields where Idol Manager exposes them as read-only;
+- TMP dropdown support is runtime-detected because the game's TextMeshPro assembly does not define `TMP_Dropdown`.
+
+These are implementation details. The public composable primitives, themes, scene/popup templates, month pager, producer-list scroll pattern, and Modern UI Pack bridges keep the same v3 API.
+
+## Font and corner behavior
+
+`IMUiKit.CreateText` follows Idol Manager's active `Fonts.GetFont()` selection by default. `VanillaUiFonts.GetGameSelectedTmpFont()` matches a loaded TMP asset for bundled fonts and creates a runtime TMP asset for an OS/dynamic font when needed. Use `IMUiKit.ApplyGameFont(root)` to normalize cloned or manually-created TMP/legacy text under an existing hierarchy.
+
+`IMUiKit.TryApplyVanillaRoundedCorners(image, radius)` uses the game's shipped `UI/RoundedCorners/RoundedCorners` shader and updates `_WidthHeightRadius` whenever the target RectTransform changes. This is intended for the subtle 4-8 UI-unit corner radii used by vanilla panels and cards, not button-pill stretching.
 
 ## Notes
 
@@ -605,14 +563,9 @@ internal static class BridgeShowcasePatch
 ## Build
 
 Project file:
+
 - `mods/IM UI Framework/IM UI Framework.csproj`
 
 Example command:
+
 - `dotnet build "mods/IM UI Framework/IM UI Framework.csproj" -c Release`
-
-
-## 2.0.3 font and corner behavior
-
-`IMUiKit.CreateText` now follows Idol Manager's active `Fonts.GetFont()` selection by default. `VanillaUiFonts.GetGameSelectedTmpFont()` matches a loaded TMP asset for bundled fonts and creates a runtime TMP asset for an OS/dynamic font when needed. Use `IMUiKit.ApplyGameFont(root)` to normalize cloned or manually-created TMP/legacy text under an existing hierarchy.
-
-`IMUiKit.TryApplyVanillaRoundedCorners(image, radius)` uses the game's shipped `UI/RoundedCorners/RoundedCorners` shader and updates `_WidthHeightRadius` whenever the target RectTransform changes. This is intended for the subtle 4-8 UI-unit corner radii used by vanilla panels and cards, not button-pill stretching.

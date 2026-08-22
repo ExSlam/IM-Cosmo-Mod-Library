@@ -5,7 +5,7 @@ IM UI Framework 3.0 exposes every `PopupManager._type` defined by the shipped ga
 Runtime cloning does **not** require the popup to be open. `PopupManager` serialized references are used first, and the catalog path is a scene-local fallback. A template can only be cloned in a scene where its hierarchy is actually loaded.
 
 | Value | PopupManager type | Gameplay scene | Main menu scene |
-|---:|---|---|---|
+| ---: | --- | --- | --- |
 | 0 | `single_senbatsu` | `AgencyPopups/Single_Senbatsu` | — |
 | 1 | `single_new` | `AgencyPopups/Single_New` | — |
 | 2 | `audition` | `AgencyPopups/Audition` | — |
@@ -69,7 +69,7 @@ Runtime cloning does **not** require the popup to be open. `PopupManager` serial
 
 ## Unmaterialized enum slots
 
-`show_release` (`4`) and `main_menu_load` (`32`) are real enum members, but neither supplied vanilla scene serializes a popup root for them. Version 3 catalogs them intentionally as `None` rather than inventing a fake template. All other enum members have at least one validated scene hierarchy.
+`show_release` (`4`) and `main_menu_load` (`32`) are real enum members, but neither supplied vanilla scene serializes a popup root for them. The framework catalogs them intentionally as `None` rather than inventing a fake template. All other enum members have at least one validated scene hierarchy.
 
 ## API
 

@@ -15,7 +15,7 @@ IMDC 3.4.7 uses SHA-256 content-fingerprinted exact-save checkpoints, keeps the 
 - Active physical-save identity: `TryGetActiveSaveKey`
 - Read-only persistence telemetry: `TryGetPersistenceDiagnostics`
 
-Built-in capture covers singles, shows, contracts, groups, tours, elections, concerts, idols, staff, relationships, finance, activities, story/system transitions, and other gameplay events. See `docs/EVENT_CATALOG.md`.
+Built-in capture covers singles, shows, contracts, groups, tours, elections, concerts, idols, staff, relationships, finance, activities, story/system transitions, and other gameplay events. See [`docs/EVENT_CATALOG.md`](docs/EVENT_CATALOG.md).
 
 The Event Catalog separates **143 queryable built-in event types** from three internal transient streams (`idol_status_changed`, `research_points_accrued`, and `idol_earnings_recorded`) that retention intentionally removes before public timeline queries. Catalog presence does not imply queryability for those explicitly marked transient types.
 
@@ -170,7 +170,6 @@ IMDC 3.4.7 reads only sidecar format 5 and transactional journal format 2. Older
 
 Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
 
-
 ## Source versions and generated build artifacts
 
 The source of truth for this development tree is the checked-out source plus project/mod metadata. `IM Data Core.csproj` and `assets/info.json` carry the mod version. Generated DLLs, PDBs, `bin/`, `obj/`, and `artifacts/` are build outputs and are ignored by the repository. A stale locally bundled DLL can therefore report revision metadata from an older build even when the source tree is correct; rebuild the mod from the desired commit instead of treating that generated DLL metadata as an IMDC runtime/source defect.
@@ -249,7 +248,7 @@ bool IMDataCoreApi.TryReadEventsForIdolPage(
     out string errorMessage);
 ```
 
-See `docs/START_HERE.md`, `docs/COOKBOOK.md`, and `templates/IMDataCore.TemplateMod` for integration examples.
+See [`docs/START_HERE.md`](docs/START_HERE.md), [`docs/COOKBOOK.md`](docs/COOKBOOK.md), and [`templates/IMDataCore.TemplateMod`](templates/IMDataCore.TemplateMod/) for integration examples.
 
 ## Repository layout
 
