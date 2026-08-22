@@ -233,37 +233,49 @@ namespace IMDataCore
                 return source;
             }
 
-            // Standalone IMDC still protects vanilla's worker-thread serializer from
-            // later mutations by detaching the graph before checkpointing it. This is
-            // strictly a defensive optimization/correctness aid, so it must fail open:
-            // IMDC is never allowed to prevent vanilla from attempting its own save.
-            try
+            // Standalone IMDC protects vanilla's worker-thread serializer from
+            // later mutations by detaching the graph before checkpointing it. The
+            // normal JsonUtility round trip falls back to a Unity-serialized-field
+            // graph clone whose compact JSON must match the original when the original
+            // JSON was available. This stays compatible with the game's JsonUtility API.
+            SaveManager.SavedData snapshot;
+            string compactJson;
+            string fallbackDetail;
+            string errorMessage;
+            if (CoreStableSavedDataSnapshot.TryCreate(
+                    source,
+                    out snapshot,
+                    out compactJson,
+                    out fallbackDetail,
+                    out errorMessage))
             {
-                string json = UnityEngine.JsonUtility.ToJson(source, false);
-                SaveManager.SavedData snapshot =
-                    UnityEngine.JsonUtility.FromJson<SaveManager.SavedData>(json);
-                if (snapshot == null)
-                {
-                    throw new InvalidOperationException(
-                        "Unity JsonUtility returned a null SavedData snapshot.");
-                }
-
-                // Reuse the JSON that already created this detached graph. The
+                // Reuse the compact JSON belonging to the detached graph. The
                 // checkpoint fingerprint therefore adds only the SHA-256 pass here,
                 // not a second full JsonUtility serialization in standalone IMDC.
                 VanillaSavedDataFingerprint.RegisterFrozenFingerprint(
                     snapshot,
-                    VanillaSavedDataFingerprint.ComputeForJson(json));
+                    VanillaSavedDataFingerprint.ComputeForJson(compactJson));
+
+                if (!string.IsNullOrEmpty(fallbackDetail))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core's primary standalone SavedData clone failed, " +
+                        "but a verified detached fallback succeeded. " +
+                        fallbackDetail);
+                }
+
                 return snapshot;
             }
-            catch (Exception exception)
-            {
-                CoreLog.Warn(
-                    "IM Data Core could not create its standalone stable SavedData " +
-                    "snapshot; vanilla saving will continue with the original object: " +
-                    exception.Message);
-                return source;
-            }
+
+            // IMDC never prevents vanilla from attempting its own save. Reaching this
+            // branch means all independent detachment strategies failed; preserve the
+            // vanilla call rather than throwing through the game's save method.
+            CoreLog.Warn(
+                "IM Data Core could not create a detached standalone SavedData " +
+                "snapshot after all fallback strategies; vanilla saving will " +
+                "continue with the original object. " +
+                errorMessage);
+            return source;
         }
 
         private static bool IsSaveWriteOrderingFixInterceptionHealthy()

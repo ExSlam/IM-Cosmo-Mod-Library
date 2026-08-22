@@ -46,21 +46,23 @@ namespace IMDataCore
     internal static class Shows_CancelShow_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures previous status so repeated cancel calls on already-canceled shows are ignored.
+        /// Captures whether the target was actually present in the in-development
+        /// show list before vanilla cancellation removes it.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(Shows._show __0, out Shows._show._status __state)
+        private static void Prefix(Shows._show __0, out bool __state)
         {
-            __state = __0 != null ? __0.status : Shows._show._status.normal;
+            __state = __0 != null && Shows.shows != null && Shows.shows.Contains(__0);
         }
 
         /// <summary>
-        /// Records one show-cancelled event after cancellation logic completes.
+        /// Records one show-cancelled event only when the static cancellation path
+        /// really removed the target. Vanilla does not set status=canceled here.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Shows._show __0, Shows._show._status __state)
+        private static void Postfix(Shows._show __0, bool __state)
         {
-            if (__0 == null || __state == Shows._show._status.canceled || __0.status != Shows._show._status.canceled)
+            if (!__state || __0 == null || (Shows.shows != null && Shows.shows.Contains(__0)))
             {
                 return;
             }

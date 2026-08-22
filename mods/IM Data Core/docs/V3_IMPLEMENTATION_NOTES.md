@@ -100,7 +100,7 @@ The source history is intentionally complete, so serialization work remains O(nu
 4. Loaded/active branches reuse immutable event records where compaction did not change the record.
 5. Timeline indexes are incrementally sorted, avoiding whole-index sort/copy work for recent timeline reads.
 6. Each successful persistence logs event count, custom mutation count, checkpoint count, final bytes, and elapsed milliseconds.
-7. If Save Write Ordering Fix is loaded, the save lifecycle skips IMDC's redundant full `SavedData` JSON clone because that mod freezes the exact vanilla payload synchronously after IMDC's hook. Standalone IMDC retains its own detached snapshot path.
+7. If Save Write Ordering Fix is positively healthy, the save lifecycle skips IMDC's redundant full `SavedData` clone because SWOF freezes the exact vanilla payload synchronously after IMDC's hook. Standalone IMDC uses the compact-JSON round trip first, then verified overwrite/serialized-field fallbacks if the primary reconstruction fails.
 8. Per-path persistence generations prevent an older snapshot from overwriting a newer already-committed snapshot for the same physical sidecar.
 
 This does not impose retention limits or silently discard history. Campaign owners can therefore retain decades of event history while avoiding the previous whole-document memory duplication on both save output and normal sidecar load input.

@@ -88,6 +88,8 @@ Checkpoint identity is the tuple of normalized relative save path, vanilla `Last
 
 Checkpoint `GameDateTime` intentionally uses vanilla's own `yyyy-MM-dd HH:mm:ss` representation. IMDC parses checkpoint dates through vanilla's `ExtensionMethods.ToDateTime`. Event and custom-mutation dates use IMDC's round-trip representation instead.
 
+Each new checkpoint also carries an optional agency-room generation snapshot. The snapshot mirrors vanilla `SavedData.agency__Floors` / room order and binds each serialized room to an IMDC-owned `g:<guid>` generation. Vanilla does not serialize `agency._room.id`, while theater/cafe IDs are recyclable, so IMDC uses the room generation as durable `EntityId` for `agency_room`, `theater`, and `cafe` history (and as the room component of room-work identity). Raw vanilla IDs remain in event payloads for current-state correlation. Early v5 checkpoints without this additive field remain valid and receive fresh forward-safe room generations on load.
+
 `EnabledMods` is frozen at the save boundary from Idol Manager's enabled mod registry. JSON-only mods are represented even when `DllNames` is empty. After exact activation, IMDC compares the saved inventory with the current installed/enabled mod set and logs missing, disabled, author/version, and DLL-name mismatches. These diagnostics do not block vanilla loading.
 
 If an existing valid sidecar contains no checkpoint matching the loaded vanilla state exactly, IMDC fails closed: supplemental state is detached read-only and the sidecar is protected from overwrite. There is no date-only fallback.
@@ -173,6 +175,8 @@ The journal writer flushes its buffered writer and then calls `FileStream.Flush(
 
 A full boundary streams a stable shallow snapshot to a validated temporary file, computes its SHA-256 while writing, durably flushes it, and only then promotes it. Destructive branch changes, recovery writes, New Save, incompatible baselines, and compaction use a full snapshot. Routine compaction is queued after the triggering delta is durable so an ordinary save boundary does not pay the complete O(history) rewrite cost.
 
+A hard process kill can strand a temporary file before the writer's `finally` cleanup runs. On later initialization of that exact physical save scope, IMDC scans only the sidecar directory and only the two temp-name families it owns for that sidecar: `<sidecar>.imdc.tmp.*` and `<sidecar>.imdc.bak.imdc.journal.tmp.*`. Files must be at least 24 hours old before best-effort deletion, and cleanup is serialized with the per-path persistence I/O lock.
+
 When replacing a healthy compact base, IMDC retains:
 
 ```text
@@ -180,7 +184,9 @@ When replacing a healthy compact base, IMDC retains:
 <sidecar>.imdc.bak.imdc.journal   # when the previous generation used a journal
 ```
 
-The backup journal is tied to the backup base by its stored base hash. Recovery may also pair a still-present current journal with the backup base if that journal's stored base hash matches, covering an interrupted backup-journal publication window.
+The backup journal is tied to the backup base by its stored base hash. Recovery may also pair a still-present current journal with the backup base if a complete parsed journal header contains that backup base hash, covering an interrupted backup-journal publication window. Missing files, empty files, and files torn before a complete header are not positive base-hash matches; recovery continues to the sibling backup journal instead of allowing such a preferred journal to mask it.
+
+Recovery also records which physical journal supplied the matched generation. If `.imdc.bak` was completed by the primary `.imdc.journal`, the subsequent healing snapshot first durably publishes that journal as `.imdc.bak.imdc.journal` before deleting the primary-path journal. A publication failure leaves the original journal in place, preserving the already-proven `backup base + journal` recovery generation.
 
 ## Deleted-save archival
 
@@ -217,7 +223,7 @@ Complete event history remains complete, but an ordinary append-only save does n
 
 Storage-form JSON for immutable events and custom SET values is cached after validation/load, and the streaming writer avoids a temporary string allocation for each record. Forward-save sequence/date watermarks avoid complete trim scans when no active record can exceed the checkpoint.
 
-The checkpoint content fingerprint is computed only at vanilla save/load boundaries. In standalone IMDC, the defensive save freeze already produces compact JSON, so the fingerprint reuses that JSON rather than performing a second serialization. The SHA-256 input is encoded in bounded UTF-8 chunks to avoid another save-sized byte-array allocation. When Save Write Ordering Fix is positively verified and IMDC skips its own defensive clone, one compact `JsonUtility.ToJson` call is required to obtain the exact checkpoint fingerprint.
+The checkpoint content fingerprint is computed only at vanilla save/load boundaries. In standalone IMDC, the defensive save freeze produces compact JSON, so the fingerprint reuses that JSON rather than performing a second serialization. If the normal `FromJson` reconstruction fails, IMDC constructs a Unity-serialized-field clone and compact-reserializes it, requiring exact JSON equivalence whenever the original compact JSON was available. This fallback avoids `FromJsonOverwrite`, which is unavailable in Idol Manager's UnityEngine API. The SHA-256 input is encoded in bounded UTF-8 chunks to avoid another save-sized byte-array allocation. When Save Write Ordering Fix is positively verified and IMDC skips its own defensive clone, one compact `JsonUtility.ToJson` call is required to obtain the exact checkpoint fingerprint.
 
 Background journal compaction is normally requested when journal bytes reach a bounded threshold: 25% of the compact base, clamped to 1-16 MiB. Transaction count is only a replay-depth ceiling and scales with base size from 2,048 to 32,768 committed transactions.
 

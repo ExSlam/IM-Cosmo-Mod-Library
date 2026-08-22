@@ -1,5 +1,60 @@
 # Changelog
 
+## 3.4.6 Pass 6 build correction
+
+- Removed the unavailable `JsonUtility.FromJsonOverwrite` call from standalone stable-save cloning. Idol Manager's UnityEngine reference exposes `FromJson<T>` but not `FromJsonOverwrite`; fallback now proceeds directly to the verified Unity-serialized-field clone.
+- Changed the reference-identity comparer to explicit `IEqualityComparer<object>` implementations so it no longer triggers CS0108 by hiding `object.Equals(object, object)`.
+- Updated the associated README/storage/validation documentation to match the actual game Unity API.
+
+## 3.4.6 Pass 6 interoperability hardening
+
+- Single `RemoveGirl` pre-state capture now runs before Unavailable Idols Fix and refuses to infer cast history from missing Harmony state. UIF declares the matching `HarmonyAfter` relationship.
+- Injury, depression, and hiatus-start capture now uses reference-type pre-state plus real final-status postconditions, so UIF vetoes on announced-graduation idols cannot create false medical history.
+- `loans.AddLoan` pre-state capture now runs at `Priority.First` before Assistant Manager replacement logic and requires a real loan-list insertion before emitting `loan_added`, preserving accurate before/delta fields and suppressing rejected developing-loan calls.
+- When Save Write Ordering Fix 1.3.0 is loaded, save-directory deletion acquires SWOF's exclusive directory lease before vanilla deletion and releases it after IMDC archival. If SWOF is present but the boundary cannot be established, deletion is blocked rather than risking save resurrection.
+- No backward-compatibility behavior was added or retained as part of this pass.
+
+## Post-3.4.6 audit follow-up - Pass 5
+
+- Replaced ephemeral `agency._room.id` historical identity with IMDC-owned room-generation IDs and persisted the room-generation map as an additive optional field on exact v5 checkpoints.
+- Reassociated persisted room generations while vanilla reconstructs agency rooms, preserving room history across save/load without modifying vanilla save JSON. Early v5 checkpoints without the additive map remain readable and receive fresh forward-safe identities because their prior ambiguous room IDs cannot be reconstructed safely.
+- Changed theater and cafe durable `EntityId` to the owning room generation so vanilla's recyclable `max(current IDs) + 1` identifiers cannot merge distinct historical facilities. Raw `theater_id`, `cafe_id`, and `room_id` payload fields remain unchanged for game-state correlation.
+- Updated room-work identity to use the same durable room generation rather than runtime `agency._room.id`.
+- Corrected the Event Catalog/API contract by separating 143 queryable built-in timeline event types from the three internal transient streams that retention intentionally drops before public queries: `idol_status_changed`, `research_points_accrued`, and `idol_earnings_recorded`.
+- Kept sidecar format 5 and journal format 2. The new checkpoint field is additive and optional; no pre-v5 backward-compatibility policy was introduced.
+
+## Post-3.4.6 audit follow-up - Pass 4
+
+- Kept ordinary show capture and the final post-mod canonical observation in one pending compaction window. Capture-triggered threshold flushes are deferred while `postModShowSettlementDepth > 0`, then resume after the settlement closes. The show editor settlement now spans the full `Show_Popup.OnContinue()` commit instead of only its nested `SaveShow()` call so the ordinary OnContinue rows cannot land in a later batch than the canonical editor observation.
+- Hardened `data_girls.Hire()` capture with an explicit pre-state snapshot and an absent-before -> contained-after postcondition. Duplicate/no-op hires and Harmony-vetoed calls no longer emit `idol_hired` or consume hire-attribution context.
+- Hardened `Rivals.UpdateTrends()` capture with the real vanilla eligibility precondition plus a changed `Trend_Data.LastUpdated` postcondition. Invalid/no-op calls no longer emit `rival_trends_updated`.
+- Hardened `agency.DestroyRoom()` capture to require contained-before -> absent-after membership in the agency floor graph. Non-contained room arguments no longer emit `agency_room_destroyed`, and an unavailable post-state is treated as unknown rather than proof of destruction.
+- No event schema or sidecar/journal format changed in this pass.
+
+## Post-3.4.6 audit follow-up - Pass 3
+
+- Preserved complete backup generations after `.imdc.bak + primary journal` recovery. IMDC now records which journal actually matched/replayed with the backup base; if that source was the primary journal, the healing write durably publishes it as `.imdc.bak.imdc.journal` before removing the primary journal, and keeps the source in place if publication fails.
+- Reworked journal probing so `missing`, `torn before header`, `header mismatch`, and `header matched` are distinct outcomes. Empty or first-header-torn preferred journals no longer masquerade as positive base-hash matches and can no longer mask a valid backup journal.
+- Added conservative orphan-temp scavenging when a physical save scope is initialized. Only temp files derived from that exact sidecar name are eligible, cleanup is serialized by the per-path persistence lock, and files younger than 24 hours are retained.
+- Kept the amended audit policy unchanged: pre-v5 sidecars are intentionally unsupported and unbounded forward history/checkpoint retention is intentional rather than a defect.
+
+## Post-3.4.6 audit follow-up - Pass 2
+
+- Moved staff-severance money ambient attribution from ordinary `staff._staff.Fire()` to the actual `Fire_Severance()` transaction scope, with Postfix/finalizer cleanup so stale severance metadata cannot leak into a later unrelated money mutation.
+- Fixed static in-development `Shows.CancelShow(show)` capture to validate the real vanilla postcondition (present before, removed after) instead of requiring a `canceled` status that vanilla never sets on that path.
+- Suppressed terminal-scandal false `audition_started` history by carrying the vanilla `Scandal_Auditions_No_More` precondition in the audition snapshot and refusing capture when vanilla takes that early-return branch.
+- Suppressed duplicate/no-op `random_event_started` rows by requiring the active-event collection to grow beyond its pre-call count before resolving the newly scheduled event.
+- Tightened `loan_paid_off` capture to the real `active before -> inactive after` transition; unaffordable/programmatic no-op calls no longer emit payoff history.
+- Clarified the public contract for `single_status_changed`, `show_status_changed`, and `tour_status_changed`: these rows observe their respective setter methods and are not exhaustive lifecycle journals. Vanilla direct release/finish assignments are represented by the retained lifecycle events `single_released`, `show_released`, and `tour_finished`.
+- Regenerated the Event Catalog from current source constants, correcting stale summary counts and restoring seven portrait-identity payload field rows that were present in source but missing from the generated documentation; the generator now preserves the catalog's readable section spacing.
+
+## Post-3.4.6 audit follow-up - Pass 1
+
+- Hardened standalone vanilla-save detachment when Save Write Ordering Fix is unavailable or not positively healthy. A failed normal `JsonUtility.FromJson<SavedData>` reconstruction now falls through to a Unity-serialized-field graph clone that is compact-JSON validated before use. The fallback avoids `JsonUtility.FromJsonOverwrite`, which is not exposed by Idol Manager's UnityEngine API.
+- Preserved the vanilla-save fail-open boundary: if every independent detachment strategy fails, IMDC still logs and lets vanilla attempt its save rather than throwing through the game save caller.
+- Clarified that sidecar formats older than 5 are intentionally unsupported in 3.4.6 and are not a backward-compatibility bug for this development line.
+- Clarified that stale generated DLL revision metadata is a local build-artifact concern. Project/mod metadata remains authoritative in source, and DLL/PDB/bin/obj/artifact outputs stay ignored and should be regenerated from the desired commit.
+
 ## 3.4.6
 
 - Added sidecar format 5 `ContentFingerprint` to exact vanilla-save checkpoints. The fingerprint is SHA-256 over Unity's compact serialized `SavedData`, closing same-second identity collisions that could occur when path/`LastSave`/playtime/game-date fields alone matched.

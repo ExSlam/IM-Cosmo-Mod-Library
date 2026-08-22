@@ -101,6 +101,8 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
+                string roomEntityId =
+                    GetOrCreateAgencyRoomHistoryEntityIdLocked(snapshot.Room);
                 RoomWorkCompletedEventPayload payload = new RoomWorkCompletedEventPayload
                 {
                     idol_id = CoreConstants.InvalidIdValue,
@@ -120,7 +122,7 @@ namespace IMDataCore
                     gameDate,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindRoomWork,
-                    string.Concat(snapshot.Room.id.ToString(CultureInfo.InvariantCulture), ":", snapshot.WorkKind, ":", snapshot.EntityId),
+                    string.Concat(roomEntityId, ":", snapshot.WorkKind, ":", snapshot.EntityId),
                     CoreConstants.EventTypeRoomWorkCompleted,
                     sourcePatchCode ?? CoreConstants.EventSourceRoomWorkCompletedPatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
@@ -293,12 +295,15 @@ namespace IMDataCore
                     return;
                 }
 
+                string roomEntityId =
+                    GetOrCreateAgencyRoomHistoryEntityIdLocked(snapshot.Room);
+
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindRoomWork,
                     string.Concat(
-                        snapshot.Room.id.ToString(CultureInfo.InvariantCulture),
+                        roomEntityId,
                         ":",
                         snapshot.WorkKind,
                         ":",

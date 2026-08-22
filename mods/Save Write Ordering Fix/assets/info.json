@@ -1,8 +1,8 @@
 {
   "Title": "Save Write Ordering Fix",
-  "Description": "Prevents older same-slot saves from overwriting newer requests and exposes verified caller-interception health for cooperating persistence mods.",
+  "Description": "Prevents older same-slot saves from overwriting newer requests and exposes verified caller-interception health plus exclusive file/directory coordination APIs for cooperating persistence mods.",
   "Author": "Cosmo",
-  "Version": "1.2.0",
+  "Version": "1.3.0",
   "Tags": [
     "fix",
     "patch",

@@ -15,10 +15,11 @@ namespace IMDataCore
     /// Captures loan-addition lifecycle events.
     /// </summary>
     [HarmonyPatch(typeof(loans), nameof(loans.AddLoan))]
+    [HarmonyBefore(new[] { "com.cosmo.assistantmanager" })]
     internal static class loans_AddLoan_IMDataCoreCapture_Patch
     {
         [HarmonyPrefix]
-        [HarmonyPriority(Priority.Last)]
+        [HarmonyPriority(Priority.First)]
         private static void Prefix(loans._loan __0, out LoanMutationSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateLoanMutationSnapshot(__0);

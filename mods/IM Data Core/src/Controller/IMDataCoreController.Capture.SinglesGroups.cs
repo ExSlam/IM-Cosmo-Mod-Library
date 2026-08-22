@@ -1084,12 +1084,37 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one idol-hired lifecycle event.
+        /// Captures pre-mutation membership for one idol hire attempt.
         /// </summary>
-        internal void CaptureIdolHired(data_girls.girls idol)
+        internal IdolHireSnapshot CreateIdolHireSnapshot(data_girls.girls idol)
         {
+            return new IdolHireSnapshot
+            {
+                WasAlreadyHired = idol != null &&
+                    data_girls.girl != null &&
+                    data_girls.girl.Contains(idol)
+            };
+        }
+
+        /// <summary>
+        /// Captures one idol-hired lifecycle event after proving that vanilla
+        /// actually inserted the idol.
+        /// </summary>
+        internal void CaptureIdolHired(
+            data_girls.girls idol,
+            IdolHireSnapshot snapshotBefore)
+        {
+            if (idol == null ||
+                snapshotBefore == null ||
+                snapshotBefore.WasAlreadyHired ||
+                data_girls.girl == null ||
+                !data_girls.girl.Contains(idol))
+            {
+                return;
+            }
+
             StaffAttributionSnapshot hiringStaff;
-            TryTakeHireStaffAttribution(idol != null ? idol.id : CoreConstants.InvalidIdValue, out hiringStaff);
+            TryTakeHireStaffAttribution(idol.id, out hiringStaff);
             CaptureIdolLifecycleEvent(
                 idol,
                 CoreConstants.EventTypeIdolHired,

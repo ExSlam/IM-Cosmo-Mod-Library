@@ -54,6 +54,22 @@ normalized RelativeSavePath
 
 `Sequence` and `EnabledMods` are checkpoint contents, not identity fields.
 
+### Optional durable agency-room identity snapshot
+
+Checkpoints created by the post-3.4.6 Pass 5 follow-up may also contain `AgencyRoomIdentities`. The field is additive within format 5 and is deliberately **not** part of exact vanilla-save identity.
+
+When present, it is an array in vanilla's serialized agency floor/room order. Each record contains:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `EntityId` | string | IMDC-owned durable room-generation identifier (`g:<guid>`). |
+| `FloorIndex` | int | Zero-based index in `SavedData.agency__Floors`. |
+| `RoomIndex` | int | Zero-based room index within that saved floor. |
+| `RoomTypeRaw` | int | Raw vanilla `agency._type` value used to validate reassociation. |
+| `TheaterId` | int | Saved vanilla `TheaterID`; used as an additional layout check for theater/cafe rooms. |
+
+The field is omitted by early v5 checkpoints and may therefore be absent on valid format-5 data. Absence does not reject the checkpoint. On such a load, IMDC assigns fresh forward-safe room generations because vanilla never persisted enough information to reconnect already-ambiguous older room history safely. New checkpoints then persist the mapping.
+
 `ContentFingerprint` is computed from:
 
 ```csharp
@@ -78,7 +94,7 @@ Required stored fields:
 | `GameDateTime` | string | IMDC round-trip date/time string. |
 | `IdolId` | integer | Idol identity, or the event's sentinel/global value where applicable. |
 | `EntityKind` | string | Event entity kind. |
-| `EntityId` | string | Entity identity. |
+| `EntityId` | string | Durable entity identity. For agency rooms, theaters, and cafes this is an IMDC-owned room-generation ID rather than the runtime/recyclable vanilla ID. |
 | `EventType` | string | Event type token. |
 | `SourcePatch` | string | Capture provenance. |
 | `NamespaceIdentifier` | string | Empty for built-in events; consumer namespace for custom events. |
@@ -119,6 +135,7 @@ A v5 document is rejected if any applicable invariant fails, including:
 - checkpoint sequence below zero or above `LastIssuedSequence`;
 - malformed or missing checkpoint `ContentFingerprint`;
 - duplicate exact checkpoint identities;
+- malformed `AgencyRoomIdentities` records when the optional field is present, including empty/duplicate generation IDs or invalid indexes/types;
 - `LastIssuedSequence` below a stored source-record sequence;
 - malformed custom operations, tokens, idempotency keys, payloads, or custom values;
 - custom-data quota/token violations enforced by the storage/API layers.

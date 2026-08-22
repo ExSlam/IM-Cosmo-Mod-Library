@@ -1,18 +1,18 @@
 # Save Write Ordering Fix
 
-**Version 1.2.0**
+## Version 1.3.0
 
 Fixes a vanilla bug where rapidly saving to the same slot can let an older save finish later and overwrite the newer save.
 
-## Important: 1.2.0 retains the Mono-safe 1.1 architecture
+## Important: 1.3.0 retains the Mono-safe 1.1 architecture
 
 Do not use 1.0.0 or 1.0.1.
 
 Those versions Harmony-patched constructed `DataSaver<T>` methods. That is unsafe on Idol Manager's Mono runtime because reference-type generic instantiations may share runtime code. In practice, a `SavedData` patch can interfere with other `DataSaver<T>` uses such as `GlobalData`.
 
-Version 1.2.0 contains **no Harmony patch on `DataSaver<T>`**.
+Version 1.3.0 contains **no Harmony patch on `DataSaver<T>`**.
 
-## How 1.2.0 works
+## How 1.3.0 works
 
 Idol Manager has five concrete vanilla places that write `SaveManager.SavedData`:
 
@@ -31,6 +31,8 @@ For each physical save path:
 3. A background writer writes the queued requests in request order.
 4. A newer save can no longer finish before an older one and then be overwritten by that older request.
 5. Different physical save paths retain independent asynchronous writers.
+
+If caller-thread JSON freezing throws after the physical path has been resolved, 1.3.0 does **not** escape to vanilla's untracked `DataSaver.saveData` thread. The request stays in the same ordered queue and retries serialization once on that queue's writer thread. That exceptional retry can still observe a later mutation of the live `SavedData` object, just as vanilla's delayed serializer can, but it remains visible to queue draining and directory-exclusive deletion leases. If the retry also throws, the ordered write fails and is logged rather than creating an untracked writer that could cross a deletion boundary.
 
 The surrounding vanilla save method still runs normally, including SaveEvent, screenshots, popup behavior, and other Harmony patches.
 
@@ -64,7 +66,7 @@ Idol Manager also reads `SavedData` directly while:
 - building manual save lists,
 - building story save/playthrough lists.
 
-Version 1.2.0 replaces the concrete `DataSaver.loadData<SaveManager.SavedData>` instructions at all known vanilla caller sites with a wrapper that waits for an ordered write to the same physical file to finish, then calls vanilla `DataSaver.loadData<SaveManager.SavedData>`.
+Version 1.3.0 replaces the concrete `DataSaver.loadData<SaveManager.SavedData>` instructions at all known vanilla caller sites with a wrapper that waits for an ordered write to the same physical file to finish, then calls vanilla `DataSaver.loadData<SaveManager.SavedData>`.
 
 Again, `DataSaver<T>` itself is not Harmony-patched.
 
@@ -103,6 +105,30 @@ SaveWriteOrderingFix.SaveWriteOrderingApi.TryRunExclusiveFileAccess(
 ```
 
 Later ordered vanilla writes to the same path wait until the exclusive operation finishes.
+
+For directory deletion/archive operations, 1.3.0 also exposes a lease that **atomically closes queue admission** beneath the directory, drains every ordered save queue that was admitted before the boundary, and keeps both existing and newly arriving writes blocked until the caller disposes it:
+
+```csharp
+IDisposable lease;
+string errorMessage;
+if (SaveWriteOrderingFix.SaveWriteOrderingApi.TryAcquireExclusiveDirectoryAccess(
+        absoluteSaveDirectory,
+        30000,
+        out lease,
+        out errorMessage))
+{
+    try
+    {
+        // Delete/archive the directory while earlier queued writes are drained.
+    }
+    finally
+    {
+        lease.Dispose();
+    }
+}
+```
+
+IM Data Core uses this boundary around vanilla save-directory deletion so neither an earlier queued SWOF writer nor a newly arriving write can recreate the directory while/after IMDC archives the matching supplemental sidecar. Queue admission and directory-lease registration share one coordinator lock, so a write is either admitted before the lease and drained, or admitted only after the lease is released.
 
 ## Build
 

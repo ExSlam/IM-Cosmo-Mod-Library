@@ -67,6 +67,10 @@ namespace IMDataCore
                         return;
                     }
 
+                    List<LightweightAgencyRoomIdentityRecord> roomIdentities =
+                        CaptureAgencyRoomIdentitySnapshotForCheckpointLocked(
+                            savedData);
+
                     VanillaSaveStamp stamp;
                     if (!VanillaSaveStamp.TryCreate(
                             savedData,
@@ -77,6 +81,7 @@ namespace IMDataCore
                             stamp,
                             captureSequence,
                             enabledMods,
+                            roomIdentities,
                             out errorMessage) ||
                         !storageEngine.TryCreatePersistenceSnapshot(
                             targetScope,
@@ -247,6 +252,9 @@ namespace IMDataCore
                     }
                     bool checkpointFound = false;
                     long activatedSequence = 0L;
+                    bool checkpointRoomIdentitySnapshotPresent = false;
+                    List<LightweightAgencyRoomIdentityRecord> checkpointRoomIdentities =
+                        new List<LightweightAgencyRoomIdentityRecord>();
                     bool hasExistingSidecarDocument =
                         sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
 
@@ -261,10 +269,14 @@ namespace IMDataCore
                         // sidecar that fails exact matching on the next load.
                         List<LightweightModSnapshotRecord> adoptedMods =
                             CaptureCurrentModSnapshot(true);
+                        checkpointRoomIdentities =
+                            CreateFreshAgencyRoomIdentitySnapshot(loadedSaveData);
+                        checkpointRoomIdentitySnapshotPresent = true;
                         if (!loadedEngine.AddOrReplaceCheckpoint(
                                 stamp,
                                 0L,
                                 adoptedMods,
+                                checkpointRoomIdentities,
                                 out errorMessage))
                         {
                             CoreLog.Warn(
@@ -305,6 +317,18 @@ namespace IMDataCore
                         {
                             WarnForCheckpointModDifferences(requiredMods);
                         }
+
+                        if (!loadedEngine.TryGetCheckpointAgencyRoomIdentities(
+                                stamp,
+                                out checkpointRoomIdentitySnapshotPresent,
+                                out checkpointRoomIdentities,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(errorMessage);
+                            checkpointRoomIdentitySnapshotPresent = false;
+                            checkpointRoomIdentities =
+                                new List<LightweightAgencyRoomIdentityRecord>();
+                        }
                     }
                     if (hasExistingSidecarDocument && !checkpointFound)
                     {
@@ -322,7 +346,12 @@ namespace IMDataCore
                         loadedEngine,
                         targetScope,
                         loadedGameDate);
-                        engineInstalled = true;
+                    PrepareAgencyRoomIdentitiesForLoad(
+                        loadedSaveData,
+                        checkpointFound,
+                        checkpointRoomIdentitySnapshotPresent,
+                        checkpointRoomIdentities);
+                    engineInstalled = true;
                     }
                 }
             }
@@ -626,6 +655,7 @@ namespace IMDataCore
                 saveLoadPreparationActive = false;
                 preparedLoadGameDate = DateTime.MinValue;
                 preparedLoadGameDateValid = false;
+                CancelPendingAgencyRoomIdentityLoadLocked();
             }
         }
         private bool EnsureInitialized(out string errorMessage)
@@ -797,6 +827,7 @@ namespace IMDataCore
             pendingCustomEventIdempotencyKeys.Clear();
             idempotencyKeysForCurrentDate.Clear();
             idempotencyDateKey = CoreConstants.UninitializedDateKey;
+            ResetEntityIdentityRuntimeStateLocked();
         }
         /// <summary>
         /// Rebuilds deferred dialogue-completion tokens from vanilla's restored

@@ -3179,6 +3179,17 @@ namespace IMDataCore
         /// </summary>
         private void FlushAfterCaptureLocked()
         {
+            // Ordinary show capture and the final post-mod canonical observation
+            // must remain in one pending batch so CorePayloadCompaction can compare
+            // them.  Crossing the normal buffered-event threshold inside a nested
+            // settlement scope used to materialize the ordinary row too early.
+            // Explicit/forced persistence boundaries still call FlushLocked(true)
+            // directly and are intentionally not suppressed here.
+            if (postModShowSettlementDepth > 0)
+            {
+                return;
+            }
+
             string errorMessage;
             if (!FlushLocked(false, out errorMessage))
             {
@@ -9788,6 +9799,22 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Snapshot captured before one medical lifecycle mutation attempt.
+    /// </summary>
+    internal sealed class MedicalLifecycleSnapshot
+    {
+        internal data_girls._status PreviousStatus;
+    }
+
+    /// <summary>
+    /// Snapshot captured before one idol hire attempt.
+    /// </summary>
+    internal sealed class IdolHireSnapshot
+    {
+        internal bool WasAlreadyHired;
+    }
+
+    /// <summary>
     /// Snapshot captured before idol salary mutation methods execute.
     /// </summary>
     internal sealed class SalaryChangeSnapshot
@@ -9899,6 +9926,7 @@ namespace IMDataCore
     internal sealed class TheaterLifecycleSnapshot
     {
         internal int TheaterId = CoreConstants.InvalidIdValue;
+        internal string EntityIdentifier = string.Empty;
         internal string TheaterTitle = string.Empty;
         internal int GroupId = CoreConstants.InvalidIdValue;
         internal int RoomTheaterId = CoreConstants.InvalidIdValue;
@@ -9926,6 +9954,7 @@ namespace IMDataCore
     internal sealed class CafeLifecycleSnapshot
     {
         internal int CafeId = CoreConstants.InvalidIdValue;
+        internal string EntityIdentifier = string.Empty;
         internal string CafeTitle = string.Empty;
         internal int GroupId = CoreConstants.InvalidIdValue;
         internal int RoomTheaterId = CoreConstants.InvalidIdValue;
@@ -10266,7 +10295,11 @@ namespace IMDataCore
     /// </summary>
     internal sealed class AgencyRoomDestroySnapshot
     {
+        internal agency AgencySystem;
+        internal agency._room RoomReference;
+        internal bool WasContainedBefore;
         internal int RoomId = CoreConstants.InvalidIdValue;
+        internal string RoomEntityIdentifier = string.Empty;
         internal agency._type RoomType = agency._type.yourOffice;
         internal int TheaterId = CoreConstants.InvalidIdValue;
         internal int FloorId = CoreConstants.InvalidIdValue;
@@ -10285,6 +10318,7 @@ namespace IMDataCore
         internal float ProgressBefore;
         internal DateTime RegionalCooldownBefore = Auditions.Regional_Date;
         internal DateTime NationwideCooldownBefore = Auditions.Nationwide_Date;
+        internal bool FinalScandalBlockedBefore;
     }
 
     /// <summary>
@@ -10419,6 +10453,7 @@ namespace IMDataCore
     /// </summary>
     internal sealed class RivalMarketSnapshot
     {
+        internal bool CanUpdateTrendsBefore;
         internal int MonthIndexBefore;
         internal int ActiveGroupCountBefore;
         internal int RisingGroupCountBefore;

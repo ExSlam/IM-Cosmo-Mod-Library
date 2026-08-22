@@ -233,6 +233,7 @@ namespace UnavailableIdolsFix
     }
 
     [HarmonyPatch(typeof(singles._single), nameof(singles._single.RemoveGirl))]
+    [HarmonyAfter(new[] { "com.cosmo.imdatacore" })]
     internal static class SingleRemovalPolicyPatch
     {
         private static bool Prefix(data_girls.girls _girl)
@@ -374,6 +375,7 @@ namespace UnavailableIdolsFix
     }
 
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.Set_Injured))]
+    [HarmonyAfter(new[] { "com.cosmo.imdatacore" })]
     internal static class InjuryLifecyclePatch
     {
         private static bool Prefix(data_girls.girls __instance, out data_girls._status __state)
@@ -406,6 +408,7 @@ namespace UnavailableIdolsFix
     }
 
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.Set_Depressed))]
+    [HarmonyAfter(new[] { "com.cosmo.imdatacore" })]
     internal static class DepressionLifecyclePatch
     {
         private static bool Prefix(data_girls.girls __instance, out data_girls._status __state)
@@ -443,6 +446,7 @@ namespace UnavailableIdolsFix
     }
 
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.SendOnHiatus))]
+    [HarmonyAfter(new[] { "com.cosmo.imdatacore" })]
     internal static class HiatusLifecyclePatch
     {
         private static bool Prefix(data_girls.girls __instance, out data_girls._status __state)

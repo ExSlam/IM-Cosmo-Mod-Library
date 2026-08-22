@@ -366,6 +366,12 @@ When an API call fails:
 
 - Treating timeline events as mutable state source for every read path
   - Use snapshots for current state; events for history
+- Treating `single_status_changed`, `show_status_changed`, or `tour_status_changed` as exhaustive lifecycle journals
+  - These streams observe setter calls. Use `single_released`, `show_released`, `tour_finished`, and the other dedicated lifecycle events for vanilla lifecycle transitions that may use direct field assignments.
+- Grouping agency-room, theater, or cafe history by raw payload IDs
+  - Vanilla room IDs are runtime-only and theater/cafe IDs can be recycled. Group historical rows by `(EntityKind, EntityId)`; use `room_id`, `theater_id`, and `cafe_id` payload fields only for current-state/game correlation.
+- Assuming every Event Catalog entry is publicly queryable
+  - The catalog explicitly separates queryable built-ins from internal transient streams that retention drops before timeline reads.
 - Writing directly into the IM Data Core sidecar
   - Use API for compatibility
 - Spamming registration calls every frame

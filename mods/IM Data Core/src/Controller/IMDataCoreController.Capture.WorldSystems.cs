@@ -750,6 +750,15 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureLoanAdded(loans._loan loan, LoanMutationSnapshot snapshotBefore)
         {
+            if (loan == null ||
+                snapshotBefore == null ||
+                loans.Loans == null ||
+                !loans.Loans.Contains(loan) ||
+                loans.Loans.Count <= snapshotBefore.TotalLoanCount)
+            {
+                return;
+            }
+
             CaptureLoanLifecycleEvent(
                 loan,
                 snapshotBefore,
@@ -776,12 +785,7 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureLoanPaidOff(loans._loan loan, LoanMutationSnapshot snapshotBefore)
         {
-            if (loan == null)
-            {
-                return;
-            }
-
-            if (snapshotBefore != null && !snapshotBefore.LoanActive && !loan.Active)
+            if (loan == null || snapshotBefore == null || !snapshotBefore.LoanActive || loan.Active)
             {
                 return;
             }
@@ -1684,6 +1688,14 @@ namespace IMDataCore
                     subscribersBefore = CoreConstants.ZeroLongValue;
                 }
 
+                string theaterEntityId = ResolveTheaterHistoryEntityId(
+                    theater,
+                    theater.GetRoom());
+                if (string.IsNullOrEmpty(theaterEntityId))
+                {
+                    continue;
+                }
+
                 TheaterDailyResultEventPayload payload = new TheaterDailyResultEventPayload
                 {
                     theater_id = theater.ID,
@@ -1724,7 +1736,7 @@ namespace IMDataCore
                         staticVars.dateTime,
                         CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindTheater,
-                        theater.ID.ToString(CultureInfo.InvariantCulture),
+                        theaterEntityId,
                         CoreConstants.EventTypeTheaterDailyResult,
                         CoreConstants.EventSourceTheatersCompleteDayPatch,
                         CoreJsonUtility.SerializeObjectPayload(payload));
@@ -1753,7 +1765,9 @@ namespace IMDataCore
             string eventType,
             string sourcePatch)
         {
-            if (snapshot == null || snapshot.TheaterId < CoreConstants.MinimumValidIdolIdentifier)
+            if (snapshot == null ||
+                snapshot.TheaterId < CoreConstants.MinimumValidIdolIdentifier ||
+                string.IsNullOrEmpty(snapshot.EntityIdentifier))
             {
                 return;
             }
@@ -1787,7 +1801,7 @@ namespace IMDataCore
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindTheater,
-                    snapshot.TheaterId.ToString(CultureInfo.InvariantCulture),
+                    snapshot.EntityIdentifier,
                     eventType,
                     sourcePatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
@@ -1799,7 +1813,7 @@ namespace IMDataCore
         /// <summary>
         /// Creates a normalized lifecycle snapshot for one theater.
         /// </summary>
-        private static TheaterLifecycleSnapshot CreateTheaterLifecycleSnapshot(Theaters._theater theater, agency._room room)
+        private TheaterLifecycleSnapshot CreateTheaterLifecycleSnapshot(Theaters._theater theater, agency._room room)
         {
             TheaterLifecycleSnapshot snapshot = new TheaterLifecycleSnapshot();
             if (theater == null)
@@ -1807,12 +1821,16 @@ namespace IMDataCore
                 return snapshot;
             }
 
+            agency._room resolvedRoom = room ?? theater.GetRoom();
             snapshot.TheaterId = theater.ID;
+            snapshot.EntityIdentifier = ResolveTheaterHistoryEntityId(
+                theater,
+                resolvedRoom);
             snapshot.TheaterTitle = theater.GetTitle() ?? string.Empty;
             snapshot.GroupId = theater.Group;
-            snapshot.RoomTheaterId = room != null
-                ? room.TheaterID
-                : (theater.GetRoom() != null ? theater.GetRoom().TheaterID : CoreConstants.InvalidIdValue);
+            snapshot.RoomTheaterId = resolvedRoom != null
+                ? resolvedRoom.TheaterID
+                : CoreConstants.InvalidIdValue;
             snapshot.TicketPrice = theater.Ticket_Price;
             snapshot.SubscriptionPrice = theater.Subscription_Price;
             snapshot.StreamingResearched = theater.Streaming_Researched;
@@ -1941,6 +1959,12 @@ namespace IMDataCore
             }
 
             Cafes._cafe._dish dish = cafe.GetDishByID(latestStat.Dish_ID);
+            string cafeEntityId = ResolveCafeHistoryEntityId(cafe, room);
+            if (string.IsNullOrEmpty(cafeEntityId))
+            {
+                return;
+            }
+
             long moneyAfter = resources.Money();
             CafeDailyResultEventPayload payload = new CafeDailyResultEventPayload
             {
@@ -1978,7 +2002,7 @@ namespace IMDataCore
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindCafe,
-                    cafe.ID.ToString(CultureInfo.InvariantCulture),
+                    cafeEntityId,
                     CoreConstants.EventTypeCafeDailyResult,
                     CoreConstants.EventSourceCafesRenderCafePatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
@@ -1996,7 +2020,9 @@ namespace IMDataCore
             string eventType,
             string sourcePatch)
         {
-            if (snapshot == null || snapshot.CafeId < CoreConstants.MinimumValidIdolIdentifier)
+            if (snapshot == null ||
+                snapshot.CafeId < CoreConstants.MinimumValidIdolIdentifier ||
+                string.IsNullOrEmpty(snapshot.EntityIdentifier))
             {
                 return;
             }
@@ -2029,7 +2055,7 @@ namespace IMDataCore
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindCafe,
-                    snapshot.CafeId.ToString(CultureInfo.InvariantCulture),
+                    snapshot.EntityIdentifier,
                     eventType,
                     sourcePatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
@@ -2041,7 +2067,7 @@ namespace IMDataCore
         /// <summary>
         /// Creates a normalized lifecycle snapshot for one cafe.
         /// </summary>
-        private static CafeLifecycleSnapshot CreateCafeLifecycleSnapshot(Cafes._cafe cafe, agency._room room)
+        private CafeLifecycleSnapshot CreateCafeLifecycleSnapshot(Cafes._cafe cafe, agency._room room)
         {
             CafeLifecycleSnapshot snapshot = new CafeLifecycleSnapshot();
             if (cafe == null)
@@ -2050,6 +2076,7 @@ namespace IMDataCore
             }
 
             snapshot.CafeId = cafe.ID;
+            snapshot.EntityIdentifier = ResolveCafeHistoryEntityId(cafe, room);
             snapshot.CafeTitle = cafe.Title ?? string.Empty;
             snapshot.GroupId = cafe.Group;
             snapshot.RoomTheaterId = room != null ? room.TheaterID : CoreConstants.InvalidIdValue;
@@ -4456,11 +4483,14 @@ namespace IMDataCore
                     return;
                 }
 
+                string roomEntityId =
+                    GetOrCreateAgencyRoomHistoryEntityIdLocked(builtRoom);
+
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindAgencyRoom,
-                    builtRoom.id.ToString(CultureInfo.InvariantCulture),
+                    roomEntityId,
                     CoreConstants.EventTypeAgencyRoomBuilt,
                     CoreConstants.EventSourceAgencyAddRoomPatch,
                     CoreJsonUtility.SerializeObjectPayload(lifecyclePayload));
@@ -4471,7 +4501,7 @@ namespace IMDataCore
                         staticVars.dateTime,
                         CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindAgencyRoom,
-                        builtRoom.id.ToString(CultureInfo.InvariantCulture),
+                        roomEntityId,
                         CoreConstants.EventTypeAgencyRoomCostPaid,
                         CoreConstants.EventSourceAgencyAddRoomPatch,
                         CoreJsonUtility.SerializeObjectPayload(costPayload));
@@ -4488,6 +4518,8 @@ namespace IMDataCore
         {
             AgencyRoomDestroySnapshot snapshot = new AgencyRoomDestroySnapshot
             {
+                AgencySystem = agencySystem,
+                RoomReference = roomToDestroy,
                 MoneyBefore = resources.Money()
             };
 
@@ -4497,11 +4529,17 @@ namespace IMDataCore
             }
 
             snapshot.RoomId = roomToDestroy.id;
+            snapshot.RoomEntityIdentifier =
+                ResolveAgencyRoomHistoryEntityId(roomToDestroy);
             snapshot.RoomType = roomToDestroy.type;
             snapshot.TheaterId = roomToDestroy.TheaterID;
             snapshot.RoomSpace = agency.roomSpace(roomToDestroy.type);
             snapshot.RoomCost = agencySystem != null ? agencySystem.roomCost(roomToDestroy.type) : CoreConstants.ZeroBasedListStartIndex;
-            TryResolveAgencyRoomLocation(agencySystem, roomToDestroy, out snapshot.FloorId, out snapshot.FloorIndex);
+            snapshot.WasContainedBefore = TryResolveAgencyRoomLocation(
+                agencySystem,
+                roomToDestroy,
+                out snapshot.FloorId,
+                out snapshot.FloorIndex);
             return snapshot;
         }
 
@@ -4510,8 +4548,33 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureAgencyRoomDestroyed(AgencyRoomDestroySnapshot snapshotBefore)
         {
-            if (snapshotBefore == null || snapshotBefore.RoomId < CoreConstants.MinimumValidIdolIdentifier)
+            if (snapshotBefore == null ||
+                !snapshotBefore.WasContainedBefore ||
+                snapshotBefore.RoomReference == null ||
+                snapshotBefore.RoomId < CoreConstants.MinimumValidIdolIdentifier ||
+                string.IsNullOrEmpty(snapshotBefore.RoomEntityIdentifier))
             {
+                return;
+            }
+
+            if (snapshotBefore.AgencySystem == null ||
+                snapshotBefore.AgencySystem.floors == null)
+            {
+                // Missing post-state is not proof of destruction.
+                return;
+            }
+
+            int ignoredFloorId;
+            int ignoredFloorIndex;
+            if (TryResolveAgencyRoomLocation(
+                    snapshotBefore.AgencySystem,
+                    snapshotBefore.RoomReference,
+                    out ignoredFloorId,
+                    out ignoredFloorIndex))
+            {
+                // Vanilla returns without removing a non-contained room.  Require
+                // the actual contained-before -> absent-after destruction
+                // postcondition instead of treating the request as the event.
                 return;
             }
 
@@ -4545,12 +4608,13 @@ namespace IMDataCore
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindAgencyRoom,
-                    snapshotBefore.RoomId.ToString(CultureInfo.InvariantCulture),
+                    snapshotBefore.RoomEntityIdentifier,
                     CoreConstants.EventTypeAgencyRoomDestroyed,
                     CoreConstants.EventSourceAgencyDestroyRoomPatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
 
                 FlushAfterCaptureLocked();
+                agencyRoomEntityIdByReference.Remove(snapshotBefore.RoomReference);
             }
         }
 
@@ -4564,7 +4628,8 @@ namespace IMDataCore
                 MoneyBefore = resources.Money(),
                 ProgressBefore = auditionData != null ? auditionData.Progress : 0f,
                 RegionalCooldownBefore = Auditions.Regional_Date,
-                NationwideCooldownBefore = Auditions.Nationwide_Date
+                NationwideCooldownBefore = Auditions.Nationwide_Date,
+                FinalScandalBlockedBefore = tasks.Story_Data != null && tasks.Story_Data.Scandal_Auditions_No_More
             };
         }
 
@@ -4573,7 +4638,7 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureAuditionStarted(Auditions.data auditionData, bool shouldPay, AuditionStartSnapshot snapshotBefore)
         {
-            if (auditionData == null)
+            if (auditionData == null || snapshotBefore == null || snapshotBefore.FinalScandalBlockedBefore)
             {
                 return;
             }
@@ -4748,7 +4813,15 @@ namespace IMDataCore
             bool forceRequested,
             RandomEventStartSnapshot snapshotBefore)
         {
-            if (manager == null || randomEvent == null)
+            if (manager == null || randomEvent == null || snapshotBefore == null || manager.activeEvents == null)
+            {
+                return;
+            }
+
+            // Vanilla appends exactly one active-event row on a successful start.
+            // A duplicate/disabled/actor-resolution no-op leaves the count unchanged,
+            // so do not rediscover an older matching row and report it as new history.
+            if (manager.activeEvents.Count <= snapshotBefore.ActiveEventCountBefore)
             {
                 return;
             }
@@ -5860,12 +5933,38 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Captures pre-mutation rival state plus vanilla's UpdateTrends eligibility
+        /// precondition.  The generic monthly snapshot intentionally does not call
+        /// CanUpdateTrends because it is used by unrelated rival recalculation hooks.
+        /// </summary>
+        internal RivalMarketSnapshot CreateRivalTrendUpdateSnapshot()
+        {
+            RivalMarketSnapshot snapshot = CreateRivalMarketSnapshot();
+            snapshot.CanUpdateTrendsBefore = Rivals.CanUpdateTrends();
+            return snapshot;
+        }
+
+        /// <summary>
         /// Captures rival trend update snapshots with research spend.
         /// </summary>
         internal void CaptureRivalTrendsUpdated(RivalMarketSnapshot snapshotBefore)
         {
-            if (snapshotBefore == null)
+            if (snapshotBefore == null || !snapshotBefore.CanUpdateTrendsBefore)
             {
+                return;
+            }
+
+            string trendLastUpdatedAfter = Rivals.Trend_Data != null
+                ? (Rivals.Trend_Data.LastUpdated ?? string.Empty)
+                : string.Empty;
+            if (string.Equals(
+                    snapshotBefore.TrendLastUpdatedBefore,
+                    trendLastUpdatedAfter,
+                    StringComparison.Ordinal))
+            {
+                // Vanilla's successful UpdateTrends always refreshes LastUpdated.
+                // If the marker did not change, the call did not complete the
+                // mutation IMDC is trying to describe.
                 return;
             }
 
@@ -5889,7 +5988,7 @@ namespace IMDataCore
                 trends_lyrics_summary = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Lyrics : null),
                 trends_choreo_summary = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Choreo : null),
                 trend_last_updated_before = snapshotBefore.TrendLastUpdatedBefore,
-                trend_last_updated_after = Rivals.Trend_Data != null ? (Rivals.Trend_Data.LastUpdated ?? string.Empty) : string.Empty,
+                trend_last_updated_after = trendLastUpdatedAfter,
                 show_popup = false,
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };

@@ -2013,7 +2013,54 @@ namespace IMDataCore
             builder.Append(',');
             AppendPropertyName(builder, "EnabledMods");
             AppendModSnapshots(builder, record.EnabledMods);
+            if (record.AgencyRoomIdentities != null)
+            {
+                builder.Append(',');
+                AppendPropertyName(builder, "AgencyRoomIdentities");
+                AppendAgencyRoomIdentities(builder, record.AgencyRoomIdentities);
+            }
             builder.Append('}');
+        }
+
+        private static void AppendAgencyRoomIdentities(
+            StringBuilder builder,
+            List<LightweightAgencyRoomIdentityRecord> records)
+        {
+            builder.Append('[');
+            bool wroteAny = false;
+            if (records != null)
+            {
+                for (int index = 0; index < records.Count; index++)
+                {
+                    LightweightAgencyRoomIdentityRecord record = records[index];
+                    if (record == null)
+                    {
+                        continue;
+                    }
+                    if (wroteAny)
+                    {
+                        builder.Append(',');
+                    }
+                    builder.Append('{');
+                    AppendPropertyName(builder, "EntityId");
+                    AppendString(builder, record.EntityId ?? string.Empty);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "FloorIndex");
+                    AppendInt32(builder, record.FloorIndex);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "RoomIndex");
+                    AppendInt32(builder, record.RoomIndex);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "RoomTypeRaw");
+                    AppendInt32(builder, record.RoomTypeRaw);
+                    builder.Append(',');
+                    AppendPropertyName(builder, "TheaterId");
+                    AppendInt32(builder, record.TheaterId);
+                    builder.Append('}');
+                    wroteAny = true;
+                }
+            }
+            builder.Append(']');
         }
 
         private static void AppendModSnapshots(
@@ -2264,8 +2311,45 @@ namespace IMDataCore
                 GameDateTime = RequireString(item, "GameDateTime"),
                 ContentFingerprint = RequireString(item, "ContentFingerprint"),
                 Sequence = RequireInt64(item, "Sequence"),
-                EnabledMods = ReadModSnapshots(item)
+                EnabledMods = ReadModSnapshots(item),
+                AgencyRoomIdentities = ReadAgencyRoomIdentitiesIfPresent(item)
             };
+        }
+
+        private static List<LightweightAgencyRoomIdentityRecord> ReadAgencyRoomIdentitiesIfPresent(
+            Dictionary<string, JsonValue> checkpoint)
+        {
+            JsonValue value;
+            if (checkpoint == null ||
+                !checkpoint.TryGetValue("AgencyRoomIdentities", out value))
+            {
+                return null;
+            }
+
+            if (value == null || value.Kind != JsonValueKind.Array)
+            {
+                throw new FormatException(
+                    "The checkpoint AgencyRoomIdentities field must be a JSON array.");
+            }
+            List<JsonValue> values = value.ArrayValue;
+            List<LightweightAgencyRoomIdentityRecord> records =
+                new List<LightweightAgencyRoomIdentityRecord>(values.Count);
+            for (int index = 0; index < values.Count; index++)
+            {
+                Dictionary<string, JsonValue> item = RequireObject(
+                    values[index],
+                    "An agency-room identity entry must be a JSON object.");
+                records.Add(new LightweightAgencyRoomIdentityRecord
+                {
+                    EntityId = RequireString(item, "EntityId"),
+                    FloorIndex = RequireInt32(item, "FloorIndex"),
+                    RoomIndex = RequireInt32(item, "RoomIndex"),
+                    RoomTypeRaw = RequireInt32(item, "RoomTypeRaw"),
+                    TheaterId = RequireInt32(item, "TheaterId")
+                });
+            }
+
+            return records;
         }
 
         private static List<LightweightModSnapshotRecord> ReadModSnapshots(

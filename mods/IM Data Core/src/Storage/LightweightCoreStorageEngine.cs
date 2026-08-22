@@ -295,6 +295,11 @@ namespace IMDataCore
         internal long Generation;
         internal long PathArchiveEpoch;
         internal bool PreserveExistingBackup;
+        // When a session was recovered from .imdc.bak, this records the exact
+        // journal that completed that backup generation. A healing snapshot uses
+        // the provenance to preserve the complete known-good backup before it
+        // removes any journal beside the repaired primary.
+        internal string BackupRecoveryJournalPath = string.Empty;
         internal long StateRevision;
         internal bool IsIncremental;
         internal int BaseEventCount;
@@ -308,6 +313,14 @@ namespace IMDataCore
         internal LightweightSidecarDocument Document;
     }
 
+    internal enum LightweightJournalReplayStatus
+    {
+        Missing = 0,
+        TornBeforeHeader = 1,
+        HeaderMismatch = 2,
+        HeaderMatched = 3
+    }
+
     internal sealed class LightweightLoadedPersistenceInfo
     {
         internal string BaseFileHash = string.Empty;
@@ -315,6 +328,7 @@ namespace IMDataCore
         internal long JournalBytes;
         internal int JournalEntryCount;
         internal bool ForceFullSnapshot;
+        internal string ReplayedJournalPath = string.Empty;
     }
 
     [Serializable]
@@ -328,6 +342,18 @@ namespace IMDataCore
     }
 
     [Serializable]
+    internal sealed class LightweightAgencyRoomIdentityRecord
+    {
+        // Durable IMDC-owned generation identity. The raw vanilla room id is
+        // intentionally not used here because vanilla does not serialize it.
+        public string EntityId = string.Empty;
+        public int FloorIndex = CoreConstants.InvalidIdValue;
+        public int RoomIndex = CoreConstants.InvalidIdValue;
+        public int RoomTypeRaw = CoreConstants.InvalidIdValue;
+        public int TheaterId = CoreConstants.InvalidIdValue;
+    }
+
+    [Serializable]
     internal sealed class LightweightCheckpointRecord
     {
         public string RelativeSavePath = string.Empty;
@@ -338,6 +364,9 @@ namespace IMDataCore
         public long Sequence;
         public List<LightweightModSnapshotRecord> EnabledMods =
             new List<LightweightModSnapshotRecord>();
+        // Null means an early format-5 checkpoint that predates durable room
+        // generation identities. An empty list is a real snapshot with no rooms.
+        public List<LightweightAgencyRoomIdentityRecord> AgencyRoomIdentities;
     }
 
     [Serializable]
@@ -388,6 +417,8 @@ namespace IMDataCore
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
         internal const int JournalFormatVersion = 2;
+        private static readonly TimeSpan OrphanTemporaryFileMinimumAge =
+            TimeSpan.FromHours(24.0);
         private const long MinimumJournalCompactionBytes = 1024L * 1024L;
         private const long MaximumJournalCompactionBytes = 16L * 1024L * 1024L;
         private const int MinimumJournalTransactionsBeforeCompaction = 2048;
@@ -685,6 +716,7 @@ namespace IMDataCore
         private DateTime maxActiveCustomMutationGameDate = DateTime.MinValue;
         private DateTime maxActiveCheckpointGameDate = DateTime.MinValue;
         private bool recoveredFromBackup;
+        private string recoveredBackupJournalPath = string.Empty;
         private bool loadedExistingSidecarDocument;
         private bool disposed;
 
@@ -785,6 +817,30 @@ namespace IMDataCore
                 return false;
             }
 
+            // Scavenge only temporary files derived from this exact sidecar name.
+            // Do it under the per-path I/O lock, before taking storageLock, so the
+            // lock order stays consistent with persistence/background compaction.
+            // Fresh files are retained for 24 hours to avoid interfering with an
+            // unusual concurrent process that may still own them.
+            string scavengeSidecarPath;
+            string scavengeValidationError;
+            if (CorePaths.TryValidateContainedMutationPath(
+                    saveScope.SidecarFilePath ?? string.Empty,
+                    false,
+                    out scavengeSidecarPath,
+                    out scavengeValidationError))
+            {
+                using (AcquirePersistenceTopologyReadLease())
+                {
+                    object pathIoLock = GetPersistenceIoLock(scavengeSidecarPath);
+                    lock (pathIoLock)
+                    {
+                        ScavengeAbandonedTemporaryFilesForScope(
+                            scavengeSidecarPath);
+                    }
+                }
+            }
+
             lock (storageLock)
             {
                 ThrowIfDisposed();
@@ -855,6 +911,8 @@ namespace IMDataCore
                         LoadDocumentLocked(document);
                         loadedExistingSidecarDocument = true;
                         recoveredFromBackup = true;
+                        recoveredBackupJournalPath =
+                            backupLoadInfo.ReplayedJournalPath ?? string.Empty;
                         errorMessage =
                             "The primary IM Data Core sidecar was unreadable or invalid " +
                             "and was left untouched. IMDC recovered this session from " +
@@ -2064,6 +2122,51 @@ namespace IMDataCore
             }
         }
 
+        internal bool TryGetCheckpointAgencyRoomIdentities(
+            VanillaSaveStamp stamp,
+            out bool snapshotPresent,
+            out List<LightweightAgencyRoomIdentityRecord> roomIdentities,
+            out string errorMessage)
+        {
+            snapshotPresent = false;
+            roomIdentities = new List<LightweightAgencyRoomIdentityRecord>();
+            errorMessage = string.Empty;
+            if (stamp == null)
+            {
+                errorMessage = "The vanilla save stamp is missing.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord checkpoint;
+                    if (!durableCheckpointsByIdentity.TryGetValue(
+                            CheckpointIdentity.From(stamp),
+                            out checkpoint) ||
+                        checkpoint == null)
+                    {
+                        return true;
+                    }
+
+                    snapshotPresent = checkpoint.AgencyRoomIdentities != null;
+                    roomIdentities = CloneAgencyRoomIdentities(
+                        checkpoint.AgencyRoomIdentities) ??
+                        new List<LightweightAgencyRoomIdentityRecord>();
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Reading the IMDC checkpoint room-identity snapshot failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
         internal bool AddOrReplaceCheckpoint(
             VanillaSaveStamp stamp,
             long sequence,
@@ -2080,6 +2183,21 @@ namespace IMDataCore
             VanillaSaveStamp stamp,
             long sequence,
             IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
+            out string errorMessage)
+        {
+            return AddOrReplaceCheckpoint(
+                stamp,
+                sequence,
+                enabledMods,
+                null,
+                out errorMessage);
+        }
+
+        internal bool AddOrReplaceCheckpoint(
+            VanillaSaveStamp stamp,
+            long sequence,
+            IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
+            IReadOnlyList<LightweightAgencyRoomIdentityRecord> agencyRoomIdentities,
             out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -2138,7 +2256,8 @@ namespace IMDataCore
                             GameDateTime = stamp.GameDateTime,
                             ContentFingerprint = stamp.ContentFingerprint,
                             Sequence = sequence,
-                            EnabledMods = CloneModSnapshots(enabledMods)
+                            EnabledMods = CloneModSnapshots(enabledMods),
+                            AgencyRoomIdentities = CloneAgencyRoomIdentities(agencyRoomIdentities)
                         };
                     activeCheckpoints.Add(newCheckpoint);
                     IndexCheckpointByPathLocked(newCheckpoint);
@@ -2566,6 +2685,7 @@ namespace IMDataCore
                         blockedPersistencePath = string.Empty;
                         blockedPersistenceReason = string.Empty;
                         recoveredFromBackup = false;
+                        recoveredBackupJournalPath = string.Empty;
                         if (!snapshot.IsIncremental)
                         {
                             durableEvents = new List<LightweightEventRecord>(
@@ -3161,10 +3281,10 @@ namespace IMDataCore
             // Primary load rejects it by base hash, while backup recovery can pair
             // it with .bak through the preferred-journal recovery path.
             bool keepCurrentJournalForBackupRecovery = false;
+            string backupJournalPath =
+                snapshot.TargetPath + ".imdc.bak.imdc.journal";
             if (targetExisted && !snapshot.PreserveExistingBackup)
             {
-                string backupJournalPath =
-                    snapshot.TargetPath + ".imdc.bak.imdc.journal";
                 string backupJournalError;
                 if (currentJournalExisted)
                 {
@@ -3188,6 +3308,42 @@ namespace IMDataCore
                     CoreLog.Warn(
                         "IM Data Core could not remove a stale backup journal: " +
                         backupJournalError);
+                }
+            }
+            else if (targetExisted && snapshot.PreserveExistingBackup &&
+                !string.IsNullOrEmpty(snapshot.BackupRecoveryJournalPath) &&
+                string.Equals(
+                    snapshot.BackupRecoveryJournalPath,
+                    currentJournalPath,
+                    CorePaths.PathComparison))
+            {
+                // Backup recovery used the primary journal to complete .imdc.bak.
+                // The healing write deliberately preserves that backup base, so
+                // publish the exact recovery journal beside it before deleting the
+                // now-stale primary journal. If publication fails, retain the source
+                // journal in place so B + J remains recoverable.
+                string backupJournalError;
+                if (currentJournalExisted)
+                {
+                    if (!TryCopyContainedFileDurably(
+                            currentJournalPath,
+                            backupJournalPath,
+                            out backupJournalError))
+                    {
+                        keepCurrentJournalForBackupRecovery = true;
+                        CoreLog.Warn(
+                            "IM Data Core healed the primary sidecar but could not " +
+                            "publish the recovery journal beside the preserved backup; " +
+                            "the original journal will be kept: " +
+                            backupJournalError);
+                    }
+                }
+                else
+                {
+                    CoreLog.Warn(
+                        "IM Data Core healed the primary sidecar after backup recovery, " +
+                        "but the primary journal that completed the preserved backup " +
+                        "was no longer present to publish as .imdc.bak.imdc.journal.");
                 }
             }
 
@@ -3363,6 +3519,87 @@ namespace IMDataCore
             {
                 errorMessage = exception.Message;
                 return false;
+            }
+        }
+
+        private static void ScavengeAbandonedTemporaryFilesForScope(
+            string normalizedSidecarPath)
+        {
+            if (string.IsNullOrEmpty(normalizedSidecarPath))
+            {
+                return;
+            }
+
+            string directoryPath = Path.GetDirectoryName(normalizedSidecarPath);
+            if (string.IsNullOrEmpty(directoryPath) ||
+                !Directory.Exists(directoryPath))
+            {
+                return;
+            }
+
+            string sidecarFileName = Path.GetFileName(normalizedSidecarPath);
+            string snapshotTemporaryPrefix =
+                sidecarFileName + ".imdc.tmp.";
+            string backupJournalTemporaryPrefix =
+                sidecarFileName + ".imdc.bak.imdc.journal.tmp.";
+            DateTime cutoffUtc = DateTime.UtcNow.Subtract(
+                OrphanTemporaryFileMinimumAge);
+
+            string[] candidates;
+            try
+            {
+                candidates = Directory.GetFiles(directoryPath);
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not inspect its sidecar directory for " +
+                    "abandoned temporary files: " + exception.Message);
+                return;
+            }
+
+            for (int index = 0; index < candidates.Length; index++)
+            {
+                string candidatePath = candidates[index];
+                string candidateFileName = Path.GetFileName(candidatePath);
+                if (!candidateFileName.StartsWith(
+                        snapshotTemporaryPrefix,
+                        CorePaths.PathComparison) &&
+                    !candidateFileName.StartsWith(
+                        backupJournalTemporaryPrefix,
+                        CorePaths.PathComparison))
+                {
+                    continue;
+                }
+
+                DateTime lastWriteUtc;
+                try
+                {
+                    lastWriteUtc = File.GetLastWriteTimeUtc(candidatePath);
+                }
+                catch (Exception exception)
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not inspect an abandoned temporary file: " +
+                        exception.Message);
+                    continue;
+                }
+
+                if (lastWriteUtc > cutoffUtc)
+                {
+                    continue;
+                }
+
+                string cleanupError;
+                if (!CorePaths.TryDeleteContainedFile(
+                        candidatePath,
+                        out cleanupError) &&
+                    !string.IsNullOrEmpty(cleanupError))
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not remove an abandoned temporary file: " +
+                        cleanupError);
+                }
             }
         }
 
@@ -3964,8 +4201,10 @@ namespace IMDataCore
             // During atomic compaction File.Replace has already moved the prior base
             // to .bak before its matching journal is copied to the backup-journal name.
             // If the process dies in that narrow interval, the still-present primary
-            // journal is exactly the one that belongs to the backup base. Prefer it
-            // during backup recovery, then fall back to the normal backup journal.
+            // journal can be the one that belongs to the backup base. Prefer it during
+            // backup recovery, but only treat it as authoritative after a real header
+            // was parsed and its base hash matched. Empty/torn preferred journals must
+            // not mask a valid sibling .bak.imdc.journal.
             if (!string.IsNullOrEmpty(preferredJournalPath) &&
                 !string.Equals(
                     preferredJournalPath,
@@ -3973,26 +4212,26 @@ namespace IMDataCore
                     CorePaths.PathComparison) &&
                 File.Exists(preferredJournalPath))
             {
-                bool preferredBaseHashMatched;
+                LightweightJournalReplayStatus preferredStatus;
                 string preferredError;
                 if (TryReplayJournalFileLocked(
                         preferredJournalPath,
                         baseFileHash,
                         document,
                         persistenceInfo,
-                        out preferredBaseHashMatched,
+                        out preferredStatus,
                         out preferredError))
                 {
-                    if (preferredBaseHashMatched)
+                    if (preferredStatus ==
+                        LightweightJournalReplayStatus.HeaderMatched)
                     {
                         return true;
                     }
 
-                    // The preferred journal belongs to some other base generation.
-                    // Reset its diagnostics before trying the normal sibling journal.
-                    persistenceInfo.JournalBytes = 0L;
-                    persistenceInfo.JournalEntryCount = 0;
-                    persistenceInfo.ForceFullSnapshot = false;
+                    // Missing/torn/mismatched preferred journals did not contribute
+                    // rows to the recovered document. Discard their diagnostics and
+                    // inspect the backup-base sibling journal instead.
+                    ResetJournalReplayDiagnostics(persistenceInfo);
                 }
                 else
                 {
@@ -4004,26 +4243,43 @@ namespace IMDataCore
                 }
             }
 
-            bool defaultBaseHashMatched;
+            LightweightJournalReplayStatus defaultStatus;
             if (!TryReplayJournalFileLocked(
                     defaultJournalPath,
                     baseFileHash,
                     document,
                     persistenceInfo,
-                    out defaultBaseHashMatched,
+                    out defaultStatus,
                     out errorMessage))
             {
                 return false;
             }
 
-            if (!defaultBaseHashMatched)
+            if (defaultStatus == LightweightJournalReplayStatus.HeaderMismatch ||
+                defaultStatus == LightweightJournalReplayStatus.TornBeforeHeader)
             {
-                // An atomically replaced base can legitimately leave a stale journal
-                // behind until cleanup. Its base hash makes it unambiguously inapplicable.
+                // An atomically replaced base can legitimately leave a stale or
+                // first-header-torn journal behind. The compact base remains
+                // authoritative, but the next persistence boundary should rewrite a
+                // clean snapshot rather than append to that journal.
                 persistenceInfo.ForceFullSnapshot = true;
             }
 
             return true;
+        }
+
+        private static void ResetJournalReplayDiagnostics(
+            LightweightLoadedPersistenceInfo persistenceInfo)
+        {
+            if (persistenceInfo == null)
+            {
+                return;
+            }
+
+            persistenceInfo.JournalBytes = 0L;
+            persistenceInfo.JournalEntryCount = 0;
+            persistenceInfo.ForceFullSnapshot = false;
+            persistenceInfo.ReplayedJournalPath = string.Empty;
         }
 
         private bool TryReplayJournalFileLocked(
@@ -4031,10 +4287,10 @@ namespace IMDataCore
             string baseFileHash,
             LightweightSidecarDocument document,
             LightweightLoadedPersistenceInfo persistenceInfo,
-            out bool baseHashMatched,
+            out LightweightJournalReplayStatus replayStatus,
             out string errorMessage)
         {
-            baseHashMatched = true;
+            replayStatus = LightweightJournalReplayStatus.Missing;
             errorMessage = string.Empty;
             string normalizedJournalPath;
             if (!CorePaths.TryValidateContainedMutationPath(
@@ -4055,6 +4311,7 @@ namespace IMDataCore
             persistenceInfo.JournalBytes = journalLength;
             if (journalLength == 0L)
             {
+                replayStatus = LightweightJournalReplayStatus.TornBeforeHeader;
                 persistenceInfo.ForceFullSnapshot = true;
                 return true;
             }
@@ -4099,7 +4356,10 @@ namespace IMDataCore
                     if (!endsWithNewline && reader.Peek() < 0)
                     {
                         // A crash while creating the first journal header cannot
-                        // invalidate the already-fsynced base snapshot.
+                        // invalidate the already-fsynced base snapshot. Crucially,
+                        // this is not evidence that the journal belongs to the base.
+                        replayStatus =
+                            LightweightJournalReplayStatus.TornBeforeHeader;
                         persistenceInfo.ForceFullSnapshot = true;
                         return true;
                     }
@@ -4114,9 +4374,13 @@ namespace IMDataCore
                         baseFileHash,
                         StringComparison.Ordinal))
                 {
-                    baseHashMatched = false;
+                    replayStatus =
+                        LightweightJournalReplayStatus.HeaderMismatch;
                     return true;
                 }
+
+                replayStatus = LightweightJournalReplayStatus.HeaderMatched;
+                persistenceInfo.ReplayedJournalPath = normalizedJournalPath;
 
                 if (journalFormatVersion != JournalFormatVersion)
                 {
@@ -4437,6 +4701,30 @@ namespace IMDataCore
                     errorMessage =
                         "The sidecar contains an invalid checkpoint.";
                     return false;
+                }
+
+                if (checkpoint.AgencyRoomIdentities != null)
+                {
+                    HashSet<string> roomEntityIds =
+                        new HashSet<string>(StringComparer.Ordinal);
+                    for (int roomIdentityIndex = 0;
+                        roomIdentityIndex < checkpoint.AgencyRoomIdentities.Count;
+                        roomIdentityIndex++)
+                    {
+                        LightweightAgencyRoomIdentityRecord roomIdentity =
+                            checkpoint.AgencyRoomIdentities[roomIdentityIndex];
+                        if (roomIdentity == null ||
+                            string.IsNullOrEmpty(roomIdentity.EntityId) ||
+                            roomIdentity.FloorIndex < 0 ||
+                            roomIdentity.RoomIndex < 0 ||
+                            roomIdentity.RoomTypeRaw < 0 ||
+                            !roomEntityIds.Add(roomIdentity.EntityId))
+                        {
+                            errorMessage =
+                                "The sidecar contains an invalid or duplicate agency-room identity snapshot entry.";
+                            return false;
+                        }
+                    }
                 }
 
                 if (!validationState.CheckpointIdentities.Add(
@@ -5269,6 +5557,9 @@ namespace IMDataCore
                 Generation = generation,
                 PathArchiveEpoch = pathArchiveEpoch,
                 PreserveExistingBackup = preserveExistingBackup,
+                BackupRecoveryJournalPath = preserveExistingBackup
+                    ? recoveredBackupJournalPath ?? string.Empty
+                    : string.Empty,
                 StateRevision = activeStateRevision,
                 IsIncremental = false,
                 BaseEventCount = 0,
@@ -5515,6 +5806,7 @@ namespace IMDataCore
             activeStateRevision = 0L;
             ResetActiveWatermarksLocked();
             recoveredFromBackup = false;
+            recoveredBackupJournalPath = string.Empty;
             loadedExistingSidecarDocument = false;
             lastIssuedSequence = 0L;
         }
@@ -6121,8 +6413,40 @@ namespace IMDataCore
                 GameDateTime = source.GameDateTime ?? string.Empty,
                 ContentFingerprint = source.ContentFingerprint ?? string.Empty,
                 Sequence = source.Sequence,
-                EnabledMods = CloneModSnapshots(source.EnabledMods)
+                EnabledMods = CloneModSnapshots(source.EnabledMods),
+                AgencyRoomIdentities = CloneAgencyRoomIdentities(source.AgencyRoomIdentities)
             };
+        }
+
+        private static List<LightweightAgencyRoomIdentityRecord> CloneAgencyRoomIdentities(
+            IReadOnlyList<LightweightAgencyRoomIdentityRecord> source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            List<LightweightAgencyRoomIdentityRecord> clone =
+                new List<LightweightAgencyRoomIdentityRecord>(source.Count);
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightAgencyRoomIdentityRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+
+                clone.Add(new LightweightAgencyRoomIdentityRecord
+                {
+                    EntityId = record.EntityId ?? string.Empty,
+                    FloorIndex = record.FloorIndex,
+                    RoomIndex = record.RoomIndex,
+                    RoomTypeRaw = record.RoomTypeRaw,
+                    TheaterId = record.TheaterId
+                });
+            }
+
+            return clone;
         }
 
         private void ThrowIfDisposed()

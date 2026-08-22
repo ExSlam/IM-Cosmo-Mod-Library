@@ -192,23 +192,31 @@ namespace IMDataCore
     /// Captures single cast-change events when one idol is removed from single cast.
     /// </summary>
     [HarmonyPatch(typeof(singles._single), nameof(singles._single.RemoveGirl))]
+    [HarmonyBefore(new[] { "com.cosmo.unavailableidolsfix" })]
     internal static class singles_single_RemoveGirl_IMDataCoreCapture_Patch
     {
         /// <summary>
         /// Captures single cast snapshot before removal mutation.
         /// </summary>
-        [HarmonyPriority(Priority.Last)]
+        [HarmonyPriority(Priority.First)]
         private static void Prefix(singles._single __instance, out SingleCastChangeSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateSingleCastChangeSnapshot(__instance);
         }
 
         /// <summary>
-        /// Records cast-change event after removal logic completes.
+        /// Records cast-change event after removal logic completes. Missing Harmony
+        /// state means an earlier Prefix prevented the pre-state snapshot, so no
+        /// historical transition can be inferred safely.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(singles._single __instance, data_girls.girls __0, SingleCastChangeSnapshot __state)
         {
+            if (__state == null)
+            {
+                return;
+            }
+
             IMDataCoreController.Instance.CaptureSingleCastChanged(__instance, __0, __state);
         }
     }

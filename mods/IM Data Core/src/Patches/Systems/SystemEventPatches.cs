@@ -355,8 +355,6 @@ namespace IMDataCore
         private static void Prefix(staff._staff __instance, out StaffLifecycleSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateStaffLifecycleSnapshot(__instance);
-            MoneyLedgerAmbientContext.Set(
-                MoneyLedgerCaptureDetails.BuildStaffSeveranceCapture(__instance, __state));
         }
 
         [HarmonyPostfix]
@@ -368,7 +366,8 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Captures staff severance firing lifecycle events.
+    /// Captures staff severance firing lifecycle events and scopes detailed money
+    /// attribution to the actual severance transaction.
     /// </summary>
     [HarmonyPatch(typeof(staff._staff), nameof(staff._staff.Fire_Severance))]
     internal static class staff_staff_Fire_Severance_IMDataCoreCapture_Patch
@@ -378,14 +377,30 @@ namespace IMDataCore
         private static void Prefix(staff._staff __instance, out StaffLifecycleSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateStaffLifecycleSnapshot(__instance);
+            MoneyLedgerAmbientContext.Set(
+                MoneyLedgerCaptureDetails.BuildStaffSeveranceCapture(__instance, __state));
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(staff._staff __instance, StaffLifecycleSnapshot __state)
         {
+            try
+            {
+                IMDataCoreController.Instance.CaptureStaffFiredSeverance(__instance, __state);
+            }
+            finally
+            {
+                MoneyLedgerAmbientContext.Clear();
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception)
+        {
             MoneyLedgerAmbientContext.Clear();
-            IMDataCoreController.Instance.CaptureStaffFiredSeverance(__instance, __state);
+            return __exception;
         }
     }
 
@@ -1033,28 +1048,42 @@ namespace IMDataCore
     /// Captures injury medical events.
     /// </summary>
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.Set_Injured))]
+    [HarmonyBefore(new[] { "com.cosmo.unavailableidolsfix" })]
     internal static class data_girls_girls_Set_Injured_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures previous idol status before injury handling.
+        /// Captures previous idol status before any cooperating Prefix can veto the
+        /// injury mutation. Reference-type state also lets the Postfix distinguish a
+        /// real snapshot from a skipped Prefix.
         /// </summary>
-        [HarmonyPriority(Priority.Last)]
-        private static void Prefix(data_girls.girls __instance, out data_girls._status __state)
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(data_girls.girls __instance, out MedicalLifecycleSnapshot __state)
         {
-            __state = __instance != null ? __instance.status : data_girls._status.normal;
+            __state = __instance == null
+                ? null
+                : new MedicalLifecycleSnapshot { PreviousStatus = __instance.status };
         }
 
         /// <summary>
-        /// Records injury medical event after game logic finishes.
+        /// Records injury history only when the requested status transition actually
+        /// committed. A vetoed/no-op call is not a medical event.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls __instance, data_girls._status __state)
+        private static void Postfix(data_girls.girls __instance, MedicalLifecycleSnapshot __state)
         {
+            if (__instance == null ||
+                __state == null ||
+                __state.PreviousStatus == data_girls._status.injured ||
+                __instance.status != data_girls._status.injured)
+            {
+                return;
+            }
+
             IMDataCoreController.Instance.CaptureMedicalLifecycleEvent(
                 __instance,
                 CoreConstants.MedicalEventTypeInjury,
                 false,
-                __state,
+                __state.PreviousStatus,
                 CoreConstants.EventSourceMedicalInjuryPatch);
         }
     }
@@ -1063,28 +1092,40 @@ namespace IMDataCore
     /// Captures depression medical events.
     /// </summary>
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.Set_Depressed))]
+    [HarmonyBefore(new[] { "com.cosmo.unavailableidolsfix" })]
     internal static class data_girls_girls_Set_Depressed_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures previous idol status before depression handling.
+        /// Captures previous idol status before any cooperating Prefix can veto the
+        /// depression mutation.
         /// </summary>
-        [HarmonyPriority(Priority.Last)]
-        private static void Prefix(data_girls.girls __instance, out data_girls._status __state)
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(data_girls.girls __instance, out MedicalLifecycleSnapshot __state)
         {
-            __state = __instance != null ? __instance.status : data_girls._status.normal;
+            __state = __instance == null
+                ? null
+                : new MedicalLifecycleSnapshot { PreviousStatus = __instance.status };
         }
 
         /// <summary>
-        /// Records depression medical event after game logic finishes.
+        /// Records depression history only when the requested transition committed.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls __instance, data_girls._status __state)
+        private static void Postfix(data_girls.girls __instance, MedicalLifecycleSnapshot __state)
         {
+            if (__instance == null ||
+                __state == null ||
+                __state.PreviousStatus == data_girls._status.depressed ||
+                __instance.status != data_girls._status.depressed)
+            {
+                return;
+            }
+
             IMDataCoreController.Instance.CaptureMedicalLifecycleEvent(
                 __instance,
                 CoreConstants.MedicalEventTypeDepression,
                 false,
-                __state,
+                __state.PreviousStatus,
                 CoreConstants.EventSourceMedicalDepressionPatch);
         }
     }
@@ -1093,28 +1134,40 @@ namespace IMDataCore
     /// Captures hiatus-start medical events.
     /// </summary>
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.SendOnHiatus))]
+    [HarmonyBefore(new[] { "com.cosmo.unavailableidolsfix" })]
     internal static class data_girls_girls_SendOnHiatus_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Captures previous idol status before hiatus handling.
+        /// Captures previous idol status before any cooperating Prefix can veto the
+        /// hiatus mutation.
         /// </summary>
-        [HarmonyPriority(Priority.Last)]
-        private static void Prefix(data_girls.girls __instance, out data_girls._status __state)
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(data_girls.girls __instance, out MedicalLifecycleSnapshot __state)
         {
-            __state = __instance != null ? __instance.status : data_girls._status.normal;
+            __state = __instance == null
+                ? null
+                : new MedicalLifecycleSnapshot { PreviousStatus = __instance.status };
         }
 
         /// <summary>
-        /// Records hiatus-start medical event after game logic finishes.
+        /// Records hiatus-start history only when the requested transition committed.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls __instance, data_girls._status __state)
+        private static void Postfix(data_girls.girls __instance, MedicalLifecycleSnapshot __state)
         {
+            if (__instance == null ||
+                __state == null ||
+                __state.PreviousStatus == data_girls._status.hiatus ||
+                __instance.status != data_girls._status.hiatus)
+            {
+                return;
+            }
+
             IMDataCoreController.Instance.CaptureMedicalLifecycleEvent(
                 __instance,
                 CoreConstants.MedicalEventTypeHiatusStarted,
                 false,
-                __state,
+                __state.PreviousStatus,
                 CoreConstants.EventSourceMedicalHiatusStartPatch);
         }
     }
@@ -1186,12 +1239,26 @@ namespace IMDataCore
     internal static class data_girls_Hire_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Records one idol-hired event after hire logic completes.
+        /// Captures whether vanilla already contained the idol before the hire call.
+        /// A missing state means an earlier Prefix vetoed the call, so the Postfix
+        /// must not infer that a hire happened.
         /// </summary>
+        [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls _girl)
+        private static void Prefix(data_girls.girls _girl, out IdolHireSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureIdolHired(_girl);
+            __state = IMDataCoreController.Instance.CreateIdolHireSnapshot(_girl);
+        }
+
+        /// <summary>
+        /// Records one idol-hired event only after a real absent-before ->
+        /// contained-after transition.
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(data_girls.girls _girl, IdolHireSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureIdolHired(_girl, __state);
         }
     }
 
@@ -1355,6 +1422,22 @@ namespace IMDataCore
         {
             inTrigger = false;
             successTier = CoreConstants.InvalidIdValue;
+        }
+    }
+
+    /// <summary>
+    /// Reassociates IMDC-owned room generation identities while vanilla rebuilds
+    /// agency._room objects from serialized RoomData. Vanilla does not restore
+    /// agency._room.id, so historical identity must not depend on that field.
+    /// </summary>
+    [HarmonyPatch(typeof(agency), "GetRoomDataForLoading")]
+    internal static class agency_GetRoomDataForLoading_IMDataCoreIdentity_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(agency.RoomData __0, agency._room __result)
+        {
+            IMDataCoreController.Instance.AssociateLoadedAgencyRoom(__0, __result);
         }
     }
 
@@ -1718,7 +1801,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(out RivalMarketSnapshot __state)
         {
-            __state = IMDataCoreController.Instance.CreateRivalMarketSnapshot();
+            __state = IMDataCoreController.Instance.CreateRivalTrendUpdateSnapshot();
         }
 
         [HarmonyPostfix]

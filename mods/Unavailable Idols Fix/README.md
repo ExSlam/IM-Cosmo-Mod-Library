@@ -4,7 +4,7 @@ Planned lifecycle and assignment fix for idols who announce graduation, become t
 
 ## Status
 
-Implementation in progress. The current code covers lifecycle-safe cast handling, strict launch validation, localized notifications, announced-graduation contract eligibility, transactional cast editors, and the optional IM Data Core pre-cleanup snapshot bridge. Repository-wide Debug and Release builds pass with zero warnings.
+Implementation in progress. The current code covers lifecycle-safe cast handling, strict launch validation, localized notifications, announced-graduation contract eligibility, transactional cast editors, and the optional IM Data Core pre-cleanup snapshot bridge. Pass 6 interoperability edits are source/static validated here; a live game build/run is still required before release.
 
 In-game lifecycle testing is still required before release.
 
@@ -26,6 +26,7 @@ In-game lifecycle testing is still required before release.
 - Keep announced-graduation idols eligible for one-time photoshoots and variety appearances, but exclude them from new advertisement and TV-drama contracts.
 - Leave world tours and election participant selection unchanged; elections inherit validation from their linked single and concert.
 - Cooperate with all other Cosmo fixes and data/UI mods through narrowly scoped patches and explicit Harmony ordering.
+- Run single-removal and announced-graduation medical veto Prefixes after IM Data Core's pre-state capture so a veto cannot manufacture false `single_cast_changed` or medical history. IM Data Core still validates the final postcondition independently.
 - Correct adjacent immutable `DateTime` graduation-date no-ops as a compatibility phase without replacing Graduation Rebalances or Tel patch logic.
 - Respect Tel's Never Graduate by disabling graduation-date correction writes while `com.tel.nevergraduate` owns the scheduled graduation-date updater.
 

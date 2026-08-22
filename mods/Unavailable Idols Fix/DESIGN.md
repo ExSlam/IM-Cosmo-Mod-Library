@@ -175,6 +175,7 @@ The implementation must remain compatible when any combination of Cosmo mods is 
 ### IM Data Core (`com.cosmo.imdatacore`)
 
 - IM Data Core observes medical transitions, room cancellation, single/show/concert cast changes, editor commits, episodes, and graduation.
+- UIF's single-removal and injury/depression/hiatus veto Prefixes explicitly run after IM Data Core's pre-state capture. This matches the existing show/concert preservation ordering and prevents a skipped IMDC Prefix from being mistaken for an empty/default historical state.
 - Prefer invoking vanilla mutation methods under a narrow context flag instead of mutating fields behind their backs, so IM Data Core prefix/postfix snapshots still record real changes.
 - For intentionally preserved pre-launch casts, emit no cast-change event because no cast changed.
 - Keep its `Priority.Last` capture patches intact and never suppress their postfixes/finalizers.

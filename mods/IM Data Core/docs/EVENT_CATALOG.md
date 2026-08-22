@@ -1,12 +1,17 @@
 ﻿# IM Data Core Event Catalog
 
-This file is the reference list of built-in IM Data Core event types and payload field constants.
+This file is the reference list of queryable built-in IM Data Core event types, explicitly non-queryable internal capture types, and payload field constants.
 
 How to use this file:
 
-- Use **Event Type** when you filter or classify timeline rows.
+- Use **Event Type** from the **Queryable Built-in Event Types** table when you filter or classify timeline rows.
 - Use **Domain** to group related events (for example `single`, `show`, `contract`).
 - Use **Field Constant** names when mapping payload JSON fields to strongly typed code.
+
+Status-stream semantics:
+
+- `single_status_changed`, `show_status_changed`, and `tour_status_changed` observe their corresponding setter methods; they are not exhaustive lifecycle journals.
+- Vanilla direct assignments for initial single release, initial show release, and tour completion are represented by `single_released`, `show_released`, and `tour_finished`.
 
 Who this is for:
 
@@ -30,12 +35,13 @@ Generation note:
 
 ## Summary
 
-- Event type constants: 145
-- Event domains: 39
-- Payload JSON field constants: 393
+- Queryable built-in event types: 143
+- Queryable event domains: 39
+- Internal transient event constants: 3
+- Payload JSON field constants: 401
 - Payload field domains: 46
 
-## Built-in Event Types
+## Queryable Built-in Event Types
 
 | Event Type | Constant | Domain |
 | --- | --- | --- |
@@ -96,17 +102,15 @@ Generation note:
 | idol_dating_ended | EventTypeIdolDatingEnded | idol |
 | idol_dating_started | EventTypeIdolDatingStarted | idol |
 | idol_dating_status_changed | EventTypeIdolDatingStatusChanged | idol |
-| idol_earnings_recorded | EventTypeIdolEarningsRecorded | idol |
 | idol_graduated | EventTypeIdolGraduated | idol |
-| idol_graduation_outcome | EventTypeIdolGraduationOutcome | idol |
 | idol_graduation_announced | EventTypeIdolGraduationAnnounced | idol |
+| idol_graduation_outcome | EventTypeIdolGraduationOutcome | idol |
 | idol_group_transferred | EventTypeIdolGroupTransferred | idol |
 | idol_hired | EventTypeIdolHired | idol |
 | idol_outfit_changed | EventTypeIdolOutfitChanged | idol |
 | idol_relationship_removed | EventTypeIdolRelationshipRemoved | idol |
 | idol_relationship_status_changed | EventTypeIdolRelationshipStatusChanged | idol |
 | idol_salary_changed | EventTypeIdolSalaryChanged | idol |
-| idol_status_changed | EventTypeStatusChanged | idol |
 | influence_blackmail_queued | EventTypeInfluenceBlackmailQueued | influence |
 | influence_blackmail_triggered | EventTypeInfluenceBlackmailTriggered | influence |
 | loan_added | EventTypeLoanAdded | loan |
@@ -133,7 +137,6 @@ Generation note:
 | random_event_started | EventTypeRandomEventStarted | random |
 | research_param_assigned | EventTypeResearchParamAssigned | research |
 | research_param_level_up | EventTypeResearchParamLevelUp | research |
-| research_points_accrued | EventTypeResearchPointsAccrued | research |
 | research_points_purchased | EventTypeResearchPointsPurchased | research |
 | rival_monthly_recalculated | EventTypeRivalMonthlyRecalculated | rival |
 | rival_trends_updated | EventTypeRivalTrendsUpdated | rival |
@@ -185,6 +188,16 @@ Generation note:
 | wish_done | EventTypeWishDone | wish |
 | wish_fulfilled | EventTypeWishFulfilled | wish |
 | wish_generated | EventTypeWishGenerated | wish |
+
+## Internal Transient Event Types (Not Queryable)
+
+These implementation-telemetry captures are filtered by `CoreEventRetention` before durable/public timeline reads. Do not use them as timeline filters.
+
+| Event Type | Constant | Domain |
+| --- | --- | --- |
+| idol_earnings_recorded | EventTypeIdolEarningsRecorded | idol |
+| idol_status_changed | EventTypeStatusChanged | idol |
+| research_points_accrued | EventTypeResearchPointsAccrued | research |
 
 ## Payload JSON Field Keys
 
@@ -353,9 +366,16 @@ Generation note:
 | idol_graduation_with_dialogue | JsonFieldIdolGraduationWithDialogue | idol |
 | idol_hiring_date | JsonFieldIdolHiringDate | idol |
 | idol_id | JsonFieldIdolId | idol |
+| idol_portrait_accessory_asset_id | JsonFieldIdolPortraitAccessoryAssetId | idol |
+| idol_portrait_body_asset_id | JsonFieldIdolPortraitBodyAssetId | idol |
+| idol_portrait_custom_id | JsonFieldIdolPortraitCustomId | idol |
+| idol_portrait_face_asset_id | JsonFieldIdolPortraitFaceAssetId | idol |
+| idol_portrait_hair_asset_id | JsonFieldIdolPortraitHairAssetId | idol |
+| idol_portrait_sprite_address | JsonFieldIdolPortraitSpriteAddress | idol |
 | idol_status | JsonFieldIdolStatus | idol |
 | idol_trivia | JsonFieldIdolTrivia | idol |
 | idol_type | JsonFieldIdolType | idol |
+| idol_type_raw | JsonFieldIdolTypeRaw | idol |
 | is_center | JsonFieldIsCenter | is |
 | kohai_id | JsonFieldKohaiId | kohai |
 | marriage_career_string_one | JsonFieldMarriageCareerStringOne | marriage |

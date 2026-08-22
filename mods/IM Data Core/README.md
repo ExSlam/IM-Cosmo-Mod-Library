@@ -17,6 +17,22 @@ IMDC 3.4.6 strengthens exact-save checkpoints with a SHA-256 content fingerprint
 
 Built-in capture covers singles, shows, contracts, groups, tours, elections, concerts, idols, staff, relationships, finance, activities, story/system transitions, and other gameplay events. See `docs/EVENT_CATALOG.md`.
 
+The Event Catalog separates **143 queryable built-in event types** from three internal transient streams (`idol_status_changed`, `research_points_accrued`, and `idol_earnings_recorded`) that retention intentionally removes before public timeline queries. Catalog presence does not imply queryability for those explicitly marked transient types.
+
+Lifecycle capture is postcondition-driven where vanilla can legally no-op: IMDC records the requested action only after the relevant state mutation is observed. In particular, static show cancellation is keyed to actual removal from `Shows.shows`, audition starts are suppressed on the terminal-scandal early-return path, random-event starts require a newly appended active event, loan payoff requires `active before -> inactive after`, idol hiring requires `absent before -> contained after`, rival trend refresh requires both vanilla eligibility and a changed update marker, and agency room destruction requires `contained before -> absent after`. Missing Harmony pre-state is treated as unknown rather than a legitimate default state. Staff severance money metadata is scoped only around the actual `Fire_Severance()` deduction and is cleared on both normal and exceptional exits.
+
+Show history has an additional compaction rule because IMDC deliberately observes certain show mutations twice: once at the ordinary vanilla hook and once after known cast-mutating mods settle. Capture-triggered threshold flushing is deferred while that post-mod settlement is open, and the show editor scope spans the complete `Show_Popup.OnContinue()` commit. This keeps the ordinary and canonical rows in the same pending batch so canonical show episode/cast compaction cannot change the current-session answer merely because the 256-event threshold was crossed between the two observations. Explicit forced save/read flushes remain authoritative and are not silently disabled.
+
+`single_status_changed`, `show_status_changed`, and `tour_status_changed` are **setter-observation streams**, not exhaustive state-transition journals. Vanilla performs some lifecycle transitions through direct field assignments: initial single release, initial show release, and tour completion are represented by `single_released`, `show_released`, and `tour_finished` respectively. Consumers reconstructing lifecycle history should use the dedicated lifecycle events rather than assuming every status mutation appears as `*_status_changed`.
+
+### Durable room/theater/cafe history identity
+
+Vanilla agency-room IDs are runtime-only, and theater/cafe IDs can be recycled after the highest-numbered instance is destroyed. IMDC therefore does **not** use those vanilla IDs as durable timeline identity for `agency_room`, `theater`, or `cafe` history. Each physical agency room receives an IMDC-owned generation identifier such as `g:<guid>`; theater and cafe events use the generation of their owning room within their own `EntityKind` namespace. Room-work compound identities use the same generation prefix.
+
+The raw vanilla `room_id`, `theater_id`, and `cafe_id` payload fields are retained for immediate game-state correlation. They are not stable historical keys. Consumers grouping historical rows should use `(EntityKind, EntityId)`.
+
+New exact checkpoints optionally freeze the room-generation map in vanilla's serialized floor/room order and reassociate it while vanilla reconstructs rooms on load. This is an additive v5 checkpoint field, so sidecar format remains 5. Early v5 checkpoints created before this field existed still load; their already-ambiguous historical room identities cannot be reconstructed retroactively, so currently loaded rooms receive fresh forward-safe generation IDs until a later exact checkpoint persists the new mapping.
+
 ## Save ownership
 
 Each physical vanilla save owns one mirrored IMDC sidecar beneath the sibling `IMDataCore` directory:
@@ -64,6 +80,8 @@ A checkpoint identifies one vanilla save state using its physical relative path,
 
 Each v5 checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
 
+Checkpoints created by this follow-up revision also freeze an optional `AgencyRoomIdentities` snapshot. It records one IMDC room-generation ID for each serialized vanilla room and is used only to restore durable historical identity after load; it does not modify vanilla save JSON or change exact-checkpoint identity. Missing snapshots in older v5 checkpoints are accepted as an additive-schema compatibility case.
+
 When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4.6 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
@@ -95,6 +113,8 @@ Atomic replacement retains one sibling:
 
 If the primary sidecar is unreadable or invalid, IMDC validates the backup. A valid backup can be used as the recovery source for the session. The damaged primary is left untouched during recovery, and the known-good backup is preserved when a later successful save replaces the damaged primary.
 
+Recovery tracks the exact journal whose parsed header matched the backup base. If an interrupted compaction left the matching journal at the primary journal path, the later healing write first publishes that journal durably as `<sidecar>.imdc.bak.imdc.journal`; only then may it remove the stale primary-journal copy. If publication fails, the source journal is kept so the recovered backup generation is not weakened. Empty or first-header-torn preferred journals are not considered base-hash matches and therefore cannot hide a valid backup journal.
+
 The recovered document still has to contain an exact checkpoint for the vanilla save being loaded. Backup recovery never weakens checkpoint matching.
 
 ## Custom event idempotency
@@ -122,7 +142,9 @@ IMDC keeps complete source history, so retained disk history still grows with ge
 - routine compaction is queued when journal bytes reach a 1-16 MiB bounded base-relative threshold; a size-scaled 2,048-32,768 transaction ceiling exists only to bound pathological replay depth;
 - rewinds, destructive branch changes, recovery writes, New Save, or an incompatible baseline immediately use a full atomic snapshot instead;
 - an incomplete v2 transaction is ignored, a completely written retry is idempotent by declared counts, and a mismatched journal hash is never replayed onto another base;
-- when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`; if that copy is interrupted or fails, recovery can pair the backup base with the still-present current journal when its stored base hash matches;
+- when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`; if that copy is interrupted or fails, recovery can pair the backup base with the still-present current journal only after parsing a real matching header, and a later healing write preserves that recovery journal beside the backup before removing its primary-path copy;
+- missing/empty/first-header-torn journals are distinguished from real base-hash matches, so a torn preferred primary journal cannot mask a valid `.imdc.bak.imdc.journal`;
+- when a physical save scope is initialized, IMDC best-effort scavenges only its exact sidecar-derived temp files that are at least 24 hours old; fresh temp files and unrelated files are left alone;
 - event payloads and custom SET values cache their validated storage-form JSON, so old immutable rows are not reparsed on later saves;
 - the streaming writer copies reusable character buffers directly to its `TextWriter`, avoiding a temporary string allocation for every record;
 - forward-save watermarks skip complete history trim scans when no record can lie beyond the checkpoint;
@@ -132,7 +154,11 @@ IMDC keeps complete source history, so retained disk history still grows with ge
 - runtime locks are released before serialization and durable disk I/O; physical sidecar locks are process-wide per canonical path so replacement engines and old background compactors cannot race the same files;
 - `TryGetPersistenceDiagnostics` exposes counts, base/journal sizes, last persistence mode, recovery/block state, and generation information without performing I/O.
 
-Save Write Ordering Fix is an optional optimization. IMDC skips its standalone full `SavedData` JSON clone only when SWOF's public health flag confirms that all five required vanilla write callers were actually intercepted. If verification is unavailable or false, IMDC keeps the defensive clone.
+Save Write Ordering Fix is an optional optimization. IMDC skips its standalone full `SavedData` JSON clone only when SWOF's public health flag confirms that all five required vanilla write callers were actually intercepted. If verification is unavailable or false, IMDC keeps the defensive clone. The standalone path now has layered detachment: the normal `JsonUtility` round trip followed, if reconstruction fails, by a Unity-serialized-field graph clone whose compact JSON is checked against the original whenever that original JSON was available. The fallback deliberately uses only `JsonUtility` APIs available in Idol Manager's Unity runtime. IMDC therefore does not immediately hand vanilla the live `SaveManager.Data` graph merely because the first JSON reconstruction failed.
+
+When Save Write Ordering Fix 1.3.0 is present, IMDC also acquires SWOF's directory-scoped exclusive lease around vanilla save-directory deletion and IMDC archival. This drains earlier ordered writes before deletion and keeps them from crossing the delete/archive boundary. If SWOF is loaded but cannot grant the boundary, IMDC leaves the save in place instead of accepting a deletion that could be undone by a queued writer. Pass 6 does not support an older loaded SWOF for this boundary: update SWOF to 1.3.0 or newer rather than relying on a compatibility fallback.
+
+Harmony-veto interoperability follows a conservative rule: missing `__state` is unknown, never an empty/default historical state, and lifecycle events require a real after-state transition. IMDC explicitly snapshots before Unavailable Idols Fix on single removal and medical transitions, and before Assistant Manager on `loans.AddLoan`.
 
 ## Substory completion after load
 
@@ -143,6 +169,11 @@ Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-sub
 IMDC 3.4.6 reads only sidecar format 5 and transactional journal format 2. Older lightweight sidecars and unsupported journals are intentionally rejected rather than migrated at runtime.
 
 Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
+
+
+## Source versions and generated build artifacts
+
+The source of truth for this development tree is the checked-out source plus project/mod metadata. `IM Data Core.csproj` and `assets/info.json` carry the mod version. Generated DLLs, PDBs, `bin/`, `obj/`, and `artifacts/` are build outputs and are ignored by the repository. A stale locally bundled DLL can therefore report revision metadata from an older build even when the source tree is correct; rebuild the mod from the desired commit instead of treating that generated DLL metadata as an IMDC runtime/source defect.
 
 ## Custom-data behavior
 

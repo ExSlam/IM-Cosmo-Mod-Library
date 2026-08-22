@@ -129,8 +129,13 @@ namespace IMDataCore
         }
     }
 
-    [HarmonyPatch(typeof(Show_Popup), "SaveShow")]
-    internal static class ShowPopup_SaveShow_IMDataCorePostModObservation_Patch
+    /// <summary>
+    /// Keeps the entire popup commit, including the ordinary OnContinue capture,
+    /// inside one settlement window.  Observing only the nested SaveShow call could
+    /// flush a canonical row before OnContinue's ordinary Postfix was enqueued.
+    /// </summary>
+    [HarmonyPatch(typeof(Show_Popup), nameof(Show_Popup.OnContinue))]
+    internal static class ShowPopup_OnContinue_IMDataCorePostModObservation_Patch
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]

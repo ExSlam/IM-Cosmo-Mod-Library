@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Added `SaveWriteOrderingApi.TryAcquireExclusiveDirectoryAccess`, returning an `IDisposable` lease that atomically blocks new queue admission beneath a physical save directory, drains every queue admitted before the boundary, and keeps later writes blocked until disposal.
+- IM Data Core can now hold that directory boundary across vanilla deletion and supplemental archival, preventing both earlier queued writers and newly arriving writes from recreating the deleted save while the sidecar is detached.
+- A caller-thread serialization failure after path resolution now remains coordinator-tracked: SWOF retries serialization on the ordered writer instead of launching vanilla's untracked asynchronous fallback, so directory leases can still drain/fence the request.
+- The lease API is optional for ordinary save/load callers; per-file FIFO ordering, load coordination, and the existing exclusive-file APIs are unchanged.
+
 ## 1.2.0
 
 - Added `SaveWriteOrderingApi.SavedDataInterceptionHealthy`, which becomes true only after all five required vanilla `SavedData` write callers were successfully transpiled exactly once.
