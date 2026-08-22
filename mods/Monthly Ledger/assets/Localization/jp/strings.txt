@@ -87,3 +87,6 @@ detail.label.finished=最終
 detail.label.role=役職
 detail.label.progress=進捗
 detail.role.assistant_manager=アシスタントマネージャー
+detail.staff_severance=スタッフ退職金
+detail.label.weekly_take_home=今週の支払額
+detail.label.severance_pay=退職金

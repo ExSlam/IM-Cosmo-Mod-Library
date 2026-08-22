@@ -87,3 +87,6 @@ detail.label.finished=Final
 detail.label.role=Função
 detail.label.progress=Progresso
 detail.role.assistant_manager=Gerente Assistente
+detail.staff_severance=Indenizações de funcionários
+detail.label.weekly_take_home=Pago esta semana
+detail.label.severance_pay=Indenização rescisória

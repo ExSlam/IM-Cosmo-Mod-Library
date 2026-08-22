@@ -87,3 +87,6 @@ detail.label.finished=最终
 detail.label.role=职位
 detail.label.progress=进度
 detail.role.assistant_manager=助理经理
+detail.staff_severance=员工遣散费
+detail.label.weekly_take_home=本周已支付
+detail.label.severance_pay=遣散费

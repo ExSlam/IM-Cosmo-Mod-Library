@@ -87,3 +87,6 @@ detail.label.finished=최종
 detail.label.role=역할
 detail.label.progress=진행도
 detail.role.assistant_manager=보조 매니저
+detail.staff_severance=직원 퇴직금
+detail.label.weekly_take_home=이번 주 지급액
+detail.label.severance_pay=퇴직금

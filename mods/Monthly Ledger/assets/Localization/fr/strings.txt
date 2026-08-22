@@ -87,3 +87,6 @@ detail.label.finished=Final
 detail.label.role=Rôle
 detail.label.progress=Progression
 detail.role.assistant_manager=Assistant manager
+detail.staff_severance=Indemnités de départ du personnel
+detail.label.weekly_take_home=Payé cette semaine
+detail.label.severance_pay=Indemnité de départ

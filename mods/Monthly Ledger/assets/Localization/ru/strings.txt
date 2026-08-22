@@ -87,3 +87,6 @@ detail.label.finished=Итог
 detail.label.role=Должность
 detail.label.progress=Прогресс
 detail.role.assistant_manager=Помощник менеджера
+detail.staff_severance=Выходные пособия сотрудникам
+detail.label.weekly_take_home=Выплачено на этой неделе
+detail.label.severance_pay=Выходное пособие
