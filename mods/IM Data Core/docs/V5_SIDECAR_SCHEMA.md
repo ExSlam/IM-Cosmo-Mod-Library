@@ -1,6 +1,6 @@
 # IM Data Core v5 sidecar schema
 
-This document describes the private sidecar representation written and accepted by IMDC 3.4.6. Consumer mods should use `IMDataCoreApi` instead of depending on these field names.
+This document describes the private sidecar representation written and accepted by IMDC 3.4.7. Consumer mods should use `IMDataCoreApi` instead of depending on these field names.
 
 Current persistence versions:
 
@@ -37,6 +37,7 @@ Required fields:
 | `ContentFingerprint` | string | `sha256:` plus 64 lowercase hex characters over compact vanilla `SavedData` JSON. |
 | `Sequence` | integer | IMDC sequence watermark for this vanilla save boundary; may be `0` for a newly adopted pre-IMDC save. |
 | `EnabledMods` | array | Enabled Idol Manager mod inventory captured at the save boundary. |
+| `AgencyRoomIdentities` | array | Required durable agency-room generation snapshot in vanilla serialized floor/room order; may be empty when the save has no rooms. |
 
 A mod snapshot contains required string fields `ModName`, `Title`, `Author`, `Version` and required string-array `DllNames`. JSON-only mods are represented with an empty DLL list.
 
@@ -54,11 +55,9 @@ normalized RelativeSavePath
 
 `Sequence` and `EnabledMods` are checkpoint contents, not identity fields.
 
-### Optional durable agency-room identity snapshot
+### Durable agency-room identity snapshot
 
-Checkpoints created by the post-3.4.6 Pass 5 follow-up may also contain `AgencyRoomIdentities`. The field is additive within format 5 and is deliberately **not** part of exact vanilla-save identity.
-
-When present, it is an array in vanilla's serialized agency floor/room order. Each record contains:
+Every accepted v5 checkpoint contains `AgencyRoomIdentities`. The field is required but deliberately **not** part of exact vanilla-save identity. It is an array in vanilla's serialized agency floor/room order. Each record contains:
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -68,7 +67,7 @@ When present, it is an array in vanilla's serialized agency floor/room order. Ea
 | `RoomTypeRaw` | int | Raw vanilla `agency._type` value used to validate reassociation. |
 | `TheaterId` | int | Saved vanilla `TheaterID`; used as an additional layout check for theater/cafe rooms. |
 
-The field is omitted by early v5 checkpoints and may therefore be absent on valid format-5 data. Absence does not reject the checkpoint. On such a load, IMDC assigns fresh forward-safe room generations because vanilla never persisted enough information to reconnect already-ambiguous older room history safely. New checkpoints then persist the mapping.
+The field may be an empty array when the vanilla save has no agency rooms. A format-5 checkpoint that omits `AgencyRoomIdentities` is invalid and is not treated as an earlier compatible v5 schema. If a present snapshot is structurally valid but does not match the loaded vanilla room layout, IMDC fails safe by assigning fresh forward-safe generations instead of binding history to the wrong rooms.
 
 `ContentFingerprint` is computed from:
 
@@ -135,7 +134,7 @@ A v5 document is rejected if any applicable invariant fails, including:
 - checkpoint sequence below zero or above `LastIssuedSequence`;
 - malformed or missing checkpoint `ContentFingerprint`;
 - duplicate exact checkpoint identities;
-- malformed `AgencyRoomIdentities` records when the optional field is present, including empty/duplicate generation IDs or invalid indexes/types;
+- missing `AgencyRoomIdentities`, or malformed records including empty/duplicate generation IDs or invalid indexes/types;
 - `LastIssuedSequence` below a stored source-record sequence;
 - malformed custom operations, tokens, idempotency keys, payloads, or custom values;
 - custom-data quota/token violations enforced by the storage/API layers.

@@ -1,4 +1,4 @@
-# IM Data Core 3.4.6 storage layout
+# IM Data Core 3.4.7 storage layout
 
 ## Physical mapping
 
@@ -36,7 +36,7 @@ All IMDC mutation paths are canonicalized and required to remain beneath the pri
 
 ## V5 document identity
 
-IMDC 3.4.6 writes and accepts sidecar format version 5 only. Transactional journals remain format version 2.
+IMDC 3.4.7 writes and accepts sidecar format version 5 only. Transactional journals remain format version 2.
 
 ```json
 {
@@ -78,17 +78,28 @@ IMDC 3.4.6 writes and accepts sidecar format version 5 only. Transactional journ
       "Version": "1.0.0",
       "DllNames": []
     }
+  ],
+  "AgencyRoomIdentities": [
+    {
+      "EntityId": "g:0123456789abcdef0123456789abcdef",
+      "FloorIndex": 0,
+      "RoomIndex": 0,
+      "RoomTypeRaw": 1,
+      "TheaterId": -1
+    }
   ]
 }
 ```
 
 Checkpoint identity is the tuple of normalized relative save path, vanilla `LastSave`, vanilla playtime seconds, vanilla game date/time, and `ContentFingerprint`. `Sequence` is the IMDC branch watermark activated by that checkpoint; it is not part of the vanilla-content identity.
 
+`AgencyRoomIdentities` is required on every accepted v5 checkpoint. It is stored in vanilla's serialized floor/room order and may be an empty array when the save contains no agency rooms. The room-generation map is checkpoint state, not part of exact vanilla-save identity.
+
 `ContentFingerprint` is SHA-256 over Unity's compact `JsonUtility.ToJson(savedData, false)` representation of the exact vanilla `SavedData` state. It is stored as `sha256:` followed by 64 lowercase hexadecimal characters. This prevents two distinct vanilla states that happen to share second-resolution timestamp/playtime fields from being treated as the same checkpoint.
 
 Checkpoint `GameDateTime` intentionally uses vanilla's own `yyyy-MM-dd HH:mm:ss` representation. IMDC parses checkpoint dates through vanilla's `ExtensionMethods.ToDateTime`. Event and custom-mutation dates use IMDC's round-trip representation instead.
 
-Each new checkpoint also carries an optional agency-room generation snapshot. The snapshot mirrors vanilla `SavedData.agency__Floors` / room order and binds each serialized room to an IMDC-owned `g:<guid>` generation. Vanilla does not serialize `agency._room.id`, while theater/cafe IDs are recyclable, so IMDC uses the room generation as durable `EntityId` for `agency_room`, `theater`, and `cafe` history (and as the room component of room-work identity). Raw vanilla IDs remain in event payloads for current-state correlation. Early v5 checkpoints without this additive field remain valid and receive fresh forward-safe room generations on load.
+Every accepted v5 checkpoint carries the required agency-room generation snapshot. The snapshot mirrors vanilla `SavedData.agency__Floors` / room order and binds each serialized room to an IMDC-owned `g:<guid>` generation. Vanilla does not serialize `agency._room.id`, while theater/cafe IDs are recyclable, so IMDC uses the room generation as durable `EntityId` for `agency_room`, `theater`, and `cafe` history (and as the room component of room-work identity). Raw vanilla IDs remain in event payloads for current-state correlation. A v5 checkpoint that omits `AgencyRoomIdentities` is invalid; a present snapshot that does not match the loaded vanilla room layout is not bound to the wrong rooms.
 
 `EnabledMods` is frozen at the save boundary from Idol Manager's enabled mod registry. JSON-only mods are represented even when `DllNames` is empty. After exact activation, IMDC compares the saved inventory with the current installed/enabled mod set and logs missing, disabled, author/version, and DLL-name mismatches. These diagnostics do not block vanilla loading.
 
@@ -231,4 +242,4 @@ Background journal compaction is normally requested when journal bytes reach a b
 
 This development build accepts only `IMDataCore.LightweightSidecar` format version 5 and transactional journal format 2. Earlier sidecar formats are intentionally unsupported and are left untouched. No runtime migration path is provided.
 
-Pre-2.0 database persistence is also outside the runtime path. Historical documents remain in `docs/` only as implementation history and do not describe accepted current persistence inputs.
+Pre-2.0 database persistence is also outside the runtime path. Historical v2-v4 schema, migration, validation, and implementation-note files are intentionally not shipped with the runtime source tree; a future external migrator can own historical-format knowledge.

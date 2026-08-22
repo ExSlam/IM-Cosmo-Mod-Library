@@ -1,6 +1,6 @@
 # IM Data Core - Start Here (Beginner-Friendly)
 
-This guide explains exactly how to use IM Data Core 3.4.6 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
+This guide explains exactly how to use IM Data Core 3.4.7 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
 
 IM Data Core stores each sidecar under a mirrored representation of its exact
 vanilla save path. This development build accepts sidecar format 5 only. For

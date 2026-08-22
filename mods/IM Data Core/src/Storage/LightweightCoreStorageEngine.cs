@@ -364,9 +364,8 @@ namespace IMDataCore
         public long Sequence;
         public List<LightweightModSnapshotRecord> EnabledMods =
             new List<LightweightModSnapshotRecord>();
-        // Null means an early format-5 checkpoint that predates durable room
-        // generation identities. An empty list is a real snapshot with no rooms.
-        public List<LightweightAgencyRoomIdentityRecord> AgencyRoomIdentities;
+        public List<LightweightAgencyRoomIdentityRecord> AgencyRoomIdentities =
+            new List<LightweightAgencyRoomIdentityRecord>();
     }
 
     [Serializable]
@@ -411,7 +410,6 @@ namespace IMDataCore
     internal sealed class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
-        internal const int MinimumSupportedSidecarFormatVersion = 5;
         internal const int SidecarFormatVersion = 5;
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
@@ -2006,7 +2004,9 @@ namespace IMDataCore
                     return false;
                 }
             }
-        }        /// <summary>
+        }
+
+        /// <summary>
         /// Selects the sequence explicitly associated with the loaded vanilla
         /// checkpoint. The greatest sidecar sequence is never an implicit choice.
         /// </summary>
@@ -2024,7 +2024,6 @@ namespace IMDataCore
                 errorMessage = "The vanilla save stamp is missing.";
                 return false;
             }
-
             lock (storageLock)
             {
                 try
@@ -2124,11 +2123,9 @@ namespace IMDataCore
 
         internal bool TryGetCheckpointAgencyRoomIdentities(
             VanillaSaveStamp stamp,
-            out bool snapshotPresent,
             out List<LightweightAgencyRoomIdentityRecord> roomIdentities,
             out string errorMessage)
         {
-            snapshotPresent = false;
             roomIdentities = new List<LightweightAgencyRoomIdentityRecord>();
             errorMessage = string.Empty;
             if (stamp == null)
@@ -2151,10 +2148,8 @@ namespace IMDataCore
                         return true;
                     }
 
-                    snapshotPresent = checkpoint.AgencyRoomIdentities != null;
                     roomIdentities = CloneAgencyRoomIdentities(
-                        checkpoint.AgencyRoomIdentities) ??
-                        new List<LightweightAgencyRoomIdentityRecord>();
+                        checkpoint.AgencyRoomIdentities);
                     return true;
                 }
                 catch (Exception exception)
@@ -2170,32 +2165,6 @@ namespace IMDataCore
         internal bool AddOrReplaceCheckpoint(
             VanillaSaveStamp stamp,
             long sequence,
-            out string errorMessage)
-        {
-            return AddOrReplaceCheckpoint(
-                stamp,
-                sequence,
-                null,
-                out errorMessage);
-        }
-
-        internal bool AddOrReplaceCheckpoint(
-            VanillaSaveStamp stamp,
-            long sequence,
-            IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
-            out string errorMessage)
-        {
-            return AddOrReplaceCheckpoint(
-                stamp,
-                sequence,
-                enabledMods,
-                null,
-                out errorMessage);
-        }
-
-        internal bool AddOrReplaceCheckpoint(
-            VanillaSaveStamp stamp,
-            long sequence,
             IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
             IReadOnlyList<LightweightAgencyRoomIdentityRecord> agencyRoomIdentities,
             out string errorMessage)
@@ -2204,6 +2173,11 @@ namespace IMDataCore
             if (stamp == null)
             {
                 errorMessage = "The vanilla save stamp is missing.";
+                return false;
+            }
+            if (agencyRoomIdentities == null)
+            {
+                errorMessage = "The agency-room identity snapshot is missing.";
                 return false;
             }
 
@@ -4488,14 +4462,13 @@ namespace IMDataCore
                 return false;
             }
 
-            // Version 5 requires content-fingerprinted checkpoints. Older sidecar
-            // schemas are intentionally unsupported during this development phase.
+            // Runtime IMDC accepts exactly the current sidecar schema. Historical
+            // format migration belongs in an external migrator, not this reader.
             if (!string.Equals(
                     document.FormatName,
                     SidecarFormatName,
                     StringComparison.Ordinal) ||
-                document.FormatVersion < MinimumSupportedSidecarFormatVersion ||
-                document.FormatVersion > SidecarFormatVersion)
+                document.FormatVersion != SidecarFormatVersion)
             {
                 errorMessage =
                     "The sidecar format is unsupported by this IM Data Core version.";
@@ -4694,6 +4667,7 @@ namespace IMDataCore
                     checkpoint.Sequence > document.LastIssuedSequence ||
                     !VanillaSavedDataFingerprint.IsValid(
                         checkpoint.ContentFingerprint) ||
+                    checkpoint.AgencyRoomIdentities == null ||
                     string.IsNullOrEmpty(
                         VanillaSaveStamp.NormalizeRelativePath(
                             checkpoint.RelativeSavePath)))
@@ -4703,27 +4677,24 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (checkpoint.AgencyRoomIdentities != null)
+                HashSet<string> roomEntityIds =
+                    new HashSet<string>(StringComparer.Ordinal);
+                for (int roomIdentityIndex = 0;
+                    roomIdentityIndex < checkpoint.AgencyRoomIdentities.Count;
+                    roomIdentityIndex++)
                 {
-                    HashSet<string> roomEntityIds =
-                        new HashSet<string>(StringComparer.Ordinal);
-                    for (int roomIdentityIndex = 0;
-                        roomIdentityIndex < checkpoint.AgencyRoomIdentities.Count;
-                        roomIdentityIndex++)
+                    LightweightAgencyRoomIdentityRecord roomIdentity =
+                        checkpoint.AgencyRoomIdentities[roomIdentityIndex];
+                    if (roomIdentity == null ||
+                        string.IsNullOrEmpty(roomIdentity.EntityId) ||
+                        roomIdentity.FloorIndex < 0 ||
+                        roomIdentity.RoomIndex < 0 ||
+                        roomIdentity.RoomTypeRaw < 0 ||
+                        !roomEntityIds.Add(roomIdentity.EntityId))
                     {
-                        LightweightAgencyRoomIdentityRecord roomIdentity =
-                            checkpoint.AgencyRoomIdentities[roomIdentityIndex];
-                        if (roomIdentity == null ||
-                            string.IsNullOrEmpty(roomIdentity.EntityId) ||
-                            roomIdentity.FloorIndex < 0 ||
-                            roomIdentity.RoomIndex < 0 ||
-                            roomIdentity.RoomTypeRaw < 0 ||
-                            !roomEntityIds.Add(roomIdentity.EntityId))
-                        {
-                            errorMessage =
-                                "The sidecar contains an invalid or duplicate agency-room identity snapshot entry.";
-                            return false;
-                        }
+                        errorMessage =
+                            "The sidecar contains an invalid or duplicate agency-room identity snapshot entry.";
+                        return false;
                     }
                 }
 
@@ -6423,7 +6394,7 @@ namespace IMDataCore
         {
             if (source == null)
             {
-                return null;
+                return new List<LightweightAgencyRoomIdentityRecord>();
             }
 
             List<LightweightAgencyRoomIdentityRecord> clone =

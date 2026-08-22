@@ -3,7 +3,7 @@ A shared data and history backend for Idol Manager mods in the Cosmo Mod Library
 
 IM Data Core is primarily a framework dependency. Other mods use it to keep save-scoped custom state, historical timeline events, and an exact money ledger without modifying Idol Manager's vanilla save JSON.
 
-[h1]Version 3.4.6[/h1]
+[h1]Version 3.4.7[/h1]
 [list]
 [*] JSON-native sidecar storage
 [*] SHA-256 content-fingerprinted exact save checkpoints
@@ -17,7 +17,7 @@ IM Data Core is primarily a framework dependency. Other mods use it to keep save
 [*] Safer handling of corrupt, unsupported, or unmatched sidecars
 [/list]
 
-The current development persistence format is IMDC sidecar format 5 with transactional journal format 2. Older sidecar formats are intentionally not migrated by this build and are left untouched.
+The current persistence format is IMDC sidecar format 5 with transactional journal format 2. Older IMDC saves are not supported.
 
 When a vanilla save is deleted, IM Data Core preserves its mirrored supplemental directory instead of deleting it. This retained history is intended to support later career-diary export tooling.
 

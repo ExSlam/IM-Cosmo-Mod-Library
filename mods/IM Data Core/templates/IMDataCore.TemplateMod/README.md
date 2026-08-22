@@ -1,6 +1,6 @@
-# IMDataCore 3.1 Template Mod
+# IM Data Core Template Mod
 
-Minimal example mod project that integrates with IM Data Core 3. The public API remains string-JSON based; values and event payloads must be valid JSON documents.
+Minimal example mod project that integrates with the current IM Data Core public API. The public API remains string-JSON based; values and event payloads must be valid JSON documents.
 
 ## What this includes
 

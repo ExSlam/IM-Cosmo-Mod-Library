@@ -780,25 +780,6 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Compatibility wrapper for callers that do not need a result.
-        /// </summary>
-        internal static void UseSaveScope(
-            CoreSaveScope saveScope)
-        {
-            TryUseSaveScope(saveScope);
-        }
-
-        /// <summary>
-        /// Restores a captured scope after an aborted load without any filesystem
-        /// operation.
-        /// </summary>
-        internal static void RestoreSaveScope(
-            CoreSaveScope saveScope)
-        {
-            TryUseSaveScope(saveScope);
-        }
-
-        /// <summary>
         /// Returns true only for supported vanilla game-save shapes. Global settings
         /// and arbitrary JSON files can never own a sidecar.
         /// </summary>
@@ -822,14 +803,6 @@ namespace IMDataCore
                 transientSaveScope =
                     CreateTransientSaveScope();
             }
-        }
-
-        /// <summary>
-        /// Compatibility name retained for lifecycle callers.
-        /// </summary>
-        internal static void ResetToTransientSaveScope()
-        {
-            ResetToTransient();
         }
 
         /// <summary>

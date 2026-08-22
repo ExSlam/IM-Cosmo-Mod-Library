@@ -1,4 +1,4 @@
-# IM Data Core 3.4.6 validation notes
+# IM Data Core 3.4.7 validation notes
 
 This revision was statically checked against the supplied Cosmo Mod Library source and the supplied decompiled Idol Manager source. No Unity/.NET compiler or game runtime was available in the analysis environment, so these notes intentionally distinguish static verification from runtime testing.
 
@@ -19,8 +19,8 @@ This revision was statically checked against the supplied Cosmo Mod Library sour
 - Deleting the active save detaches its physical scope while retaining the logical in-memory branch.
 - Standalone defensive `SavedData` cloning is layered: normal `FromJson`, then a Unity-serialized-field graph clone. The fallback clone is reserialized; when the original compact JSON exists, equivalence is required before the clone is trusted. `FromJsonOverwrite` is intentionally not used because Idol Manager's UnityEngine API does not expose it. The outer Harmony boundary remains fail-open only after all detachment strategies fail, so IMDC still cannot block vanilla saving.
 - Backup/journal recovery still requires exact checkpoint activation after a document is recovered.
-- New checkpoints may contain the additive `AgencyRoomIdentities` v5 field. When present, records require non-empty unique generation IDs and valid saved floor/room/type metadata; missing fields on early v5 checkpoints are accepted.
-- Room-identity restoration validates the snapshot against the exact vanilla `SavedData` room layout before binding it to reconstructed rooms. A missing/incompatible snapshot falls forward to new generation IDs rather than binding old history to the wrong room.
+- Every v5 checkpoint requires `AgencyRoomIdentities`. The array may be empty, but omission is invalid; records require non-empty unique generation IDs and valid saved floor/room/type metadata.
+- Room-identity restoration validates the required snapshot against the exact vanilla `SavedData` room layout before binding it to reconstructed rooms. A present but layout-incompatible snapshot falls forward to new generation IDs rather than binding history to the wrong room; an omitted field is rejected during v5 decoding.
 - Historical `agency_room`, `theater`, and `cafe` `EntityId` values use the IMDC room generation; raw runtime/recyclable vanilla IDs remain payload data only.
 
 ## Vanilla targets checked
@@ -37,15 +37,15 @@ Story autosaves hide their delete UI in `Playthrough_Save.Set`, so the apparent 
 
 Before packaging this source revision, the following checks were completed successfully:
 
-- `assets/info.json` parsed as strict JSON and reports version **3.4.6**.
-- `IM Data Core.csproj` parsed as XML and reports version **3.4.6**.
-- `MinimumSupportedSidecarFormatVersion == SidecarFormatVersion == 5`; `JournalFormatVersion == 2`.
+- `assets/info.json` parsed as strict JSON and reports version **3.4.7**.
+- `IM Data Core.csproj` parsed as XML and reports version **3.4.7**.
+- Runtime sidecar validation requires `FormatVersion == SidecarFormatVersion == 5`; `JournalFormatVersion == 2`.
 - Every checkpoint construction/serialization path includes `ContentFingerprint`, and every persistence snapshot construction includes `PathArchiveEpoch`.
 - All three deletion patch target methods and their exact vanilla deletion paths were rechecked in the supplied decompilation.
 - All three deletion hooks use Harmony Finalizers and preserve the original vanilla exception unchanged.
 - `git diff --check` passes for the IM Data Core tree.
 - All C# sources pass a string/comment-aware delimiter scan.
-- Current-facing documentation contains no stale claim that v3/v4 sidecars are accepted. Historical v2/v3/v4 documents are marked as historical.
+- Current-facing documentation contains no stale claim that v2-v4 sidecars are accepted; obsolete v2-v4 schema/migration/validation/implementation-note files are removed from the packaged tree.
 - The repository ignores `*.dll`, `*.pdb`, `**/bin/`, `**/obj/`, and `artifacts/`; stale generated DLL revision metadata is not treated as source-version authority.
 - The Pass 1 standalone snapshot helper preserves the original five vanilla `SavedData` call sites and does not change SWOF Harmony ordering.
 
@@ -69,4 +69,4 @@ These are static checks, not a substitute for compilation or in-game regression 
 - Save with Harmony, JSON-only, and multi-DLL mods enabled; then change their state and verify checkpoint mod diagnostics remain diagnostic-only.
 - Build at least two rooms, save, restart, and verify each reconstructed room retains the same IMDC generation `EntityId`; destroy/rebuild the highest-numbered room and verify the new room receives a different generation.
 - Destroy the highest-numbered theater and cafe, rebuild so vanilla reuses the raw ID, and verify timeline grouping remains separated by IMDC generation while payload `theater_id` / `cafe_id` still expose the reused vanilla value.
-- Load an early format-5 checkpoint with no `AgencyRoomIdentities` field and verify it remains readable, assigns fresh forward-safe room generations, and persists them at the next exact checkpoint.
+- Remove `AgencyRoomIdentities` from an otherwise valid format-5 checkpoint and verify the sidecar is rejected as malformed rather than treated as an older compatible v5 schema.

@@ -1,10 +1,10 @@
-# IM Data Core 3.4
+# IM Data Core 3.4.7
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-IMDC 3.4.6 writes sidecar format 5 and transactional journal format 2. This development build intentionally accepts only sidecar format 5; older sidecars are left untouched rather than migrated at runtime.
+IMDC 3.4.7 writes sidecar format 5 and transactional journal format 2. Runtime IMDC accepts exactly sidecar format 5; older sidecars are left untouched rather than migrated at runtime.
 
-IMDC 3.4.6 strengthens exact-save checkpoints with a SHA-256 content fingerprint of the vanilla `SavedData` graph, keeps the enabled-mod inventory, anchors newly adopted vanilla careers before any explicit IMDC-only flush, and preserves deleted-save sidecars under `OLD` archive directories. Append-only generations still use the SHA-256-bound transactional journal and periodically compact into the atomic v5 snapshot.
+IMDC 3.4.7 uses SHA-256 content-fingerprinted exact-save checkpoints, keeps the enabled-mod inventory and durable agency-room generation map, anchors newly adopted vanilla careers before any explicit IMDC-only flush, and preserves deleted-save sidecars under `OLD` archive directories. Append-only generations use the SHA-256-bound transactional journal and periodically compact into the atomic v5 snapshot.
 
 ## Services
 
@@ -31,7 +31,7 @@ Vanilla agency-room IDs are runtime-only, and theater/cafe IDs can be recycled a
 
 The raw vanilla `room_id`, `theater_id`, and `cafe_id` payload fields are retained for immediate game-state correlation. They are not stable historical keys. Consumers grouping historical rows should use `(EntityKind, EntityId)`.
 
-New exact checkpoints optionally freeze the room-generation map in vanilla's serialized floor/room order and reassociate it while vanilla reconstructs rooms on load. This is an additive v5 checkpoint field, so sidecar format remains 5. Early v5 checkpoints created before this field existed still load; their already-ambiguous historical room identities cannot be reconstructed retroactively, so currently loaded rooms receive fresh forward-safe generation IDs until a later exact checkpoint persists the new mapping.
+Every v5 checkpoint freezes the room-generation map in vanilla's serialized floor/room order and reassociates it while vanilla reconstructs rooms on load. `AgencyRoomIdentities` is required in every accepted v5 checkpoint, including an empty array when the save contains no rooms. A format-5 checkpoint that omits the field is invalid rather than treated as an older compatible schema.
 
 ## Save ownership
 
@@ -80,9 +80,9 @@ A checkpoint identifies one vanilla save state using its physical relative path,
 
 Each v5 checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
 
-Checkpoints created by this follow-up revision also freeze an optional `AgencyRoomIdentities` snapshot. It records one IMDC room-generation ID for each serialized vanilla room and is used only to restore durable historical identity after load; it does not modify vanilla save JSON or change exact-checkpoint identity. Missing snapshots in older v5 checkpoints are accepted as an additive-schema compatibility case.
+Every v5 checkpoint freezes a required `AgencyRoomIdentities` snapshot. It records one IMDC room-generation ID for each serialized vanilla room and is used only to restore durable historical identity after load; it does not modify vanilla save JSON or change exact-checkpoint identity. The array may be empty for a save with no agency rooms, but the field itself may not be omitted.
 
-When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4.6 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4.7 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
 
@@ -166,7 +166,7 @@ Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-sub
 
 ## Current-format-only persistence
 
-IMDC 3.4.6 reads only sidecar format 5 and transactional journal format 2. Older lightweight sidecars and unsupported journals are intentionally rejected rather than migrated at runtime.
+IMDC 3.4.7 reads only sidecar format 5 and transactional journal format 2. Older lightweight sidecars and unsupported journals are intentionally rejected rather than migrated at runtime.
 
 Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
 

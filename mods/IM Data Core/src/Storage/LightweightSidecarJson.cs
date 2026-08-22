@@ -21,67 +21,6 @@ namespace IMDataCore
     /// </summary>
     internal static class LightweightSidecarJson
     {
-        internal static string Serialize(LightweightSidecarDocument document)
-        {
-            if (document == null)
-            {
-                throw new ArgumentNullException("document");
-            }
-
-            if (document.Checkpoints == null)
-            {
-                throw new InvalidOperationException(
-                    "The lightweight sidecar Checkpoints collection is null.");
-            }
-
-            if (document.Events == null)
-            {
-                throw new InvalidOperationException(
-                    "The lightweight sidecar Events collection is null.");
-            }
-
-            if (document.CustomMutations == null)
-            {
-                throw new InvalidOperationException(
-                    "The lightweight sidecar CustomMutations collection is null.");
-            }
-
-            StringBuilder builder = new StringBuilder(
-                Math.Max(256, EstimateCapacity(document)));
-
-            builder.Append('{');
-
-            AppendPropertyName(builder, "FormatName");
-            AppendString(builder, document.FormatName ?? string.Empty);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "FormatVersion");
-            AppendInt32(builder, document.FormatVersion);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "RelativeSavePath");
-            AppendString(builder, document.RelativeSavePath ?? string.Empty);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "LastIssuedSequence");
-            AppendInt64(builder, document.LastIssuedSequence);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "Checkpoints");
-            AppendCheckpoints(builder, document.Checkpoints);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "Events");
-            AppendEvents(builder, document.Events);
-            builder.Append(',');
-
-            AppendPropertyName(builder, "CustomMutations");
-            AppendCustomMutations(builder, document.CustomMutations);
-
-            builder.Append('}');
-            return builder.ToString();
-        }
-
         /// <summary>
         /// Streams one sidecar directly to a writer. This keeps peak save-time
         /// memory proportional to the largest individual record instead of the
@@ -184,95 +123,6 @@ namespace IMDataCore
             return builder.ToString();
         }
 
-        internal static void SerializeJournalEntryTo(
-            TextWriter writer,
-            LightweightSidecarDocument document,
-            int checkpointStartIndex,
-            int eventStartIndex,
-            int customMutationStartIndex)
-        {
-            if (writer == null)
-            {
-                throw new ArgumentNullException("writer");
-            }
-            ValidateSerializableDocument(document);
-            if (checkpointStartIndex < 0 ||
-                checkpointStartIndex > document.Checkpoints.Count ||
-                eventStartIndex < 0 ||
-                eventStartIndex > document.Events.Count ||
-                customMutationStartIndex < 0 ||
-                customMutationStartIndex > document.CustomMutations.Count)
-            {
-                throw new ArgumentOutOfRangeException(
-                    "A journal start index is outside the document collection.");
-            }
-
-            StringBuilder fragment = new StringBuilder(512);
-            char[] fragmentBuffer = new char[1024];
-            writer.Write('{');
-
-            AppendPropertyName(fragment, "LastIssuedSequence");
-            AppendInt64(fragment, document.LastIssuedSequence);
-            fragment.Append(',');
-            AppendPropertyName(fragment, "Checkpoints");
-            WriteBuilder(writer, fragment, ref fragmentBuffer);
-            writer.Write('[');
-            for (int index = checkpointStartIndex;
-                index < document.Checkpoints.Count;
-                index++)
-            {
-                if (index > checkpointStartIndex)
-                {
-                    writer.Write(',');
-                }
-                fragment.Length = 0;
-                AppendCheckpointRecord(fragment, document.Checkpoints[index]);
-                WriteBuilder(writer, fragment, ref fragmentBuffer);
-            }
-            writer.Write(']');
-            writer.Write(',');
-
-            fragment.Length = 0;
-            AppendPropertyName(fragment, "Events");
-            WriteBuilder(writer, fragment, ref fragmentBuffer);
-            writer.Write('[');
-            for (int index = eventStartIndex;
-                index < document.Events.Count;
-                index++)
-            {
-                if (index > eventStartIndex)
-                {
-                    writer.Write(',');
-                }
-                fragment.Length = 0;
-                AppendEventRecord(fragment, document.Events[index]);
-                WriteBuilder(writer, fragment, ref fragmentBuffer);
-            }
-            writer.Write(']');
-            writer.Write(',');
-
-            fragment.Length = 0;
-            AppendPropertyName(fragment, "CustomMutations");
-            WriteBuilder(writer, fragment, ref fragmentBuffer);
-            writer.Write('[');
-            for (int index = customMutationStartIndex;
-                index < document.CustomMutations.Count;
-                index++)
-            {
-                if (index > customMutationStartIndex)
-                {
-                    writer.Write(',');
-                }
-                fragment.Length = 0;
-                AppendCustomMutationRecord(
-                    fragment,
-                    document.CustomMutations[index]);
-                WriteBuilder(writer, fragment, ref fragmentBuffer);
-            }
-            writer.Write(']');
-            writer.Write('}');
-        }
-
         internal static bool TryReadJournalHeader(
             string json,
             out string baseFileHash,
@@ -314,48 +164,6 @@ namespace IMDataCore
                 errorMessage = exception.Message;
                 return false;
             }
-        }
-
-        internal static void ApplyJournalEntry(
-            string json,
-            LightweightSidecarDocument document)
-        {
-            if (document == null)
-            {
-                throw new ArgumentNullException("document");
-            }
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                throw new FormatException("The IMDC journal entry is empty.");
-            }
-
-            JsonValue rootValue = new JsonParser(json).ParseDocument();
-            Dictionary<string, JsonValue> root = RequireObject(
-                rootValue,
-                "An IMDC journal entry must be a JSON object.");
-            long lastIssuedSequence = RequireInt64(root, "LastIssuedSequence");
-            if (lastIssuedSequence < document.LastIssuedSequence)
-            {
-                throw new FormatException(
-                    "An IMDC journal entry regresses LastIssuedSequence.");
-            }
-
-            List<LightweightCheckpointRecord> checkpoints = ReadCheckpoints(
-                RequireArray(root, "Checkpoints"),
-                document.FormatVersion,
-                document.RelativeSavePath);
-            List<LightweightEventRecord> events = ReadEvents(
-                RequireArray(root, "Events"),
-                document.FormatVersion);
-            List<LightweightCustomMutationRecord> customMutations =
-                ReadCustomMutations(
-                    RequireArray(root, "CustomMutations"),
-                    document.FormatVersion);
-
-            document.Checkpoints.AddRange(checkpoints);
-            document.Events.AddRange(events);
-            document.CustomMutations.AddRange(customMutations);
-            document.LastIssuedSequence = lastIssuedSequence;
         }
 
         /// <summary>
@@ -618,7 +426,6 @@ namespace IMDataCore
                         {
                             pendingCheckpoints.Add(ReadCheckpoint(
                                 RequireMember(root, "Record"),
-                                document.FormatVersion,
                                 document.RelativeSavePath));
                         }
                     }
@@ -633,8 +440,7 @@ namespace IMDataCore
                         if (applyTransaction)
                         {
                             pendingEvents.Add(ReadEvent(
-                                RequireMember(root, "Record"),
-                                document.FormatVersion));
+                                RequireMember(root, "Record")));
                         }
                     }
                     else if (string.Equals(
@@ -652,8 +458,7 @@ namespace IMDataCore
                         if (applyTransaction)
                         {
                             pendingCustomMutations.Add(ReadCustomMutation(
-                                RequireMember(root, "Record"),
-                                document.FormatVersion));
+                                RequireMember(root, "Record")));
                         }
                     }
                     else if (string.Equals(kind, "COMMIT", StringComparison.Ordinal))
@@ -825,47 +630,6 @@ namespace IMDataCore
             }
         }
 
-        internal static LightweightSidecarDocument Deserialize(string json)
-        {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                throw new FormatException("The lightweight sidecar JSON is empty.");
-            }
-
-            JsonValue rootValue = new JsonParser(json).ParseDocument();
-            Dictionary<string, JsonValue> root = RequireObject(
-                rootValue,
-                "The lightweight sidecar root must be a JSON object.");
-
-            string formatName = RequireString(root, "FormatName");
-            int formatVersion = RequireInt32(root, "FormatVersion");
-            if (formatVersion < LightweightCoreStorageEngine.MinimumSupportedSidecarFormatVersion ||
-                formatVersion > LightweightCoreStorageEngine.SidecarFormatVersion)
-            {
-                throw new FormatException(
-                    "The lightweight sidecar format is unsupported by this IM Data Core version.");
-            }
-            string relativeSavePath = RequireString(root, "RelativeSavePath");
-
-            return new LightweightSidecarDocument
-            {
-                FormatName = formatName,
-                FormatVersion = formatVersion,
-                RelativeSavePath = relativeSavePath,
-                LastIssuedSequence = RequireInt64(root, "LastIssuedSequence"),
-                Checkpoints = ReadCheckpoints(
-                    RequireArray(root, "Checkpoints"),
-                    formatVersion,
-                    relativeSavePath),
-                Events = ReadEvents(
-                    RequireArray(root, "Events"),
-                    formatVersion),
-                CustomMutations = ReadCustomMutations(
-                    RequireArray(root, "CustomMutations"),
-                    formatVersion)
-            };
-        }
-
         /// <summary>
         /// Streams the sidecar from a reader and materializes one history record at
         /// a time. Normal v5 files therefore never require a second in-memory copy
@@ -928,10 +692,8 @@ namespace IMDataCore
                         case "FormatVersion":
                             document.FormatVersion =
                                 parser.ParseRequiredInt32(propertyName);
-                            if (document.FormatVersion <
-                                    LightweightCoreStorageEngine.MinimumSupportedSidecarFormatVersion ||
-                                document.FormatVersion >
-                                    LightweightCoreStorageEngine.SidecarFormatVersion)
+                            if (document.FormatVersion !=
+                                LightweightCoreStorageEngine.SidecarFormatVersion)
                             {
                                 throw new FormatException(
                                     "The lightweight sidecar format is unsupported by this IM Data Core version.");
@@ -958,7 +720,6 @@ namespace IMDataCore
                                 document.Checkpoints =
                                     ReadCheckpointArrayFromStream(
                                         parser,
-                                        document.FormatVersion,
                                         document.RelativeSavePath);
                             }
                             else
@@ -972,9 +733,7 @@ namespace IMDataCore
                             if (hasFormatVersion)
                             {
                                 document.Events =
-                                    ReadEventArrayFromStream(
-                                        parser,
-                                        document.FormatVersion);
+                                    ReadEventArrayFromStream(parser);
                             }
                             else
                             {
@@ -987,9 +746,7 @@ namespace IMDataCore
                             if (hasFormatVersion)
                             {
                                 document.CustomMutations =
-                                    ReadCustomMutationArrayFromStream(
-                                        parser,
-                                        document.FormatVersion);
+                                    ReadCustomMutationArrayFromStream(parser);
                             }
                             else
                             {
@@ -998,9 +755,8 @@ namespace IMDataCore
                             break;
 
                         default:
-                            // Preserve the historical decoder's tolerance for
-                            // unknown top-level fields while still validating
-                            // their JSON syntax.
+                            // Tolerate unknown top-level fields within the current v5 schema
+                            // while still validating their JSON syntax.
                             parser.ParseValue();
                             break;
                     }
@@ -1039,7 +795,6 @@ namespace IMDataCore
 
                 document.Checkpoints = ReadCheckpoints(
                     deferredCheckpoints.ArrayValue,
-                    document.FormatVersion,
                     document.RelativeSavePath);
             }
 
@@ -1051,9 +806,7 @@ namespace IMDataCore
                         "The lightweight sidecar field 'Events' must be a JSON array.");
                 }
 
-                document.Events = ReadEvents(
-                    deferredEvents.ArrayValue,
-                    document.FormatVersion);
+                document.Events = ReadEvents(deferredEvents.ArrayValue);
             }
 
             if (deferredCustomMutations != null)
@@ -1065,8 +818,7 @@ namespace IMDataCore
                 }
 
                 document.CustomMutations = ReadCustomMutations(
-                    deferredCustomMutations.ArrayValue,
-                    document.FormatVersion);
+                    deferredCustomMutations.ArrayValue);
             }
 
             return document;
@@ -1075,7 +827,6 @@ namespace IMDataCore
         private static List<LightweightCheckpointRecord>
             ReadCheckpointArrayFromStream(
                 StreamingJsonParser parser,
-                int formatVersion,
                 string documentRelativeSavePath)
         {
             List<LightweightCheckpointRecord> records =
@@ -1092,7 +843,6 @@ namespace IMDataCore
                 records.Add(
                     ReadCheckpoint(
                         parser.ParseValue(),
-                        formatVersion,
                         documentRelativeSavePath));
                 parser.SkipWhitespace();
                 if (parser.TryConsume(']'))
@@ -1107,8 +857,7 @@ namespace IMDataCore
         }
 
         private static List<LightweightEventRecord> ReadEventArrayFromStream(
-            StreamingJsonParser parser,
-            int formatVersion)
+            StreamingJsonParser parser)
         {
             List<LightweightEventRecord> records =
                 new List<LightweightEventRecord>();
@@ -1121,7 +870,7 @@ namespace IMDataCore
 
             while (true)
             {
-                records.Add(ReadEvent(parser.ParseValue(), formatVersion));
+                records.Add(ReadEvent(parser.ParseValue()));
                 parser.SkipWhitespace();
                 if (parser.TryConsume(']'))
                 {
@@ -1136,8 +885,7 @@ namespace IMDataCore
 
         private static List<LightweightCustomMutationRecord>
             ReadCustomMutationArrayFromStream(
-                StreamingJsonParser parser,
-                int formatVersion)
+                StreamingJsonParser parser)
         {
             List<LightweightCustomMutationRecord> records =
                 new List<LightweightCustomMutationRecord>();
@@ -1151,9 +899,7 @@ namespace IMDataCore
             while (true)
             {
                 records.Add(
-                    ReadCustomMutation(
-                        parser.ParseValue(),
-                        formatVersion));
+                    ReadCustomMutation(parser.ParseValue()));
                 parser.SkipWhitespace();
                 if (parser.TryConsume(']'))
                 {
@@ -1954,37 +1700,6 @@ namespace IMDataCore
             builder.Append("null");
         }
 
-        private static int EstimateCapacity(LightweightSidecarDocument document)
-        {
-            long estimate = 192L;
-            estimate += (long)document.Checkpoints.Count * 256L;
-            estimate += (long)document.Events.Count * 320L;
-            estimate += (long)document.CustomMutations.Count * 240L;
-
-            if (estimate > int.MaxValue)
-            {
-                return int.MaxValue;
-            }
-
-            return (int)estimate;
-        }
-
-        private static void AppendCheckpoints(
-            StringBuilder builder,
-            List<LightweightCheckpointRecord> records)
-        {
-            builder.Append('[');
-            for (int index = 0; index < records.Count; index++)
-            {
-                if (index > 0)
-                {
-                    builder.Append(',');
-                }
-                AppendCheckpointRecord(builder, records[index]);
-            }
-            builder.Append(']');
-        }
-
         private static void AppendCheckpointRecord(
             StringBuilder builder,
             LightweightCheckpointRecord record)
@@ -2013,12 +1728,14 @@ namespace IMDataCore
             builder.Append(',');
             AppendPropertyName(builder, "EnabledMods");
             AppendModSnapshots(builder, record.EnabledMods);
-            if (record.AgencyRoomIdentities != null)
+            if (record.AgencyRoomIdentities == null)
             {
-                builder.Append(',');
-                AppendPropertyName(builder, "AgencyRoomIdentities");
-                AppendAgencyRoomIdentities(builder, record.AgencyRoomIdentities);
+                throw new InvalidOperationException(
+                    "The lightweight sidecar checkpoint is missing AgencyRoomIdentities.");
             }
+            builder.Append(',');
+            AppendPropertyName(builder, "AgencyRoomIdentities");
+            AppendAgencyRoomIdentities(builder, record.AgencyRoomIdentities);
             builder.Append('}');
         }
 
@@ -2028,37 +1745,34 @@ namespace IMDataCore
         {
             builder.Append('[');
             bool wroteAny = false;
-            if (records != null)
+            for (int index = 0; index < records.Count; index++)
             {
-                for (int index = 0; index < records.Count; index++)
+                LightweightAgencyRoomIdentityRecord record = records[index];
+                if (record == null)
                 {
-                    LightweightAgencyRoomIdentityRecord record = records[index];
-                    if (record == null)
-                    {
-                        continue;
-                    }
-                    if (wroteAny)
-                    {
-                        builder.Append(',');
-                    }
-                    builder.Append('{');
-                    AppendPropertyName(builder, "EntityId");
-                    AppendString(builder, record.EntityId ?? string.Empty);
-                    builder.Append(',');
-                    AppendPropertyName(builder, "FloorIndex");
-                    AppendInt32(builder, record.FloorIndex);
-                    builder.Append(',');
-                    AppendPropertyName(builder, "RoomIndex");
-                    AppendInt32(builder, record.RoomIndex);
-                    builder.Append(',');
-                    AppendPropertyName(builder, "RoomTypeRaw");
-                    AppendInt32(builder, record.RoomTypeRaw);
-                    builder.Append(',');
-                    AppendPropertyName(builder, "TheaterId");
-                    AppendInt32(builder, record.TheaterId);
-                    builder.Append('}');
-                    wroteAny = true;
+                    continue;
                 }
+                if (wroteAny)
+                {
+                    builder.Append(',');
+                }
+                builder.Append('{');
+                AppendPropertyName(builder, "EntityId");
+                AppendString(builder, record.EntityId ?? string.Empty);
+                builder.Append(',');
+                AppendPropertyName(builder, "FloorIndex");
+                AppendInt32(builder, record.FloorIndex);
+                builder.Append(',');
+                AppendPropertyName(builder, "RoomIndex");
+                AppendInt32(builder, record.RoomIndex);
+                builder.Append(',');
+                AppendPropertyName(builder, "RoomTypeRaw");
+                AppendInt32(builder, record.RoomTypeRaw);
+                builder.Append(',');
+                AppendPropertyName(builder, "TheaterId");
+                AppendInt32(builder, record.TheaterId);
+                builder.Append('}');
+                wroteAny = true;
             }
             builder.Append(']');
         }
@@ -2120,22 +1834,6 @@ namespace IMDataCore
                     }
                     AppendString(builder, values[index] ?? string.Empty);
                 }
-            }
-            builder.Append(']');
-        }
-
-        private static void AppendEvents(
-            StringBuilder builder,
-            List<LightweightEventRecord> records)
-        {
-            builder.Append('[');
-            for (int index = 0; index < records.Count; index++)
-            {
-                if (index > 0)
-                {
-                    builder.Append(',');
-                }
-                AppendEventRecord(builder, records[index]);
             }
             builder.Append(']');
         }
@@ -2202,22 +1900,6 @@ namespace IMDataCore
             builder.Append('}');
         }
 
-        private static void AppendCustomMutations(
-            StringBuilder builder,
-            List<LightweightCustomMutationRecord> records)
-        {
-            builder.Append('[');
-            for (int index = 0; index < records.Count; index++)
-            {
-                if (index > 0)
-                {
-                    builder.Append(',');
-                }
-                AppendCustomMutationRecord(builder, records[index]);
-            }
-            builder.Append(']');
-        }
-
         private static void AppendCustomMutationRecord(
             StringBuilder builder,
             LightweightCustomMutationRecord record)
@@ -2276,7 +1958,6 @@ namespace IMDataCore
 
         private static List<LightweightCheckpointRecord> ReadCheckpoints(
             List<JsonValue> values,
-            int formatVersion,
             string documentRelativeSavePath)
         {
             List<LightweightCheckpointRecord> records =
@@ -2287,7 +1968,6 @@ namespace IMDataCore
                 records.Add(
                     ReadCheckpoint(
                         values[index],
-                        formatVersion,
                         documentRelativeSavePath));
             }
 
@@ -2296,7 +1976,6 @@ namespace IMDataCore
 
         private static LightweightCheckpointRecord ReadCheckpoint(
             JsonValue value,
-            int formatVersion,
             string documentRelativeSavePath)
         {
             Dictionary<string, JsonValue> item = RequireObject(
@@ -2312,26 +1991,16 @@ namespace IMDataCore
                 ContentFingerprint = RequireString(item, "ContentFingerprint"),
                 Sequence = RequireInt64(item, "Sequence"),
                 EnabledMods = ReadModSnapshots(item),
-                AgencyRoomIdentities = ReadAgencyRoomIdentitiesIfPresent(item)
+                AgencyRoomIdentities = ReadAgencyRoomIdentities(item)
             };
         }
 
-        private static List<LightweightAgencyRoomIdentityRecord> ReadAgencyRoomIdentitiesIfPresent(
+        private static List<LightweightAgencyRoomIdentityRecord> ReadAgencyRoomIdentities(
             Dictionary<string, JsonValue> checkpoint)
         {
-            JsonValue value;
-            if (checkpoint == null ||
-                !checkpoint.TryGetValue("AgencyRoomIdentities", out value))
-            {
-                return null;
-            }
-
-            if (value == null || value.Kind != JsonValueKind.Array)
-            {
-                throw new FormatException(
-                    "The checkpoint AgencyRoomIdentities field must be a JSON array.");
-            }
-            List<JsonValue> values = value.ArrayValue;
+            List<JsonValue> values = RequireArray(
+                checkpoint,
+                "AgencyRoomIdentities");
             List<LightweightAgencyRoomIdentityRecord> records =
                 new List<LightweightAgencyRoomIdentityRecord>(values.Count);
             for (int index = 0; index < values.Count; index++)
@@ -2401,23 +2070,21 @@ namespace IMDataCore
 
 
         private static List<LightweightEventRecord> ReadEvents(
-            List<JsonValue> values,
-            int formatVersion)
+            List<JsonValue> values)
         {
             List<LightweightEventRecord> records =
                 new List<LightweightEventRecord>(values.Count);
 
             for (int index = 0; index < values.Count; index++)
             {
-                records.Add(ReadEvent(values[index], formatVersion));
+                records.Add(ReadEvent(values[index]));
             }
 
             return records;
         }
 
         private static LightweightEventRecord ReadEvent(
-            JsonValue value,
-            int formatVersion)
+            JsonValue value)
         {
             Dictionary<string, JsonValue> item = RequireObject(
                 value,
@@ -2428,57 +2095,16 @@ namespace IMDataCore
             string namespaceIdentifier = RequireString(
                 item,
                 "NamespaceIdentifier");
-            int gameDateKey;
-            string payloadJson;
-            string storagePayloadJson;
-
-            if (formatVersion >= 3)
+            int gameDateKey = BuildGameDateKeyFromRoundTrip(
+                gameDateTime,
+                "event");
+            JsonValue payloadValue = RequireMember(item, "Payload");
+            string storagePayloadJson = SerializeJsonValue(payloadValue);
+            if (string.IsNullOrEmpty(namespaceIdentifier))
             {
-                gameDateKey = BuildGameDateKeyFromRoundTrip(
-                    gameDateTime,
-                    "event");
-                JsonValue payloadValue = RequireMember(item, "Payload");
-                storagePayloadJson = SerializeJsonValue(payloadValue);
-                if (string.IsNullOrEmpty(namespaceIdentifier))
-                {
-                    TransformEventPayloadForRuntime(payloadValue);
-                }
-                payloadJson = SerializeJsonValue(payloadValue);
+                TransformEventPayloadForRuntime(payloadValue);
             }
-            else
-            {
-                long storedEventId = RequireInt64(item, "EventId");
-                if (storedEventId != sequence)
-                {
-                    throw new FormatException(
-                        "The legacy lightweight sidecar contains an event " +
-                        "identifier that does not match its sequence.");
-                }
-
-                int storedGameDateKey = RequireInt32(item, "GameDateKey");
-                gameDateKey = BuildGameDateKeyFromRoundTrip(
-                    gameDateTime,
-                    "event");
-                if (storedGameDateKey != gameDateKey)
-                {
-                    throw new FormatException(
-                        "The legacy lightweight sidecar contains an event " +
-                        "GameDateKey that does not match GameDateTime.");
-                }
-                payloadJson = RequireString(item, "PayloadJson");
-                string ignoredRuntime;
-                string storageError;
-                if (!TryNormalizeEventPayloadForStorage(
-                        payloadJson,
-                        !string.IsNullOrEmpty(namespaceIdentifier),
-                        out ignoredRuntime,
-                        out storagePayloadJson,
-                        out storageError))
-                {
-                    throw new FormatException(
-                        "The legacy event payload is invalid: " + storageError);
-                }
-            }
+            string payloadJson = SerializeJsonValue(payloadValue);
 
             return new LightweightEventRecord
             {
@@ -2502,23 +2128,21 @@ namespace IMDataCore
 
 
         private static List<LightweightCustomMutationRecord> ReadCustomMutations(
-            List<JsonValue> values,
-            int formatVersion)
+            List<JsonValue> values)
         {
             List<LightweightCustomMutationRecord> records =
                 new List<LightweightCustomMutationRecord>(values.Count);
 
             for (int index = 0; index < values.Count; index++)
             {
-                records.Add(ReadCustomMutation(values[index], formatVersion));
+                records.Add(ReadCustomMutation(values[index]));
             }
 
             return records;
         }
 
         private static LightweightCustomMutationRecord ReadCustomMutation(
-            JsonValue value,
-            int formatVersion)
+            JsonValue value)
         {
             Dictionary<string, JsonValue> item = RequireObject(
                 value,
@@ -2526,56 +2150,17 @@ namespace IMDataCore
 
             string operation = RequireString(item, "Operation");
             string gameDateTime = RequireString(item, "GameDateTime");
-            int gameDateKey;
-            string valueJson;
-            string storageValueJson = string.Empty;
+            int gameDateKey = BuildGameDateKeyFromRoundTrip(
+                gameDateTime,
+                "custom-data mutation");
 
-            if (formatVersion >= 3)
-            {
-                gameDateKey = BuildGameDateKeyFromRoundTrip(
-                    gameDateTime,
-                    "custom-data mutation");
-
-                valueJson = string.Equals(
-                    operation,
-                    LightweightCoreStorageEngine.CustomOperationSet,
-                    StringComparison.Ordinal)
-                    ? SerializeJsonValue(RequireMember(item, "Value"))
-                    : string.Empty;
-                storageValueJson = valueJson;
-            }
-            else
-            {
-                int storedGameDateKey = RequireInt32(item, "GameDateKey");
-                gameDateKey = BuildGameDateKeyFromRoundTrip(
-                    gameDateTime,
-                    "custom-data mutation");
-                if (storedGameDateKey != gameDateKey)
-                {
-                    throw new FormatException(
-                        "The legacy lightweight sidecar contains a custom-data " +
-                        "GameDateKey that does not match GameDateTime.");
-                }
-                valueJson = RequireString(item, "ValueJson");
-                if (string.Equals(
-                        operation,
-                        LightweightCoreStorageEngine.CustomOperationSet,
-                        StringComparison.Ordinal))
-                {
-                    string normalizedValue;
-                    string normalizeError;
-                    if (!TryNormalizeJsonDocument(
-                            valueJson,
-                            out normalizedValue,
-                            out normalizeError))
-                    {
-                        throw new FormatException(
-                            "The legacy custom-data value is invalid: " +
-                            normalizeError);
-                    }
-                    storageValueJson = normalizedValue;
-                }
-            }
+            string valueJson = string.Equals(
+                operation,
+                LightweightCoreStorageEngine.CustomOperationSet,
+                StringComparison.Ordinal)
+                ? SerializeJsonValue(RequireMember(item, "Value"))
+                : string.Empty;
+            string storageValueJson = valueJson;
 
             return new LightweightCustomMutationRecord
             {

@@ -972,7 +972,6 @@ namespace IMDataCore
                 string.Equals(normalized, CoreConstants.EventTypeShowCancelled, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeShowStatusChanged, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeShowEpisodeReleased, StringComparison.Ordinal) ||
-                string.Equals(normalized, "show_episode", StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeShowCastChanged, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeShowConfigurationChanged, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeShowRelaunchStarted, StringComparison.Ordinal) ||

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.7
+
+- Removed runtime compatibility scaffolding for unsupported historical sidecar schemas: sidecar validation is exact `FormatVersion == 5`, pre-v3 event/custom-mutation readers are gone, and obsolete format-version plumbing was removed from current record decoders.
+- Made `AgencyRoomIdentities` mandatory on every accepted v5 checkpoint, including an empty array for saves with no rooms. Removed the unreleased early-v5 missing-field compatibility path while retaining fail-safe handling for a present snapshot that does not match the loaded vanilla room layout.
+- Removed the historical `show_episode` timeline alias. Current show episode history uses `show_episode_released`; the separate current money-detail token named `show_episode` is unchanged.
+- Removed unused pre-transaction journal entry encode/decode routines, unused whole-document string sidecar encode/decode routines, obsolete checkpoint overloads, and unused save-scope compatibility wrappers.
+- Removed bundled v2-v4 schema, migration, validation, implementation-note, and example documents. Historical-format migration is intentionally outside the runtime mod and can be handled by a future standalone migrator.
+- Bumped project and mod metadata to 3.4.7 and updated current v5 documentation/examples to match the stricter schema.
+
 ## 3.4.6 Pass 6 build correction
 
 - Removed the unavailable `JsonUtility.FromJsonOverwrite` call from standalone stable-save cloning. Idol Manager's UnityEngine reference exposes `FromJson<T>` but not `FromJsonOverwrite`; fallback now proceeds directly to the verified Unity-serialized-field clone.

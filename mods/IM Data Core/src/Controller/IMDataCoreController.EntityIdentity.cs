@@ -238,20 +238,19 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Arms the room loader with the exact checkpoint snapshot. Early v5
-        /// checkpoints have no such field; those receive fresh forward-safe
-        /// identities instead of reusing ambiguous historical vanilla IDs.
+        /// Arms the room loader with the exact checkpoint room-generation snapshot.
+        /// A present but inconsistent snapshot fails safe by assigning fresh
+        /// generations rather than binding history to the wrong rooms.
         /// </summary>
         internal void PrepareAgencyRoomIdentitiesForLoad(
             SaveManager.SavedData loadedSaveData,
             bool exactCheckpointSelected,
-            bool checkpointSnapshotPresent,
             IReadOnlyList<LightweightAgencyRoomIdentityRecord> checkpointSnapshot)
         {
             lock (runtimeLock)
             {
                 List<LightweightAgencyRoomIdentityRecord> prepared;
-                if (checkpointSnapshotPresent &&
+                if (exactCheckpointSelected &&
                     IsAgencyRoomIdentitySnapshotCompatible(
                         loadedSaveData,
                         checkpointSnapshot))
@@ -261,18 +260,7 @@ namespace IMDataCore
                 else
                 {
                     prepared = CreateFreshAgencyRoomIdentitySnapshot(loadedSaveData);
-                    if (loadedSaveData != null &&
-                        prepared.Count > 0 &&
-                        exactCheckpointSelected &&
-                        !checkpointSnapshotPresent)
-                    {
-                        CoreLog.Warn(
-                            "The exact IMDC v5 checkpoint predates durable agency-room " +
-                            "generation identities. Current rooms were assigned new " +
-                            "forward-safe identities; already-ambiguous older room history " +
-                            "cannot be retroactively reconnected.");
-                    }
-                    else if (checkpointSnapshotPresent && prepared.Count > 0)
+                    if (exactCheckpointSelected && prepared.Count > 0)
                     {
                         CoreLog.Warn(
                             "The exact IMDC checkpoint room-identity snapshot did not " +

@@ -252,7 +252,6 @@ namespace IMDataCore
                     }
                     bool checkpointFound = false;
                     long activatedSequence = 0L;
-                    bool checkpointRoomIdentitySnapshotPresent = false;
                     List<LightweightAgencyRoomIdentityRecord> checkpointRoomIdentities =
                         new List<LightweightAgencyRoomIdentityRecord>();
                     bool hasExistingSidecarDocument =
@@ -271,7 +270,6 @@ namespace IMDataCore
                             CaptureCurrentModSnapshot(true);
                         checkpointRoomIdentities =
                             CreateFreshAgencyRoomIdentitySnapshot(loadedSaveData);
-                        checkpointRoomIdentitySnapshotPresent = true;
                         if (!loadedEngine.AddOrReplaceCheckpoint(
                                 stamp,
                                 0L,
@@ -320,12 +318,10 @@ namespace IMDataCore
 
                         if (!loadedEngine.TryGetCheckpointAgencyRoomIdentities(
                                 stamp,
-                                out checkpointRoomIdentitySnapshotPresent,
                                 out checkpointRoomIdentities,
                                 out errorMessage))
                         {
                             CoreLog.Warn(errorMessage);
-                            checkpointRoomIdentitySnapshotPresent = false;
                             checkpointRoomIdentities =
                                 new List<LightweightAgencyRoomIdentityRecord>();
                         }
@@ -349,7 +345,6 @@ namespace IMDataCore
                     PrepareAgencyRoomIdentitiesForLoad(
                         loadedSaveData,
                         checkpointFound,
-                        checkpointRoomIdentitySnapshotPresent,
                         checkpointRoomIdentities);
                     engineInstalled = true;
                     }
@@ -397,7 +392,7 @@ namespace IMDataCore
             CoreSaveScope safeScope = targetScope;
             if (safeScope == null || safeScope.IsTransient)
             {
-                CorePaths.ResetToTransientSaveScope();
+                CorePaths.ResetToTransient();
                 safeScope = CorePaths.GetSaveScope();
             }
             InstallLoadedEngine(
@@ -438,7 +433,7 @@ namespace IMDataCore
             if (!loadedEngine.HasPhysicalScope &&
                 (targetScope == null || !targetScope.IsTransient))
             {
-                CorePaths.ResetToTransientSaveScope();
+                CorePaths.ResetToTransient();
                 targetScope = CorePaths.GetSaveScope();
             }
             lock (runtimeLock)
@@ -461,7 +456,7 @@ namespace IMDataCore
                 saveLoadPreparationActive = true;
                 if (targetScope.IsTransient)
                 {
-                    CorePaths.ResetToTransientSaveScope();
+                    CorePaths.ResetToTransient();
                 }
                 else
                 {
@@ -484,7 +479,7 @@ namespace IMDataCore
                 }
                 storageEngine = new LightweightCoreStorageEngine();
                 storageEngine.InitializeTransient();
-                CorePaths.ResetToTransientSaveScope();
+                CorePaths.ResetToTransient();
                 activeSaveScope = CorePaths.GetSaveScope();
                 activeSaveKey = NormalizeSaveKey(
                     activeSaveScope.InternalSaveKey);
@@ -573,7 +568,7 @@ namespace IMDataCore
                                 // recreate the save directory vanilla just deleted. A
                                 // later vanilla New Save/Save As can bind this branch to
                                 // its new path normally when archival succeeded.
-                                CorePaths.ResetToTransientSaveScope();
+                                CorePaths.ResetToTransient();
                                 activeSaveScope = CorePaths.GetSaveScope();
                                 activeSaveKey = NormalizeSaveKey(
                                     activeSaveScope.InternalSaveKey);
@@ -677,7 +672,7 @@ namespace IMDataCore
             {
                 storageEngine = new LightweightCoreStorageEngine();
                 storageEngine.InitializeTransient();
-                CorePaths.ResetToTransientSaveScope();
+                CorePaths.ResetToTransient();
                 activeSaveScope = CorePaths.GetSaveScope();
                 activeSaveKey = NormalizeSaveKey(
                     activeSaveScope.InternalSaveKey);

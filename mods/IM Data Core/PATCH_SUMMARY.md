@@ -1,4 +1,13 @@
-# IM Data Core 3.4.6 patch summary
+# IM Data Core 3.4.7 patch summary
+
+## 3.4.7 current-format cleanup
+
+1. **Exact v5 runtime policy:** runtime sidecar validation now accepts only `FormatVersion == 5`; the unused minimum-supported-version range and pre-v3 event/custom-mutation decoding branches are removed.
+2. **Required room generations:** every accepted v5 checkpoint must contain `AgencyRoomIdentities`, including an empty array when no rooms exist. The unreleased early-v5 missing-field compatibility path is removed; present-but-inconsistent snapshots still fail safe rather than misbinding history.
+3. **Dead persistence codecs removed:** unused whole-document string serialization/deserialization and the superseded pre-transaction journal-entry codec are removed. Current persistence continues to use streaming v5 sidecars and journal-format-2 `BEGIN`/row/`COMMIT` transactions.
+4. **Historical event alias removed:** the old `show_episode` timeline alias is no longer recognized; current built-in show episode history uses `show_episode_released`. The unrelated current money-detail token `show_episode` is retained.
+5. **Internal compatibility wrappers removed:** obsolete checkpoint overloads and unused save-scope wrapper names are removed; current call sites use the canonical APIs directly.
+6. **Historical docs removed:** v2-v4 implementation, migration, validation, schema, and example files are no longer packaged with IMDC. Historical-format knowledge belongs in a future external migrator rather than the runtime mod.
 
 ## Post-`cc924b6` audit follow-up - Pass 6
 
@@ -12,11 +21,11 @@
 ## Post-`cc924b6` audit follow-up - Pass 5
 
 1. **Durable agency-room generations:** timeline history no longer promotes runtime-only `agency._room.id` into a persistent key. Each room receives an IMDC-owned `g:<guid>` generation.
-2. **Exact-checkpoint reassociation:** new v5 checkpoints optionally freeze room generations in vanilla's serialized floor/room order; the load hook reassociates those generations as vanilla reconstructs each room. Older v5 checkpoints without the additive field remain valid and receive fresh forward-safe IDs.
+2. **Exact-checkpoint reassociation:** v5 checkpoints freeze room generations in vanilla's serialized floor/room order; the load hook reassociates those generations as vanilla reconstructs each room. In 3.4.7 the field is required for every accepted v5 checkpoint.
 3. **Theater/cafe collision prevention:** theater and cafe history use the owning room generation as `EntityId`, so destroyed highest IDs may be recycled by vanilla without merging two historical facilities. Raw vanilla IDs remain payload fields.
 4. **Room-work continuity:** room-work compound history uses the durable room generation component and therefore survives save/load identity loss in vanilla.
 5. **Public catalog contract:** `idol_status_changed`, `research_points_accrued`, and `idol_earnings_recorded` are explicitly catalogued as internal transient/non-queryable streams; the remaining 143 built-in types are the queryable catalog.
-6. **Compatibility preserved:** sidecar format remains 5, journal format remains 2, and the new checkpoint member is optional/additive. Pass 5 does not attempt to retroactively invent identities absent from older checkpoints.
+6. **Current schema:** sidecar format remains 5 and journal format remains 2. Version 3.4.7 requires the room-generation checkpoint member rather than retaining the unreleased early-v5 optional-field compatibility path.
 
 ## Post-`cc924b6` audit follow-up - Pass 4
 
@@ -78,7 +87,7 @@ This revision closes four persistence/lifecycle defects found by static comparis
 
 ## Compatibility and versions
 
-- Project/mod version: **3.4.6**.
+- Project/mod version: **3.4.7**.
 - Sidecar `FormatName`: `IMDataCore.LightweightSidecar`.
 - Sidecar `FormatVersion`: **5 only**.
 - Journal `FormatName`: `IMDataCore.LightweightJournal`.
