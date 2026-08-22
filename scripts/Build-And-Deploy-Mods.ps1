@@ -7,7 +7,12 @@ param(
 
     [string]$DeployRoot = (Join-Path $env:USERPROFILE "AppData\LocalLow\Glitch Pitch\Idol Manager\Mods"),
 
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+
+    # Existing *.config.ini files in an installed mod folder are treated as
+    # user settings and preserved by default. Use this switch only when the
+    # packaged defaults should replace the live configuration.
+    [switch]$OverwriteConfig
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,13 +26,34 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     }
 }
 
+if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
+    throw "Repository root not found: $RepoRoot"
+}
+
+$RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+
+if ([string]::IsNullOrWhiteSpace($DeployRoot)) {
+    throw "DeployRoot cannot be empty."
+}
+
+if (-not [System.IO.Path]::IsPathRooted($DeployRoot)) {
+    $DeployRoot = Join-Path (Get-Location).Path $DeployRoot
+}
+$DeployRoot = [System.IO.Path]::GetFullPath($DeployRoot)
+
 function Get-ProjectMetadata {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ProjectPath
     )
 
-    [xml]$projectXml = Get-Content -Path $ProjectPath -Raw
+    try {
+        [xml]$projectXml = Get-Content -LiteralPath $ProjectPath -Raw
+    }
+    catch {
+        throw "Unable to read project file '$ProjectPath': $($_.Exception.Message)"
+    }
+
     $propertyGroups = @($projectXml.Project.PropertyGroup)
     $modName = $null
     $assemblyName = $null
@@ -35,15 +61,15 @@ function Get-ProjectMetadata {
 
     foreach ($propertyGroup in $propertyGroups) {
         if (-not $modName -and $propertyGroup.ModName) {
-            $modName = $propertyGroup.ModName.Trim()
+            $modName = ([string]$propertyGroup.ModName).Trim()
         }
 
         if (-not $assemblyName -and $propertyGroup.AssemblyName) {
-            $assemblyName = $propertyGroup.AssemblyName.Trim()
+            $assemblyName = ([string]$propertyGroup.AssemblyName).Trim()
         }
 
         if (-not $deployFolderName -and $propertyGroup.DeployFolderName) {
-            $deployFolderName = $propertyGroup.DeployFolderName.Trim()
+            $deployFolderName = ([string]$propertyGroup.DeployFolderName).Trim()
         }
     }
 
@@ -55,32 +81,70 @@ function Get-ProjectMetadata {
         $deployFolderName = $null
     }
 
+    $projectDir = Split-Path -Parent $ProjectPath
+    $projectReferences = @()
+    foreach ($itemGroup in @($projectXml.Project.ItemGroup)) {
+        foreach ($projectReference in @($itemGroup.ProjectReference)) {
+            if ($null -eq $projectReference -or [string]::IsNullOrWhiteSpace([string]$projectReference.Include)) {
+                continue
+            }
+
+            $referencedPath = Join-Path $projectDir ([string]$projectReference.Include)
+            $projectReferences += [System.IO.Path]::GetFullPath($referencedPath)
+        }
+    }
+
     return [PSCustomObject]@{
-        ProjectPath   = $ProjectPath
-        ProjectDir    = Split-Path -Parent $ProjectPath
-        ModName       = $modName
-        AssemblyName  = $assemblyName
-        DeployFolderName = $deployFolderName
-        ArtifactDir   = Join-Path $RepoRoot ("artifacts\mods\{0}\{1}" -f $Configuration, $modName)
+        ProjectPath       = [System.IO.Path]::GetFullPath($ProjectPath)
+        ProjectDir        = $projectDir
+        ModName           = $modName
+        AssemblyName      = $assemblyName
+        DeployFolderName  = $deployFolderName
+        ProjectReferences = @($projectReferences)
+        ArtifactDir       = Join-Path $RepoRoot ("artifacts\mods\{0}\{1}" -f $Configuration, $modName)
     }
 }
 
-function Get-HarmonyIdFromInfoJson {
+function Get-ModInfoJson {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$InfoJsonPath
+        [string]$InfoJsonPath,
+
+        [switch]$AllowInvalid
     )
 
     if (-not (Test-Path -LiteralPath $InfoJsonPath -PathType Leaf)) {
         return $null
     }
 
-    $info = Get-Content -LiteralPath $InfoJsonPath -Raw | ConvertFrom-Json
-    if ($null -eq $info -or [string]::IsNullOrWhiteSpace($info.HarmonyID)) {
+    try {
+        $info = Get-Content -LiteralPath $InfoJsonPath -Raw | ConvertFrom-Json
+        return $info
+    }
+    catch {
+        if ($AllowInvalid) {
+            Write-Warning "Ignoring invalid info.json '$InfoJsonPath': $($_.Exception.Message)"
+            return $null
+        }
+
+        throw "Invalid info.json '$InfoJsonPath': $($_.Exception.Message)"
+    }
+}
+
+function Get-HarmonyIdFromInfoJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InfoJsonPath,
+
+        [switch]$AllowInvalid
+    )
+
+    $info = Get-ModInfoJson -InfoJsonPath $InfoJsonPath -AllowInvalid:$AllowInvalid
+    if ($null -eq $info -or [string]::IsNullOrWhiteSpace([string]$info.HarmonyID)) {
         return $null
     }
 
-    return $info.HarmonyID.Trim()
+    return ([string]$info.HarmonyID).Trim()
 }
 
 function Get-RelativePath {
@@ -92,9 +156,23 @@ function Get-RelativePath {
         [string]$ChildPath
     )
 
-    $baseUri = New-Object System.Uri((Resolve-Path -LiteralPath $BasePath).Path.TrimEnd('\') + '\')
-    $childUri = New-Object System.Uri((Resolve-Path -LiteralPath $ChildPath).Path)
+    $resolvedBasePath = (Resolve-Path -LiteralPath $BasePath).Path
+    $resolvedChildPath = (Resolve-Path -LiteralPath $ChildPath).Path
+    $baseUri = New-Object System.Uri($resolvedBasePath.TrimEnd('\') + '\')
+    $childUri = New-Object System.Uri($resolvedChildPath)
     return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($childUri).ToString()).Replace('/', '\')
+}
+
+function Test-IsUserConfigFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $fileName = [System.IO.Path]::GetFileName($Path)
+    return $fileName.EndsWith(
+        ".config.ini",
+        [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Build-InstalledModMap {
@@ -104,22 +182,25 @@ function Build-InstalledModMap {
     )
 
     $map = @{}
+
+    # A missing Mods directory is valid for a first-time deploy. Deploy-Project
+    # will create the target directories when actual copying begins.
     if (-not (Test-Path -LiteralPath $InstalledModsRoot -PathType Container)) {
-        throw "Installed mods directory not found: $InstalledModsRoot"
+        return $map
     }
 
-    Get-ChildItem -LiteralPath $InstalledModsRoot -Directory | ForEach-Object {
-        $infoJsonPath = Join-Path $_.FullName "info.json"
-        $harmonyId = Get-HarmonyIdFromInfoJson -InfoJsonPath $infoJsonPath
+    foreach ($installedDirectory in Get-ChildItem -LiteralPath $InstalledModsRoot -Directory) {
+        $infoJsonPath = Join-Path $installedDirectory.FullName "info.json"
+        $harmonyId = Get-HarmonyIdFromInfoJson -InfoJsonPath $infoJsonPath -AllowInvalid
         if ([string]::IsNullOrWhiteSpace($harmonyId)) {
-            return
+            continue
         }
 
         if ($map.ContainsKey($harmonyId)) {
-            throw "Duplicate deployed HarmonyID '$harmonyId' found in '$($_.FullName)' and '$($map[$harmonyId])'."
+            throw "Duplicate deployed HarmonyID '$harmonyId' found in '$($installedDirectory.FullName)' and '$($map[$harmonyId])'."
         }
 
-        $map[$harmonyId] = $_.FullName
+        $map[$harmonyId] = $installedDirectory.FullName
     }
 
     return $map
@@ -146,13 +227,80 @@ function Resolve-DeployTargetDir {
         return $InstalledModMap[$HarmonyId]
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($Project.DeployFolderName)) {
-        return Join-Path $InstalledModsRoot $Project.DeployFolderName
+    $folderName = if (-not [string]::IsNullOrWhiteSpace($Project.DeployFolderName)) {
+        $Project.DeployFolderName
+    }
+    else {
+        $Project.ModName
     }
 
-    # A first-time deploy should be as complete as an update deploy.  Use the project ModName
-    # when no existing HarmonyID-matched install supplies a custom folder name.
-    return Join-Path $InstalledModsRoot $Project.ModName
+    $candidate = Join-Path $InstalledModsRoot $folderName
+
+    # If the preferred first-time folder already belongs to a different HarmonyID,
+    # fail closed instead of overwriting an unrelated installed mod.
+    if (Test-Path -LiteralPath $candidate -PathType Container) {
+        $candidateInfoPath = Join-Path $candidate "info.json"
+        $candidateHarmonyId = Get-HarmonyIdFromInfoJson -InfoJsonPath $candidateInfoPath -AllowInvalid
+
+        if (-not [string]::IsNullOrWhiteSpace($candidateHarmonyId) -and
+            -not [string]::Equals($candidateHarmonyId, $HarmonyId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Deploy target collision: '$candidate' belongs to HarmonyID '$candidateHarmonyId', not '$HarmonyId'."
+        }
+    }
+
+    return $candidate
+}
+
+function Resolve-ProjectBuildOrder {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Projects
+    )
+
+    $projectMap = @{}
+    foreach ($project in $Projects) {
+        $projectMap[$project.ProjectPath] = $project
+    }
+
+    $remaining = @($Projects)
+    $ordered = @()
+    $completed = @{}
+
+    while ($remaining.Count -gt 0) {
+        $ready = @(
+            $remaining |
+                Where-Object {
+                    $project = $_
+                    $blocked = $false
+
+                    foreach ($referencePath in @($project.ProjectReferences)) {
+                        if ($projectMap.ContainsKey($referencePath) -and -not $completed.ContainsKey($referencePath)) {
+                            $blocked = $true
+                            break
+                        }
+                    }
+
+                    -not $blocked
+                } |
+                Sort-Object ProjectPath
+        )
+
+        if ($ready.Count -eq 0) {
+            $cycleNames = ($remaining | Sort-Object ModName | ForEach-Object { $_.ModName }) -join ", "
+            throw "ProjectReference dependency cycle detected among deployable mods: $cycleNames"
+        }
+
+        $readyMap = @{}
+        foreach ($project in $ready) {
+            $ordered += $project
+            $completed[$project.ProjectPath] = $true
+            $readyMap[$project.ProjectPath] = $true
+        }
+
+        $remaining = @($remaining | Where-Object { -not $readyMap.ContainsKey($_.ProjectPath) })
+    }
+
+    return $ordered
 }
 
 function Build-Project {
@@ -167,13 +315,26 @@ function Build-Project {
 
     $srcDir = Join-Path $Project.ProjectDir "src"
     if (Test-Path -LiteralPath $srcDir -PathType Container) {
-        $sourceInputs += Get-ChildItem -LiteralPath $srcDir -Recurse -File | Where-Object { $_.Extension -eq ".cs" }
+        $sourceInputs += Get-ChildItem -LiteralPath $srcDir -Recurse -File |
+            Where-Object { $_.Extension -eq ".cs" }
+    }
+
+    # Directory.Build.props participates in every project build and can contain
+    # shared compile items, references, and packaging rules.
+    $directoryBuildProps = Join-Path $RepoRoot "Directory.Build.props"
+    if (Test-Path -LiteralPath $directoryBuildProps -PathType Leaf) {
+        $sourceInputs += Get-Item -LiteralPath $directoryBuildProps
+    }
+
+    $directoryBuildTargets = Join-Path $RepoRoot "Directory.Build.targets"
+    if (Test-Path -LiteralPath $directoryBuildTargets -PathType Leaf) {
+        $sourceInputs += Get-Item -LiteralPath $directoryBuildTargets
     }
 
     $latestInput = $sourceInputs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
     Write-Host ("Building {0}" -f $Project.ModName)
-    $artifactRoot = Join-Path $RepoRoot ("artifacts\\mods\\{0}" -f $Configuration)
+    $artifactRoot = Join-Path $RepoRoot ("artifacts\mods\{0}" -f $Configuration)
     & dotnet build $Project.ProjectPath -c $Configuration -t:Rebuild ("-p:ModOutputDir={0}" -f $artifactRoot)
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for $($Project.ProjectPath)"
@@ -190,13 +351,10 @@ function Build-Project {
     }
 }
 
-function Deploy-Project {
+function Get-ArtifactDeploymentInfo {
     param(
         [Parameter(Mandatory = $true)]
-        [pscustomobject]$Project,
-
-        [Parameter(Mandatory = $true)]
-        [hashtable]$InstalledModMap
+        [pscustomobject]$Project
     )
 
     if (-not (Test-Path -LiteralPath $Project.ArtifactDir -PathType Container)) {
@@ -209,15 +367,35 @@ function Deploy-Project {
         throw "Artifact info.json is missing HarmonyID for '$($Project.ModName)': $artifactInfoPath"
     }
 
-    $targetDir = Resolve-DeployTargetDir -Project $Project -HarmonyId $harmonyId -InstalledModMap $InstalledModMap -InstalledModsRoot $DeployRoot
     $sourceDll = Join-Path $Project.ArtifactDir ($Project.AssemblyName + ".dll")
-    $targetDll = Join-Path $targetDir ($Project.AssemblyName + ".dll")
-
     if (-not (Test-Path -LiteralPath $sourceDll -PathType Leaf)) {
         throw "Built DLL not found for '$($Project.ModName)': $sourceDll"
     }
 
+    return [PSCustomObject]@{
+        Project   = $Project
+        HarmonyId = $harmonyId
+        SourceDll = $sourceDll
+    }
+}
+
+function Deploy-Project {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Deployment,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$InstalledModMap
+    )
+
+    $Project = $Deployment.Project
+    $harmonyId = $Deployment.HarmonyId
+    $sourceDll = $Deployment.SourceDll
+
+    $targetDir = $Deployment.TargetDir
+    $targetDll = Join-Path $targetDir ($Project.AssemblyName + ".dll")
     $copiedFiles = 0
+    $preservedConfigs = 0
 
     if (-not (Test-Path -LiteralPath $targetDir -PathType Container)) {
         if ($PSCmdlet.ShouldProcess($targetDir, "Create deploy directory for $($Project.ModName)")) {
@@ -230,18 +408,26 @@ function Deploy-Project {
         $copiedFiles++
     }
 
-    Get-ChildItem -LiteralPath $Project.ArtifactDir -Recurse -File | ForEach-Object {
-        if ($_.FullName -eq $sourceDll) {
-            return
+    foreach ($artifactFile in Get-ChildItem -LiteralPath $Project.ArtifactDir -Recurse -File) {
+        if ([string]::Equals($artifactFile.FullName, $sourceDll, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
         }
 
-        if ([string]::Equals($_.Extension, ".pdb", [System.StringComparison]::OrdinalIgnoreCase)) {
-            return
+        if ([string]::Equals($artifactFile.Extension, ".pdb", [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
         }
 
-        $relativePath = Get-RelativePath -BasePath $Project.ArtifactDir -ChildPath $_.FullName
+        $relativePath = Get-RelativePath -BasePath $Project.ArtifactDir -ChildPath $artifactFile.FullName
         $targetPath = Join-Path $targetDir $relativePath
         $targetPathParent = Split-Path -Parent $targetPath
+
+        if ((Test-IsUserConfigFile -Path $artifactFile.FullName) -and
+            -not $OverwriteConfig -and
+            (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+            Write-Host ("Preserving existing config for {0}: {1}" -f $Project.ModName, $targetPath)
+            $preservedConfigs++
+            continue
+        }
 
         if (-not (Test-Path -LiteralPath $targetPathParent -PathType Container)) {
             if ($PSCmdlet.ShouldProcess($targetPathParent, "Create directory for $relativePath")) {
@@ -249,14 +435,27 @@ function Deploy-Project {
             }
         }
 
-        if ($PSCmdlet.ShouldProcess($targetPath, "Update from $($_.FullName)")) {
-            Copy-Item -LiteralPath $_.FullName -Destination $targetPath -Force
+        if ($PSCmdlet.ShouldProcess($targetPath, "Update from $($artifactFile.FullName)")) {
+            Copy-Item -LiteralPath $artifactFile.FullName -Destination $targetPath -Force
             $copiedFiles++
         }
     }
 
+    # Keep this map current during the run. This matters for first-time deploys and
+    # also prevents later projects from accidentally treating the same HarmonyID as new.
+    if (-not $WhatIfPreference) {
+        $InstalledModMap[$harmonyId] = $targetDir
+    }
+
     $statusLabel = if ($WhatIfPreference) { "Prepared deploy" } else { "Deployed" }
-    Write-Host ("{0} {1} -> {2} ({3} copied)" -f $statusLabel, $Project.ModName, $targetDir, $copiedFiles)
+    $configSuffix = if ($preservedConfigs -gt 0) {
+        ", $preservedConfigs config preserved"
+    }
+    else {
+        ""
+    }
+
+    Write-Host ("{0} {1} -> {2} ({3} copied{4})" -f $statusLabel, $Project.ModName, $targetDir, $copiedFiles, $configSuffix)
 }
 
 $modsRoot = Join-Path $RepoRoot "mods"
@@ -264,8 +463,9 @@ if (-not (Test-Path -LiteralPath $modsRoot -PathType Container)) {
     throw "Mods directory not found: $modsRoot"
 }
 
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    throw "dotnet was not found in PATH."
+# A build requires dotnet; a pure -SkipBuild deploy does not.
+if (-not $SkipBuild -and -not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+    throw "dotnet was not found in PATH. Install the .NET SDK, or use -SkipBuild with existing artifacts."
 }
 
 $projects = Get-ChildItem -LiteralPath $modsRoot -Recurse -Filter *.csproj |
@@ -278,6 +478,9 @@ if (-not $projects) {
     throw "No deployable mod projects were found under $modsRoot"
 }
 
+$projects = @(Resolve-ProjectBuildOrder -Projects @($projects))
+Write-Host ("Found {0} deployable mod projects." -f @($projects).Count)
+
 $installedModMap = Build-InstalledModMap -InstalledModsRoot $DeployRoot
 
 if (-not $SkipBuild) {
@@ -286,6 +489,49 @@ if (-not $SkipBuild) {
     }
 }
 
+# Preflight every artifact before copying anything. This avoids a partial deploy
+# caused by a missing/invalid artifact discovered only halfway through the run.
+$deployments = @()
+$packagedHarmonyIds = @{}
+
 foreach ($project in $projects) {
-    Deploy-Project -Project $project -InstalledModMap $installedModMap
+    $deployment = Get-ArtifactDeploymentInfo -Project $project
+
+    if ($packagedHarmonyIds.ContainsKey($deployment.HarmonyId)) {
+        $otherProject = $packagedHarmonyIds[$deployment.HarmonyId]
+        throw "Duplicate packaged HarmonyID '$($deployment.HarmonyId)' found in '$($otherProject.ModName)' and '$($project.ModName)'."
+    }
+
+    $packagedHarmonyIds[$deployment.HarmonyId] = $project
+    $deployments += $deployment
+}
+
+# Resolve and validate every target before the first copy. This catches folder-name
+# collisions up front rather than leaving a half-updated live Mods directory.
+$resolvedDeployments = @()
+$targetPathMap = @{}
+
+foreach ($deployment in $deployments) {
+    $targetDir = Resolve-DeployTargetDir `
+        -Project $deployment.Project `
+        -HarmonyId $deployment.HarmonyId `
+        -InstalledModMap $installedModMap `
+        -InstalledModsRoot $DeployRoot
+
+    if ($targetPathMap.ContainsKey($targetDir)) {
+        $otherDeployment = $targetPathMap[$targetDir]
+        throw "Multiple packaged mods resolve to the same deploy directory '$targetDir': '$($otherDeployment.Project.ModName)' and '$($deployment.Project.ModName)'."
+    }
+
+    $targetPathMap[$targetDir] = $deployment
+    $resolvedDeployments += [PSCustomObject]@{
+        Project   = $deployment.Project
+        HarmonyId = $deployment.HarmonyId
+        SourceDll = $deployment.SourceDll
+        TargetDir = $targetDir
+    }
+}
+
+foreach ($deployment in $resolvedDeployments) {
+    Deploy-Project -Deployment $deployment -InstalledModMap $installedModMap
 }
