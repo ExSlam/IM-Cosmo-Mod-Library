@@ -63,12 +63,13 @@ Idol Manager\BepInEx\core\0Harmony.dll
 
 ## Mods Included
 
-The repository currently contains 20 buildable mod projects.
+The repository currently contains 23 buildable mod projects.
 
 ### Gameplay and Interface Mods
 
 * [Assistant Manager](mods/Assistant%20Manager/) - Adds Assistant Manager Offices and allows Assistant Managers to share eligible office work with the Producer.
 * [Cheats Mod](mods/Cheats%20Mod/) - Adds configurable cheat and testing actions to the Mod Buttons Action Hub.
+* [Faster Skip Dialogue](mods/Faster%20Skip%20Dialogue/) - Makes the vanilla VN Skip button rapidly advance dialogue and accelerate dialogue transitions while pausing normally at choices.
 * [Graduation Calendar](mods/Graduation%20Calendar/) - Shows idol graduation dates in Extras and adds a graduation calendar popup.
 * [Graduation Details](mods/Graduation%20Details/) - Adds a graduated-idol details popup containing career earnings, singles, marriage information, and other history.
 * [Graduation Rebalances](mods/Graduation%20Rebalances/) - Pushes graduation dates back for qualifying high-performing idols.
@@ -87,8 +88,10 @@ The repository currently contains 20 buildable mod projects.
 ### Bug Fixes and Compatibility Mods
 
 * [Clinic Recovery Priority Fix](mods/Clinic%20Recovery%20Priority%20Fix/) - Makes automated clinics claim eligible low-stamina idols before competing auto-practice rooms.
+* [Dialogue Click Race Fix](mods/Dialogue%20Click%20Race%20Fix/) - Prevents late dialogue clicks during the closing window from triggering null-node dialogue traversal errors.
 * [Divorce Fix](mods/Divorce%20Fix/) - Clears stale marriage state after divorce events so affected idols can flirt again.
 * [Room Assignment Fix](mods/Room%20Assignment%20Fix/) - Prevents manual and automatic room assignment from placing one idol in multiple rooms or tasks at once.
+* [Save Write Ordering Fix](mods/Save%20Write%20Ordering%20Fix/) - Prevents older same-slot save operations from overwriting newer save requests and provides coordination APIs for cooperating persistence mods.
 * [Show Cast Assignment Fix](mods/Show%20Cast%20Assignment%20Fix/) - Prevents one idol from occupying multiple permanent-cast slots in radio, internet, and television shows.
 * [Singles Marketing Checkbox Fix](mods/Singles%20Marketing%20Checkbox%20Fix/) - Keeps the Marketing checklist row visible for in-development singles when no marketing campaign was selected.
 * [Staff Firing Freeze Fix](mods/Staff%20Firing%20Freeze%20Fix/) - Prevents room and business-proposal state from becoming stuck when busy staff members are fired.
