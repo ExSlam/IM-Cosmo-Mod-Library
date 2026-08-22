@@ -769,7 +769,7 @@ TextTotalLoanCount=总贷款数
 TextTotalLoanPaymentPerWeek=每周支付贷款总额
 TextTriggeredDialogue=触发的剧情事件
 TextVocalPoints=演唱点数
-TextWaitStaffCount=已分配服务偶像数
+TextWaitStaffCount=服务员人数
 TextWarningUsed=已触发绯闻警告事件
 TextWorkingStaffCount=工作中的员工计数
 TextRelationshipUnknownToProducer=制作人不知晓关系。
@@ -1076,3 +1076,18 @@ CodeLabel.youngadult=青年
 CodeLabel.producer=制作人
 CodeLabel.show_configuration_changed=节目配置已更改
 CodeLabel.song=歌曲
+
+# 补充与英语键一致的翻译。
+TitleConcertSetlist=演唱会歌单
+TitleConcertCardsUsed=已使用的卡片
+TitleConcertDisasters=事故
+TextTalkBreak=谈话环节 #
+TextCenterIdol=C位
+TextMcs=主持人
+TextFanSatisfaction=粉丝满意度
+TextSales=销量
+TextStaminaPoints=体力
+TextSkillValue=技能值
+TextNoConcertCardsUsed=未使用任何卡片。
+TextNoConcertDisasters=未发生任何事故。
+TextIdolGraduationOutcome=毕业后
