@@ -303,6 +303,91 @@ function Resolve-ProjectBuildOrder {
     return $ordered
 }
 
+function Get-FileSha256 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Assert-ArtifactAssetsMatchSource {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Project
+    )
+
+    $assetsDir = Join-Path $Project.ProjectDir "assets"
+    if (-not (Test-Path -LiteralPath $assetsDir -PathType Container)) {
+        return
+    }
+
+    $sourceFiles = @(
+        Get-ChildItem -LiteralPath $assetsDir -Recurse -File |
+            Sort-Object FullName
+    )
+
+    $sourceRelativePaths = @{}
+    foreach ($sourceFile in $sourceFiles) {
+        $relativePath = Get-RelativePath -BasePath $assetsDir -ChildPath $sourceFile.FullName
+        $sourceRelativePaths[$relativePath] = $sourceFile.FullName
+
+        $artifactPath = Join-Path $Project.ArtifactDir $relativePath
+        if (-not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) {
+            throw "Packaged asset missing for '$($Project.ModName)': $relativePath"
+        }
+
+        $sourceHash = Get-FileSha256 -Path $sourceFile.FullName
+        $artifactHash = Get-FileSha256 -Path $artifactPath
+        if (-not [string]::Equals($sourceHash, $artifactHash, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Packaged asset is stale for '$($Project.ModName)': $relativePath"
+        }
+    }
+
+    # The artifact directory should contain exactly the current assets plus the
+    # compiled DLL/PDB. Anything else is stale packaging residue and should fail
+    # the build rather than being deployed silently.
+    foreach ($artifactFile in Get-ChildItem -LiteralPath $Project.ArtifactDir -Recurse -File) {
+        $relativePath = Get-RelativePath -BasePath $Project.ArtifactDir -ChildPath $artifactFile.FullName
+        $expectedDllName = $Project.AssemblyName + ".dll"
+        $expectedPdbName = $Project.AssemblyName + ".pdb"
+
+        if ([string]::Equals($relativePath, $expectedDllName, [System.StringComparison]::OrdinalIgnoreCase) -or
+            [string]::Equals($relativePath, $expectedPdbName, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        if (-not $sourceRelativePaths.ContainsKey($relativePath)) {
+            throw "Stale packaged asset found for '$($Project.ModName)': $relativePath"
+        }
+    }
+}
+
+function Remove-LegacyProjectArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Project
+    )
+
+    # Older invocations sometimes passed a relative ModOutputDir, which created
+    # project-local trees such as mods/Cheats Mod/artifacts/mods/Release/....
+    # They are generated output, not source, and can easily be mistaken for the
+    # canonical repository-level artifacts directory.
+    $legacyArtifactDir = Join-Path $Project.ProjectDir ("artifacts\mods\{0}\{1}" -f $Configuration, $Project.ModName)
+    $legacyArtifactDir = [System.IO.Path]::GetFullPath($legacyArtifactDir)
+    $canonicalArtifactDir = [System.IO.Path]::GetFullPath($Project.ArtifactDir)
+
+    if ([string]::Equals($legacyArtifactDir, $canonicalArtifactDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return
+    }
+
+    if (Test-Path -LiteralPath $legacyArtifactDir -PathType Container) {
+        Write-Host ("Removing legacy project-local artifact for {0}: {1}" -f $Project.ModName, $legacyArtifactDir)
+        Remove-Item -LiteralPath $legacyArtifactDir -Recurse -Force
+    }
+}
+
 function Build-Project {
     param(
         [Parameter(Mandatory = $true)]
@@ -317,6 +402,11 @@ function Build-Project {
     if (Test-Path -LiteralPath $srcDir -PathType Container) {
         $sourceInputs += Get-ChildItem -LiteralPath $srcDir -Recurse -File |
             Where-Object { $_.Extension -eq ".cs" }
+    }
+
+    $assetsDir = Join-Path $Project.ProjectDir "assets"
+    if (Test-Path -LiteralPath $assetsDir -PathType Container) {
+        $sourceInputs += Get-ChildItem -LiteralPath $assetsDir -Recurse -File
     }
 
     # Directory.Build.props participates in every project build and can contain
@@ -335,6 +425,16 @@ function Build-Project {
 
     Write-Host ("Building {0}" -f $Project.ModName)
     $artifactRoot = Join-Path $RepoRoot ("artifacts\mods\{0}" -f $Configuration)
+
+    Remove-LegacyProjectArtifact -Project $Project
+
+    # Do not rely on a prior MSBuild Clean having run. Starting from an empty
+    # per-mod artifact directory guarantees removed/renamed localization files
+    # cannot survive a rebuild as stale deployable content.
+    if (Test-Path -LiteralPath $Project.ArtifactDir -PathType Container) {
+        Remove-Item -LiteralPath $Project.ArtifactDir -Recurse -Force
+    }
+
     & dotnet build $Project.ProjectPath -c $Configuration -t:Rebuild ("-p:ModOutputDir={0}" -f $artifactRoot)
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for $($Project.ProjectPath)"
@@ -349,6 +449,7 @@ function Build-Project {
     if ($null -ne $latestInput -and $artifactDllItem.LastWriteTime -lt $latestInput.LastWriteTime) {
         throw ("Artifact DLL for '{0}' is older than the latest source input. DLL: {1:yyyy-MM-dd HH:mm:ss}, Source: {2:yyyy-MM-dd HH:mm:ss} ({3})" -f $Project.ModName, $artifactDllItem.LastWriteTime, $latestInput.LastWriteTime, $latestInput.FullName)
     }
+
 }
 
 function Get-ArtifactDeploymentInfo {
@@ -360,6 +461,10 @@ function Get-ArtifactDeploymentInfo {
     if (-not (Test-Path -LiteralPath $Project.ArtifactDir -PathType Container)) {
         throw "Artifact directory not found for '$($Project.ModName)': $($Project.ArtifactDir)"
     }
+
+    # Validate packaged assets even under -SkipBuild. A skip-build deploy must not
+    # silently ship localization or other assets that no longer match the source tree.
+    Assert-ArtifactAssetsMatchSource -Project $Project
 
     $artifactInfoPath = Join-Path $Project.ArtifactDir "info.json"
     $harmonyId = Get-HarmonyIdFromInfoJson -InfoJsonPath $artifactInfoPath

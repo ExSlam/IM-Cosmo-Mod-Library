@@ -71,7 +71,14 @@
   </Target>
 
   <Target Name="CopyModArtifacts" AfterTargets="Build" Condition="'$(ModName)' != '' and '$(ModOutputDir)' != ''">
-    <MakeDir Directories="$(ModOutputDir)\$(ModName)" Condition="!Exists('$(ModOutputDir)\$(ModName)')" />
+    <!--
+      Recreate the per-mod package on every packaging pass, not only on Clean.
+      This prevents deleted/renamed assets (especially localization strings) from
+      surviving an incremental Build as stale deployable files.
+    -->
+    <RemoveDir Directories="$(ModOutputDir)\$(ModName)" Condition="Exists('$(ModOutputDir)\$(ModName)')" />
+    <MakeDir Directories="$(ModOutputDir)\$(ModName)" />
+
     <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(ModOutputDir)\$(ModName)\$(AssemblyName).dll" />
     <Copy
       SourceFiles="$(TargetDir)$(AssemblyName).pdb"
