@@ -814,12 +814,21 @@ namespace IMDataCore
                 errorMessage = "A physical vanilla save scope is required.";
                 return false;
             }
+            if (!PersistenceTopologyLock.IsReadLockHeld &&
+                !PersistenceTopologyLock.IsWriteLockHeld)
+            {
+                errorMessage =
+                    "The IMDC persistence topology lease must be held while initializing physical storage.";
+                return false;
+            }
 
             // Scavenge only temporary files derived from this exact sidecar name.
-            // Do it under the per-path I/O lock, before taking storageLock, so the
-            // lock order stays consistent with persistence/background compaction.
-            // Fresh files are retained for 24 hours to avoid interfering with an
-            // unusual concurrent process that may still own them.
+            // The controller holds the process-wide topology read lease across the
+            // entire Initialize/install handoff. Do not reacquire that non-recursive
+            // ReaderWriterLockSlim here; only take the per-path I/O lock before
+            // storageLock so the ordering stays consistent with persistence/background
+            // compaction. Fresh files are retained for 24 hours to avoid interfering
+            // with an unusual concurrent process that may still own them.
             string scavengeSidecarPath;
             string scavengeValidationError;
             if (CorePaths.TryValidateContainedMutationPath(
@@ -828,14 +837,11 @@ namespace IMDataCore
                     out scavengeSidecarPath,
                     out scavengeValidationError))
             {
-                using (AcquirePersistenceTopologyReadLease())
+                object pathIoLock = GetPersistenceIoLock(scavengeSidecarPath);
+                lock (pathIoLock)
                 {
-                    object pathIoLock = GetPersistenceIoLock(scavengeSidecarPath);
-                    lock (pathIoLock)
-                    {
-                        ScavengeAbandonedTemporaryFilesForScope(
-                            scavengeSidecarPath);
-                    }
+                    ScavengeAbandonedTemporaryFilesForScope(
+                        scavengeSidecarPath);
                 }
             }
 
