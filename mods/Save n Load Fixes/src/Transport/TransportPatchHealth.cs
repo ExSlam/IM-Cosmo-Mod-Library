@@ -52,7 +52,7 @@ namespace SaveNLoadFixes.Transport
             }
         }
 
-        internal static void ReportCaller(
+        internal static bool ReportCaller(
             TransportPatchSurface surface,
             string callerIdentity,
             int matchingCallSites,
@@ -72,7 +72,9 @@ namespace SaveNLoadFixes.Transport
 
             lock (SyncRoot)
             {
+                bool wasProviderActivated = providerActivated;
                 SurfaceState state = States[surface];
+                state.PendingOpaqueCallers.Remove(callerIdentity);
                 state.CallerCallSiteCounts[callerIdentity] = matchingCallSites;
                 if (matchingCallSites != expectedMatchingCallSites)
                 {
@@ -80,6 +82,7 @@ namespace SaveNLoadFixes.Transport
                 }
 
                 providerActivated = AreAllSurfacesHealthyLocked();
+                return !wasProviderActivated && providerActivated;
             }
         }
 
@@ -89,6 +92,39 @@ namespace SaveNLoadFixes.Transport
             {
                 States[surface].SawFailure = true;
                 providerActivated = false;
+            }
+        }
+
+        /// <summary>
+        /// HarmonyX can initially run or re-run a transpiler against an opaque
+        /// intermediate body in which neither the original generic call nor the final
+        /// replacement is visible. This observation is deliberately neutral: it can
+        /// neither establish caller health nor permanently poison a later exact pass.
+        /// If no exact pass follows, the missing caller keeps authority disabled.
+        /// </summary>
+        internal static void ReportOpaqueRecomposition(
+            TransportPatchSurface surface,
+            string callerIdentity,
+            int expectedMatchingCallSites)
+        {
+            if (string.IsNullOrEmpty(callerIdentity) || expectedMatchingCallSites < 0)
+            {
+                throw new ArgumentException(
+                    "Opaque transport observations require a caller identity and a non-negative expected count.",
+                    nameof(callerIdentity));
+            }
+
+            lock (SyncRoot)
+            {
+                SurfaceState state = States[surface];
+                int priorMatchingCallSites;
+                if (!state.CallerCallSiteCounts.TryGetValue(
+                        callerIdentity,
+                        out priorMatchingCallSites) ||
+                    priorMatchingCallSites != expectedMatchingCallSites)
+                {
+                    state.PendingOpaqueCallers.Add(callerIdentity);
+                }
             }
         }
 
@@ -204,6 +240,8 @@ namespace SaveNLoadFixes.Transport
         {
             internal readonly Dictionary<string, int> CallerCallSiteCounts =
                 new Dictionary<string, int>(StringComparer.Ordinal);
+            internal readonly HashSet<string> PendingOpaqueCallers =
+                new HashSet<string>(StringComparer.Ordinal);
             internal bool SawFailure;
         }
     }

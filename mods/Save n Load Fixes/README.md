@@ -14,11 +14,19 @@ table. This preserves the exact finite message/reply tree after load even though
 vanilla's compiled `_message.Replies` schema is recursive. The vanilla field remains
 in the vanilla JSON for compatibility without SNLF, so Unity may still print its
 schema-depth warning; exact SNLF restoration no longer depends on the truncated
-recursive representation.
+recursive representation. After the complete envelope passes its strict serialization
+round trip, SNLF logs `SNS Fix successfully serialized`; after an adopted checkpoint is
+validated and reconstructed, it logs `SNS Fix successfully deserialized and restored`.
+These messages identify the independent exact SNS path without claiming that Unity's
+compatibility warning itself was suppressed.
 
 The embedded transport and standalone SWOF paths are also Harmony-recomposition
 safe: each accepts its own complete exact replacement shape on re-entry while still
-rejecting mixed, partial, or duplicate call-site shapes.
+rejecting mixed, partial, or duplicate call-site shapes. HarmonyX's opaque `0/0`
+intermediate observations are neutral and pending: they cannot establish authority or
+poison a later exact composition. SNLF logs one positive transport self-check only when
+all 5 SavedData writers, 7 readers / 8 read sites, and both GlobalData callers have
+reported their complete exact shapes.
 
 Post-0.52 runtime qualification fix: A14's Harmony bookkeeping and activities-delay
 transpiler are re-entry-safe when HarmonyX recomposes the generated tutorial iterator.

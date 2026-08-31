@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using SaveNLoadFixes.Repairs;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -84,6 +85,9 @@ namespace SaveNLoadFixes.Persistence
             checkpointId = envelope.checkpoint_id;
             Interlocked.Increment(ref frozenCheckpointCount);
             SetDiagnostic("Frozen one SavedData request with SNLF checkpoint " + checkpointId + ".");
+            SnsMessageRepair.ReportSerializedCheckpointSuccess(
+                checkpointId,
+                envelope.records.sns_message_nodes.Count);
             return true;
         }
 

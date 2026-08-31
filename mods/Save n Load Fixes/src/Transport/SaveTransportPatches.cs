@@ -10,6 +10,8 @@ namespace SaveNLoadFixes.Transport
 {
     internal static class TransportPatchHelpers
     {
+        private const int OpaqueRecomposition = -1;
+
         internal static string BuildCallerIdentity(MethodBase method)
         {
             if (method == null)
@@ -199,6 +201,14 @@ namespace SaveNLoadFixes.Transport
                 return expectedCount;
             }
 
+            if (vanillaCount == 0 && replacementCount == 0)
+            {
+                // HarmonyX can briefly expose neither call during an initial or later
+                // recomposition. The health ledger treats this sentinel as pending;
+                // it can never establish authority or poison a later exact result.
+                return OpaqueRecomposition;
+            }
+
             Debug.LogWarning(
                 SaveNLoadFixesConstants.LogPrefix +
                 "Rejected a mixed or partial transport shape in " +
@@ -217,9 +227,23 @@ namespace SaveNLoadFixes.Transport
             int replacedCount,
             int expectedCount)
         {
-            TransportPatchHealth.ReportCaller(
+            string callerIdentity = BuildCallerIdentity(originalMethod);
+            if (replacedCount == OpaqueRecomposition)
+            {
+                // HarmonyX can expose an empty/opaque intermediate before the exact
+                // composed body. Record no success and no failure. A later complete
+                // observation must still account for this caller before authority can
+                // activate; if it never arrives, the provider remains fail-closed.
+                TransportPatchHealth.ReportOpaqueRecomposition(
+                    surface,
+                    callerIdentity,
+                    expectedCount);
+                return;
+            }
+
+            bool providerActivated = TransportPatchHealth.ReportCaller(
                 surface,
-                BuildCallerIdentity(originalMethod),
+                callerIdentity,
                 replacedCount,
                 expectedCount);
 
@@ -234,6 +258,14 @@ namespace SaveNLoadFixes.Transport
                     " but found " +
                     replacedCount.ToString(CultureInfo.InvariantCulture) +
                     ". Embedded transport health is not authoritative.");
+            }
+            else if (providerActivated)
+            {
+                Debug.Log(
+                    SaveNLoadFixesConstants.LogPrefix +
+                    "Embedded ordered transport self-check passed: 5/5 SavedData write callers, " +
+                    "7/7 SavedData read callers (8 call sites), and 1/1 GlobalData write/read callers. " +
+                    "SNLF is the authoritative save transport.");
             }
         }
     }

@@ -139,6 +139,22 @@ namespace SaveNLoadFixes.Repairs
             return true;
         }
 
+        /// <summary>
+        /// Called only after the complete repair envelope has serialized, passed its
+        /// strict value round trip, and been injected into the frozen vanilla payload.
+        /// This deliberately follows Unity's possible recursive-schema warning so the
+        /// log states whether SNLF's independent non-recursive SNS payload succeeded.
+        /// </summary>
+        internal static void ReportSerializedCheckpointSuccess(
+            string checkpointId,
+            int messageCount)
+        {
+            lastDiagnostic = "SNS Fix successfully serialized " + messageCount +
+                " SNS message(s) into the non-recursive exact-state payload for SNLF checkpoint " +
+                checkpointId + ". Unity's recursive SNS depth warning does not affect this payload.";
+            Debug.Log(SaveNLoadFixesConstants.LogPrefix + lastDiagnostic);
+        }
+
         internal static void RestoreAfterVanillaLoad(SNS_Manager manager)
         {
             SaveManager.SavedData target = GetTargetSavedData();
@@ -195,8 +211,11 @@ namespace SaveNLoadFixes.Repairs
 
             Interlocked.Increment(ref restoredLoadCount);
             Interlocked.Add(ref restoredNodeCount, envelopeRecords.sns_message_nodes.Count);
-            lastDiagnostic = "Restored exact SNS state for SNLF checkpoint " +
+            lastDiagnostic = "SNS Fix successfully deserialized and restored " +
+                envelopeRecords.sns_message_nodes.Count +
+                " SNS message(s) from SNLF checkpoint " +
                 state.Envelope.checkpoint_id + ".";
+            Debug.Log(SaveNLoadFixesConstants.LogPrefix + lastDiagnostic);
 
             try
             {
