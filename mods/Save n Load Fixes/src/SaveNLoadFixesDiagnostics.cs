@@ -1593,6 +1593,51 @@ namespace SaveNLoadFixes
             get { return RepairEnvelopeTransport.LastDiagnostic; }
         }
 
+        public static bool SnsMessageExactStateRepairImplemented
+        {
+            get { return SnsMessageRepair.IsImplemented; }
+        }
+
+        public static long SnsMessageCapturedCheckpointCount
+        {
+            get { return SnsMessageRepair.CapturedCheckpointCount; }
+        }
+
+        public static long SnsMessageCapturedNodeCount
+        {
+            get { return SnsMessageRepair.CapturedNodeCount; }
+        }
+
+        public static long SnsMessageRestoredLoadCount
+        {
+            get { return SnsMessageRepair.RestoredLoadCount; }
+        }
+
+        public static long SnsMessageRestoredNodeCount
+        {
+            get { return SnsMessageRepair.RestoredNodeCount; }
+        }
+
+        public static long SnsMessageLegacySectionAbsentCount
+        {
+            get { return SnsMessageRepair.LegacySectionAbsentCount; }
+        }
+
+        public static long SnsMessageInvalidSectionCount
+        {
+            get { return SnsMessageRepair.InvalidSectionCount; }
+        }
+
+        public static long SnsMessageAssociationMissingCount
+        {
+            get { return SnsMessageRepair.AssociationMissingCount; }
+        }
+
+        public static string LastSnsMessageDiagnostic
+        {
+            get { return SnsMessageRepair.LastDiagnostic; }
+        }
+
         public static bool RoomSubstorySceneRepairImplemented
         {
             get { return RoomSubstorySceneRepair.IsImplemented; }

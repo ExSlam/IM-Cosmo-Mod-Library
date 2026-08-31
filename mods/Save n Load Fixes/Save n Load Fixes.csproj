@@ -57,6 +57,8 @@
     <Compile Include="src\Repairs\AwardTempNominationRepairPatches.cs" />
     <Compile Include="src\Repairs\ExternalPortraitIdentityRepair.cs" />
     <Compile Include="src\Repairs\ExternalPortraitIdentityRepairPatches.cs" />
+    <Compile Include="src\Repairs\SnsMessageRepair.cs" />
+    <Compile Include="src\Repairs\SnsMessageRepairPatches.cs" />
     <Compile Include="src\Repairs\LegacyMigrationDeterminism.cs" />
     <Compile Include="src\Repairs\LegacyIdolProfileMigration.cs" />
     <Compile Include="src\Repairs\LegacyIdolProfileMigrationPatches.cs" />

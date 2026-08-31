@@ -4,6 +4,11 @@
 
 Fixes vanilla same-path save ordering races. This cumulative development 1.4 build preserves the complete 1.3 career transport, adds ordered `GlobalData` write/read coverage, and now delegates transport coordination to authoritative Save n Load Fixes when both mods are installed.
 
+Post-1.4.5 runtime qualification makes every transport transpiler idempotent under
+HarmonyX recomposition. SWOF now distinguishes a complete already-installed local
+replacement from an untouched vanilla call and from authoritative SNLF delegation;
+mixed, partial, duplicate, or changed shapes still fail closed.
+
 ## Important: 1.4.0-dev.5 retains the Mono-safe 1.3 architecture
 
 Do not use 1.0.0 or 1.0.1.

@@ -117,6 +117,100 @@ namespace SaveNLoadFixes.Transport
                    calledMethod.ReturnType == dataType;
         }
 
+        internal static bool IsExactStaticCall(
+            CodeInstruction instruction,
+            MethodInfo expectedMethod)
+        {
+            MethodInfo calledMethod = instruction == null
+                ? null
+                : instruction.operand as MethodInfo;
+
+            if (calledMethod == null || expectedMethod == null ||
+                instruction.opcode != OpCodes.Call ||
+                calledMethod.DeclaringType != expectedMethod.DeclaringType ||
+                !string.Equals(calledMethod.Name, expectedMethod.Name, StringComparison.Ordinal) ||
+                calledMethod.ReturnType != expectedMethod.ReturnType)
+            {
+                return false;
+            }
+
+            ParameterInfo[] calledParameters = calledMethod.GetParameters();
+            ParameterInfo[] expectedParameters = expectedMethod.GetParameters();
+            if (calledParameters.Length != expectedParameters.Length)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < calledParameters.Length; index++)
+            {
+                if (calledParameters[index].ParameterType != expectedParameters[index].ParameterType)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        internal static int RewriteOrRecognize(
+            List<CodeInstruction> instructions,
+            Func<CodeInstruction, bool> isVanillaSite,
+            MethodInfo replacement,
+            int expectedCount,
+            MethodBase originalMethod)
+        {
+            int vanillaCount = 0;
+            int replacementCount = 0;
+
+            for (int index = 0; index < instructions.Count; index++)
+            {
+                CodeInstruction instruction = instructions[index];
+                if (isVanillaSite(instruction))
+                {
+                    vanillaCount++;
+                }
+                else if (IsExactStaticCall(instruction, replacement))
+                {
+                    replacementCount++;
+                }
+            }
+
+            if (vanillaCount == expectedCount && replacementCount == 0)
+            {
+                for (int index = 0; index < instructions.Count; index++)
+                {
+                    if (!isVanillaSite(instructions[index]))
+                    {
+                        continue;
+                    }
+
+                    instructions[index].opcode = OpCodes.Call;
+                    instructions[index].operand = replacement;
+                }
+
+                return expectedCount;
+            }
+
+            if (vanillaCount == 0 && replacementCount == expectedCount)
+            {
+                // HarmonyX can re-enter this transpiler while composing a later mod.
+                // The exact SNLF call shape is already installed, so this is the same
+                // healthy logical interception and must not be wrapped or failed.
+                return expectedCount;
+            }
+
+            Debug.LogWarning(
+                SaveNLoadFixesConstants.LogPrefix +
+                "Rejected a mixed or partial transport shape in " +
+                DescribeMethod(originalMethod) +
+                ": " + vanillaCount.ToString(CultureInfo.InvariantCulture) +
+                " untouched vanilla site(s), " +
+                replacementCount.ToString(CultureInfo.InvariantCulture) +
+                " exact SNLF replacement site(s), expected one complete shape of " +
+                expectedCount.ToString(CultureInfo.InvariantCulture) + ".");
+            return 0;
+        }
+
         internal static void ReportCaller(
             TransportPatchSurface surface,
             MethodBase originalMethod,
@@ -206,21 +300,17 @@ namespace SaveNLoadFixes.Transport
 
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
-            int replacedCount = 0;
-
-            foreach (CodeInstruction instruction in result)
-            {
-                if (!TransportPatchHelpers.IsDataSaverWriteOf(
-                        instruction,
-                        typeof(SaveManager.SavedData)))
+            int replacedCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                delegate(CodeInstruction instruction)
                 {
-                    continue;
-                }
-
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = replacement;
-                replacedCount++;
-            }
+                    return TransportPatchHelpers.IsDataSaverWriteOf(
+                        instruction,
+                        typeof(SaveManager.SavedData));
+                },
+                replacement,
+                1,
+                __originalMethod);
 
             TransportPatchHelpers.ReportCaller(
                 TransportPatchSurface.SavedDataWrite,
@@ -296,21 +386,6 @@ namespace SaveNLoadFixes.Transport
 
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
-            int replacedCount = 0;
-
-            foreach (CodeInstruction instruction in result)
-            {
-                if (!TransportPatchHelpers.IsDataSaverReadOf(
-                        instruction,
-                        typeof(SaveManager.SavedData)))
-                {
-                    continue;
-                }
-
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = replacement;
-                replacedCount++;
-            }
 
             int expectedCount =
                 __originalMethod != null &&
@@ -321,6 +396,18 @@ namespace SaveNLoadFixes.Transport
                     StringComparison.Ordinal)
                     ? 2
                     : 1;
+
+            int replacedCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                delegate(CodeInstruction instruction)
+                {
+                    return TransportPatchHelpers.IsDataSaverReadOf(
+                        instruction,
+                        typeof(SaveManager.SavedData));
+                },
+                replacement,
+                expectedCount,
+                __originalMethod);
 
             TransportPatchHelpers.ReportCaller(
                 TransportPatchSurface.SavedDataRead,
@@ -368,21 +455,17 @@ namespace SaveNLoadFixes.Transport
 
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
-            int replacedCount = 0;
-
-            foreach (CodeInstruction instruction in result)
-            {
-                if (!TransportPatchHelpers.IsDataSaverWriteOf(
-                        instruction,
-                        typeof(SaveManager.GlobalData)))
+            int replacedCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                delegate(CodeInstruction instruction)
                 {
-                    continue;
-                }
-
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = replacement;
-                replacedCount++;
-            }
+                    return TransportPatchHelpers.IsDataSaverWriteOf(
+                        instruction,
+                        typeof(SaveManager.GlobalData));
+                },
+                replacement,
+                1,
+                __originalMethod);
 
             TransportPatchHelpers.ReportCaller(
                 TransportPatchSurface.GlobalDataWrite,
@@ -424,21 +507,17 @@ namespace SaveNLoadFixes.Transport
 
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
-            int replacedCount = 0;
-
-            foreach (CodeInstruction instruction in result)
-            {
-                if (!TransportPatchHelpers.IsDataSaverReadOf(
-                        instruction,
-                        typeof(SaveManager.GlobalData)))
+            int replacedCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                delegate(CodeInstruction instruction)
                 {
-                    continue;
-                }
-
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = replacement;
-                replacedCount++;
-            }
+                    return TransportPatchHelpers.IsDataSaverReadOf(
+                        instruction,
+                        typeof(SaveManager.GlobalData));
+                },
+                replacement,
+                1,
+                __originalMethod);
 
             TransportPatchHelpers.ReportCaller(
                 TransportPatchSurface.GlobalDataRead,

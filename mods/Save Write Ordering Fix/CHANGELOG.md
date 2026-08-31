@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - Harmony recomposition qualification
+
+- Made all four SWOF transport transpilers recognize their own complete exact replacement call shapes when HarmonyX recomposes a caller after initial installation.
+- Kept authoritative SNLF delegation first: a complete SNLF shape remains delegated success, while a complete standalone SWOF shape remains local success.
+- Mixed SNLF/SWOF/vanilla, partial, duplicate, or signature-changed shapes still fail health checks instead of being double-wrapped or treated as authoritative.
+- Both Debug and Release behavior retain caller-level interception only; no constructed `DataSaver<T>` method is patched.
+
 ## 1.4.5 - TX source/static qualification
 
 - Added `Test-TransportCoexistenceSourceQualification.py` to cross-check SWOF, SNLF, and the supplied decompiled Idol Manager source.

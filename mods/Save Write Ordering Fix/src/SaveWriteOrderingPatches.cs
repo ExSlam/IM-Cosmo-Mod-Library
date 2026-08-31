@@ -7,6 +7,72 @@ using Debug = UnityEngine.Debug;
 
 namespace SaveWriteOrderingFix
 {
+    internal static class SaveWriteOrderingInstructionShape
+    {
+        internal static int CountMatches(
+            List<CodeInstruction> instructions,
+            Func<CodeInstruction, bool> predicate)
+        {
+            int count = 0;
+            for (int index = 0; index < instructions.Count; index++)
+            {
+                if (predicate(instructions[index]))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        internal static int CountExactStaticCalls(
+            List<CodeInstruction> instructions,
+            MethodInfo expectedMethod)
+        {
+            int count = 0;
+            for (int index = 0; index < instructions.Count; index++)
+            {
+                CodeInstruction instruction = instructions[index];
+                MethodInfo calledMethod = instruction == null
+                    ? null
+                    : instruction.operand as MethodInfo;
+                if (calledMethod == null || expectedMethod == null ||
+                    instruction.opcode != OpCodes.Call ||
+                    calledMethod.DeclaringType != expectedMethod.DeclaringType ||
+                    !string.Equals(calledMethod.Name, expectedMethod.Name, StringComparison.Ordinal) ||
+                    calledMethod.ReturnType != expectedMethod.ReturnType)
+                {
+                    continue;
+                }
+
+                ParameterInfo[] calledParameters = calledMethod.GetParameters();
+                ParameterInfo[] expectedParameters = expectedMethod.GetParameters();
+                if (calledParameters.Length != expectedParameters.Length)
+                {
+                    continue;
+                }
+
+                bool exact = true;
+                for (int parameterIndex = 0;
+                     parameterIndex < calledParameters.Length;
+                     parameterIndex++)
+                {
+                    if (calledParameters[parameterIndex].ParameterType !=
+                        expectedParameters[parameterIndex].ParameterType)
+                    {
+                        exact = false;
+                        break;
+                    }
+                }
+
+                if (exact)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+
     /// <summary>
     /// Mono-safe save interception.
     ///
@@ -88,9 +154,15 @@ namespace SaveWriteOrderingFix
                 new List<CodeInstruction>(instructions);
 
             int delegatedCount = CountSnlSavedDataWrites(result);
+            int installedCount =
+                SaveWriteOrderingInstructionShape.CountExactStaticCalls(result, replacement);
+            int vanillaCount = SaveWriteOrderingInstructionShape.CountMatches(
+                result,
+                IsSavedDataWrite);
             if (delegatedCount > 0)
             {
-                bool delegatedSuccess = delegatedCount == 1;
+                bool delegatedSuccess = delegatedCount == 1 &&
+                    installedCount == 0 && vanillaCount == 0;
                 SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
                     __originalMethod,
                     delegatedSuccess);
@@ -101,6 +173,22 @@ namespace SaveWriteOrderingFix
                         "Expected exactly one SNLF SavedData transport replacement in " +
                         DescribeMethod(__originalMethod) +
                         " but found " + delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
+
+            if (installedCount > 0)
+            {
+                bool recomposedSuccess = installedCount == 1 && vanillaCount == 0;
+                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                    __originalMethod,
+                    recomposedSuccess);
+                if (!recomposedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Rejected a mixed or partial recomposed SWOF SavedData write shape in " +
+                        DescribeMethod(__originalMethod) + ".");
                 }
                 return result;
             }
@@ -316,9 +404,15 @@ namespace SaveWriteOrderingFix
                     : 1;
 
             int delegatedCount = CountSnlSavedDataReads(result);
+            int installedCount =
+                SaveWriteOrderingInstructionShape.CountExactStaticCalls(result, replacement);
+            int vanillaCount = SaveWriteOrderingInstructionShape.CountMatches(
+                result,
+                IsSavedDataRead);
             if (delegatedCount > 0)
             {
-                if (delegatedCount != expectedCount)
+                if (delegatedCount != expectedCount ||
+                    installedCount != 0 || vanillaCount != 0)
                 {
                     Debug.LogWarning(
                         SaveWriteOrderingConstants.LogPrefix +
@@ -327,6 +421,18 @@ namespace SaveWriteOrderingFix
                         DescribeMethod(__originalMethod) +
                         " but found " + delegatedCount.ToString() +
                         ". SWOF will not install a second read owner in that caller.");
+                }
+                return result;
+            }
+
+            if (installedCount > 0)
+            {
+                if (installedCount != expectedCount || vanillaCount != 0)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Rejected a mixed or partial recomposed SWOF SavedData read shape in " +
+                        DescribeMethod(__originalMethod) + ".");
                 }
                 return result;
             }
@@ -500,9 +606,15 @@ namespace SaveWriteOrderingFix
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
             int delegatedCount = CountSnlGlobalDataWrites(result);
+            int installedCount =
+                SaveWriteOrderingInstructionShape.CountExactStaticCalls(result, replacement);
+            int vanillaCount = SaveWriteOrderingInstructionShape.CountMatches(
+                result,
+                IsGlobalDataWrite);
             if (delegatedCount > 0)
             {
-                bool delegatedSuccess = delegatedCount == 1;
+                bool delegatedSuccess = delegatedCount == 1 &&
+                    installedCount == 0 && vanillaCount == 0;
                 SaveWriteOrderingPatchHealth.ReportGlobalDataWriteCaller(
                     __originalMethod,
                     delegatedSuccess);
@@ -512,6 +624,21 @@ namespace SaveWriteOrderingFix
                         SaveWriteOrderingConstants.LogPrefix +
                         "Expected exactly one SNLF GlobalData write replacement but found " +
                         delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
+
+            if (installedCount > 0)
+            {
+                bool recomposedSuccess = installedCount == 1 && vanillaCount == 0;
+                SaveWriteOrderingPatchHealth.ReportGlobalDataWriteCaller(
+                    __originalMethod,
+                    recomposedSuccess);
+                if (!recomposedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Rejected a mixed or partial recomposed SWOF GlobalData write shape.");
                 }
                 return result;
             }
@@ -644,9 +771,15 @@ namespace SaveWriteOrderingFix
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
             int delegatedCount = CountSnlGlobalDataReads(result);
+            int installedCount =
+                SaveWriteOrderingInstructionShape.CountExactStaticCalls(result, replacement);
+            int vanillaCount = SaveWriteOrderingInstructionShape.CountMatches(
+                result,
+                IsGlobalDataRead);
             if (delegatedCount > 0)
             {
-                bool delegatedSuccess = delegatedCount == 1;
+                bool delegatedSuccess = delegatedCount == 1 &&
+                    installedCount == 0 && vanillaCount == 0;
                 SaveWriteOrderingPatchHealth.ReportGlobalDataReadCaller(
                     __originalMethod,
                     delegatedSuccess);
@@ -656,6 +789,21 @@ namespace SaveWriteOrderingFix
                         SaveWriteOrderingConstants.LogPrefix +
                         "Expected exactly one SNLF GlobalData read replacement but found " +
                         delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
+
+            if (installedCount > 0)
+            {
+                bool recomposedSuccess = installedCount == 1 && vanillaCount == 0;
+                SaveWriteOrderingPatchHealth.ReportGlobalDataReadCaller(
+                    __originalMethod,
+                    recomposedSuccess);
+                if (!recomposedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Rejected a mixed or partial recomposed SWOF GlobalData read shape.");
                 }
                 return result;
             }

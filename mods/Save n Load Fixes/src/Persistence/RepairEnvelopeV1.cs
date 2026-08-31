@@ -135,6 +135,25 @@ namespace SaveNLoadFixes.Persistence
         public int external_portrait_identities_version;
         public List<ExternalPortraitIdentityRecordV1> external_portrait_identities =
             new List<ExternalPortraitIdentityRecordV1>();
+
+        // Unity's vanilla SavedData embeds SNS_Manager._message recursively through
+        // Replies and therefore reaches the serializer's type-layout depth limit.
+        // Keep the exact finite message tree as a flat, non-recursive node table.
+        public int sns_messages_version;
+        public List<SnsMessageNodeRecordV1> sns_message_nodes =
+            new List<SnsMessageNodeRecordV1>();
+    }
+
+
+    [Serializable]
+    internal sealed class SnsMessageNodeRecordV1
+    {
+        public int node_id;
+        public int parent_node_id = -1;
+        public int sibling_ordinal;
+        public int chara;
+        public string user = string.Empty;
+        public string message = string.Empty;
     }
 
 
@@ -717,6 +736,15 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            List<SnsMessageNodeRecordV1> snsMessageNodes;
+            if (!SnsMessageRepair.TryCaptureForEnvelope(
+                    dataToSave,
+                    out snsMessageNodes,
+                    out error))
+            {
+                return false;
+            }
+
             envelope = new RepairEnvelopeV1
             {
                 checkpoint_id = Guid.NewGuid().ToString("D"),
@@ -762,7 +790,9 @@ namespace SaveNLoadFixes.Persistence
                     award_temp_nominations_version = AwardTempNominationRepair.SectionVersion,
                     award_temp_nominations = awardTempNominations,
                     external_portrait_identities_version = ExternalPortraitIdentityRepair.SectionVersion,
-                    external_portrait_identities = externalPortraitIdentities
+                    external_portrait_identities = externalPortraitIdentities,
+                    sns_messages_version = SnsMessageRepair.SectionVersion,
+                    sns_message_nodes = snsMessageNodes
                 }
             };
 

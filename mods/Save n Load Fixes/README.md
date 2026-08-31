@@ -2,6 +2,24 @@
 
 ## Version 0.52.0
 
+Post-0.52 envelope qualification fixes a release-blocking persistence defect: the
+physical v0.52 save could contain only the SNLF header while silently omitting
+`records`. SNLF now writes the finite repair graph independently of Unity's nested
+DTO writer and verifies raw presence plus a complete deserialize/value round trip
+before queueing any repair-dependent save. A header-only root is invalid, never an
+exact empty checkpoint.
+
+SNS state is now part of the same SNLF envelope as a non-recursive ordered node
+table. This preserves the exact finite message/reply tree after load even though
+vanilla's compiled `_message.Replies` schema is recursive. The vanilla field remains
+in the vanilla JSON for compatibility without SNLF, so Unity may still print its
+schema-depth warning; exact SNLF restoration no longer depends on the truncated
+recursive representation.
+
+The embedded transport and standalone SWOF paths are also Harmony-recomposition
+safe: each accepts its own complete exact replacement shape on re-entry while still
+rejecting mixed, partial, or duplicate call-site shapes.
+
 Post-0.52 runtime qualification fix: A14's Harmony bookkeeping and activities-delay
 transpiler are re-entry-safe when HarmonyX recomposes the generated tutorial iterator.
 This prevents a false A14 health failure from vetoing legacy-save `Save As` while retaining
