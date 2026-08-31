@@ -14,6 +14,7 @@ namespace SaveWriteOrderingFix
     {
         internal const string HarmonyId = "com.cosmo.savewriteorderingfix";
         internal const string IMDataCoreHarmonyId = "com.cosmo.imdatacore";
+        internal const string SnlHarmonyId = "com.cosmo.savenloadfixes";
         internal const string GraduationDetailsHarmonyId =
             "com.cosmo.graduationdetails";
 
@@ -33,21 +34,107 @@ namespace SaveWriteOrderingFix
     /// </summary>
     public static class SaveWriteOrderingApi
     {
-        public const string Version = "1.3.0";
+        public const string Version = "1.4.0-dev.5";
 
         /// <summary>
-        /// True only after every known vanilla SavedData write caller has been
-        /// inspected and exactly one DataSaver.saveData&lt;SavedData&gt; call in each
-        /// caller was replaced by the ordered writer. Merely loading this assembly is
-        /// intentionally not enough to make this property true.
+        /// In standalone mode, true only after every known vanilla SavedData write
+        /// caller was intercepted exactly once. When authoritative SNLF is present,
+        /// this compatibility property reports SNLF's effective SavedData health so
+        /// older consumers do not mistake clean delegation for transport failure.
         /// </summary>
         public static bool SavedDataInterceptionHealthy
         {
-            get { return SaveWriteOrderingPatchHealth.IsSavedDataInterceptionHealthy; }
+            get
+            {
+                if (SnlTransportProvider.IsAuthoritative)
+                {
+                    bool delegatedHealth;
+                    return SnlTransportProvider.TryGetSavedDataHealth(out delegatedHealth) &&
+                        delegatedHealth;
+                }
+                return SaveWriteOrderingPatchHealth.IsSavedDataInterceptionHealthy;
+            }
+        }
+
+        /// <summary>
+        /// In standalone mode, true only when the one concrete GlobalData writer and
+        /// one concrete reader were each intercepted exactly once. Under authoritative
+        /// SNLF, reports SNLF's GlobalData health instead of local patch ownership.
+        /// </summary>
+        public static bool GlobalDataInterceptionHealthy
+        {
+            get
+            {
+                if (SnlTransportProvider.IsAuthoritative)
+                {
+                    bool delegatedHealth;
+                    return SnlTransportProvider.TryGetGlobalDataHealth(out delegatedHealth) &&
+                        delegatedHealth;
+                }
+                return SaveWriteOrderingPatchHealth.IsGlobalDataInterceptionHealthy;
+            }
+        }
+
+        /// <summary>
+        /// True when the effective transport provider is healthy across both career
+        /// SavedData and GlobalData. When SNLF is authoritative this reports delegated
+        /// provider health; otherwise it reports SWOF's local caller-level coverage.
+        /// </summary>
+        public static bool EffectiveTransportHealthy
+        {
+            get
+            {
+                if (SnlTransportProvider.IsAuthoritative)
+                {
+                    return SnlTransportProvider.EffectiveTransportHealthy;
+                }
+
+                return SaveWriteOrderingPatchHealth.IsSavedDataInterceptionHealthy &&
+                    SaveWriteOrderingPatchHealth.IsGlobalDataInterceptionHealthy;
+            }
+        }
+
+        /// <summary>
+        /// Returns the Harmony/provider ID that actually owns physical vanilla
+        /// transport. Empty means no complete effective provider is healthy yet.
+        /// </summary>
+        public static string TransportOwner
+        {
+            get
+            {
+                if (SnlTransportProvider.IsAuthoritative)
+                {
+                    return SnlTransportProvider.TransportOwner;
+                }
+
+                return EffectiveTransportHealthy
+                    ? SaveWriteOrderingConstants.HarmonyId
+                    : string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// True only when standalone SWOF itself is the complete effective transport
+        /// owner. It is intentionally false while authoritative SNLF owns transport,
+        /// even though this API continues to forward coordination calls successfully.
+        /// </summary>
+        public static bool IsAuthoritativeTransport
+        {
+            get
+            {
+                return !SnlTransportProvider.IsAuthoritative &&
+                    SaveWriteOrderingPatchHealth.IsSavedDataInterceptionHealthy &&
+                    SaveWriteOrderingPatchHealth.IsGlobalDataInterceptionHealthy;
+            }
         }
 
         public static bool HasPendingWrites(string absoluteSavePath)
         {
+            if (SnlTransportProvider.IsAuthoritative)
+            {
+                return SnlTransportProvider.HasPendingWrites(absoluteSavePath);
+            }
+
             string normalizedPath;
             if (!SavePathResolver.TryNormalizeAbsolutePath(
                     absoluteSavePath,
@@ -70,6 +157,14 @@ namespace SaveWriteOrderingFix
             {
                 errorMessage = "timeoutMilliseconds must be -1 or greater.";
                 return false;
+            }
+
+            if (SnlTransportProvider.IsAuthoritative)
+            {
+                return SnlTransportProvider.TryWaitForPendingWrites(
+                    absoluteSavePath,
+                    timeoutMilliseconds,
+                    out errorMessage);
             }
 
             string normalizedPath;
@@ -115,6 +210,15 @@ namespace SaveWriteOrderingFix
                 return false;
             }
 
+            if (SnlTransportProvider.IsAuthoritative)
+            {
+                return SnlTransportProvider.TryAcquireExclusiveDirectoryAccess(
+                    absoluteDirectoryPath,
+                    timeoutMilliseconds,
+                    out exclusiveAccess,
+                    out errorMessage);
+            }
+
             string normalizedDirectoryPath;
             if (!SavePathResolver.TryNormalizeAbsolutePath(
                     absoluteDirectoryPath,
@@ -152,6 +256,15 @@ namespace SaveWriteOrderingFix
                 return false;
             }
 
+            if (SnlTransportProvider.IsAuthoritative)
+            {
+                return SnlTransportProvider.TryRunExclusiveFileAccess(
+                    absoluteSavePath,
+                    fileAction,
+                    timeoutMilliseconds,
+                    out errorMessage);
+            }
+
             string normalizedPath;
             if (!SavePathResolver.TryNormalizeAbsolutePath(
                     absoluteSavePath,
@@ -182,10 +295,17 @@ namespace SaveWriteOrderingFix
     internal static class SaveWriteOrderingPatchHealth
     {
         private const int ExpectedSavedDataWriteCallerCount = 5;
+        private const int ExpectedGlobalDataWriteCallerCount = 1;
+        private const int ExpectedGlobalDataReadCallerCount = 1;
         private static readonly object SyncRoot = new object();
-        private static readonly HashSet<string> SuccessfulCallers =
+        private static readonly HashSet<string> SuccessfulSavedDataWriteCallers =
             new HashSet<string>(StringComparer.Ordinal);
-        private static bool sawFailure;
+        private static readonly HashSet<string> SuccessfulGlobalDataWriteCallers =
+            new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<string> SuccessfulGlobalDataReadCallers =
+            new HashSet<string>(StringComparer.Ordinal);
+        private static bool sawSavedDataFailure;
+        private static bool sawGlobalDataFailure;
 
         internal static bool IsSavedDataInterceptionHealthy
         {
@@ -193,8 +313,21 @@ namespace SaveWriteOrderingFix
             {
                 lock (SyncRoot)
                 {
-                    return !sawFailure &&
-                        SuccessfulCallers.Count == ExpectedSavedDataWriteCallerCount;
+                    return !sawSavedDataFailure &&
+                        SuccessfulSavedDataWriteCallers.Count == ExpectedSavedDataWriteCallerCount;
+                }
+            }
+        }
+
+        internal static bool IsGlobalDataInterceptionHealthy
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return !sawGlobalDataFailure &&
+                        SuccessfulGlobalDataWriteCallers.Count == ExpectedGlobalDataWriteCallerCount &&
+                        SuccessfulGlobalDataReadCallers.Count == ExpectedGlobalDataReadCallerCount;
                 }
             }
         }
@@ -208,11 +341,43 @@ namespace SaveWriteOrderingFix
             {
                 if (!success)
                 {
-                    sawFailure = true;
+                    sawSavedDataFailure = true;
                     return;
                 }
 
-                SuccessfulCallers.Add(identity);
+                SuccessfulSavedDataWriteCallers.Add(identity);
+            }
+        }
+
+        internal static void ReportGlobalDataWriteCaller(
+            System.Reflection.MethodBase method,
+            bool success)
+        {
+            ReportGlobalDataCaller(method, success, SuccessfulGlobalDataWriteCallers);
+        }
+
+        internal static void ReportGlobalDataReadCaller(
+            System.Reflection.MethodBase method,
+            bool success)
+        {
+            ReportGlobalDataCaller(method, success, SuccessfulGlobalDataReadCallers);
+        }
+
+        private static void ReportGlobalDataCaller(
+            System.Reflection.MethodBase method,
+            bool success,
+            HashSet<string> successfulCallers)
+        {
+            string identity = BuildMethodIdentity(method);
+            lock (SyncRoot)
+            {
+                if (!success)
+                {
+                    sawGlobalDataFailure = true;
+                    return;
+                }
+
+                successfulCallers.Add(identity);
             }
         }
 
@@ -317,7 +482,7 @@ namespace SaveWriteOrderingFix
     {
         internal string TargetPath = string.Empty;
         internal string Payload = string.Empty;
-        internal SaveManager.SavedData DeferredDataToSerialize;
+        internal object DeferredDataToSerialize;
         internal bool SerializeOnWriter;
         internal bool IsJson = true;
     }
@@ -411,7 +576,7 @@ namespace SaveWriteOrderingFix
 
             if (string.IsNullOrEmpty(targetPath))
             {
-                FallbackToVanilla(
+                FallbackSavedDataToVanilla(
                     dataToSave,
                     dataFileName,
                     isJson,
@@ -420,14 +585,59 @@ namespace SaveWriteOrderingFix
                 return;
             }
 
+            QueueObjectWrite(
+                dataToSave,
+                targetPath,
+                isJson,
+                "SavedData");
+        }
+
+        /// <summary>
+        /// Development 1.4 replacement for the one concrete vanilla GlobalData writer.
+        /// SaveGlobalDataEvent has already populated _GlobalData before this call site,
+        /// so freezing here captures the exact logical settings/log/CG request on the
+        /// caller thread before another request can mutate the shared DTO aliases.
+        /// </summary>
+        internal static void QueueGlobalDataWrite(
+            SaveManager.GlobalData dataToSave,
+            string dataFileName,
+            bool isJson,
+            bool fullPath)
+        {
+            string targetPath =
+                SavePathResolver.ResolveWritePath(dataFileName, fullPath);
+
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                FallbackGlobalDataToVanilla(
+                    dataToSave,
+                    dataFileName,
+                    isJson,
+                    fullPath,
+                    "Could not resolve the physical GlobalData path.");
+                return;
+            }
+
+            QueueObjectWrite(
+                dataToSave,
+                targetPath,
+                isJson,
+                "GlobalData");
+        }
+
+        private static void QueueObjectWrite(
+            object dataToSave,
+            string targetPath,
+            bool isJson,
+            string payloadKind)
+        {
             string payload;
             try
             {
                 if (isJson)
                 {
-                    // Vanilla uses JsonUtility.ToJson(..., true) on its worker.
-                    // Doing the serialization now freezes the exact state belonging
-                    // to this save request before any later request can mutate it.
+                    // Vanilla serializes on its worker. Freezing here preserves the
+                    // state belonging to this request for both SavedData and GlobalData.
                     payload = JsonUtility.ToJson(dataToSave, true);
                 }
                 else
@@ -439,15 +649,14 @@ namespace SaveWriteOrderingFix
             }
             catch (Exception exception)
             {
-                // Do not escape to vanilla's untracked background thread after the
-                // physical path has been resolved. A directory lease cannot drain or
-                // fence such a thread. Instead keep the exceptional retry inside the
-                // same ordered queue and serialize once on its writer thread. This has
-                // the same delayed-live-object weakness as vanilla's fallback, but it
-                // remains visible to queue draining and directory deletion leases.
+                // Keep the exceptional retry inside the same tracked FIFO instead of
+                // escaping to an untracked vanilla writer. This is exactly the 1.3
+                // safety behavior, now payload-agnostic so GlobalData shares it.
                 Debug.LogWarning(
                     SaveWriteOrderingConstants.LogPrefix +
-                    "Could not freeze the save payload on the caller thread: " +
+                    "Could not freeze " +
+                    payloadKind +
+                    " on the caller thread: " +
                     exception.Message +
                     " Retrying serialization inside the ordered writer.");
                 payload = null;
@@ -456,9 +665,7 @@ namespace SaveWriteOrderingFix
             SavePathQueue queue;
             bool startDrainer = false;
 
-            // Queue admission is atomic with respect to directory leases. Holding
-            // RegistrySync until this write is enqueued guarantees that a directory
-            // lease cannot register between GetOrCreateQueue and the enqueue itself.
+            // Queue admission remains atomic with directory-exclusive registration.
             lock (RegistrySync)
             {
                 while (IsPathBlockedByExclusiveDirectoryLocked(targetPath))
@@ -529,6 +736,31 @@ namespace SaveWriteOrderingFix
             // patching a constructed reference-type generic on Mono. This assembly
             // never patches DataSaver<T> itself.
             return DataSaver.loadData<SaveManager.SavedData>(dataFileName);
+        }
+
+        internal static SaveManager.GlobalData LoadGlobalDataAfterPendingWrites(
+            string dataFileName)
+        {
+            string physicalPath =
+                SavePathResolver.ResolveReadPath(dataFileName);
+
+            if (!string.IsNullOrEmpty(physicalPath))
+            {
+                bool completed = WaitForPath(
+                    physicalPath,
+                    SaveWriteOrderingConstants.LoadWaitTimeoutMilliseconds);
+
+                if (!completed)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Timed out waiting for an ordered GlobalData write before reading " +
+                        physicalPath +
+                        ". Vanilla load will continue.");
+                }
+            }
+
+            return DataSaver.loadData<SaveManager.GlobalData>(dataFileName);
         }
 
         internal static bool HasPendingWrites(string normalizedPath)
@@ -935,7 +1167,7 @@ namespace SaveWriteOrderingFix
             return candidatePath.StartsWith(prefix, comparison);
         }
 
-        private static void FallbackToVanilla(
+        private static void FallbackSavedDataToVanilla(
             SaveManager.SavedData dataToSave,
             string dataFileName,
             bool isJson,
@@ -948,6 +1180,25 @@ namespace SaveWriteOrderingFix
                 " Falling back to vanilla asynchronous saving for this request.");
 
             DataSaver.saveData<SaveManager.SavedData>(
+                dataToSave,
+                dataFileName,
+                isJson,
+                fullPath);
+        }
+
+        private static void FallbackGlobalDataToVanilla(
+            SaveManager.GlobalData dataToSave,
+            string dataFileName,
+            bool isJson,
+            bool fullPath,
+            string reason)
+        {
+            Debug.LogWarning(
+                SaveWriteOrderingConstants.LogPrefix +
+                reason +
+                " Falling back to vanilla asynchronous GlobalData saving for this request.");
+
+            DataSaver.saveData<SaveManager.GlobalData>(
                 dataToSave,
                 dataFileName,
                 isJson,

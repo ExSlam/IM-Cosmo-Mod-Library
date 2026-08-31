@@ -15,10 +15,10 @@ namespace SaveWriteOrderingFix
     /// never Harmony-patches DataSaver<SavedData> directly. Instead it replaces only
     /// the known concrete vanilla SavedData call sites.
     ///
-    /// Priority.Last plus HarmonyAfter for the two Cosmo supplemental persistence mods
-    /// allows their caller-level transpilers to prepare sidecars/checkpoints first.
-    /// They leave the original DataSaver call in place, which this final transpiler
-    /// then replaces with the ordered writer using the exact same four arguments.
+    /// Priority.Last plus HarmonyAfter allows persistence-preparation patches to run
+    /// first. Save n Load Fixes is special: when its embedded transport has already
+    /// rewritten a concrete call site, SWOF recognizes that exact replacement shape
+    /// as delegated success and does not install a second queue owner.
     /// </summary>
     [HarmonyPatch]
     internal static class VanillaSavedDataWrite_SaveWriteOrdering_Patch
@@ -54,6 +54,7 @@ namespace SaveWriteOrderingFix
         [HarmonyTranspiler]
         [HarmonyPriority(Priority.Last)]
         [HarmonyAfter(
+            SaveWriteOrderingConstants.SnlHarmonyId,
             SaveWriteOrderingConstants.IMDataCoreHarmonyId,
             SaveWriteOrderingConstants.GraduationDetailsHarmonyId)]
         private static IEnumerable<CodeInstruction> Transpiler(
@@ -86,8 +87,25 @@ namespace SaveWriteOrderingFix
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
 
-            int replacedCount = 0;
+            int delegatedCount = CountSnlSavedDataWrites(result);
+            if (delegatedCount > 0)
+            {
+                bool delegatedSuccess = delegatedCount == 1;
+                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                    __originalMethod,
+                    delegatedSuccess);
+                if (!delegatedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Expected exactly one SNLF SavedData transport replacement in " +
+                        DescribeMethod(__originalMethod) +
+                        " but found " + delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
 
+            int replacedCount = 0;
             foreach (CodeInstruction instruction in result)
             {
                 if (!IsSavedDataWrite(instruction))
@@ -103,30 +121,45 @@ namespace SaveWriteOrderingFix
                 replacedCount++;
             }
 
-            if (replacedCount != 1)
+            bool success = replacedCount == 1;
+            SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
+                __originalMethod,
+                success);
+
+            if (!success)
             {
-                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
-                    __originalMethod,
-                    false);
                 Debug.LogWarning(
                     SaveWriteOrderingConstants.LogPrefix +
                     "Expected exactly one vanilla SavedData write in " +
                     DescribeMethod(__originalMethod) +
-                    " but found " +
-                    replacedCount.ToString() +
-                    ". The method was left " +
-                    (replacedCount == 0
-                        ? "without a Save Write Ordering replacement."
-                        : "with every matching SavedData call ordered."));
-            }
-            else
-            {
-                SaveWriteOrderingPatchHealth.ReportSavedDataWriteCaller(
-                    __originalMethod,
-                    true);
+                    " but found " + replacedCount.ToString() + ".");
             }
 
             return result;
+        }
+
+        private static int CountSnlSavedDataWrites(
+            List<CodeInstruction> instructions)
+        {
+            int count = 0;
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                MethodInfo calledMethod = instructions[i] == null
+                    ? null
+                    : instructions[i].operand as MethodInfo;
+                if (SnlTransportProvider.IsEmbeddedTransportCall(
+                        calledMethod,
+                        "QueueSavedDataWrite",
+                        typeof(void),
+                        typeof(SaveManager.SavedData),
+                        typeof(string),
+                        typeof(bool),
+                        typeof(bool)))
+                {
+                    count++;
+                }
+            }
+            return count;
         }
 
         private static bool IsSavedDataWrite(
@@ -248,6 +281,7 @@ namespace SaveWriteOrderingFix
 
         [HarmonyTranspiler]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter(SaveWriteOrderingConstants.SnlHarmonyId)]
         private static IEnumerable<CodeInstruction> Transpiler(
             IEnumerable<CodeInstruction> instructions,
             MethodBase __originalMethod)
@@ -271,8 +305,33 @@ namespace SaveWriteOrderingFix
             List<CodeInstruction> result =
                 new List<CodeInstruction>(instructions);
 
-            int replacedCount = 0;
+            int expectedCount =
+                __originalMethod != null &&
+                __originalMethod.DeclaringType == typeof(SaveManager) &&
+                string.Equals(
+                    __originalMethod.Name,
+                    nameof(SaveManager.GetLatestAutosavePath),
+                    StringComparison.Ordinal)
+                    ? 2
+                    : 1;
 
+            int delegatedCount = CountSnlSavedDataReads(result);
+            if (delegatedCount > 0)
+            {
+                if (delegatedCount != expectedCount)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Expected " + expectedCount.ToString() +
+                        " SNLF SavedData read replacement(s) in " +
+                        DescribeMethod(__originalMethod) +
+                        " but found " + delegatedCount.ToString() +
+                        ". SWOF will not install a second read owner in that caller.");
+                }
+                return result;
+            }
+
+            int replacedCount = 0;
             foreach (CodeInstruction instruction in result)
             {
                 if (!IsSavedDataRead(instruction))
@@ -287,16 +346,38 @@ namespace SaveWriteOrderingFix
                 replacedCount++;
             }
 
-            if (replacedCount == 0)
+            if (replacedCount != expectedCount)
             {
                 Debug.LogWarning(
                     SaveWriteOrderingConstants.LogPrefix +
-                    "No vanilla SavedData reads were found in " +
+                    "Expected " + expectedCount.ToString() +
+                    " vanilla SavedData read(s) in " +
                     DescribeMethod(__originalMethod) +
-                    ". The method was left unchanged.");
+                    " but found " + replacedCount.ToString() + ".");
             }
 
             return result;
+        }
+
+        private static int CountSnlSavedDataReads(
+            List<CodeInstruction> instructions)
+        {
+            int count = 0;
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                MethodInfo calledMethod = instructions[i] == null
+                    ? null
+                    : instructions[i].operand as MethodInfo;
+                if (SnlTransportProvider.IsEmbeddedTransportCall(
+                        calledMethod,
+                        "LoadSavedDataAfterPendingWrites",
+                        typeof(SaveManager.SavedData),
+                        typeof(string)))
+                {
+                    count++;
+                }
+            }
+            return count;
         }
 
         private static bool IsSavedDataRead(
@@ -364,4 +445,294 @@ namespace SaveWriteOrderingFix
                    method.Name;
         }
     }
+    /// <summary>
+    /// Development 1.4 GlobalData write ordering. This patches only the one concrete
+    /// SaveManager.SaveGlobalData caller and never Harmony-patches DataSaver<T>.
+    /// SaveGlobalDataEvent has already populated _GlobalData before the replaced call.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class VanillaGlobalDataWrite_SaveWriteOrdering_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            MethodInfo method = AccessTools.Method(
+                typeof(SaveManager),
+                nameof(SaveManager.SaveGlobalData),
+                Type.EmptyTypes);
+            if (method == null)
+            {
+                throw new MissingMethodException(
+                    typeof(SaveManager).FullName,
+                    nameof(SaveManager.SaveGlobalData));
+            }
+            return method;
+        }
+
+        [HarmonyTranspiler]
+        [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter(SaveWriteOrderingConstants.SnlHarmonyId)]
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions,
+            MethodBase __originalMethod)
+        {
+            MethodInfo replacement = AccessTools.Method(
+                typeof(OrderedSaveCoordinator),
+                nameof(OrderedSaveCoordinator.QueueGlobalDataWrite),
+                new Type[]
+                {
+                    typeof(SaveManager.GlobalData),
+                    typeof(string),
+                    typeof(bool),
+                    typeof(bool)
+                });
+
+            if (replacement == null)
+            {
+                SaveWriteOrderingPatchHealth.ReportGlobalDataWriteCaller(
+                    __originalMethod,
+                    false);
+                Debug.LogWarning(
+                    SaveWriteOrderingConstants.LogPrefix +
+                    "Could not resolve the ordered GlobalData writer. Leaving vanilla caller unchanged.");
+                return instructions;
+            }
+
+            List<CodeInstruction> result =
+                new List<CodeInstruction>(instructions);
+            int delegatedCount = CountSnlGlobalDataWrites(result);
+            if (delegatedCount > 0)
+            {
+                bool delegatedSuccess = delegatedCount == 1;
+                SaveWriteOrderingPatchHealth.ReportGlobalDataWriteCaller(
+                    __originalMethod,
+                    delegatedSuccess);
+                if (!delegatedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Expected exactly one SNLF GlobalData write replacement but found " +
+                        delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
+
+            int replacedCount = 0;
+            foreach (CodeInstruction instruction in result)
+            {
+                if (!IsGlobalDataWrite(instruction))
+                {
+                    continue;
+                }
+
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = replacement;
+                replacedCount++;
+            }
+
+            bool success = replacedCount == 1;
+            SaveWriteOrderingPatchHealth.ReportGlobalDataWriteCaller(
+                __originalMethod,
+                success);
+            if (!success)
+            {
+                Debug.LogWarning(
+                    SaveWriteOrderingConstants.LogPrefix +
+                    "Expected exactly one vanilla GlobalData write in SaveManager.SaveGlobalData but found " +
+                    replacedCount.ToString() + ".");
+            }
+
+            return result;
+        }
+
+        private static int CountSnlGlobalDataWrites(
+            List<CodeInstruction> instructions)
+        {
+            int count = 0;
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                MethodInfo calledMethod = instructions[i] == null
+                    ? null
+                    : instructions[i].operand as MethodInfo;
+                if (SnlTransportProvider.IsEmbeddedTransportCall(
+                        calledMethod,
+                        "QueueGlobalDataWrite",
+                        typeof(void),
+                        typeof(SaveManager.GlobalData),
+                        typeof(string),
+                        typeof(bool),
+                        typeof(bool)))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static bool IsGlobalDataWrite(CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction == null
+                ? null
+                : instruction.operand as MethodInfo;
+            if (calledMethod == null ||
+                calledMethod.DeclaringType != typeof(DataSaver) ||
+                !string.Equals(
+                    calledMethod.Name,
+                    SaveWriteOrderingConstants.DataSaverSaveMethodName,
+                    StringComparison.Ordinal) ||
+                !calledMethod.IsGenericMethod)
+            {
+                return false;
+            }
+
+            Type[] genericArguments = calledMethod.GetGenericArguments();
+            ParameterInfo[] parameters = calledMethod.GetParameters();
+            return genericArguments.Length == 1 &&
+                genericArguments[0] == typeof(SaveManager.GlobalData) &&
+                parameters.Length == 4 &&
+                parameters[0].ParameterType == typeof(SaveManager.GlobalData) &&
+                parameters[1].ParameterType == typeof(string) &&
+                parameters[2].ParameterType == typeof(bool) &&
+                parameters[3].ParameterType == typeof(bool);
+        }
+    }
+
+    /// <summary>
+    /// Development 1.4 GlobalData read fence. LoadGlobalData waits only for the
+    /// physical global_data.json queue and then calls vanilla DataSaver.loadData<T>.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class VanillaGlobalDataRead_SaveWriteOrdering_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            MethodInfo method = AccessTools.Method(
+                typeof(SaveManager),
+                nameof(SaveManager.LoadGlobalData),
+                Type.EmptyTypes);
+            if (method == null)
+            {
+                throw new MissingMethodException(
+                    typeof(SaveManager).FullName,
+                    nameof(SaveManager.LoadGlobalData));
+            }
+            return method;
+        }
+
+        [HarmonyTranspiler]
+        [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter(SaveWriteOrderingConstants.SnlHarmonyId)]
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions,
+            MethodBase __originalMethod)
+        {
+            MethodInfo replacement = AccessTools.Method(
+                typeof(OrderedSaveCoordinator),
+                nameof(OrderedSaveCoordinator.LoadGlobalDataAfterPendingWrites),
+                new Type[] { typeof(string) });
+
+            if (replacement == null)
+            {
+                SaveWriteOrderingPatchHealth.ReportGlobalDataReadCaller(
+                    __originalMethod,
+                    false);
+                Debug.LogWarning(
+                    SaveWriteOrderingConstants.LogPrefix +
+                    "Could not resolve the coordinated GlobalData reader. Leaving vanilla caller unchanged.");
+                return instructions;
+            }
+
+            List<CodeInstruction> result =
+                new List<CodeInstruction>(instructions);
+            int delegatedCount = CountSnlGlobalDataReads(result);
+            if (delegatedCount > 0)
+            {
+                bool delegatedSuccess = delegatedCount == 1;
+                SaveWriteOrderingPatchHealth.ReportGlobalDataReadCaller(
+                    __originalMethod,
+                    delegatedSuccess);
+                if (!delegatedSuccess)
+                {
+                    Debug.LogWarning(
+                        SaveWriteOrderingConstants.LogPrefix +
+                        "Expected exactly one SNLF GlobalData read replacement but found " +
+                        delegatedCount.ToString() + ".");
+                }
+                return result;
+            }
+
+            int replacedCount = 0;
+            foreach (CodeInstruction instruction in result)
+            {
+                if (!IsGlobalDataRead(instruction))
+                {
+                    continue;
+                }
+
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = replacement;
+                replacedCount++;
+            }
+
+            bool success = replacedCount == 1;
+            SaveWriteOrderingPatchHealth.ReportGlobalDataReadCaller(
+                __originalMethod,
+                success);
+            if (!success)
+            {
+                Debug.LogWarning(
+                    SaveWriteOrderingConstants.LogPrefix +
+                    "Expected exactly one vanilla GlobalData read in SaveManager.LoadGlobalData but found " +
+                    replacedCount.ToString() + ".");
+            }
+
+            return result;
+        }
+
+        private static int CountSnlGlobalDataReads(
+            List<CodeInstruction> instructions)
+        {
+            int count = 0;
+            for (int i = 0; i < instructions.Count; i++)
+            {
+                MethodInfo calledMethod = instructions[i] == null
+                    ? null
+                    : instructions[i].operand as MethodInfo;
+                if (SnlTransportProvider.IsEmbeddedTransportCall(
+                        calledMethod,
+                        "LoadGlobalDataAfterPendingWrites",
+                        typeof(SaveManager.GlobalData),
+                        typeof(string)))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static bool IsGlobalDataRead(CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction == null
+                ? null
+                : instruction.operand as MethodInfo;
+            if (calledMethod == null ||
+                calledMethod.DeclaringType != typeof(DataSaver) ||
+                !string.Equals(
+                    calledMethod.Name,
+                    SaveWriteOrderingConstants.DataSaverLoadMethodName,
+                    StringComparison.Ordinal) ||
+                !calledMethod.IsGenericMethod)
+            {
+                return false;
+            }
+
+            Type[] genericArguments = calledMethod.GetGenericArguments();
+            ParameterInfo[] parameters = calledMethod.GetParameters();
+            return genericArguments.Length == 1 &&
+                genericArguments[0] == typeof(SaveManager.GlobalData) &&
+                parameters.Length == 1 &&
+                parameters[0].ParameterType == typeof(string) &&
+                calledMethod.ReturnType == typeof(SaveManager.GlobalData);
+        }
+    }
+
 }
