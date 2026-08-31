@@ -1,0 +1,15 @@
+Save n Load Fixes
+
+Development build. Cumulative through Sprint 1D Task 48 / v0.50.0.
+
+Implemented foundations include A20 deterministic legacy idol-profile migration, A21 deterministic legacy aggregate-fan migration, ordered SavedData/GlobalData transport, checkpoint safety,
+selective LoadEpoch stale-carrier invalidation, the completed low-risk/no-storage repair wave,
+and Wave-3 repair-envelope continuity through N01 relationship Dynamic, N05 show FanAppeal,
+N07 Activities.Chain, N08 Event_Overlord.Latest_Event, N09 paused-training girl rebinding,
+N10 exact paused-business remaining minutes, N11 tutorial activity baselines, A02 sparse private project progress counters, A15 bounded recent-activity recency continuity, and A16 PreviousNewSubstory spacing-anchor continuity.
+
+The SNLF V1 repair envelope is active and frozen together with the same caller-thread SavedData
+checkpoint. Older V1 sections remain backward-compatible through section-level version markers.
+
+This development package is source/static validated. No live Unity/game runtime claim is made by
+the bundled reports.

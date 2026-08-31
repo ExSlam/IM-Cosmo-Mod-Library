@@ -1,0 +1,14 @@
+{
+  "Title": "Save n Load Fixes",
+  "Description": "Development build of Cosmo save/load continuity fixes with ordered transport, repair-envelope continuity, completed Wave-4 repairs, and deterministic legacy migrations through A21 / Task 48.",
+  "Author": "Cosmo",
+  "Version": "0.52.0",
+  "Tags": [
+    "save",
+    "load",
+    "fix",
+    "patch",
+    "bugfix"
+  ],
+  "HarmonyID": "com.cosmo.savenloadfixes"
+}
