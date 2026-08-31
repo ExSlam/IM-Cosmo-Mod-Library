@@ -7,6 +7,12 @@ transpiler are re-entry-safe when HarmonyX recomposes the generated tutorial ite
 This prevents a false A14 health failure from vetoing legacy-save `Save As` while retaining
 the exact two-site manifest and malformed/partial-shape refusal.
 
+The same qualification pass fixes pre-A29 old-save synthesis timing. Vanilla clears
+`Groups.Groups_` during `LoadEvent` and reconstructs group membership in private
+`Groups._Load` several frames later, so A29 now defers its release-formula baseline
+until that exact seam. The pending work is `LoadEpoch`-bound, and a checkpoint during
+the short unresolved window fails closed instead of persisting a false null baseline.
+
 `Save n Load Fixes` is the dedicated Cosmo repair mod for vanilla save/load continuity,
 reconstruction, and closely related verified gameplay-state bugs identified by the
 persistence audit.

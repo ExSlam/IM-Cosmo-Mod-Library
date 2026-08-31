@@ -3,6 +3,8 @@
 - Fixed legacy-save `Save As` requests being refused by A14 after HarmonyX recomposed the delayed tutorial iterator. A14 now treats repeat discovery of the same audited target as idempotent and recognizes its own exact two-site delay-resolver IL without wrapping it twice.
 - Preserved the fail-closed contract: only the complete `{0, 1}` resolver ordinal set is accepted; mixed, partial, duplicate, malformed, or genuinely changed `WaitForSeconds(5f)` shapes still veto repair-dependent saves.
 - Expanded A14 capture errors with resolved-target and wait-site health counts so future runtime patch incompatibilities identify the failing seam directly.
+- Fixed A29 legacy baseline synthesis running before vanilla's delayed `Groups._Load` membership reconstruction. Pre-A29 loads now defer only that synthesis to the exact group-ready seam, bind it to `LoadEpoch`, and refuse an intervening checkpoint instead of freezing a false null baseline.
+- Made A29's five-target Harmony health manifest idempotent under logical target rediscovery while retaining exact unique-target cardinality.
 
 ## 0.52.0 - Sprint 1D Task 50
 
