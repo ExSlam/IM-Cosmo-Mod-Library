@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using SaveNLoadFixes.Persistence;
+using SaveNLoadFixes.Safety;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -29,7 +30,10 @@ namespace SaveNLoadFixes.Repairs
         internal const int SectionVersion = 1;
         internal const int FanAxisCount = 7;
 
+        private static readonly object LegacyPendingSync = new object();
         private static int currentSourceSingleId = -1;
+        private static int pendingLegacySourceSingleId = -1;
+        private static long pendingLegacyEpoch = -1L;
         private static long captureFailureCount;
         private static long staleClearCount;
         private static long releaseObservedCount;
@@ -37,13 +41,19 @@ namespace SaveNLoadFixes.Repairs
         private static long restoredNullCount;
         private static long legacySynthesizedCount;
         private static long legacyNoReleasedSingleCount;
+        private static long legacyDeferredCount;
+        private static long legacyDeferredDiscardedCount;
         private static long invalidSectionCount;
         private static long associationMissingCount;
         private static string lastDiagnostic = string.Empty;
 
         internal static bool IsImplemented
         {
-            get { return FanAppealLastSinglePatchHealth.IsHealthy; }
+            get
+            {
+                return FanAppealLastSinglePatchHealth.IsHealthy &&
+                    LoadEpochPatchHealth.IsHealthy;
+            }
         }
 
         internal static long CaptureFailureCount { get { return Interlocked.Read(ref captureFailureCount); } }
@@ -53,6 +63,8 @@ namespace SaveNLoadFixes.Repairs
         internal static long RestoredNullCount { get { return Interlocked.Read(ref restoredNullCount); } }
         internal static long LegacySynthesizedCount { get { return Interlocked.Read(ref legacySynthesizedCount); } }
         internal static long LegacyNoReleasedSingleCount { get { return Interlocked.Read(ref legacyNoReleasedSingleCount); } }
+        internal static long LegacyDeferredCount { get { return Interlocked.Read(ref legacyDeferredCount); } }
+        internal static long LegacyDeferredDiscardedCount { get { return Interlocked.Read(ref legacyDeferredDiscardedCount); } }
         internal static long InvalidSectionCount { get { return Interlocked.Read(ref invalidSectionCount); } }
         internal static long AssociationMissingCount { get { return Interlocked.Read(ref associationMissingCount); } }
         internal static string LastDiagnostic { get { return lastDiagnostic; } }
@@ -64,6 +76,16 @@ namespace SaveNLoadFixes.Repairs
         {
             record = null;
             error = string.Empty;
+
+            int pendingSourceId;
+            if (TryGetCurrentPendingLegacySource(out pendingSourceId))
+            {
+                return CaptureFailed(
+                    "A29 legacy target-state synthesis for source single " +
+                    pendingSourceId +
+                    " is still waiting for vanilla Groups._Load reconstruction.",
+                    out error);
+            }
 
             if (dataToSave == null || dataToSave.singles__Singles == null)
             {
@@ -115,6 +137,7 @@ namespace SaveNLoadFixes.Repairs
 
         internal static void ClearBeforeVanillaSinglesLoad()
         {
+            ClearPendingLegacyCompatibility();
             singles.FanAppeal_LastSingle = null;
             currentSourceSingleId = -1;
             Interlocked.Increment(ref staleClearCount);
@@ -241,19 +264,171 @@ namespace SaveNLoadFixes.Repairs
                 return;
             }
 
+            // Groups.LoadFunction clears Groups.Groups_ during the career LoadEvent
+            // and vanilla rebuilds memberships three frames later in Groups._Load.
+            // Running GetSenbatsuStats here would therefore dereference a null group
+            // for every ordinary pre-A29 save. Defer only the deterministic legacy
+            // synthesis; exact repaired-envelope vectors above remain immediate.
+            if (!HasReadyGroupBinding(source))
+            {
+                DeferLegacyCompatibilityUntilGroupsLoad(sourceId);
+                return;
+            }
+
+            TryApplyLegacySynthesis(source, sourceId, false);
+        }
+
+        internal static void CompleteDeferredLegacyCompatibilityAfterGroupsLoad()
+        {
+            int sourceId;
+            long epoch;
+            lock (LegacyPendingSync)
+            {
+                if (pendingLegacySourceSingleId < 0)
+                {
+                    return;
+                }
+
+                sourceId = pendingLegacySourceSingleId;
+                epoch = pendingLegacyEpoch;
+                pendingLegacySourceSingleId = -1;
+                pendingLegacyEpoch = -1L;
+            }
+
+            if (!LoadEpoch.IsCurrent(epoch))
+            {
+                Interlocked.Increment(ref legacyDeferredDiscardedCount);
+                lastDiagnostic =
+                    "A29 discarded deferred legacy synthesis from a superseded LoadEpoch.";
+                return;
+            }
+
+            singles._single source = singles.GetSingleByID(sourceId);
+            if (source == null || source.status != singles._single._status.released)
+            {
+                RecordInvalid(
+                    "A29 deferred legacy source ID did not rebind to one loaded released single.");
+                return;
+            }
+            if (!HasReadyGroupBinding(source))
+            {
+                RecordInvalid(
+                    "A29 vanilla Groups._Load completed without binding the deferred source single to a reconstructed group.");
+                return;
+            }
+
+            TryApplyLegacySynthesis(source, sourceId, true);
+        }
+
+        private static void DeferLegacyCompatibilityUntilGroupsLoad(int sourceId)
+        {
+            bool displacedPending;
+            lock (LegacyPendingSync)
+            {
+                displacedPending = pendingLegacySourceSingleId >= 0;
+                pendingLegacySourceSingleId = sourceId;
+                pendingLegacyEpoch = LoadEpoch.Capture();
+            }
+
+            if (displacedPending)
+            {
+                Interlocked.Increment(ref legacyDeferredDiscardedCount);
+            }
+            Interlocked.Increment(ref legacyDeferredCount);
+            lastDiagnostic =
+                "A29 deferred legacy target-state synthesis for source single " +
+                sourceId +
+                " until vanilla Groups._Load reconstructs group membership.";
+        }
+
+        private static bool TryApplyLegacySynthesis(
+            singles._single source,
+            int sourceId,
+            bool afterDeferredGroupsLoad)
+        {
             List<singles._fanAppeal> synthesized;
             string synthError;
             if (!TrySynthesizeFromTargetState(source, out synthesized, out synthError))
             {
                 RecordInvalid("A29 deterministic target-state synthesis failed: " + synthError);
-                return;
+                return false;
             }
 
             singles.FanAppeal_LastSingle = synthesized;
             currentSourceSingleId = sourceId;
             Interlocked.Increment(ref legacySynthesizedCount);
-            lastDiagnostic = "A29 synthesized a deterministic pre-fix comparison baseline from loaded target single " +
-                sourceId + "; it is compatibility state, not claimed recovered history.";
+            lastDiagnostic =
+                "A29 synthesized a deterministic pre-fix comparison baseline from loaded target single " +
+                sourceId +
+                (afterDeferredGroupsLoad
+                    ? " after vanilla group reconstruction"
+                    : string.Empty) +
+                "; it is compatibility state, not claimed recovered history.";
+            return true;
+        }
+
+        private static bool HasReadyGroupBinding(singles._single source)
+        {
+            if (source == null || Groups.Groups_ == null)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < Groups.Groups_.Count; index++)
+            {
+                Groups._group group = Groups.Groups_[index];
+                if (group != null && group.Singles != null && group.Singles.Contains(source))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryGetCurrentPendingLegacySource(out int sourceId)
+        {
+            sourceId = -1;
+            bool stale = false;
+            lock (LegacyPendingSync)
+            {
+                if (pendingLegacySourceSingleId < 0)
+                {
+                    return false;
+                }
+
+                if (!LoadEpoch.IsCurrent(pendingLegacyEpoch))
+                {
+                    pendingLegacySourceSingleId = -1;
+                    pendingLegacyEpoch = -1L;
+                    stale = true;
+                }
+                else
+                {
+                    sourceId = pendingLegacySourceSingleId;
+                    return true;
+                }
+            }
+
+            if (stale)
+            {
+                Interlocked.Increment(ref legacyDeferredDiscardedCount);
+            }
+            return false;
+        }
+
+        private static void ClearPendingLegacyCompatibility()
+        {
+            bool discarded;
+            lock (LegacyPendingSync)
+            {
+                discarded = pendingLegacySourceSingleId >= 0;
+                pendingLegacySourceSingleId = -1;
+                pendingLegacyEpoch = -1L;
+            }
+            if (discarded)
+            {
+                Interlocked.Increment(ref legacyDeferredDiscardedCount);
+            }
         }
 
         private static bool TrySynthesizeFromTargetState(
@@ -286,7 +461,7 @@ namespace SaveNLoadFixes.Repairs
             }
             catch (Exception exception)
             {
-                error = exception.Message;
+                error = exception.ToString();
                 return false;
             }
             finally
@@ -535,10 +710,11 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class FanAppealLastSinglePatchHealth
     {
-        internal const int ExpectedTargetMethodCount = 4;
+        internal const int ExpectedTargetMethodCount = 5;
 
         private static readonly object Sync = new object();
-        private static int resolvedTargetMethodCount;
+        private static readonly HashSet<string> ResolvedTargets =
+            new HashSet<string>(StringComparer.Ordinal);
         private static string failure = string.Empty;
 
         internal static bool IsHealthy
@@ -547,7 +723,7 @@ namespace SaveNLoadFixes.Repairs
             {
                 lock (Sync)
                 {
-                    return resolvedTargetMethodCount == ExpectedTargetMethodCount &&
+                    return ResolvedTargets.Count == ExpectedTargetMethodCount &&
                         string.IsNullOrEmpty(failure);
                 }
             }
@@ -555,7 +731,7 @@ namespace SaveNLoadFixes.Repairs
 
         internal static int ResolvedTargetMethodCount
         {
-            get { lock (Sync) { return resolvedTargetMethodCount; } }
+            get { lock (Sync) { return ResolvedTargets.Count; } }
         }
 
         internal static string Failure
@@ -563,14 +739,22 @@ namespace SaveNLoadFixes.Repairs
             get { lock (Sync) { return failure; } }
         }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(string target)
         {
             lock (Sync)
             {
-                resolvedTargetMethodCount++;
-                if (resolvedTargetMethodCount > ExpectedTargetMethodCount)
+                if (string.IsNullOrEmpty(target))
                 {
-                    failure = "A29 resolved more patch targets than the frozen four-method manifest.";
+                    failure = "A29 resolved an empty logical Harmony target.";
+                    return;
+                }
+
+                // Harmony/HarmonyX can rediscover the same logical seam while
+                // recomposing methods. Health is the unique audited target set.
+                ResolvedTargets.Add(target);
+                if (ResolvedTargets.Count > ExpectedTargetMethodCount)
+                {
+                    failure = "A29 resolved more patch targets than the frozen five-method manifest.";
                 }
             }
         }

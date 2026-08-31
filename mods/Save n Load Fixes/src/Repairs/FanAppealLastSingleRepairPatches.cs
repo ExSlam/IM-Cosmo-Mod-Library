@@ -15,7 +15,7 @@ namespace SaveNLoadFixes.Repairs
                 FanAppealLastSinglePatchHealth.ReportFailure("singles.LoadFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(singles).FullName, "LoadFunction");
             }
-            FanAppealLastSinglePatchHealth.ReportTargetResolved();
+            FanAppealLastSinglePatchHealth.ReportTargetResolved("singles.LoadFunction()");
             return method;
         }
 
@@ -40,7 +40,8 @@ namespace SaveNLoadFixes.Repairs
                 FanAppealLastSinglePatchHealth.ReportFailure("singles.ReleaseSingle(_single) could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(singles).FullName, "ReleaseSingle");
             }
-            FanAppealLastSinglePatchHealth.ReportTargetResolved();
+            FanAppealLastSinglePatchHealth.ReportTargetResolved(
+                "singles.ReleaseSingle(singles._single)");
             return method;
         }
 
@@ -65,7 +66,8 @@ namespace SaveNLoadFixes.Repairs
                 FanAppealLastSinglePatchHealth.ReportFailure("SaveManager.LoadData(string) could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(string)");
             }
-            FanAppealLastSinglePatchHealth.ReportTargetResolved();
+            FanAppealLastSinglePatchHealth.ReportTargetResolved(
+                "SaveManager.LoadData(string)");
             return method;
         }
 
@@ -90,7 +92,8 @@ namespace SaveNLoadFixes.Repairs
                 FanAppealLastSinglePatchHealth.ReportFailure("SaveManager.LoadData(bool) could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(bool)");
             }
-            FanAppealLastSinglePatchHealth.ReportTargetResolved();
+            FanAppealLastSinglePatchHealth.ReportTargetResolved(
+                "SaveManager.LoadData(bool)");
             return method;
         }
 
@@ -98,6 +101,38 @@ namespace SaveNLoadFixes.Repairs
         private static void Postfix(SaveManager __instance)
         {
             FanAppealLastSingleRepair.RestoreAfterCareerLoad(__instance);
+        }
+    }
+
+    /// <summary>
+    /// Groups.LoadFunction deliberately clears the static group list during the
+    /// career LoadEvent, then Groups.Update calls the private _Load method after
+    /// three frames to reconstruct memberships. Pre-A29 compatibility synthesis
+    /// needs that completed membership graph for _single.GetSenbatsuStats().
+    /// </summary>
+    [HarmonyPatch]
+    internal static class GroupsLateLoadFanAppealLastSingle_SaveNLoadFixes_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            MethodInfo method = AccessTools.Method(
+                typeof(Groups),
+                "_Load",
+                Type.EmptyTypes);
+            if (method == null || method.ReturnType != typeof(void))
+            {
+                FanAppealLastSinglePatchHealth.ReportFailure(
+                    "Groups._Load() could not be resolved with the audited private void signature.");
+                throw new MissingMethodException(typeof(Groups).FullName, "_Load");
+            }
+            FanAppealLastSinglePatchHealth.ReportTargetResolved("Groups._Load()");
+            return method;
+        }
+
+        [HarmonyPostfix]
+        private static void Postfix()
+        {
+            FanAppealLastSingleRepair.CompleteDeferredLegacyCompatibilityAfterGroupsLoad();
         }
     }
 }

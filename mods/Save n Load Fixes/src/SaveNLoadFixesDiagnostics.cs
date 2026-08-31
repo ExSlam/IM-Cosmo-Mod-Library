@@ -1433,6 +1433,16 @@ namespace SaveNLoadFixes
             get { return FanAppealLastSingleRepair.LegacyNoReleasedSingleCount; }
         }
 
+        public static long FanAppealLastSingleLegacyDeferredCount
+        {
+            get { return FanAppealLastSingleRepair.LegacyDeferredCount; }
+        }
+
+        public static long FanAppealLastSingleLegacyDeferredDiscardedCount
+        {
+            get { return FanAppealLastSingleRepair.LegacyDeferredDiscardedCount; }
+        }
+
         public static long FanAppealLastSingleInvalidSectionCount
         {
             get { return FanAppealLastSingleRepair.InvalidSectionCount; }
