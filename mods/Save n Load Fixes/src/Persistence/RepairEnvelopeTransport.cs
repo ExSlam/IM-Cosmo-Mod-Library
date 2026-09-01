@@ -23,6 +23,7 @@ namespace SaveNLoadFixes.Persistence
 
         private static long frozenCheckpointCount;
         private static long envelopeReadCount;
+        private static long simpleJsonRecoveredReadCount;
         private static long legacyReadCount;
         private static long invalidEnvelopeReadCount;
         private static long freezeFailureCount;
@@ -30,6 +31,7 @@ namespace SaveNLoadFixes.Persistence
 
         internal static long FrozenCheckpointCount { get { return Interlocked.Read(ref frozenCheckpointCount); } }
         internal static long EnvelopeReadCount { get { return Interlocked.Read(ref envelopeReadCount); } }
+        internal static long SimpleJsonRecoveredReadCount { get { return Interlocked.Read(ref simpleJsonRecoveredReadCount); } }
         internal static long LegacyReadCount { get { return Interlocked.Read(ref legacyReadCount); } }
         internal static long InvalidEnvelopeReadCount { get { return Interlocked.Read(ref invalidEnvelopeReadCount); } }
         internal static long FreezeFailureCount { get { return Interlocked.Read(ref freezeFailureCount); } }
@@ -187,7 +189,20 @@ namespace SaveNLoadFixes.Persistence
             else
             {
                 Interlocked.Increment(ref envelopeReadCount);
-                SetDiagnostic("Loaded SavedData with SNLF checkpoint " + state.Envelope.checkpoint_id + ".");
+                if (state.RecoveredFromSimpleJsonRewrite)
+                {
+                    Interlocked.Increment(ref simpleJsonRecoveredReadCount);
+                    SetDiagnostic(
+                        "Recovered SNLF checkpoint " + state.Envelope.checkpoint_id +
+                        " from vanilla FixSaveFile's uniform SimpleJSON scalar rewrite; " +
+                        "every typed value passed canonical exactness checks. The next save " +
+                        "will write the normal typed JSON form.");
+                    Debug.LogWarning(SaveNLoadFixesConstants.LogPrefix + LastDiagnostic);
+                }
+                else
+                {
+                    SetDiagnostic("Loaded SavedData with SNLF checkpoint " + state.Envelope.checkpoint_id + ".");
+                }
             }
 
             return loaded;

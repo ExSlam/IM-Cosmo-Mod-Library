@@ -8,7 +8,8 @@ namespace SaveNLoadFixes.Transport
         SavedDataWrite = 0,
         SavedDataRead = 1,
         GlobalDataWrite = 2,
-        GlobalDataRead = 3
+        GlobalDataRead = 3,
+        StartupSavedDataMigration = 4
     }
 
     /// <summary>
@@ -28,6 +29,8 @@ namespace SaveNLoadFixes.Transport
         internal const int ExpectedGlobalDataWriteCallSiteCount = 1;
         internal const int ExpectedGlobalDataReadCallerCount = 1;
         internal const int ExpectedGlobalDataReadCallSiteCount = 1;
+        internal const int ExpectedStartupSavedDataMigrationCallerCount = 1;
+        internal const int ExpectedStartupSavedDataMigrationCallSiteCount = 1;
 
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<TransportPatchSurface, SurfaceState> States =
@@ -36,7 +39,8 @@ namespace SaveNLoadFixes.Transport
                 { TransportPatchSurface.SavedDataWrite, new SurfaceState() },
                 { TransportPatchSurface.SavedDataRead, new SurfaceState() },
                 { TransportPatchSurface.GlobalDataWrite, new SurfaceState() },
-                { TransportPatchSurface.GlobalDataRead, new SurfaceState() }
+                { TransportPatchSurface.GlobalDataRead, new SurfaceState() },
+                { TransportPatchSurface.StartupSavedDataMigration, new SurfaceState() }
             };
 
         private static bool providerActivated;
@@ -161,7 +165,11 @@ namespace SaveNLoadFixes.Transport
                    IsSurfaceHealthyLocked(
                        TransportPatchSurface.GlobalDataRead,
                        ExpectedGlobalDataReadCallerCount,
-                       ExpectedGlobalDataReadCallSiteCount);
+                       ExpectedGlobalDataReadCallSiteCount) &&
+                   IsSurfaceHealthyLocked(
+                       TransportPatchSurface.StartupSavedDataMigration,
+                       ExpectedStartupSavedDataMigrationCallerCount,
+                       ExpectedStartupSavedDataMigrationCallSiteCount);
         }
 
         internal static TransportPatchHealthSnapshot GetSnapshot()
@@ -186,7 +194,11 @@ namespace SaveNLoadFixes.Transport
                     GlobalDataRead = BuildSurfaceSnapshotLocked(
                         TransportPatchSurface.GlobalDataRead,
                         ExpectedGlobalDataReadCallerCount,
-                        ExpectedGlobalDataReadCallSiteCount)
+                        ExpectedGlobalDataReadCallSiteCount),
+                    StartupSavedDataMigration = BuildSurfaceSnapshotLocked(
+                        TransportPatchSurface.StartupSavedDataMigration,
+                        ExpectedStartupSavedDataMigrationCallerCount,
+                        ExpectedStartupSavedDataMigrationCallSiteCount)
                 };
             }
         }
@@ -253,6 +265,7 @@ namespace SaveNLoadFixes.Transport
         internal TransportSurfaceHealthSnapshot SavedDataRead;
         internal TransportSurfaceHealthSnapshot GlobalDataWrite;
         internal TransportSurfaceHealthSnapshot GlobalDataRead;
+        internal TransportSurfaceHealthSnapshot StartupSavedDataMigration;
     }
 
     internal sealed class TransportSurfaceHealthSnapshot

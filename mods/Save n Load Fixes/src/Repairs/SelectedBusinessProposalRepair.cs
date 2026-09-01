@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using SaveNLoadFixes.Persistence;
 using UnityEngine;
@@ -238,7 +239,10 @@ namespace SaveNLoadFixes.Repairs
 
         private static SelectedBusinessProposalRecordV1 EmptyRecord()
         {
-            return new SelectedBusinessProposalRecordV1();
+            return new SelectedBusinessProposalRecordV1
+            {
+                liability_decimal = "0"
+            };
         }
 
         private static bool TryFindLatestBusinessEventOwner(
@@ -429,6 +433,7 @@ namespace SaveNLoadFixes.Repairs
                 agent_name = savedProposal.Agent_Name ?? string.Empty,
                 product_name = savedProposal.Product_Name ?? string.Empty,
                 liability = savedProposal.Liability,
+                liability_decimal = savedProposal.Liability.ToString(CultureInfo.InvariantCulture),
                 end_date = savedProposal.EndDate ?? string.Empty
             };
         }
@@ -496,6 +501,7 @@ namespace SaveNLoadFixes.Repairs
                 record.proposal_type == 0 && record.payment_per_week == 0 && record.buzz_per_week == 0 &&
                 record.fame_per_week == 0 && record.stamina_per_week == 0 && record.fans_per_week == 0 &&
                 record.liability == 0L && !record.proposal_is_group &&
+                (string.IsNullOrEmpty(record.liability_decimal) || record.liability_decimal == "0") &&
                 string.IsNullOrEmpty(record.event_id) && string.IsNullOrEmpty(record.event_date) &&
                 string.IsNullOrEmpty(record.agent_name) && string.IsNullOrEmpty(record.product_name) &&
                 string.IsNullOrEmpty(record.end_date);

@@ -1,6 +1,7 @@
 using SaveNLoadFixes.Safety;
 using SaveNLoadFixes.Persistence;
 using SaveNLoadFixes.Repairs;
+using SaveNLoadFixes.Transport;
 
 namespace SaveNLoadFixes
 {
@@ -1573,6 +1574,11 @@ namespace SaveNLoadFixes
             get { return RepairEnvelopeTransport.EnvelopeReadCount; }
         }
 
+        public static long RepairEnvelopeSimpleJsonRecoveredReadCount
+        {
+            get { return RepairEnvelopeTransport.SimpleJsonRecoveredReadCount; }
+        }
+
         public static long RepairEnvelopeLegacyReadCount
         {
             get { return RepairEnvelopeTransport.LegacyReadCount; }
@@ -1591,6 +1597,31 @@ namespace SaveNLoadFixes
         public static string LastRepairEnvelopeDiagnostic
         {
             get { return RepairEnvelopeTransport.LastDiagnostic; }
+        }
+
+        public static long StartupSaveMigrationAttemptCount
+        {
+            get { return StartupSaveFileMigration.AttemptCount; }
+        }
+
+        public static long StartupSaveMigrationMigratedFileCount
+        {
+            get { return StartupSaveFileMigration.MigratedFileCount; }
+        }
+
+        public static long StartupSaveMigrationMigratedFieldCount
+        {
+            get { return StartupSaveFileMigration.MigratedFieldCount; }
+        }
+
+        public static long StartupSaveMigrationFailureCount
+        {
+            get { return StartupSaveFileMigration.FailureCount; }
+        }
+
+        public static string LastStartupSaveMigrationDiagnostic
+        {
+            get { return StartupSaveFileMigration.LastDiagnostic; }
         }
 
         public static bool SnsMessageExactStateRepairImplemented
@@ -2426,6 +2457,69 @@ namespace SaveNLoadFixes
         public static string LastLegacyRivalBootstrapMigrationDiagnostic
         {
             get { return LegacyRivalBootstrapMigration.LastDiagnostic; }
+        }
+
+        public static bool WideNumericRepairImplemented
+        {
+            get { return WideNumericRepair.IsImplemented; }
+        }
+
+        public static bool WideNumericRepairHealthy
+        {
+            get { return WideNumericRepair.IsHealthy; }
+        }
+
+        public static bool WideNumericFailureLatched
+        {
+            get { return WideNumericRepair.HasLatchedFailure; }
+        }
+
+        public static int WideNumericExpectedTargetMethodCount
+        {
+            get { return WideNumericPatchHealth.ExpectedTargetMethodCount; }
+        }
+
+        public static int WideNumericResolvedTargetMethodCount
+        {
+            get { return WideNumericPatchHealth.ResolvedTargetMethodCount; }
+        }
+
+        public static long WideNumericCheckedOperationCount
+        {
+            get { return WideNumericRepair.CheckedOperationCount; }
+        }
+
+        public static long WideNumericOverflowFailureCount
+        {
+            get { return WideNumericRepair.OverflowFailureCount; }
+        }
+
+        public static long WideNumericInvariantFailureCount
+        {
+            get { return WideNumericRepair.InvariantFailureCount; }
+        }
+
+        public static long WideNumericBusinessHistoryCorrectionCount
+        {
+            get { return WideNumericRepair.BusinessHistoryCorrectionCount; }
+        }
+
+        public static string LastWideNumericDiagnostic
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(WideNumericPatchHealth.Failure))
+                {
+                    return WideNumericPatchHealth.Failure;
+                }
+
+                if (!string.IsNullOrEmpty(WideNumericRepair.LastDiagnostic))
+                {
+                    return WideNumericRepair.LastDiagnostic;
+                }
+
+                return WideNumericPatchHealth.LastDiagnostic;
+            }
         }
 
     }

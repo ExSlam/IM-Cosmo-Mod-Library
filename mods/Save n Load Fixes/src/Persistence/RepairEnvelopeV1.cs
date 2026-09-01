@@ -250,6 +250,10 @@ namespace SaveNLoadFixes.Persistence
         public string agent_name = string.Empty;
         public string product_name = string.Empty;
         public long liability;
+        // Exact decimal witness for the one Int64 in V1. Vanilla FixSaveFile routes
+        // integers outside Int32 through Double before SimpleJSON writes them, so the
+        // numeric member alone is not always recoverable after that legacy rewrite.
+        public string liability_decimal = string.Empty;
         public string end_date = string.Empty;
     }
 

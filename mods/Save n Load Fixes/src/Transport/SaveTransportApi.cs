@@ -7,7 +7,8 @@ namespace SaveNLoadFixes
     /// <summary>
     /// Public coordination surface for Save n Load Fixes' embedded ordered transport.
     /// The provider is authoritative only after all audited SavedData/GlobalData
-    /// caller-level read/write patches report healthy interception.
+    /// caller-level read/write patches and the type-preserving startup migration
+    /// report healthy interception.
     ///
     /// Legacy SWOF and legacy IMDataCore compatibility adapters are intentionally not
     /// implemented in Sprint 1B. They are deferred until the companion mods are updated.
@@ -59,7 +60,8 @@ namespace SaveNLoadFixes
                 TransportPatchHealthSnapshot snapshot = TransportPatchHealth.GetSnapshot();
                 return snapshot.ProviderActivated &&
                     snapshot.SavedDataWrite.Healthy &&
-                    snapshot.SavedDataRead.Healthy;
+                    snapshot.SavedDataRead.Healthy &&
+                    snapshot.StartupSavedDataMigration.Healthy;
             }
         }
 
@@ -229,6 +231,7 @@ namespace SaveNLoadFixes
         public SaveTransportSurfaceDiagnostics SavedDataRead { get; private set; }
         public SaveTransportSurfaceDiagnostics GlobalDataWrite { get; private set; }
         public SaveTransportSurfaceDiagnostics GlobalDataRead { get; private set; }
+        public SaveTransportSurfaceDiagnostics StartupSavedDataMigration { get; private set; }
 
         internal static SaveTransportDiagnostics FromSnapshot(
             TransportPatchHealthSnapshot snapshot)
@@ -242,7 +245,9 @@ namespace SaveNLoadFixes
                 SavedDataWrite = SaveTransportSurfaceDiagnostics.FromSnapshot(snapshot.SavedDataWrite),
                 SavedDataRead = SaveTransportSurfaceDiagnostics.FromSnapshot(snapshot.SavedDataRead),
                 GlobalDataWrite = SaveTransportSurfaceDiagnostics.FromSnapshot(snapshot.GlobalDataWrite),
-                GlobalDataRead = SaveTransportSurfaceDiagnostics.FromSnapshot(snapshot.GlobalDataRead)
+                GlobalDataRead = SaveTransportSurfaceDiagnostics.FromSnapshot(snapshot.GlobalDataRead),
+                StartupSavedDataMigration = SaveTransportSurfaceDiagnostics.FromSnapshot(
+                    snapshot.StartupSavedDataMigration)
             };
         }
     }

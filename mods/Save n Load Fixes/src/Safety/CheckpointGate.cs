@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading;
+using SaveNLoadFixes.Repairs;
 using UnityEngine;
 
 namespace SaveNLoadFixes.Safety
@@ -96,7 +97,8 @@ namespace SaveNLoadFixes.Safety
             {
                 lock (Sync)
                 {
-                    return ActiveBlockers.Count != 0;
+                    return ActiveBlockers.Count != 0 ||
+                        !WideNumericRepair.IsCheckpointSafe;
                 }
             }
         }
@@ -107,7 +109,8 @@ namespace SaveNLoadFixes.Safety
             {
                 lock (Sync)
                 {
-                    return ActiveBlockers.Count;
+                    return ActiveBlockers.Count +
+                        (WideNumericRepair.IsCheckpointSafe ? 0 : 1);
                 }
             }
         }
@@ -136,7 +139,7 @@ namespace SaveNLoadFixes.Safety
 
         internal static bool ShouldAllowManualSave(out string reason)
         {
-            return !TryBuildUnsafeLiveCheckpointReason(out reason);
+            return !TryBuildUnsafeLiveCheckpointReason(out reason, true);
         }
 
         internal static bool ShouldAllowInGameLoad(out string reason)
@@ -147,7 +150,10 @@ namespace SaveNLoadFixes.Safety
                 return true;
             }
 
-            return !TryBuildUnsafeLiveCheckpointReason(out reason);
+            // A33 failures block writes, not recovery. Loading another checkpoint is
+            // allowed to discard the current live timeline; the process-latched A33
+            // diagnostic remains visible and still blocks later writes until restart.
+            return !TryBuildUnsafeLiveCheckpointReason(out reason, false);
         }
 
         internal static void RecordBlockedOperation(string operation, string reason)
@@ -187,7 +193,9 @@ namespace SaveNLoadFixes.Safety
             }
         }
 
-        private static bool TryBuildUnsafeLiveCheckpointReason(out string reason)
+        private static bool TryBuildUnsafeLiveCheckpointReason(
+            out string reason,
+            bool includeWideNumeric)
         {
             List<string> reasons = new List<string>();
 
@@ -210,9 +218,11 @@ namespace SaveNLoadFixes.Safety
 
             lock (Sync)
             {
-                if (ActiveBlockers.Count != 0)
+                string blockerDescription = BuildBlockerDescriptionLocked(
+                    includeWideNumeric);
+                if (!string.IsNullOrEmpty(blockerDescription))
                 {
-                    reasons.Add("SNLF blockers: " + BuildBlockerDescriptionLocked());
+                    reasons.Add("SNLF blockers: " + blockerDescription);
                 }
             }
 
@@ -241,9 +251,12 @@ namespace SaveNLoadFixes.Safety
             }
         }
 
-        private static string BuildBlockerDescriptionLocked()
+        private static string BuildBlockerDescriptionLocked(
+            bool includeWideNumeric = true)
         {
-            if (ActiveBlockers.Count == 0)
+            bool wideNumericSafe = !includeWideNumeric ||
+                WideNumericRepair.IsCheckpointSafe;
+            if (ActiveBlockers.Count == 0 && wideNumericSafe)
             {
                 return string.Empty;
             }
@@ -271,6 +284,18 @@ namespace SaveNLoadFixes.Safety
                     builder.Append(blocker.Detail);
                     builder.Append(')');
                 }
+            }
+
+            if (!wideNumericSafe)
+            {
+                if (builder.Length != 0)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append("A33WideNumeric(");
+                builder.Append(WideNumericRepair.CheckpointUnsafeReason);
+                builder.Append(')');
             }
 
             return builder.ToString();

@@ -3,7 +3,7 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>0.52.0</Version>
+    <Version>0.53.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -113,8 +113,12 @@
     <Compile Include="src\Repairs\TrainingProgressInitRepairPatches.cs" />
     <Compile Include="src\Repairs\GlobalDataDeliveryRepair.cs" />
     <Compile Include="src\Repairs\GlobalDataDeliveryRepairPatches.cs" />
+    <Compile Include="src\Repairs\WideNumericMath.cs" />
+    <Compile Include="src\Repairs\WideNumericRepair.cs" />
+    <Compile Include="src\Repairs\WideNumericRepairPatches.cs" />
     <Compile Include="src\Transport\TransportPatchHealth.cs" />
     <Compile Include="src\Transport\OrderedSaveTransport.cs" />
+    <Compile Include="src\Transport\StartupSaveFileMigration.cs" />
     <Compile Include="src\Transport\SaveTransportPatches.cs" />
     <Compile Include="src\Transport\SaveTransportApi.cs" />
   </ItemGroup>

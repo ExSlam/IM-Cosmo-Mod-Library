@@ -1,6 +1,16 @@
 # Save n Load Fixes
 
-## Version 0.52.0
+## Version 0.53.0
+
+Version 0.53.0 starts A33 with a checked `Int64` numeric substrate and an exact
+17-target Harmony manifest. It fixes all nine audited expressions that performed
+`Int32` arithmetic before widening, guards the core resource/fan mutation seams,
+and checks the first fan/show/loan aggregates. In particular, theater ticket sales
+now calculate directly as `Int64`: 250 visitors at ¥99,000,000 each produces the
+exact ¥24,750,000,000 result that already fits the vanilla `Int64` theater stat.
+An actual signed-`Int64` overflow refuses the patched arithmetic result, latches a
+named diagnostic, and blocks checkpoint writes instead of wrapping or saturating;
+in-game load remains available for recovery.
 
 Post-0.52 envelope qualification fixes a release-blocking persistence defect: the
 physical v0.52 save could contain only the SNLF header while silently omitting
@@ -8,6 +18,20 @@ physical v0.52 save could contain only the SNLF header while silently omitting
 DTO writer and verifies raw presence plus a complete deserialize/value round trip
 before queueing any repair-dependent save. A header-only root is invalid, never an
 exact empty checkpoint.
+
+The startup compatibility path is now type-preserving. Vanilla
+`SaveManager.FixSaveFile` used SimpleJSON to rename legacy idol parameter key `val`
+to `_val`, then rewrote the entire save; this game's `JSONData.ToString()` quotes
+every scalar and therefore changed SNLF numbers/Booleans into strings. SNLF keeps
+the one audited rename but applies it directly to the original UTF-8 JSON text,
+leaving every other token untouched. The interception is part of transport health.
+Already-rewritten envelopes are recovered only when every scalar has the uniform
+SimpleJSON string shape and every schema-directed conversion has a unique canonical
+preimage. Unknown envelope members, mixed token types, ambiguous `"null"`, and
+locale-dependent decimal/thousands collisions remain invalid rather than being
+guessed. The V1 business-proposal
+record also carries an additive exact decimal witness for its sole `Int64`, so large
+liabilities never depend on SimpleJSON's lossy `Double` fallback.
 
 SNS state is now part of the same SNLF envelope as a non-recursive ordered node
 table. This preserves the exact finite message/reply tree after load even though
@@ -26,7 +50,8 @@ rejecting mixed, partial, or duplicate call-site shapes. HarmonyX's opaque `0/0`
 intermediate observations are neutral and pending: they cannot establish authority or
 poison a later exact composition. SNLF logs one positive transport self-check only when
 all 5 SavedData writers, 7 readers / 8 read sites, and both GlobalData callers have
-reported their complete exact shapes.
+reported their complete exact shapes, together with the one audited type-preserving
+`FixSaveFile` migration site.
 
 Post-0.52 runtime qualification fix: A14's Harmony bookkeeping and activities-delay
 transpiler are re-entry-safe when HarmonyX recomposes the generated tutorial iterator.
@@ -45,9 +70,11 @@ persistence audit.
 
 ### Current development state
 
-This is a cumulative development build through **Sprint 1D, Task 50: A23 deterministic legacy rival bootstrap**. Sprint 1A foundations, Sprint 1B embedded transport, and Sprint 1D Tasks 1-49 remain intact. All planned repair families are now source-implemented; compiled/live Unity/Harmony and release-matrix qualification remain separate release gates.
+This is a cumulative development build through **A33.1: checked-wide numeric foundation**, over Sprint 1D Task 50 / A23 and all earlier repair/transport work. A33.1 has compiled successfully and its pure arithmetic is runtime-harnessed; live Unity/Harmony and the remaining A33 accounting, fan-simulation, persistence, consumer, and long-horizon segments remain separate release gates.
 
-Implemented cumulatively through 0.52.0:
+Implemented cumulatively through 0.53.0:
+
+- **A33.1 checked-wide numeric foundation:** checked add/subtract/negate/multiply, exact rational/decimal midpoint-to-even rounding, exact `Int64` aggregation, explicit Int32 compatibility conversion, idempotent target-identity health, and checkpoint-failure latching. The first manifest covers `resources._Add`, `_fan.AddPeople`, the three core fan totals, all nine mandatory late-widen sites, show long totals/profit, and loan committed/debt totals. Mutable resource/fan adds are preflighted while vanilla retains its normal clamps, fan distribution, statistics, and observer callbacks. Staff severance retains its compiled `Int32` ABI and fails closed if an exact result cannot fit; later A33 segments will add authoritative wide shadows where the vanilla ABI itself is narrow.
 
 - **A23 deterministic legacy rival bootstrap:** SNLF scopes a replacement only to the `Rivals.Generate()` call reached from `Rivals.LoadFunction()` when the exact target save serializes zero rival groups. The replacement mirrors vanilla's complete bootstrap: all genre/choreography/lyrics trend rows, 50 groups, exact fan-band ranges, rising/genre/name choices, fixed top-three overrides, story rival/Phantasm tagging, descending sorts, and the three `LinearFunction` initializations. Every bootstrap random choice comes from the shared repair-owned deterministic stream keyed to the physical save/migration identity. Because vanilla `GenerateGroup()` destructively removes chosen names from the global `rival_group` pool, A23 also snapshots that pool before the first `Generate()` mutation and restores it at each legacy migration so repeated F9 loads do not inherit discarded-timeline name consumption. New-career `Start()`, later `OnNewMonth()` generation, and normal `GenerateGroup()` remain vanilla-owned. No repair-envelope field is added because the next ordinary vanilla save serializes the migrated rival ecosystem normally.
 

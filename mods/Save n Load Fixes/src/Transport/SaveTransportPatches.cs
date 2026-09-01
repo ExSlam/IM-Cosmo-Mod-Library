@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
@@ -119,6 +120,43 @@ namespace SaveNLoadFixes.Transport
                    calledMethod.ReturnType == dataType;
         }
 
+        internal static bool IsFileWriteAllText(
+            CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction == null
+                ? null
+                : instruction.operand as MethodInfo;
+            if (calledMethod == null ||
+                calledMethod.DeclaringType != typeof(File) ||
+                !string.Equals(calledMethod.Name, nameof(File.WriteAllText), StringComparison.Ordinal) ||
+                !calledMethod.IsStatic ||
+                calledMethod.ReturnType != typeof(void))
+            {
+                return false;
+            }
+
+            ParameterInfo[] parameters = calledMethod.GetParameters();
+            return parameters.Length == 2 &&
+                parameters[0].ParameterType == typeof(string) &&
+                parameters[1].ParameterType == typeof(string);
+        }
+
+        internal static bool IsParameterlessInstanceToString(
+            CodeInstruction instruction)
+        {
+            MethodInfo calledMethod = instruction == null
+                ? null
+                : instruction.operand as MethodInfo;
+            return calledMethod != null &&
+                !calledMethod.IsStatic &&
+                string.Equals(
+                    calledMethod.Name,
+                    nameof(object.ToString),
+                    StringComparison.Ordinal) &&
+                calledMethod.ReturnType == typeof(string) &&
+                calledMethod.GetParameters().Length == 0;
+        }
+
         internal static bool IsExactStaticCall(
             CodeInstruction instruction,
             MethodInfo expectedMethod)
@@ -221,6 +259,22 @@ namespace SaveNLoadFixes.Transport
             return 0;
         }
 
+        internal static int CombineRequiredRewriteResults(
+            int first,
+            int second)
+        {
+            if (first == 1 && second == 1)
+            {
+                return 1;
+            }
+            if (first == OpaqueRecomposition &&
+                second == OpaqueRecomposition)
+            {
+                return OpaqueRecomposition;
+            }
+            return 0;
+        }
+
         internal static void ReportCaller(
             TransportPatchSurface surface,
             MethodBase originalMethod,
@@ -264,9 +318,80 @@ namespace SaveNLoadFixes.Transport
                 Debug.Log(
                     SaveNLoadFixesConstants.LogPrefix +
                     "Embedded ordered transport self-check passed: 5/5 SavedData write callers, " +
-                    "7/7 SavedData read callers (8 call sites), and 1/1 GlobalData write/read callers. " +
+                    "7/7 SavedData read callers (8 call sites), 1/1 type-preserving startup migration, " +
+                    "and 1/1 GlobalData write/read callers. " +
                     "SNLF is the authoritative save transport.");
             }
+        }
+    }
+
+    /// <summary>
+    /// Keeps vanilla FixSaveFile's one audited val-to-_val migration while replacing
+    /// only its final SimpleJSON whole-document rewrite with a raw-token-preserving
+    /// implementation.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class VanillaStartupSavedDataMigration_SaveNLoadFixes_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            return TransportPatchHelpers.RequireMethod(
+                typeof(SaveManager),
+                "FixSaveFile",
+                new Type[] { typeof(bool) });
+        }
+
+        [HarmonyTranspiler]
+        [HarmonyPriority(Priority.Last)]
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions,
+            MethodBase __originalMethod)
+        {
+            MethodInfo replacement = AccessTools.Method(
+                typeof(StartupSaveFileMigration),
+                nameof(StartupSaveFileMigration.WriteTypePreservingMigration),
+                new Type[] { typeof(string), typeof(string) });
+            MethodInfo suppressReserialization = AccessTools.Method(
+                typeof(StartupSaveFileMigration),
+                nameof(StartupSaveFileMigration.SuppressSimpleJsonReserialization),
+                new Type[] { typeof(object) });
+            if (replacement == null || suppressReserialization == null)
+            {
+                TransportPatchHealth.ReportFailure(
+                    TransportPatchSurface.StartupSavedDataMigration);
+                return instructions;
+            }
+
+            List<CodeInstruction> result = new List<CodeInstruction>(instructions);
+            int suppressedCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                TransportPatchHelpers.IsParameterlessInstanceToString,
+                suppressReserialization,
+                1,
+                __originalMethod);
+            int writeReplacementCount = TransportPatchHelpers.RewriteOrRecognize(
+                result,
+                TransportPatchHelpers.IsFileWriteAllText,
+                replacement,
+                1,
+                __originalMethod);
+            int replacedCount = TransportPatchHelpers.CombineRequiredRewriteResults(
+                suppressedCount,
+                writeReplacementCount);
+            if (replacedCount == 0)
+            {
+                Debug.LogWarning(
+                    SaveNLoadFixesConstants.LogPrefix +
+                    "FixSaveFile did not expose one complete JSONNode.ToString/File.WriteAllText " +
+                    "pair. The type-preserving startup migration is not authoritative.");
+            }
+
+            TransportPatchHelpers.ReportCaller(
+                TransportPatchSurface.StartupSavedDataMigration,
+                __originalMethod,
+                replacedCount,
+                1);
+            return result;
         }
     }
 
