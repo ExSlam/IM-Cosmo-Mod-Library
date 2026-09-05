@@ -117,21 +117,66 @@ namespace IMDataCore
         }
     }
 
+    internal sealed class MoneyLedgerAmbientFrame
+    {
+        internal MoneyLedgerAmbientCapture Capture;
+        internal MoneyLedgerAmbientFrame Previous;
+        internal bool IsOwnedFrame;
+    }
+
     internal static class MoneyLedgerAmbientContext
     {
         private static readonly Dictionary<business.active_proposal, MoneyLedgerContractRuntimeMetadata> ContractMetadata =
             new Dictionary<business.active_proposal, MoneyLedgerContractRuntimeMetadata>();
-        private static MoneyLedgerAmbientCapture current;
 
-        internal static void Set(MoneyLedgerAmbientCapture capture)
+        [ThreadStatic]
+        private static MoneyLedgerAmbientFrame currentFrame;
+
+        internal static void Begin()
         {
-            current = capture;
+            currentFrame = new MoneyLedgerAmbientFrame
+            {
+                Capture = null,
+                Previous = currentFrame,
+                IsOwnedFrame = true
+            };
+        }
+
+        internal static void SetCurrentCapture(MoneyLedgerAmbientCapture capture)
+        {
+            if (currentFrame == null || !currentFrame.IsOwnedFrame)
+            {
+                Begin();
+            }
+
+            currentFrame.Capture = capture;
+        }
+
+        internal static void PushTransient(MoneyLedgerAmbientCapture capture)
+        {
+            currentFrame = new MoneyLedgerAmbientFrame
+            {
+                Capture = capture,
+                Previous = currentFrame,
+                IsOwnedFrame = false
+            };
         }
 
         internal static MoneyLedgerAmbientCapture Consume()
         {
-            MoneyLedgerAmbientCapture capture = current;
-            current = null;
+            if (currentFrame == null)
+            {
+                return null;
+            }
+
+            MoneyLedgerAmbientFrame frame = currentFrame;
+            MoneyLedgerAmbientCapture capture = frame.Capture;
+            frame.Capture = null;
+            if (!frame.IsOwnedFrame)
+            {
+                currentFrame = frame.Previous;
+            }
+
             if (capture != null && capture.PrepareForCapture != null)
             {
                 capture.PrepareForCapture();
@@ -142,7 +187,8 @@ namespace IMDataCore
 
         internal static MoneyLedgerAmbientCapture Consume(string sourceType, string sourceMethod)
         {
-            if (current == null)
+            MoneyLedgerAmbientCapture current = currentFrame != null ? currentFrame.Capture : null;
+            if (currentFrame == null || current == null)
             {
                 return null;
             }
@@ -167,13 +213,22 @@ namespace IMDataCore
                         >= CoreConstants.ZeroBasedListStartIndex);
         }
 
-        internal static void Clear()
+        internal static void Restore()
         {
-            current = null;
+            while (currentFrame != null && !currentFrame.IsOwnedFrame)
+            {
+                currentFrame = currentFrame.Previous;
+            }
+
+            if (currentFrame != null)
+            {
+                currentFrame = currentFrame.Previous;
+            }
         }
 
         internal static bool TryPopulateKnownSource(MoneyMutationSnapshot snapshot)
         {
+            MoneyLedgerAmbientCapture current = currentFrame != null ? currentFrame.Capture : null;
             if (snapshot == null || current == null ||
                 string.IsNullOrEmpty(current.ExpectedSourceType))
             {
@@ -269,6 +324,7 @@ namespace IMDataCore
                 Multiplier = ResolveProposalMultiplier(proposal),
                 Negotiations = proposal.negotiation_attempts
             };
+            ApplyCurrentContractReference(activeContract);
         }
 
         internal static bool TryGetContractMetadata(business.active_proposal activeContract, out MoneyLedgerContractRuntimeMetadata metadata)
@@ -289,6 +345,21 @@ namespace IMDataCore
                 Multiplier = multiplier,
                 Negotiations = negotiations
             };
+            ApplyCurrentContractReference(activeContract);
+        }
+
+        private static void ApplyCurrentContractReference(business.active_proposal activeContract)
+        {
+            MoneyLedgerAmbientCapture current = currentFrame != null ? currentFrame.Capture : null;
+            if (activeContract == null || current == null || current.Details == null ||
+                !string.Equals(current.Details.kind, MoneyLedgerConstants.DetailKindContract, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            string entityId = IMDataCoreController.Instance.ResolveContractHistoryEntityIdForMoney(activeContract);
+            current.Details.contract_entity_id = entityId ?? string.Empty;
+            current.Details.contract_reference_known = !string.IsNullOrEmpty(entityId);
         }
 
         internal static float ResolveProposalMultiplier(business._proposal proposal)
@@ -352,6 +423,8 @@ namespace IMDataCore
                 Details = new MoneyLedgerDetailPayload
                 {
                     kind = MoneyLedgerConstants.DetailKindStaffSeverance,
+                    staff_id = snapshotBefore.StaffId,
+                    staff_reference_known = snapshotBefore.StaffId >= CoreConstants.MinimumValidIdolIdentifier,
                     staff_name = snapshotBefore.StaffName ?? string.Empty,
                     staff_role_code = snapshotBefore.StaffType ?? string.Empty,
                     payment_amount = snapshotBefore.SeveranceCostBefore,
@@ -503,6 +576,7 @@ namespace IMDataCore
                     continue;
                 }
 
+                string theaterEntityId = IMDataCoreController.Instance.ResolveTheaterHistoryEntityId(theater, null);
                 Theaters._theater._schedule performedSchedule = ResolvePerformedTheaterSchedule(theater);
                 bool hasAttendanceIncome =
                     theater.Doing_Now == Theaters._theater._schedule._type.performance
@@ -519,6 +593,9 @@ namespace IMDataCore
                     {
                         kind = MoneyLedgerConstants.DetailKindTheaterAttendance,
                         theater_id = theater.ID,
+                        facility_entity_kind = CoreConstants.EventEntityKindTheater,
+                        facility_entity_id = theaterEntityId ?? string.Empty,
+                        facility_reference_known = !string.IsNullOrEmpty(theaterEntityId),
                         theater_title = theater.GetTitle() ?? string.Empty,
                         theater_income_type = MoneyLedgerDetailConstants.TheaterIncomeAttendance,
                         theater_ticket_price = theater.Ticket_Price,
@@ -545,6 +622,9 @@ namespace IMDataCore
                         {
                             kind = MoneyLedgerConstants.DetailKindTheaterStreaming,
                             theater_id = theater.ID,
+                            facility_entity_kind = CoreConstants.EventEntityKindTheater,
+                            facility_entity_id = theaterEntityId ?? string.Empty,
+                            facility_reference_known = !string.IsNullOrEmpty(theaterEntityId),
                             theater_title = theater.GetTitle() ?? string.Empty,
                             theater_income_type = MoneyLedgerDetailConstants.TheaterIncomeStreaming,
                             theater_subscription_price = theater.Subscription_Price,
@@ -572,6 +652,8 @@ namespace IMDataCore
             }
 
             Cafes._cafe._dish dish = cafe.GetCurrentDish();
+            string cafeEntityId = IMDataCoreController.Instance.ResolveCafeHistoryEntityId(cafe, null);
+            List<int> workingIdolIds = ResolveIdolIdentifiers(cafe.WorkingGirls);
             int amount = cafe.GetMoneyToAdd();
             capture.Allocations.Add(new MoneyLedgerAllocationSnapshot
             {
@@ -586,12 +668,19 @@ namespace IMDataCore
                 {
                     kind = MoneyLedgerConstants.DetailKindCafeDaily,
                     cafe_id = cafe.ID,
+                    facility_entity_kind = CoreConstants.EventEntityKindCafe,
+                    facility_entity_id = cafeEntityId ?? string.Empty,
+                    facility_reference_known = !string.IsNullOrEmpty(cafeEntityId),
                     cafe_title = cafe.GetTitle() ?? string.Empty,
+                    cafe_dish_id = dish != null ? dish.ID : CoreConstants.InvalidIdValue,
+                    cafe_dish_reference_known = true,
                     cafe_dish_title = dish != null ? dish.Title ?? string.Empty : string.Empty,
                     cafe_dish_type = dish != null
                         ? CoreEnumNameMapping.ToCafeDishTypeCode(dish.Type)
                         : CoreConstants.StatusCodeUnknown,
                     cafe_staff_names = ResolveIdolNames(cafe.WorkingGirls),
+                    cafe_working_idol_ids = workingIdolIds,
+                    cafe_working_idol_references_known = true,
                     cafe_new_fans = cafe.GetFansToAdd(),
                     cafe_appeal_type = CoreEnumNameMapping.ToFanTypeCode(cafe.GetFanTypeToAdd()),
                     gross_revenue = amount
@@ -768,14 +857,25 @@ namespace IMDataCore
                 }
 
                 SEvent_Concerts._concert._song song = item as SEvent_Concerts._concert._song;
+                List<data_girls.girls> itemIdols = item.GetGirls(true);
                 setlist.Add(new MoneyLedgerConcertSetlistItemPayload
                 {
                     is_talk = item.isMC(),
                     title = item.GetTitle() ?? string.Empty,
+                    single_id = song != null && song.Single != null
+                        ? song.Single.id
+                        : CoreConstants.InvalidIdValue,
+                    single_reference_known = true,
                     center_name = song != null && song.Center != null
                         ? song.Center.GetName(true) ?? string.Empty
                         : string.Empty,
-                    idol_names = ResolveIdolNames(item.GetGirls(true))
+                    center_idol_id = song != null && song.Center != null
+                        ? song.Center.id
+                        : CoreConstants.InvalidIdValue,
+                    center_reference_known = true,
+                    idol_names = ResolveIdolNames(itemIdols),
+                    idol_ids = ResolveIdolIdentifiers(itemIdols),
+                    idol_references_known = true
                 });
             }
 
@@ -842,6 +942,8 @@ namespace IMDataCore
                 MoneyLedgerDetailPayload details = new MoneyLedgerDetailPayload
                 {
                     kind = MoneyLedgerConstants.DetailKindStaffSalary,
+                    staff_id = staffer.id,
+                    staff_reference_known = staffer.id >= CoreConstants.MinimumValidIdolIdentifier,
                     staff_name = staffer.GetName(true, false) ?? string.Empty,
                     staff_role_code = CoreEnumNameMapping.ToStaffTypeCode(staffer.type),
                     salary_amount = salary,
@@ -941,9 +1043,12 @@ namespace IMDataCore
                 hasMetadata = TryRestoreContractMetadata(activeContract, out metadata);
             }
 
+            string contractEntityId = IMDataCoreController.Instance.ResolveContractHistoryEntityIdForMoney(activeContract);
             return new MoneyLedgerDetailPayload
             {
                 kind = MoneyLedgerConstants.DetailKindContract,
+                contract_entity_id = contractEntityId ?? string.Empty,
+                contract_reference_known = !string.IsNullOrEmpty(contractEntityId),
                 contract_type_code = CoreEnumNameMapping.ToBusinessContractTypeCode(activeContract.Type),
                 contractor_name = activeContract.Agent_Name ?? string.Empty,
                 product_name = activeContract.Product_Name ?? string.Empty,
@@ -1015,16 +1120,24 @@ namespace IMDataCore
 
         private static MoneyLedgerDetailPayload BuildSingleDetail(singles._single single)
         {
+            Groups._group group = single.GetGroup();
+            List<int> participantIds = ResolveIdolIdentifiers(single.girls);
             MoneyLedgerDetailPayload details = new MoneyLedgerDetailPayload
             {
                 kind = MoneyLedgerConstants.DetailKindSingle,
+                single_id = single.id,
+                single_reference_known = single.id >= CoreConstants.MinimumValidIdolIdentifier,
                 single_title = single.title ?? string.Empty,
-                single_group_name = single.GetGroup() != null ? single.GetGroup().Title ?? string.Empty : string.Empty,
+                single_group_id = group != null ? group.ID : CoreConstants.InvalidIdValue,
+                single_group_reference_known = true,
+                single_group_name = group != null ? group.Title ?? string.Empty : string.Empty,
                 single_genre_token = ResolveSingleParameterToken(single.genre),
                 single_lyrics_token = ResolveSingleParameterToken(single.lyrics),
                 single_choreography_token = ResolveSingleParameterToken(single.choreography),
                 single_marketing_tokens = ResolveSingleMarketingTokens(single.marketing),
                 participant_names = ResolveIdolNames(single.girls),
+                participant_ids = participantIds,
+                participant_references_known = true,
                 gross_revenue = single.GetMoney(),
                 production_cost = single.GetProductionCost()
             };
@@ -1035,9 +1148,12 @@ namespace IMDataCore
         {
             long fanAudience;
             bool hasFanAudience = TryGetFansWatchAudience(show, out fanAudience);
+            List<data_girls.girls> cast = show.GetCast();
             return new MoneyLedgerDetailPayload
             {
                 kind = MoneyLedgerConstants.DetailKindShow,
+                show_id = show.id,
+                show_reference_known = show.id >= CoreConstants.MinimumValidIdolIdentifier,
                 show_title = show.title ?? string.Empty,
                 show_medium_token = ResolveSingleParameterToken(show.medium),
                 show_genre_token = ResolveSingleParameterToken(show.genre),
@@ -1048,7 +1164,9 @@ namespace IMDataCore
                 show_fan_audience = fanAudience,
                 show_fatigue = show.GetFatigue(null),
                 show_weekly_budget = show.GetBudget(),
-                participant_names = ResolveIdolNames(show.GetCast()),
+                participant_names = ResolveIdolNames(cast),
+                participant_ids = ResolveIdolIdentifiers(cast),
+                participant_references_known = true,
                 gross_revenue = show.GetRevenue(null)
             };
         }
@@ -1124,6 +1242,25 @@ namespace IMDataCore
             return names;
         }
 
+        private static List<int> ResolveIdolIdentifiers(IEnumerable<data_girls.girls> idols)
+        {
+            List<int> identifiers = new List<int>();
+            if (idols == null)
+            {
+                return identifiers;
+            }
+
+            foreach (data_girls.girls idol in idols)
+            {
+                if (idol != null && idol.id >= CoreConstants.MinimumValidIdolIdentifier)
+                {
+                    identifiers.Add(idol.id);
+                }
+            }
+
+            return identifiers;
+        }
+
         private static business ResolveBusinessManager()
         {
             if (Camera.main == null)
@@ -1188,13 +1325,16 @@ namespace IMDataCore
         [HarmonyPrefix]
         private static void Prefix(business __instance)
         {
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildProposalCapture(__instance != null ? __instance.ActiveProposal : null));
+            MoneyLedgerAmbientContext.Begin();
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildProposalCapture(
+                    __instance != null ? __instance.ActiveProposal : null));
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1210,6 +1350,7 @@ namespace IMDataCore
             }
 
             business.active_proposal activeContract = __instance.ActiveProposals[__instance.ActiveProposals.Count - MoneyLedgerDetailConstants.LastCollectionIndexOffset];
+            IMDataCoreController.Instance.BindContractActivationIdentity(__instance, activeContract, prop);
             MoneyLedgerAmbientContext.RegisterContract(activeContract, prop);
         }
     }
@@ -1220,13 +1361,15 @@ namespace IMDataCore
         [HarmonyPrefix]
         private static void Prefix(business.active_proposal _Proposal, bool Damages)
         {
-            MoneyLedgerAmbientContext.Set(Damages ? MoneyLedgerCaptureDetails.BuildActiveContractCapture(_Proposal) : null);
+            MoneyLedgerAmbientContext.Begin();
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                Damages ? MoneyLedgerCaptureDetails.BuildActiveContractCapture(_Proposal) : null);
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1236,6 +1379,7 @@ namespace IMDataCore
         [HarmonyPrefix]
         private static void Prefix(business __instance, data_girls.girls _girl)
         {
+            MoneyLedgerAmbientContext.Begin();
             List<business.active_proposal> matching = new List<business.active_proposal>();
             if (__instance != null && __instance.ActiveProposals != null)
             {
@@ -1249,13 +1393,14 @@ namespace IMDataCore
                 }
             }
 
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildBrokenContractCapture(matching));
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildBrokenContractCapture(matching));
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1265,6 +1410,7 @@ namespace IMDataCore
         [HarmonyPrefix]
         private static void Prefix(business __instance, List<Event_Manager._activeEvent._actor> Actors)
         {
+            MoneyLedgerAmbientContext.Begin();
             List<business.active_proposal> matching = new List<business.active_proposal>();
             if (__instance != null && __instance.ActiveProposals != null && Actors != null)
             {
@@ -1288,13 +1434,14 @@ namespace IMDataCore
                 }
             }
 
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildBrokenContractCapture(matching));
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildBrokenContractCapture(matching));
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1304,13 +1451,15 @@ namespace IMDataCore
         [HarmonyPrefix]
         private static void Prefix(singles._single single)
         {
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildSingleCapture(single));
+            MoneyLedgerAmbientContext.Begin();
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildSingleCapture(single));
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1322,7 +1471,7 @@ namespace IMDataCore
         {
             if (MoneyLedgerCaptureDetails.IsShowMoneyCall())
             {
-                MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildShowCapture(__instance));
+                MoneyLedgerAmbientContext.PushTransient(MoneyLedgerCaptureDetails.BuildShowCapture(__instance));
             }
         }
     }
@@ -1334,13 +1483,14 @@ namespace IMDataCore
         private static void Prefix()
         {
             MoneyLedgerCaptureDetails.EnterShowMoneyScope();
+            MoneyLedgerAmbientContext.Begin();
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
             MoneyLedgerCaptureDetails.ExitShowMoneyScope();
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 
@@ -1351,13 +1501,14 @@ namespace IMDataCore
         private static void Prefix()
         {
             MoneyLedgerCaptureDetails.EnterShowMoneyScope();
+            MoneyLedgerAmbientContext.Begin();
         }
 
         [HarmonyFinalizer]
         private static void Finalizer()
         {
             MoneyLedgerCaptureDetails.ExitShowMoneyScope();
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
         }
     }
 }

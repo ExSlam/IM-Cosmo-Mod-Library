@@ -1,16 +1,20 @@
 # Save n Load Fixes
 
-## Version 0.53.0
+**Runtime compatibility hotfix:** SNLF must load ordinary vanilla saves and older SNLF saves without requiring prior SNLF metadata. The current Task-6 hotfix removes A33's `System.Numerics` runtime dependency after Unity/Mono was observed throwing from the patched idol salary/UI path even though vanilla `SaveManager.LoadData` had succeeded. SNLF now keeps its exact wide arithmetic self-contained. No vanilla idol migration or guessed recovery path is involved.
 
-Version 0.53.0 starts A33 with a checked `Int64` numeric substrate and an exact
-17-target Harmony manifest. It fixes all nine audited expressions that performed
-`Int32` arithmetic before widening, guards the core resource/fan mutation seams,
-and checks the first fan/show/loan aggregates. In particular, theater ticket sales
-now calculate directly as `Int64`: 250 visitors at ¥99,000,000 each produces the
-exact ¥24,750,000,000 result that already fits the vanilla `Int64` theater stat.
-An actual signed-`Int64` overflow refuses the patched arithmetic result, latches a
-named diagnostic, and blocks checkpoint writes instead of wrapping or saturating;
-in-game load remains available for recovery.
+## Version 0.54.0
+
+Version 0.54.0 completes the A33.1-A33.6 wide-numeric implementation. Scalable money,
+fan, sales, audience, subscriber, project, story, and accounting paths now calculate in
+checked `Int64`; narrow vanilla storage is paired with exact SNLF decimal-string shadows;
+and comparisons, tooltips, animations, scripts, counters, and persistent ID allocators no
+longer silently wrap those values. In particular, theater ticket sales calculate directly
+as `Int64`: 250 visitors at ¥99,000,000 each produces the exact ¥24,750,000,000 result.
+The theater Pricing UI also renders subscription revenue from the exact `Int64` path, so wide monthly streaming income is not narrowed back to `Int32` for display.
+The money-display audit also makes the weekly theater hover include streaming income, keeps full-width monetary text exact, removes float precision loss from idol earnings and new-single production costs, and carries staff severance through exact checked `Int64` calculation and display paths.
+An actual signed-`Int64` overflow or exhausted persistent `Int32` identity refuses the
+operation, latches a named diagnostic, and blocks checkpoint writes instead of wrapping
+or saturating; in-game load remains available for recovery.
 
 Post-0.52 envelope qualification fixes a release-blocking persistence defect: the
 physical v0.52 save could contain only the SNLF header while silently omitting
@@ -70,11 +74,11 @@ persistence audit.
 
 ### Current development state
 
-This is a cumulative development build through **A33.1: checked-wide numeric foundation**, over Sprint 1D Task 50 / A23 and all earlier repair/transport work. A33.1 has compiled successfully and its pure arithmetic is runtime-harnessed; live Unity/Harmony and the remaining A33 accounting, fan-simulation, persistence, consumer, and long-horizon segments remain separate release gates.
+This is a cumulative development build through **A33.6: wide numeric continuity and overflow repair**, over Sprint 1D Task 50 / A23 and all earlier repair/transport work. All six A33 implementation segments compile, pass their decompiled-source and implementation contracts, and pass the isolated arithmetic/envelope/Harmony runtime harnesses. The live Unity overwrite-save, Save As, autosave, F9, restart, repeated-load, and mod-combination matrix remains a separate release qualification gate.
 
-Implemented cumulatively through 0.53.0:
+Implemented cumulatively through 0.54.0:
 
-- **A33.1 checked-wide numeric foundation:** checked add/subtract/negate/multiply, exact rational/decimal midpoint-to-even rounding, exact `Int64` aggregation, explicit Int32 compatibility conversion, idempotent target-identity health, and checkpoint-failure latching. The first manifest covers `resources._Add`, `_fan.AddPeople`, the three core fan totals, all nine mandatory late-widen sites, show long totals/profit, and loan committed/debt totals. Mutable resource/fan adds are preflighted while vanilla retains its normal clamps, fan distribution, statistics, and observer callbacks. Staff severance retains its compiled `Int32` ABI and fails closed if an exact result cannot fit; later A33 segments will add authoritative wide shadows where the vanilla ABI itself is narrow.
+- **A33.1-A33.6 wide numeric continuity and overflow repair:** checked add/subtract/negate/multiply, exact rational/decimal midpoint-to-even rounding, exact `Int64` aggregation, and explicit narrow-ABI compatibility conversions now cover the audited resource, rent, business, loan, salary, fan engine, single, show, tour, theater, café, concert, SSK, research, story, VN, statistics, and UI paths. Multi-step mutations are preflighted transactionally, including mod-expanded theater prices. SNLF persists exact tour/single/show/theater/Stats/story/loan/café shadows as canonical decimal strings in `wide_numeric_state_version = 2`, accepts version 1 with an honest legacy fallback for its newly added chapter-four scandal baseline, validates identity/count/mirror witnesses before restore, and follows draft tours by object identity across ID assignment. Exact scandal totals and chapter-three/four targets flow through gameplay and display consumers; bounded vanilla ABI endpoints clamp only at the compatibility edge. Persistent counters and allocators fail closed at exhaustion instead of wrapping. Both frozen Harmony manifests are recomposition-idempotent, health-gated, and part of the checkpoint veto.
 
 - **A23 deterministic legacy rival bootstrap:** SNLF scopes a replacement only to the `Rivals.Generate()` call reached from `Rivals.LoadFunction()` when the exact target save serializes zero rival groups. The replacement mirrors vanilla's complete bootstrap: all genre/choreography/lyrics trend rows, 50 groups, exact fan-band ranges, rising/genre/name choices, fixed top-three overrides, story rival/Phantasm tagging, descending sorts, and the three `LinearFunction` initializations. Every bootstrap random choice comes from the shared repair-owned deterministic stream keyed to the physical save/migration identity. Because vanilla `GenerateGroup()` destructively removes chosen names from the global `rival_group` pool, A23 also snapshots that pool before the first `Generate()` mutation and restores it at each legacy migration so repeated F9 loads do not inherit discarded-timeline name consumption. New-career `Start()`, later `OnNewMonth()` generation, and normal `GenerateGroup()` remain vanilla-owned. No repair-envelope field is added because the next ordinary vanilla save serializes the migrated rival ecosystem normally.
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -31,11 +31,31 @@ namespace IMDataCore
     [HarmonyPatch(typeof(Shows), nameof(Shows.ReleaseShow))]
     internal static class Shows_ReleaseShow_IMDataCoreCapture_Patch
     {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(out SemanticCaptureScope __state)
+        {
+            __state = IMDataCoreController.Instance.BeginSemanticCaptureScope();
+        }
+
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Shows._show __0)
+        private static void Postfix(Shows._show __0, SemanticCaptureScope __state)
         {
+            IMDataCoreController.Instance.EndSemanticCaptureScope(__state);
             IMDataCoreController.Instance.CaptureShowReleased(__0);
+            IMDataCoreController.Instance.CommitSemanticCaptureScope(__state);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception, SemanticCaptureScope __state)
+        {
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.AbortSemanticCaptureScope(__state);
+            }
+            return __exception;
         }
     }
 
@@ -72,32 +92,40 @@ namespace IMDataCore
     }
 
     /// <summary>
-    /// Captures direct show cancellation calls to cover auto-cancel paths.
+    /// Captures direct show cancellation calls, including deferred-cancellation intent.
     /// </summary>
     [HarmonyPatch(typeof(Shows._show), nameof(Shows._show.Cancel))]
     internal static class Shows_show_Cancel_IMDataCoreCapture_Patch
     {
-        /// <summary>
-        /// Captures previous status so no-op cancel loops do not emit duplicate lifecycle rows.
-        /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(Shows._show __instance, out Shows._show._status __state)
+        private static void Prefix(Shows._show __instance, out ShowCancellationTransitionSnapshot __state)
         {
-            __state = __instance != null ? __instance.status : Shows._show._status.normal;
+            __state = IMDataCoreController.Instance.CreateShowCancellationTransitionSnapshot(__instance);
         }
 
-        /// <summary>
-        /// Records one show-cancelled event after direct show cancel logic completes.
-        /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Shows._show __instance, Shows._show._status __state)
+        private static void Postfix(Shows._show __instance, ShowCancellationTransitionSnapshot __state)
         {
-            if (__instance == null || __state == Shows._show._status.canceled || __instance.status != Shows._show._status.canceled)
-            {
-                return;
-            }
+            IMDataCoreController.Instance.CaptureShowCancelTransition(__instance, __state);
+        }
+    }
 
-            IMDataCoreController.Instance.CaptureShowCancelled(__instance, CoreConstants.EventSourceShowCancelMethodPatch);
+    /// <summary>
+    /// Captures withdrawal of a previously scheduled show cancellation.
+    /// </summary>
+    [HarmonyPatch(typeof(Shows._show), nameof(Shows._show.DontCancel))]
+    internal static class Shows_show_DontCancel_IMDataCoreCapture_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(Shows._show __instance, out ShowCancellationTransitionSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateShowCancellationTransitionSnapshot(__instance);
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(Shows._show __instance, ShowCancellationTransitionSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureShowDontCancelTransition(__instance, __state);
         }
     }
 
@@ -185,21 +213,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix()
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceShowRevenue);
-        }
-
-        [HarmonyPostfix]
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix()
-        {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceShowRevenue);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }

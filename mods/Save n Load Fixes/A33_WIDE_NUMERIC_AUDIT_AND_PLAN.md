@@ -1,8 +1,8 @@
 # SNLF-A33 — Wide numeric continuity and overflow repair
 
-Status: source audit/plan with A33.1 first implementation slice in v0.53.0  
+Status: A33.1-A33.6 implemented in v0.54.0; live Unity checkpoint matrix pending
 Audit date: 2026-09-01  
-SNLF audit baseline: 0.52.0; current implementation: 0.53.0  
+SNLF audit baseline: 0.52.0; current implementation: 0.54.0
 Game source baseline: supplied decompiled Idol Manager source plus the installed English JSON constants
 
 ## 1. Verdict
@@ -42,12 +42,13 @@ Accepting A33 makes it the 33rd additional SNLF repair family. Its provisional r
 suite uses `A33-WN-*` identifiers until the tests exist and are deliberately merged into
 the global count.
 
-At audit freeze, this document changed no code or release metadata. The required first
-A33 code update has since advanced SNLF from 0.52.0 to 0.53.0 as described in section 14.
+At audit freeze, this document changed no code or release metadata. The first A33.1 code
+update advanced SNLF from 0.52.0 to 0.53.0; the cumulative A33.2-A33.6 implementation is
+now 0.54.0 as described in section 14.
 
-### 2.1 Implemented in v0.53.0
+### 2.1 Implemented cumulatively through v0.54.0
 
-The first executable A33.1 slice now provides:
+The A33.1 foundation and cumulative A33.2-A33.6 implementation provide:
 
 - pure checked signed-`Int64` arithmetic and exact rational/decimal rounding helpers;
 - an idempotent 17-target Harmony health manifest verified against the installed game
@@ -62,13 +63,23 @@ The first executable A33.1 slice now provides:
   discount, and the complete legal 0-10-song domain, with exact wide behavior outside
   that domain; and
 - named failure latching that blocks checkpoint writes but preserves in-game load as a
-  recovery action.
+  recovery action;
+- transactionally preflighted money/accounting, rent, business, loan, salary, tour,
+  theater, café, project, resource, and fan mutations, including mod-expanded inputs;
+- checked fan allocation/conservation, sales, show, single, demographic, subscriber,
+  history, and story calculations without `Int64 -> Single -> Int32` authority loss;
+- canonical decimal-string wide shadows with strict identity/count/mirror witnesses for
+  every audited narrow persistent endpoint and version-1 backward compatibility;
+- exact gameplay, comparison, script, tooltip, animation, and popup consumers, with
+  compatibility clamping only where an unchanged vanilla ABI is inherently `Int32`;
+- guarded persistent lifetime counters and identity allocators that refuse exhaustion;
+  and
+- complete recomposition-idempotent target health integrated with the checkpoint gate.
 
-This is intentionally the first slice, not closure of A33. Remaining money/accounting
-callers, fan simulation, narrow-field shadows, envelope persistence, consumers/UI, and
-long-horizon counters/allocators remain assigned to A33.2-A33.6. In particular, a
-checked low-level resource add cannot by itself make every higher-level multi-step
-caller transactional; those callers are patched in their owning later segment.
+All six implementation segments are present. Compilation, decompiled-source contracts,
+implementation contracts, the pure numeric harness, and the isolated envelope/Harmony
+runtime harness pass. Live Unity overwrite-save, Save As, autosave, F9, restart,
+repeated-load, and mod-combination behavior remains the final release qualification gate.
 
 ## 3. Audit boundary and method
 
@@ -303,7 +314,7 @@ from a source-proven legacy witness. Do not use IMDataCore history as restore au
 Keep repair-envelope root format version 1 and add an optional, section-marked record:
 
 ```text
-records.wide_numeric_state_version = 1
+records.wide_numeric_state_version = 2
 records.wide_numeric_state = { typed sparse sections }
 ```
 
@@ -327,7 +338,8 @@ Typed sparse sections are required for:
 4. theater subscriber buckets keyed by theater ID and demographic tuple;
 5. theater stat subscriber deltas keyed by theater ID and stat date/ordinal;
 6. Stats `total_fans_per_week` and `fans_change_per_week` series;
-7. story `ch3_aya_fans` and `ch4_fans_needed` with explicit presence flags;
+7. story `ch3_aya_fans`, `ch4_fans_needed`, and the chapter-four scandal baseline with
+   explicit presence flags;
 8. loan weekly payments when the exact value is outside the vanilla field; and
 9. café daily profit/stat values only when mod-expanded inputs make the exact value
    exceed the vanilla `Int32` field.
@@ -335,8 +347,9 @@ Typed sparse sections are required for:
 The section must include count/identity witnesses sufficient to prove that each shadow
 matches the exact vanilla DTO occurrence. Present malformed, duplicated, orphaned, or
 partially matching records invalidate the A33 section and prevent an exact-load claim.
-An authoritative empty version-1 section is distinct from an older envelope that lacks
-the marker.
+An authoritative empty version-2 section is distinct from an older envelope that lacks
+the marker. Version 1 remains readable; because it predates the chapter-four scandal
+baseline, that one value is legacy-seeded and is never falsely reported as exact.
 
 ## 10. Legacy and recovery rules
 
@@ -508,11 +521,10 @@ Do not treat this list as permission for an unbounded namespace-wide patch.
 
 ## 14. Version policy
 
-The audit document itself does not bump the mod because it changes no executable code.
-The first A33 code update must be **0.53.0**. If the six segments above are delivered as
-six code updates, the expected sequence is 0.53.0 through 0.58.0. If any segment is split
-into more than one code update, each additional update receives the next unused version;
-versions are never reused.
+The audit document itself did not bump the mod because it initially changed no executable
+code. The first A33.1 code update was **0.53.0**. The cumulative A33.2-A33.6 implementation
+and the final direct-consumer closure are **0.54.0**. Each later executable update must
+receive the next unused version; versions are never reused.
 
 Every code update from this point must atomically synchronize the same version in:
 
@@ -574,3 +586,7 @@ A33 is not complete when the project merely compiles. Release requires:
 6. no regression in the existing SNLF 1–47 suite; and
 7. no log claim of exact restoration for a legacy value whose original preimage is not
    uniquely recoverable.
+
+The 0.54.0 code satisfies the frozen target-resolution, complete-envelope,
+byte-preservation, and isolated regression gates. Items 2, 3, and the live portion of 6
+remain pending until the installed Unity game completes the stated checkpoint matrix.

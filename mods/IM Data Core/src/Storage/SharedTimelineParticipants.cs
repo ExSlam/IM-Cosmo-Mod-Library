@@ -9,6 +9,7 @@ namespace IMDataCore
         NotCandidate,
         Shared,
         ValidEmpty,
+        Unknown,
         Malformed
     }
 
@@ -40,11 +41,35 @@ namespace IMDataCore
                 return SharedTimelineParticipantResolution.NotCandidate;
             }
 
-            if (!TryReadParticipantMetadata(record, out participantIds))
+            if (record.ParticipantSchemaVersion ==
+                LightweightParticipantSchema.LegacyUnknownSchemaVersion)
+            {
+                return SharedTimelineParticipantResolution.Unknown;
+            }
+            if (record.ParticipantSchemaVersion !=
+                LightweightParticipantSchema.CurrentSchemaVersion)
             {
                 return SharedTimelineParticipantResolution.Malformed;
             }
 
+            return ResolveParticipantIdsCurrentSchema(record, out participantIds);
+        }
+
+
+        internal static SharedTimelineParticipantResolution
+            ResolveParticipantIdsCurrentSchema(
+                LightweightEventRecord record,
+                out List<int> participantIds)
+        {
+            participantIds = new List<int>();
+            if (!IsSharedEventCandidate(record))
+            {
+                return SharedTimelineParticipantResolution.NotCandidate;
+            }
+            if (!TryReadParticipantMetadata(record, out participantIds))
+            {
+                return SharedTimelineParticipantResolution.Malformed;
+            }
             return participantIds.Count > 0
                 ? SharedTimelineParticipantResolution.Shared
                 : SharedTimelineParticipantResolution.ValidEmpty;
@@ -124,6 +149,17 @@ namespace IMDataCore
             }
             if (string.Equals(
                     entityKind,
+                    CoreConstants.EventEntityKindGroup,
+                    StringComparison.Ordinal) &&
+                IsSharedGroupEventType(record.EventType))
+            {
+                return TryReadCsv(
+                    record.PayloadJson,
+                    CoreConstants.JsonFieldGroupMemberIdList,
+                    out participantIds);
+            }
+            if (string.Equals(
+                    entityKind,
                     CoreConstants.EventEntityKindRelationship,
                     StringComparison.Ordinal) &&
                 IsSharedRelationshipEventType(record.EventType))
@@ -148,12 +184,19 @@ namespace IMDataCore
             }
             if (IsSharedNarrativeEvent(record))
             {
-                string participantPropertyName = string.Equals(
-                        entityKind,
-                        CoreConstants.EventEntityKindRandomEvent,
-                        StringComparison.Ordinal)
-                    ? CoreConstants.JsonFieldRandomEventActorIdList
-                    : CoreConstants.JsonFieldSubstoryActorIdList;
+                string participantPropertyName;
+                if (string.Equals(entityKind, CoreConstants.EventEntityKindRandomEvent, StringComparison.Ordinal))
+                {
+                    participantPropertyName = CoreConstants.JsonFieldRandomEventActorIdList;
+                }
+                else if (string.Equals(entityKind, CoreConstants.EventEntityKindTemplateEvent, StringComparison.Ordinal))
+                {
+                    participantPropertyName = CoreConstants.JsonFieldTemplateEventActorIdList;
+                }
+                else
+                {
+                    participantPropertyName = CoreConstants.JsonFieldSubstoryActorIdList;
+                }
                 return TryReadCsv(
                     record.PayloadJson,
                     participantPropertyName,
@@ -193,8 +236,10 @@ namespace IMDataCore
                 (string.Equals(entityKind, CoreConstants.EventEntityKindTour, StringComparison.Ordinal) && IsSharedTourEventType(eventType)) ||
                 (string.Equals(entityKind, CoreConstants.EventEntityKindElection, StringComparison.Ordinal) && IsSharedElectionEventType(eventType)) ||
                 (string.Equals(entityKind, CoreConstants.EventEntityKindRoomWork, StringComparison.Ordinal) &&
-                 (string.Equals(eventType, CoreConstants.EventTypeRoomWorkCompleted, StringComparison.Ordinal) ||
+                 (string.Equals(eventType, CoreConstants.EventTypeRoomWorkAssigned, StringComparison.Ordinal) ||
+                  string.Equals(eventType, CoreConstants.EventTypeRoomWorkCompleted, StringComparison.Ordinal) ||
                   string.Equals(eventType, CoreConstants.EventTypeRoomWorkCancelled, StringComparison.Ordinal))) ||
+                (string.Equals(entityKind, CoreConstants.EventEntityKindGroup, StringComparison.Ordinal) && IsSharedGroupEventType(eventType)) ||
                 (string.Equals(entityKind, CoreConstants.EventEntityKindRelationship, StringComparison.Ordinal) && IsSharedRelationshipEventType(eventType)) ||
                 (string.Equals(entityKind, CoreConstants.EventEntityKindMentorship, StringComparison.Ordinal) && IsSharedMentorshipEventType(eventType)) ||
                 IsSharedNarrativeEvent(record);
@@ -216,6 +261,10 @@ namespace IMDataCore
             if (string.Equals(
                     eventType,
                     CoreConstants.EventTypeSingleReleased,
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    eventType,
+                    CoreConstants.EventTypeSingleChartResult,
                     StringComparison.Ordinal))
             {
                 return ExpandSingleRelease(record, requestedIdolId);
@@ -983,6 +1032,7 @@ namespace IMDataCore
             string normalized = eventType ?? string.Empty;
             return string.Equals(normalized, CoreConstants.EventTypeSingleCreated, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeSingleReleased, StringComparison.Ordinal) ||
+                string.Equals(normalized, CoreConstants.EventTypeSingleChartResult, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeSingleCancelled, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeSingleStatusChanged, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeSingleCastChanged, StringComparison.Ordinal) ||
@@ -1017,10 +1067,17 @@ namespace IMDataCore
                 string.Equals(normalized, CoreConstants.EventTypeElectionFinished, StringComparison.Ordinal);
         }
 
+        private static bool IsSharedGroupEventType(string eventType)
+        {
+            return string.Equals(eventType ?? string.Empty, CoreConstants.EventTypeGroupCreated, StringComparison.Ordinal) ||
+                string.Equals(eventType ?? string.Empty, CoreConstants.EventTypeGroupDisbanded, StringComparison.Ordinal);
+        }
+
         private static bool IsSharedRelationshipEventType(string eventType)
         {
             string normalized = eventType ?? string.Empty;
-            return string.Equals(normalized, CoreConstants.EventTypeIdolDatingStarted, StringComparison.Ordinal) ||
+            return string.Equals(normalized, CoreConstants.EventTypeIdolRelationshipCreated, StringComparison.Ordinal) ||
+                string.Equals(normalized, CoreConstants.EventTypeIdolDatingStarted, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeIdolDatingEnded, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeIdolRelationshipStatusChanged, StringComparison.Ordinal) ||
                 string.Equals(normalized, CoreConstants.EventTypeIdolRelationshipRemoved, StringComparison.Ordinal);
@@ -1044,8 +1101,16 @@ namespace IMDataCore
                     string.Equals(eventType, CoreConstants.EventTypeRandomEventConcluded, StringComparison.Ordinal);
             }
 
+            if (string.Equals(entityKind, CoreConstants.EventEntityKindTemplateEvent, StringComparison.Ordinal))
+            {
+                return string.Equals(eventType, CoreConstants.EventTypeTemplateEventPresented, StringComparison.Ordinal) ||
+                    string.Equals(eventType, CoreConstants.EventTypeTemplateEventConcluded, StringComparison.Ordinal);
+            }
+
             return string.Equals(entityKind, CoreConstants.EventEntityKindSubstory, StringComparison.Ordinal) &&
                 (string.Equals(eventType, CoreConstants.EventTypeSubstoryStarted, StringComparison.Ordinal) ||
+                 string.Equals(eventType, CoreConstants.EventTypeSubstoryQueued, StringComparison.Ordinal) ||
+                 string.Equals(eventType, CoreConstants.EventTypeSubstoryPresented, StringComparison.Ordinal) ||
                  string.Equals(eventType, CoreConstants.EventTypeSubstoryDelayed, StringComparison.Ordinal) ||
                  string.Equals(eventType, CoreConstants.EventTypeSubstoryCompleted, StringComparison.Ordinal));
         }

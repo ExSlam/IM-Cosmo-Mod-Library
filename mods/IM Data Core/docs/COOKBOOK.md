@@ -17,33 +17,25 @@ internal static class DataCoreState
 {
     internal const string NamespaceId = "com.example.your_mod";
     internal static IMDataCoreSession Session;
-    internal static bool RegistrationAttempted;
+    internal const int MaxRegistrationAttempts = 3;
+    internal static int RegistrationAttempts;
 
     internal static void TryInitialize()
     {
-        if (Session != null)
+        if (Session != null || RegistrationAttempts >= MaxRegistrationAttempts)
         {
             return;
         }
 
-        if (!IMDataCoreApi.IsReady())
-        {
-            return;
-        }
-
+        RegistrationAttempts++;
         string error;
         if (!IMDataCoreApi.TryRegisterNamespace(NamespaceId, out Session, out error))
         {
-            if (!RegistrationAttempted)
-            {
-                Debug.LogWarning("[YourMod] Data Core registration failed: " + error);
-            }
-
-            RegistrationAttempted = true;
+            Debug.LogWarning("[YourMod] Data Core registration attempt " +
+                RegistrationAttempts + " failed: " + error);
             return;
         }
 
-        RegistrationAttempted = true;
         Debug.Log("[YourMod] Data Core registration succeeded.");
     }
 }
@@ -61,8 +53,11 @@ internal static class PopupManager_Start_DataCoreInit_Patch
 
 Why this helps:
 
-- Avoids duplicate namespace registration attempts.
-- Avoids log spam when readiness is delayed.
+- Avoids duplicate namespace registration once a session exists.
+- Does not depend on relative Harmony postfix order: `TryRegisterNamespace(...)` performs safe initialization itself.
+- Keeps registration failure visible so a bounded later retry can recover from a transient availability problem.
+
+`IMDataCoreApi.IsReady()` is an observational predicate, not a required prerequisite for `TryRegisterNamespace(...)`.
 
 ## Recipe 2: Stable custom data key design
 
@@ -252,11 +247,15 @@ internal static List<IMDataCoreEvent> GetTimelineRows(int idolId)
 }
 ```
 
-For a complete career/history browser, prefer `TryReadEventsForIdolPage` and pass `page[page.Count - 1].EventId` as the exclusive cursor for the next page. This avoids a hard dependency on any single recent-event request size while preserving newest-to-oldest ordering.
+For a complete **career-wide** history browser, prefer `TryReadHistoryPage(...)` and pass `page[page.Count - 1].EventId` as the exclusive cursor for the next page. It walks the selected branch's canonical physical event stream by stable EventId/shared sequence, so global-only rows, historical idols without live referents, and namespaced/entity-scoped rows are all discoverable without first supplying an idol ID.
+
+Use `TryReadEventsForIdolPage(...)` when you specifically want the older compatibility view for one known idol. That API merges idol + global-relevant rows and participant-expands shared occurrences.
 
 Ordering note:
 
-- API returns newest-first ordering scoped to idol + global relevant events.
+- `TryReadHistoryPage(...)` returns canonical rows newest-first by durable shared sequence.
+- `TryReadEventsForIdolPage(...)` returns the participant-expanded idol + global view in its established `(GameDateKey, Sequence)` ordering.
+- A discarded F9/load branch cursor fails closed rather than continuing from another row.
 
 ## Recipe 8: Flush before irreversible transitions
 
@@ -305,14 +304,15 @@ internal static void DisposeDataCoreSession()
 }
 ```
 
-## Recipe 10: Retry-on-ready helper
+## Recipe 10: Bounded registration retry helper
 
-If your mod loads before IM Data Core is ready, call a polling helper from update/tick hooks until session exists.
+If the direct registration attempt in Recipe 1 fails, call a bounded helper from a later safe gameplay hook until a session exists. Do not poll `IsReady()` first; retry the registration API itself.
 
 ```csharp
 internal static void EnsureDataCoreReady()
 {
-    if (DataCoreState.Session != null)
+    if (DataCoreState.Session != null ||
+        DataCoreState.RegistrationAttempts >= DataCoreState.MaxRegistrationAttempts)
     {
         return;
     }

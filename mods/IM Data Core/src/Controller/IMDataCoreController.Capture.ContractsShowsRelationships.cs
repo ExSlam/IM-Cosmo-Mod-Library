@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -59,7 +59,11 @@ namespace IMDataCore
                         gameDate,
                         CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindContract,
-                        BuildContractEntityIdentifier(CoreConstants.InvalidIdValue, contractTypeCode, contractEndDate),
+                        ResolveAcceptedContractHistoryEntityIdentifier(
+                            snapshot,
+                            CoreConstants.InvalidIdValue,
+                            contractTypeCode,
+                            contractEndDate),
                         CoreConstants.EventTypeContractAccepted,
                         CoreConstants.EventSourceContractAcceptPatch,
                         CoreJsonUtility.SerializeContractLifecyclePayload(payload));
@@ -79,7 +83,11 @@ namespace IMDataCore
                             gameDate,
                             idolId,
                             CoreConstants.EventEntityKindContract,
-                            BuildContractEntityIdentifier(idolId, contractTypeCode, contractEndDate),
+                            ResolveAcceptedContractHistoryEntityIdentifier(
+                                snapshot,
+                                idolId,
+                                contractTypeCode,
+                                contractEndDate),
                             CoreConstants.EventTypeContractAccepted,
                             CoreConstants.EventSourceContractAcceptPatch,
                             CoreJsonUtility.SerializeContractLifecyclePayload(payload));
@@ -123,21 +131,17 @@ namespace IMDataCore
                         CoreConstants.ZeroLongValue,
                         string.Empty);
 
-                    string contractEntityIdentifier = BuildContractEntityIdentifier(CoreConstants.InvalidIdValue, contractTypeCode, contractEndDate);
+                    string contractEntityIdentifier = ResolveContractHistoryEntityIdentifierLocked(
+                        activeContract,
+                        CoreConstants.InvalidIdValue,
+                        contractTypeCode,
+                        contractEndDate);
                     EnqueueEventRecordLocked(
                         gameDate,
                         CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindContract,
                         contractEntityIdentifier,
                         CoreConstants.EventTypeContractActivated,
-                        CoreConstants.EventSourceContractActivationPatch,
-                        CoreJsonUtility.SerializeContractLifecyclePayload(payload));
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindContract,
-                        contractEntityIdentifier,
-                        CoreConstants.EventTypeContractWindowOpened,
                         CoreConstants.EventSourceContractActivationPatch,
                         CoreJsonUtility.SerializeContractLifecyclePayload(payload));
                 }
@@ -153,21 +157,17 @@ namespace IMDataCore
                             CoreConstants.ZeroLongValue,
                             string.Empty);
 
-                        string contractEntityIdentifier = BuildContractEntityIdentifier(idolId, contractTypeCode, contractEndDate);
+                        string contractEntityIdentifier = ResolveContractHistoryEntityIdentifierLocked(
+                            activeContract,
+                            idolId,
+                            contractTypeCode,
+                            contractEndDate);
                         EnqueueEventRecordLocked(
                             gameDate,
                             idolId,
                             CoreConstants.EventEntityKindContract,
                             contractEntityIdentifier,
                             CoreConstants.EventTypeContractActivated,
-                            CoreConstants.EventSourceContractActivationPatch,
-                            CoreJsonUtility.SerializeContractLifecyclePayload(payload));
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            idolId,
-                            CoreConstants.EventEntityKindContract,
-                            contractEntityIdentifier,
-                            CoreConstants.EventTypeContractWindowOpened,
                             CoreConstants.EventSourceContractActivationPatch,
                             CoreJsonUtility.SerializeContractLifecyclePayload(payload));
                     }
@@ -178,25 +178,66 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one explicit contract cancellation event.
+        /// Captures immutable cancellation facts while the exact active-contract row is still present.
         /// </summary>
-        internal void CaptureContractCancelled(business.active_proposal activeContract, bool damagesApplied)
+        internal ContractCancellationSnapshot CreateContractCancellationSnapshot(
+            business businessSystem,
+            business.active_proposal activeContract,
+            bool damagesApplied)
         {
-            if (activeContract == null)
+            ContractCancellationSnapshot snapshot = new ContractCancellationSnapshot
             {
-                return;
+                BusinessSystem = businessSystem,
+                ActiveContract = activeContract,
+                ContainedBefore = businessSystem != null &&
+                    businessSystem.ActiveProposals != null &&
+                    activeContract != null &&
+                    businessSystem.ActiveProposals.Contains(activeContract)
+            };
+
+            if (!snapshot.ContainedBefore)
+            {
+                return snapshot;
             }
 
-            int idolId = activeContract.Girl != null ? activeContract.Girl.id : CoreConstants.InvalidIdValue;
-            DateTime gameDate = staticVars.dateTime;
-            string contractTypeCode = CoreEnumNameMapping.ToBusinessContractTypeCode(activeContract.Type);
-            DateTime contractEndDate = activeContract.EndDate;
-            ContractLifecyclePayload payload = BuildContractLifecyclePayloadFromActiveContract(
+            snapshot.IdolId = activeContract.Girl != null
+                ? activeContract.Girl.id
+                : CoreConstants.InvalidIdValue;
+            string contractTypeCode =
+                CoreEnumNameMapping.ToBusinessContractTypeCode(activeContract.Type);
+            lock (runtimeLock)
+            {
+                snapshot.EntityIdentifier = ResolveContractHistoryEntityIdentifierLocked(
+                    activeContract,
+                    snapshot.IdolId,
+                    contractTypeCode,
+                    activeContract.EndDate);
+            }
+            snapshot.Payload = BuildContractLifecyclePayloadFromActiveContract(
                 activeContract,
-                idolId,
+                snapshot.IdolId,
                 damagesApplied,
                 CoreConstants.ZeroLongValue,
                 string.Empty);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Captures cancellation only after a proven contained-before to exact-absent-after transition.
+        /// </summary>
+        internal void CaptureContractCancelled(ContractCancellationSnapshot snapshot)
+        {
+            if (snapshot == null ||
+                !snapshot.ContainedBefore ||
+                snapshot.ActiveContract == null ||
+                snapshot.Payload == null ||
+                snapshot.IdolId < CoreConstants.MinimumValidIdolIdentifier ||
+                (snapshot.BusinessSystem != null &&
+                 snapshot.BusinessSystem.ActiveProposals != null &&
+                 snapshot.BusinessSystem.ActiveProposals.Contains(snapshot.ActiveContract)))
+            {
+                return;
+            }
 
             lock (runtimeLock)
             {
@@ -207,15 +248,15 @@ namespace IMDataCore
                     return;
                 }
 
-                string contractEntityIdentifier = BuildContractEntityIdentifier(idolId, contractTypeCode, contractEndDate);
                 EnqueueEventRecordLocked(
-                    gameDate,
-                    idolId,
+                    staticVars.dateTime,
+                    snapshot.IdolId,
                     CoreConstants.EventEntityKindContract,
-                    contractEntityIdentifier,
+                    snapshot.EntityIdentifier ?? string.Empty,
                     CoreConstants.EventTypeContractCancelled,
                     CoreConstants.EventSourceContractCancellationPatch,
-                    CoreJsonUtility.SerializeContractLifecyclePayload(payload));
+                    CoreJsonUtility.SerializeContractLifecyclePayload(snapshot.Payload));
+                RetireContractIdentityLocked(snapshot.ActiveContract);
                 FlushAfterCaptureLocked();
             }
         }
@@ -293,7 +334,11 @@ namespace IMDataCore
                         gameDate,
                         idolId,
                         CoreConstants.EventEntityKindContract,
-                        BuildContractEntityIdentifier(idolId, contractTypeCode, activeContract.EndDate),
+                        ResolveContractHistoryEntityIdentifierLocked(
+                            activeContract,
+                            idolId,
+                            contractTypeCode,
+                            activeContract.EndDate),
                         eventTypeCode,
                         sourcePatchCode,
                         CoreJsonUtility.SerializeContractWeeklyAccrualPayload(payload));
@@ -373,10 +418,15 @@ namespace IMDataCore
                         gameDate,
                         idolId,
                         CoreConstants.EventEntityKindContract,
-                        BuildContractEntityIdentifier(idolId, contractTypeCode, activeContract.EndDate),
+                        ResolveContractHistoryEntityIdentifierLocked(
+                            activeContract,
+                            idolId,
+                            contractTypeCode,
+                            activeContract.EndDate),
                         CoreConstants.EventTypeContractFinished,
                         CoreConstants.EventSourceContractNaturalCompletionPatch,
                         CoreJsonUtility.SerializeContractLifecyclePayload(payload));
+                    RetireContractIdentityLocked(activeContract);
                 }
 
                 FlushAfterCaptureLocked();
@@ -434,7 +484,7 @@ namespace IMDataCore
                 breakContextCode);
         }
 
-        private static List<ContractBreakSnapshot> CreateContractBreakSnapshots(
+        private List<ContractBreakSnapshot> CreateContractBreakSnapshots(
             business businessSystem,
             ISet<data_girls.girls> targetIdols,
             string breakContextCode)
@@ -472,7 +522,8 @@ namespace IMDataCore
                     BusinessSystem = businessSystem,
                     ActiveContract = activeContract,
                     IdolId = idolId,
-                    EntityIdentifier = BuildContractEntityIdentifier(
+                    EntityIdentifier = ResolveContractHistoryEntityIdentifierLocked(
+                        activeContract,
                         idolId,
                         contractType,
                         activeContract.EndDate),
@@ -537,6 +588,7 @@ namespace IMDataCore
                             CoreConstants.EventSourceContractBreakSingleIdolPatch,
                         CoreJsonUtility.SerializeContractLifecyclePayload(
                             snapshot.Payload));
+                    RetireContractIdentityLocked(snapshot.ActiveContract);
                 }
 
                 FlushAfterCaptureLocked();
@@ -757,6 +809,8 @@ namespace IMDataCore
                 ShowEpisodeDate = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime),
                 ShowCastCount = castIdolIdentifiers.Count,
                 ShowCastIdList = BuildDelimitedIdentifierList(castIdolIdentifiers),
+                ShowFanAppealSummary = BuildFanAppealSummary(show.FanAppeal),
+                ShowFanSegmentAudienceSummary = BuildShowFanSegmentAudienceSummary(show),
                 ShowPreviousAudience = previousAudience,
                 ShowLatestAudience = latestAudience,
                 ShowAudienceDelta = latestAudience - previousAudience,
@@ -2061,26 +2115,52 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Captures one clique-join event.
+        /// Creates one clique-join snapshot before AddMember can replace the leader.
         /// </summary>
-        internal void CaptureCliqueMemberJoined(Relationships._clique clique, data_girls.girls joinedIdol)
+        internal CliqueJoinSnapshot CreateCliqueJoinSnapshot(Relationships._clique clique, data_girls.girls joinedIdol)
         {
-            if (clique == null || joinedIdol == null || joinedIdol.id < CoreConstants.MinimumValidIdolIdentifier || clique.Members == null || !clique.Members.Contains(joinedIdol))
+            CliqueJoinSnapshot snapshot = new CliqueJoinSnapshot();
+            if (clique == null || joinedIdol == null || clique.Members == null)
+            {
+                return snapshot;
+            }
+
+            snapshot.WasMemberBeforeJoin = clique.Members.Contains(joinedIdol);
+            snapshot.PreviousLeaderId = ResolveCliqueLeaderIdOrInvalid(clique);
+            snapshot.MemberCountBefore = clique.Members.Count;
+            snapshot.CliqueSignatureBefore = BuildCliqueSignature(clique);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Captures one clique-join event with truthful leader succession.
+        /// </summary>
+        internal void CaptureCliqueMemberJoined(
+            Relationships._clique clique,
+            data_girls.girls joinedIdol,
+            CliqueJoinSnapshot snapshot)
+        {
+            if (clique == null ||
+                joinedIdol == null ||
+                joinedIdol.id < CoreConstants.MinimumValidIdolIdentifier ||
+                clique.Members == null ||
+                !clique.Members.Contains(joinedIdol) ||
+                (snapshot != null && snapshot.WasMemberBeforeJoin))
             {
                 return;
             }
 
-            int leaderId = ResolveCliqueLeaderIdOrInvalid(clique);
+            int leaderIdAfter = ResolveCliqueLeaderIdOrInvalid(clique);
+            int leaderIdBefore = snapshot != null
+                ? snapshot.PreviousLeaderId
+                : leaderIdAfter;
             string cliqueSignature = BuildCliqueSignature(clique);
-            string cliqueEntityIdentifier = !string.IsNullOrEmpty(cliqueSignature)
-                ? cliqueSignature
-                : CoreConstants.UnknownCliqueEntityIdentifier;
             CliqueLifecyclePayload payload = new CliqueLifecyclePayload
             {
                 IdolId = joinedIdol.id,
-                CliqueLeaderId = leaderId,
-                CliqueLeaderIdBefore = leaderId,
-                CliqueLeaderIdAfter = leaderId,
+                CliqueLeaderId = leaderIdAfter,
+                CliqueLeaderIdBefore = leaderIdBefore,
+                CliqueLeaderIdAfter = leaderIdAfter,
                 CliqueMemberCount = clique.Members.Count,
                 CliqueSignature = cliqueSignature,
                 CliqueQuitWasViolent = false
@@ -2096,6 +2176,10 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
+                string cliqueEntityIdentifier =
+                    ResolveCliqueHistoryEntityIdentifierLocked(
+                        clique,
+                        cliqueSignature);
                 EnqueueEventRecordLocked(
                     gameDate,
                     joinedIdol.id,
@@ -2124,6 +2208,8 @@ namespace IMDataCore
             snapshot.PreviousLeaderId = ResolveCliqueLeaderIdOrInvalid(clique);
             snapshot.MemberCountBefore = clique.Members.Count;
             snapshot.CliqueSignatureBefore = BuildCliqueSignature(clique);
+            snapshot.CliqueGenerationId =
+                CaptureCliqueGenerationForQuitSnapshot(clique);
             if (clique.Bullied_Girls != null)
             {
                 for (int targetIndex = CoreConstants.ZeroBasedListStartIndex;
@@ -2171,9 +2257,6 @@ namespace IMDataCore
             {
                 cliqueSignature = BuildCliqueSignature(clique);
             }
-            string cliqueEntityIdentifier = !string.IsNullOrEmpty(cliqueSignature)
-                ? cliqueSignature
-                : CoreConstants.UnknownCliqueEntityIdentifier;
             int cliqueMemberCount = clique != null && clique.Members != null ? clique.Members.Count : CoreConstants.ZeroBasedListStartIndex;
             CliqueLifecyclePayload payload = new CliqueLifecyclePayload
             {
@@ -2196,6 +2279,11 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
+                string cliqueEntityIdentifier =
+                    ResolveCliqueHistoryEntityIdentifierLocked(
+                        clique,
+                        cliqueSignature,
+                        quitSnapshot.CliqueGenerationId);
                 EnqueueEventRecordLocked(
                     gameDate,
                     leavingIdol.id,
@@ -2232,6 +2320,11 @@ namespace IMDataCore
                     }
                 }
             }
+
+            // Recursive Quit can emit the last-member leave before the outer
+            // frame physically removes the clique. Retire only after all leave
+            // and induced bullying terminal rows have been captured.
+            RetireCliqueIdentityIfRemoved(clique);
         }
 
         /// <summary>
@@ -2249,12 +2342,6 @@ namespace IMDataCore
             }
 
             int leaderId = ResolveCliqueLeaderIdOrInvalid(clique);
-            string bullyingEntityIdentifier = BuildBullyingEntityIdentifier(leaderId, targetIdol.id);
-            if (string.IsNullOrEmpty(bullyingEntityIdentifier))
-            {
-                bullyingEntityIdentifier = CoreConstants.UnknownBullyingEntityIdentifier;
-            }
-
             BullyingLifecyclePayload payload = new BullyingLifecyclePayload
             {
                 IdolId = targetIdol.id,
@@ -2273,6 +2360,15 @@ namespace IMDataCore
                     CoreLog.Warn(errorMessage);
                     return;
                 }
+
+                string parentCliqueGenerationId;
+                string bullyingEntityIdentifier =
+                    ResolveBullyingStartedEntityIdentifierLocked(
+                        clique,
+                        targetIdol,
+                        leaderId,
+                        out parentCliqueGenerationId);
+                payload.CliqueGenerationId = parentCliqueGenerationId;
 
                 DateTime gameDate = staticVars.dateTime;
                 EnqueueEventRecordLocked(
@@ -2312,6 +2408,17 @@ namespace IMDataCore
                 snapshot.WasBullied = clique.IsBullied(targetIdol);
                 snapshot.WasKnownToPlayer = clique.KnownBulliedGirls != null &&
                     clique.KnownBulliedGirls.Contains(targetIdol);
+                if (snapshot.WasBullied)
+                {
+                    lock (runtimeLock)
+                    {
+                        CaptureBullyingIdentityForStopSnapshotLocked(
+                            clique,
+                            targetIdol,
+                            snapshot.LeaderId,
+                            snapshot);
+                    }
+                }
             }
 
             return snapshot;
@@ -2350,14 +2457,6 @@ namespace IMDataCore
                 return;
             }
 
-            string bullyingEntityIdentifier = BuildBullyingEntityIdentifier(
-                snapshot.LeaderId,
-                snapshot.TargetId);
-            if (string.IsNullOrEmpty(bullyingEntityIdentifier))
-            {
-                bullyingEntityIdentifier = CoreConstants.UnknownBullyingEntityIdentifier;
-            }
-
             BullyingLifecyclePayload payload = new BullyingLifecyclePayload
             {
                 IdolId = snapshot.TargetId,
@@ -2376,6 +2475,14 @@ namespace IMDataCore
                     CoreLog.Warn(errorMessage);
                     return;
                 }
+
+                string parentCliqueGenerationId;
+                string bullyingEntityIdentifier =
+                    ResolveBullyingEndedEntityIdentifierLocked(
+                        clique,
+                        snapshot,
+                        out parentCliqueGenerationId);
+                payload.CliqueGenerationId = parentCliqueGenerationId;
 
                 DateTime gameDate = staticVars.dateTime;
                 string idempotencyKey = BuildBullyingLifecycleIdempotencyKey(
@@ -2397,6 +2504,10 @@ namespace IMDataCore
                     CoreJsonUtility.SerializeBullyingLifecyclePayload(payload));
 
                 FlushAfterCaptureLocked();
+                RetireBullyingEpisodeIdentityLocked(
+                    clique,
+                    snapshot.TargetId,
+                    snapshot.BullyingEpisodeId);
             }
         }
 

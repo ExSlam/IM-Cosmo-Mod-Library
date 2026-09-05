@@ -59,8 +59,16 @@ namespace SaveNLoadFixes.Transport
                 return false;
             }
 
-            normalizedPath = NormalizePath(absolutePath);
-            return !string.IsNullOrEmpty(normalizedPath);
+            try
+            {
+                normalizedPath = Path.GetFullPath(absolutePath);
+                return !string.IsNullOrEmpty(normalizedPath);
+            }
+            catch
+            {
+                normalizedPath = string.Empty;
+                return false;
+            }
         }
 
         private static string NormalizePath(string path)

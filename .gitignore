@@ -40,3 +40,19 @@ mods/Faster Skip Dialogue/alt thumb.png
 mods/Faster Skip Dialogue/thumb uncompressed.png
 mods/Faster Skip Dialogue/thumb.png
 new mod ideas.txt
+mods/Save n Load Fixes/docs/
+mods/Save n Load Fixes/tests/
+mods/Save Write Ordering Fix/docs/
+mods/IM Data Core/tests
+mods/IM Data Core/docs/IMDC_Wave*
+mods/IM Data Core/docs/JOURNAL_V3_SCHEMA.md
+mods/IM Data Core/docs/IMDC_LEGACY_NAMESPACE_AUTHORIZATION_FOLLOWUP.md
+mods/IM Data Core/docs/NAMESPACE_OWNER_PROVENANCE.md
+mods/IM Data Core/docs/V6_COVERAGE_SCHEMA.md
+mods/IM Data Core/docs/V6_HISTORICAL_BASELINE_SCHEMA.md
+mods/IM Data Core/docs/V6_IDENTITY_BINDING_SCHEMA.md
+mods/IM Data Core/docs/V6_MIGRATION_PROVENANCE_SCHEMA.md
+mods/Save n Load Fixes.zip
+mods/Save Write Ordering Fix.zip
+mods/Save Write Ordering Fix/tests/Test-TransportCoexistenceSourceQualification.py
+mods/Save Write Ordering Fix/tests/Test-VersionSync.py

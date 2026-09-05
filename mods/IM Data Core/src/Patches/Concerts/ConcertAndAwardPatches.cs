@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -73,9 +73,11 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(SEvent_Concerts __instance)
         {
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildConcertCapture(
-                __instance != null ? __instance.Concert : null,
-                false));
+            MoneyLedgerAmbientContext.Begin();
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildConcertCapture(
+                    __instance != null ? __instance.Concert : null,
+                    false));
         }
 
         /// <summary>
@@ -84,22 +86,15 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(SEvent_Concerts __instance)
         {
-            try
-            {
-                SEvent_Concerts._concert activeConcert = __instance != null ? __instance.Concert : null;
-                IMDataCoreController.Instance.CaptureConcertStarted(activeConcert);
-            }
-            finally
-            {
-                MoneyLedgerAmbientContext.Clear();
-            }
+            SEvent_Concerts._concert activeConcert = __instance != null ? __instance.Concert : null;
+            IMDataCoreController.Instance.CaptureConcertStarted(activeConcert);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
             return __exception;
         }
     }

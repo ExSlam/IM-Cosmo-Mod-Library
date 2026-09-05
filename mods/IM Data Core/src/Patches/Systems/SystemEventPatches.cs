@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -18,23 +18,33 @@ namespace IMDataCore
     internal static class ActivityEarningsSourceContext
     {
         [ThreadStatic]
-        private static string currentSourceCode;
+        private static Stack<string> sourceCodeFrames;
 
-        internal static void Set(string sourceCode)
+        internal static void Push(string sourceCode)
         {
-            currentSourceCode = sourceCode ?? CoreConstants.EarningsSourceUnknown;
+            if (sourceCodeFrames == null)
+            {
+                sourceCodeFrames = new Stack<string>();
+            }
+
+            sourceCodeFrames.Push(sourceCode ?? CoreConstants.EarningsSourceUnknown);
         }
 
         internal static string Get()
         {
-            return string.IsNullOrEmpty(currentSourceCode)
+            return sourceCodeFrames == null || sourceCodeFrames.Count == CoreConstants.ZeroBasedListStartIndex
                 ? CoreConstants.EarningsSourceUnknown
-                : currentSourceCode;
+                : sourceCodeFrames.Peek();
         }
 
-        internal static void Clear()
+        internal static void Restore()
         {
-            currentSourceCode = string.Empty;
+            if (sourceCodeFrames == null || sourceCodeFrames.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                return;
+            }
+
+            sourceCodeFrames.Pop();
         }
     }
 
@@ -44,21 +54,33 @@ namespace IMDataCore
     internal static class ConcertCrisisChoiceContext
     {
         [ThreadStatic]
-        private static ConcertCrisisChoiceSnapshot currentSnapshot;
+        private static Stack<ConcertCrisisChoiceSnapshot> snapshotFrames;
 
-        internal static void Set(ConcertCrisisChoiceSnapshot snapshot)
+        internal static void Push(ConcertCrisisChoiceSnapshot snapshot)
         {
-            currentSnapshot = snapshot;
+            if (snapshotFrames == null)
+            {
+                snapshotFrames = new Stack<ConcertCrisisChoiceSnapshot>();
+            }
+
+            snapshotFrames.Push(snapshot);
         }
 
         internal static ConcertCrisisChoiceSnapshot Get()
         {
-            return currentSnapshot;
+            return snapshotFrames == null || snapshotFrames.Count == CoreConstants.ZeroBasedListStartIndex
+                ? null
+                : snapshotFrames.Peek();
         }
 
-        internal static void Clear()
+        internal static void Restore()
         {
-            currentSnapshot = null;
+            if (snapshotFrames == null || snapshotFrames.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                return;
+            }
+
+            snapshotFrames.Pop();
         }
     }
 
@@ -72,8 +94,8 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(out ActivityActionSnapshot __state)
         {
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceActivitiesPerformance);
             __state = IMDataCoreController.Instance.CreateActivityActionSnapshot();
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceActivitiesPerformance);
         }
 
         [HarmonyPostfix]
@@ -81,14 +103,13 @@ namespace IMDataCore
         private static void Postfix(Activities __instance, ActivityActionSnapshot __state)
         {
             IMDataCoreController.Instance.CaptureActivityPerformance(__instance, __state);
-            ActivityEarningsSourceContext.Clear();
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }
@@ -103,8 +124,8 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(out ActivityActionSnapshot __state)
         {
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceActivitiesPromotion);
             __state = IMDataCoreController.Instance.CreateActivityActionSnapshot();
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceActivitiesPromotion);
         }
 
         [HarmonyPostfix]
@@ -112,14 +133,13 @@ namespace IMDataCore
         private static void Postfix(Activities __instance, ActivityActionSnapshot __state)
         {
             IMDataCoreController.Instance.CaptureActivityPromotion(__instance, __state);
-            ActivityEarningsSourceContext.Clear();
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }
@@ -134,8 +154,8 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(out ActivityActionSnapshot __state)
         {
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceActivitiesSpaTreatment);
             __state = IMDataCoreController.Instance.CreateActivityActionSnapshot();
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceActivitiesSpaTreatment);
         }
 
         [HarmonyPostfix]
@@ -143,14 +163,13 @@ namespace IMDataCore
         private static void Postfix(ActivityActionSnapshot __state)
         {
             IMDataCoreController.Instance.CaptureActivitySpaTreatment(__state);
-            ActivityEarningsSourceContext.Clear();
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }
@@ -225,32 +244,27 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(out TheaterCompleteDaySnapshot __state)
         {
+            MoneyLedgerAmbientContext.Begin();
             __state = IMDataCoreController.Instance.CreateTheaterCompleteDaySnapshot();
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildTheaterCapture());
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildTheaterCapture());
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(TheaterCompleteDaySnapshot __state)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureTheaterCompleteDay(__state);
-                MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
-                    MoneyLedgerDetailConstants.SourceTypeTheaters,
-                    MoneyLedgerDetailConstants.SourceMethodTheaterCompleteDay);
-            }
-            finally
-            {
-                MoneyLedgerAmbientContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureTheaterCompleteDay(__state);
+            MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
+                MoneyLedgerDetailConstants.SourceTypeTheaters,
+                MoneyLedgerDetailConstants.SourceMethodTheaterCompleteDay);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
             return __exception;
         }
     }
@@ -300,32 +314,27 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(Cafes._cafe Cafe, out CafeRenderSnapshot __state)
         {
+            MoneyLedgerAmbientContext.Begin();
             __state = IMDataCoreController.Instance.CreateCafeRenderSnapshot(Cafe);
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildCafeCapture(Cafe));
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildCafeCapture(Cafe));
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(agency._room Room, Cafes._cafe Cafe, CafeRenderSnapshot __state)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureCafeRenderResult(Room, Cafe, __state);
-                MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
-                    MoneyLedgerDetailConstants.SourceTypeCafes,
-                    MoneyLedgerDetailConstants.SourceMethodCafeRender);
-            }
-            finally
-            {
-                MoneyLedgerAmbientContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureCafeRenderResult(Room, Cafe, __state);
+            MoneyLedgerCaptureDetails.CapturePendingZeroAllocations(
+                MoneyLedgerDetailConstants.SourceTypeCafes,
+                MoneyLedgerDetailConstants.SourceMethodCafeRender);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
             return __exception;
         }
     }
@@ -376,8 +385,9 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(staff._staff __instance, out StaffLifecycleSnapshot __state)
         {
+            MoneyLedgerAmbientContext.Begin();
             __state = IMDataCoreController.Instance.CreateStaffLifecycleSnapshot(__instance);
-            MoneyLedgerAmbientContext.Set(
+            MoneyLedgerAmbientContext.SetCurrentCapture(
                 MoneyLedgerCaptureDetails.BuildStaffSeveranceCapture(__instance, __state));
         }
 
@@ -385,21 +395,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(staff._staff __instance, StaffLifecycleSnapshot __state)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureStaffFiredSeverance(__instance, __state);
-            }
-            finally
-            {
-                MoneyLedgerAmbientContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureStaffFiredSeverance(__instance, __state);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            MoneyLedgerAmbientContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
             return __exception;
         }
     }
@@ -552,6 +555,28 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Captures the authoritative true-to-false fulfillment rollback used by
+    /// reversible chapter-3 money objectives.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks._task), nameof(tasks._task.Unfulfill))]
+    internal static class tasks_task_Unfulfill_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(tasks._task __instance, out TaskLifecycleSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateTaskLifecycleSnapshot(__instance);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(tasks._task __instance, TaskLifecycleSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureTaskUnfulfilled(__instance, __state);
+        }
+    }
+
+    /// <summary>
     /// Captures story task failure outcomes.
     /// </summary>
     [HarmonyPatch(typeof(tasks._task), nameof(tasks._task.OnFail))]
@@ -613,6 +638,45 @@ namespace IMDataCore
         private static void Postfix(List<TaskLifecycleSnapshot> __state)
         {
             IMDataCoreController.Instance.CaptureTasksRemovedOnGraduation(__state);
+        }
+    }
+
+    /// <summary>
+    /// Captures generated non-custom task birth at the authoritative generator
+    /// seam and allocates its durable occurrence generation.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks), nameof(tasks.GenerateTask), new Type[] { typeof(tasks._task._type) })]
+    internal static class tasks_GenerateTask_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            tasks._task._type Type,
+            out GeneratedTaskBirthSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateGeneratedTaskBirthSnapshot(Type);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(GeneratedTaskBirthSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureGeneratedTaskAdded(__state);
+        }
+    }
+
+    /// <summary>
+    /// Re-associates staged v6 task occurrence generations only after vanilla
+    /// has rebuilt ActiveTasks from tasks__TaskData in serialized order.
+    /// </summary>
+    [HarmonyPatch(typeof(tasks), nameof(tasks.LoadFunction))]
+    internal static class tasks_LoadFunction_IMDataCoreTaskIdentity_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix()
+        {
+            IMDataCoreController.Instance.AssociateLoadedTaskIdentities();
         }
     }
 
@@ -745,18 +809,13 @@ namespace IMDataCore
         private static void Postfix(Concert_CrisisPopup __instance, bool Safe)
         {
             ConcertCrisisChoiceSnapshot decisionSnapshot = IMDataCoreController.Instance.CaptureConcertCrisisDecision(__instance, Safe);
-            ConcertCrisisChoiceContext.Set(decisionSnapshot);
+            ConcertCrisisChoiceContext.Push(decisionSnapshot);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            if (__exception != null)
-            {
-                ConcertCrisisChoiceContext.Clear();
-            }
-
             return __exception;
         }
     }
@@ -778,21 +837,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Concert_CrisisPopup __instance, ConcertCrisisAppliedSnapshot __state)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureConcertCrisisApplied(__instance, __state);
-            }
-            finally
-            {
-                ConcertCrisisChoiceContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureConcertCrisisApplied(__instance, __state);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ConcertCrisisChoiceContext.Clear();
+            ConcertCrisisChoiceContext.Restore();
             return __exception;
         }
     }
@@ -807,11 +859,13 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(Concert_Popup __instance, out ConcertFinishSnapshot __state)
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceConcertFinish);
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceConcertFinish);
+            MoneyLedgerAmbientContext.Begin();
             __state = IMDataCoreController.Instance.CreateConcertFinishSnapshot(__instance);
-            MoneyLedgerAmbientContext.Set(MoneyLedgerCaptureDetails.BuildConcertCapture(
-                __instance != null ? __instance.Concert : null,
-                true));
+            MoneyLedgerAmbientContext.SetCurrentCapture(
+                MoneyLedgerCaptureDetails.BuildConcertCapture(
+                    __instance != null ? __instance.Concert : null,
+                    true));
         }
 
         [HarmonyPostfix]
@@ -828,9 +882,6 @@ namespace IMDataCore
                 {
                     MoneyLedgerConcertOutcomeTracker.Remove(__instance.Concert.ID);
                 }
-
-                MoneyLedgerAmbientContext.Clear();
-                ActivityEarningsSourceContext.Clear();
             }
         }
 
@@ -838,8 +889,8 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            MoneyLedgerAmbientContext.Clear();
-            ActivityEarningsSourceContext.Clear();
+            MoneyLedgerAmbientContext.Restore();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }
@@ -935,14 +986,14 @@ namespace IMDataCore
     internal static class data_girls_girls_param_add_IMDataCoreCapture_Patch
     {
         [ThreadStatic]
-        private static bool isScandalParameterAddMutationInProgress;
+        private static int scandalParameterAddMutationDepth;
 
         /// <summary>
         /// Returns true while one scandal `param.add` mutation is executing on the current thread.
         /// </summary>
         internal static bool IsScandalParameterAddMutationInProgress()
         {
-            return isScandalParameterAddMutationInProgress;
+            return scandalParameterAddMutationDepth > CoreConstants.ZeroBasedListStartIndex;
         }
 
         /// <summary>
@@ -952,7 +1003,10 @@ namespace IMDataCore
         private static void Prefix(data_girls.girls.param __instance, out float __state)
         {
             bool isScandalParameter = __instance != null && __instance.type == data_girls._paramType.scandalPoints;
-            isScandalParameterAddMutationInProgress = isScandalParameter;
+            if (isScandalParameter)
+            {
+                scandalParameterAddMutationDepth++;
+            }
 
             if (!isScandalParameter)
             {
@@ -969,32 +1023,31 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(data_girls.girls.param __instance, float __state)
         {
-            try
+            if (__instance == null || __instance.type != data_girls._paramType.scandalPoints)
             {
-                if (__instance == null || __instance.type != data_girls._paramType.scandalPoints)
-                {
-                    return;
-                }
+                return;
+            }
 
-                IMDataCoreController.Instance.CaptureScandalPointsMutation(
-                    __instance.Parent,
-                    __state,
-                    CoreConstants.ScandalMutationSourceParameterAdd,
-                    CoreConstants.EventSourceScandalParameterAddPatch);
-            }
-            finally
-            {
-                isScandalParameterAddMutationInProgress = false;
-            }
+            IMDataCoreController.Instance.CaptureScandalPointsMutation(
+                __instance.Parent,
+                __state,
+                CoreConstants.ScandalMutationSourceParameterAdd,
+                CoreConstants.EventSourceScandalParameterAddPatch);
         }
 
         /// <summary>
-        /// Ensures add-mutation context is cleared even if game code throws during execution.
+        /// Restores this call's scandal-add frame even if game or patch code throws.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static Exception Finalizer(Exception __exception)
+        private static Exception Finalizer(Exception __exception, data_girls.girls.param __instance)
         {
-            isScandalParameterAddMutationInProgress = false;
+            if (__instance != null &&
+                __instance.type == data_girls._paramType.scandalPoints &&
+                scandalParameterAddMutationDepth > CoreConstants.ZeroBasedListStartIndex)
+            {
+                scandalParameterAddMutationDepth--;
+            }
+
             return __exception;
         }
     }
@@ -1389,39 +1442,44 @@ namespace IMDataCore
     internal static class BlackmailTriggerContext
     {
         [ThreadStatic]
-        private static bool inTrigger;
-
-        [ThreadStatic]
-        private static int successTier;
+        private static Stack<int> successTierFrames;
 
         internal static void Begin()
         {
-            inTrigger = true;
-            successTier = CoreConstants.InvalidIdValue;
+            if (successTierFrames == null)
+            {
+                successTierFrames = new Stack<int>();
+            }
+
+            successTierFrames.Push(CoreConstants.InvalidIdValue);
         }
 
         internal static void CaptureResult(int result)
         {
-            if (!inTrigger)
+            if (successTierFrames == null || successTierFrames.Count == CoreConstants.ZeroBasedListStartIndex)
             {
                 return;
             }
 
-            successTier = result;
+            successTierFrames.Pop();
+            successTierFrames.Push(result);
         }
 
-        internal static int ConsumeResult()
+        internal static int GetResult()
         {
-            int result = successTier;
-            inTrigger = false;
-            successTier = CoreConstants.InvalidIdValue;
-            return result;
+            return successTierFrames == null || successTierFrames.Count == CoreConstants.ZeroBasedListStartIndex
+                ? CoreConstants.InvalidIdValue
+                : successTierFrames.Peek();
         }
 
-        internal static void Reset()
+        internal static void Restore()
         {
-            inTrigger = false;
-            successTier = CoreConstants.InvalidIdValue;
+            if (successTierFrames == null || successTierFrames.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                return;
+            }
+
+            successTierFrames.Pop();
         }
     }
 
@@ -1452,13 +1510,31 @@ namespace IMDataCore
         private static void Prefix(int type_, bool build, out AgencyRoomBuildSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateAgencyRoomBuildSnapshot(type_, build);
+            if (__state != null)
+            {
+                __state.SemanticScope = IMDataCoreController.Instance.BeginSemanticCaptureScope();
+            }
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(agency __instance, int type_, bool build, AgencyRoomBuildSnapshot __state)
         {
+            SemanticCaptureScope scope = __state != null ? __state.SemanticScope : null;
+            IMDataCoreController.Instance.EndSemanticCaptureScope(scope);
             IMDataCoreController.Instance.CaptureAgencyRoomBuilt(__instance, type_, build, __state);
+            IMDataCoreController.Instance.CommitSemanticCaptureScope(scope);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception, AgencyRoomBuildSnapshot __state)
+        {
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.AbortSemanticCaptureScope(__state != null ? __state.SemanticScope : null);
+            }
+            return __exception;
         }
     }
 
@@ -1594,6 +1670,38 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Captures actual presentation of an ordinary queued substory dialogue.
+    /// The queue row is still present while ActiveDialogueController.Set executes.
+    /// </summary>
+    [HarmonyPatch(typeof(ActiveDialogueController), nameof(ActiveDialogueController.Set),
+        new Type[] { typeof(data_dialogues._dialogue), typeof(bool), typeof(float), typeof(Substories_Manager._substoryData) })]
+    internal static class ActiveDialogueController_Set_IMDataCoreSubstoryPresentation_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            data_dialogues._dialogue res_dialogue,
+            out SubstoryDialoguePresentationSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance
+                .CreateSubstoryDialoguePresentationSnapshot(res_dialogue);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(
+            ActiveDialogueController __instance,
+            data_dialogues._dialogue res_dialogue,
+            SubstoryDialoguePresentationSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureSubstoryDialoguePresented(
+                __instance,
+                res_dialogue,
+                __state);
+        }
+    }
+
+    /// <summary>
     /// Captures substory completion when active dialogue is closed.
     /// </summary>
     [HarmonyPatch(typeof(ActiveDialogueController), nameof(ActiveDialogueController.Hide))]
@@ -1687,7 +1795,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(data_girls.girls Spy, data_girls.girls Target)
         {
-            IMDataCoreController.Instance.CaptureInfluenceBlackmailQueued(Spy, Target);
+            Date_Influence._blackmail added = Date_Influence.Blackmail != null && Date_Influence.Blackmail.Count > CoreConstants.ZeroBasedListStartIndex
+                ? Date_Influence.Blackmail[Date_Influence.Blackmail.Count - 1]
+                : null;
+            if (added != null && (!ReferenceEquals(added.Spy, Spy) || !ReferenceEquals(added.Target, Target)))
+            {
+                added = null;
+            }
+            IMDataCoreController.Instance.CaptureInfluenceBlackmailQueued(Spy, Target, added);
         }
     }
 
@@ -1722,7 +1837,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Date_Influence._blackmail BL)
         {
-            int successTier = BlackmailTriggerContext.ConsumeResult();
+            int successTier = BlackmailTriggerContext.GetResult();
             IMDataCoreController.Instance.CaptureInfluenceBlackmailTriggered(BL, successTier);
         }
 
@@ -1730,8 +1845,29 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            BlackmailTriggerContext.Reset();
+            BlackmailTriggerContext.Restore();
             return __exception;
+        }
+    }
+
+    /// <summary>
+    /// Captures the source-proven dequeue checkpoint after due blackmail rows are removed.
+    /// </summary>
+    [HarmonyPatch(typeof(Date_Influence), CoreConstants.HarmonyDateInfluenceCheckBlackmailQueueMethodName)]
+    internal static class Date_Influence_CheckBlackmailQueue_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(out BlackmailDequeueSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateInfluenceBlackmailDequeueSnapshot();
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(BlackmailDequeueSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureInfluenceBlackmailDequeued(__state);
         }
     }
 

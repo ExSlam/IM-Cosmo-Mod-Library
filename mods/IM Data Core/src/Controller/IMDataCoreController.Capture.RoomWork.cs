@@ -38,6 +38,72 @@ namespace IMDataCore
             }
         }
 
+        /// <summary>
+        /// Records the authoritative start boundary for idol training or treatment.
+        /// Production jobs intentionally retain their existing completion-only history.
+        /// </summary>
+        internal void CaptureRoomWorkAssigned(agency._room room, string sourcePatchCode)
+        {
+            RoomWorkCompletionSnapshot snapshot = CreateRoomWorkCancellationSnapshot(room);
+            if (snapshot == null || !snapshot.HasWork || snapshot.Room == null ||
+                snapshot.IdolIds == null || snapshot.IdolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount ||
+                (!string.Equals(snapshot.WorkKind, "training", StringComparison.Ordinal) &&
+                 !string.Equals(snapshot.WorkKind, "medical_recovery", StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            List<int> participantIdolIds = new List<int>();
+            HashSet<int> emittedIdols = new HashSet<int>();
+            for (int index = CoreConstants.ZeroBasedListStartIndex; index < snapshot.IdolIds.Count; index++)
+            {
+                int idolId = snapshot.IdolIds[index];
+                if (idolId >= CoreConstants.MinimumValidIdolIdentifier && emittedIdols.Add(idolId))
+                {
+                    participantIdolIds.Add(idolId);
+                }
+            }
+            if (participantIdolIds.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+            {
+                return;
+            }
+
+            RoomWorkCompletedEventPayload payload = new RoomWorkCompletedEventPayload
+            {
+                idol_id = CoreConstants.InvalidIdValue,
+                room_work_participant_id_list = BuildDelimitedIdentifierList(participantIdolIds),
+                room_id = snapshot.Room.id,
+                room_type = CoreEnumNameMapping.ToAgencyRoomTypeCode(snapshot.Room.type),
+                room_work_kind = snapshot.WorkKind ?? string.Empty,
+                room_work_stage = snapshot.Stage ?? string.Empty,
+                room_work_entity_id = snapshot.EntityId ?? string.Empty,
+                room_work_title = snapshot.Title ?? string.Empty
+            };
+            CopyPrimaryStaff(payload, snapshot.AssignedStaff);
+            CopyAssignedStaff(payload, snapshot.AssignedStaff);
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+                string roomEntityId = GetOrCreateAgencyRoomHistoryEntityIdLocked(snapshot.Room);
+                RegisterRoomWorkLegacyCandidate(roomEntityId, snapshot.WorkKind ?? string.Empty, snapshot.EntityId ?? string.Empty);
+                EnqueueEventRecordLocked(
+                    staticVars.dateTime,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindRoomWork,
+                    string.Concat(roomEntityId, ":", snapshot.WorkKind, ":", snapshot.EntityId),
+                    CoreConstants.EventTypeRoomWorkAssigned,
+                    sourcePatchCode ?? CoreConstants.EventSourceRoomWorkAssignedPatch,
+                    CoreJsonUtility.SerializeObjectPayload(payload));
+                FlushAfterCaptureLocked();
+            }
+        }
+
         internal RoomWorkCompletionSnapshot CreateRoomWorkCompletionSnapshot(
             agency._room room,
             string workKind,
@@ -103,6 +169,10 @@ namespace IMDataCore
                 DateTime gameDate = staticVars.dateTime;
                 string roomEntityId =
                     GetOrCreateAgencyRoomHistoryEntityIdLocked(snapshot.Room);
+                RegisterRoomWorkLegacyCandidate(
+                    roomEntityId,
+                    snapshot.WorkKind ?? string.Empty,
+                    snapshot.EntityId ?? string.Empty);
                 RoomWorkCompletedEventPayload payload = new RoomWorkCompletedEventPayload
                 {
                     idol_id = CoreConstants.InvalidIdValue,
@@ -206,7 +276,7 @@ namespace IMDataCore
                 else if (room.status == agency._room._status.SSKProduction &&
                     room.SSK != null)
                 {
-                    snapshot.WorkKind = "event";
+                    snapshot.WorkKind = "ssk";
                     snapshot.EntityId = room.SSK.ID.ToString(CultureInfo.InvariantCulture);
                     snapshot.Title = room.SSK.GetTitle() ?? string.Empty;
                     snapshot.Stage = room.SSKParamType(room.SSK).ToString();
@@ -215,7 +285,7 @@ namespace IMDataCore
                 else if (room.status == agency._room._status.tourProduction &&
                     room.tour != null)
                 {
-                    snapshot.WorkKind = "event";
+                    snapshot.WorkKind = "tour";
                     snapshot.EntityId = room.tour.ID.ToString(CultureInfo.InvariantCulture);
                     snapshot.Title = string.Concat(
                         "Tour #",
@@ -241,7 +311,7 @@ namespace IMDataCore
         /// <summary>
         /// Records one cancelled assignment from its pre-mutation snapshot.
         /// </summary>
-        internal void CaptureRoomWorkCancelled(RoomWorkCompletionSnapshot snapshot)
+        internal void CaptureRoomWorkCancelled(RoomWorkCompletionSnapshot snapshot, string sourcePatchCode = null)
         {
             if (snapshot == null ||
                 !snapshot.HasWork ||
@@ -297,6 +367,10 @@ namespace IMDataCore
 
                 string roomEntityId =
                     GetOrCreateAgencyRoomHistoryEntityIdLocked(snapshot.Room);
+                RegisterRoomWorkLegacyCandidate(
+                    roomEntityId,
+                    snapshot.WorkKind ?? string.Empty,
+                    snapshot.EntityId ?? string.Empty);
 
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
@@ -309,10 +383,40 @@ namespace IMDataCore
                         ":",
                         snapshot.EntityId),
                     CoreConstants.EventTypeRoomWorkCancelled,
-                    CoreConstants.EventSourceRoomWorkCancelJobPatch,
+                    sourcePatchCode ?? CoreConstants.EventSourceRoomWorkCancelJobPatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
                 FlushAfterCaptureLocked();
             }
+        }
+
+        internal RoomWorkCompletionSnapshot CreateTreatmentCompletionSnapshot(agency._room room)
+        {
+            RoomWorkCompletionSnapshot snapshot = CreateRoomWorkCancellationSnapshot(room);
+            if (snapshot == null || !snapshot.HasWork ||
+                !string.Equals(snapshot.WorkKind, "medical_recovery", StringComparison.Ordinal))
+            {
+                return new RoomWorkCompletionSnapshot();
+            }
+            snapshot.IsDue = room != null && room.finishTime < staticVars.dateTime;
+            return snapshot;
+        }
+
+        internal bool HasRoomWorkEnded(RoomWorkCompletionSnapshot snapshot)
+        {
+            if (snapshot == null || !snapshot.HasWork || snapshot.Room == null)
+            {
+                return false;
+            }
+            agency._room room = snapshot.Room;
+            if (room.status == agency._room._status.normal)
+            {
+                return true;
+            }
+            if (snapshot.IdolIds != null && snapshot.IdolIds.Count > 0 && room.girl != null)
+            {
+                return room.girl.id != snapshot.IdolIds[0];
+            }
+            return room.girl == null;
         }
 
         internal TrainingCompletionSnapshot CreateTrainingCompletionSnapshot(agency._room room, bool force)
@@ -523,6 +627,24 @@ namespace IMDataCore
         internal int StaffUniqueTypeRaw = CoreConstants.InvalidIdValue;
         internal bool StaffIsPro;
         internal bool StaffIsProducer;
+    }
+
+    internal sealed class RoomCancelJobCaptureSnapshot
+    {
+        internal RoomWorkCompletionSnapshot RoomWork;
+        internal LoanMutationSnapshot DevelopingLoan;
+    }
+
+    internal sealed class RoomPracticeCaptureSnapshot
+    {
+        internal TrainingCompletionSnapshot Completion;
+        internal RoomWorkCompletionSnapshot ForcedCancellation;
+    }
+
+    internal sealed class TreatmentCaptureSnapshot
+    {
+        internal RoomWorkCompletionSnapshot Completion;
+        internal StaffAttributionSnapshot PreviousMedicalStaff;
     }
 
     internal sealed class RoomWorkCompletionSnapshot

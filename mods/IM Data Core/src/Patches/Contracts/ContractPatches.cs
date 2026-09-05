@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -24,30 +24,83 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(business __instance, out ContractAcceptedSnapshot __state)
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceBusinessAccept);
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceBusinessAccept);
             __state = IMDataCoreController.Instance.CreateContractAcceptedSnapshot(__instance);
+            if (__state != null)
+            {
+                __state.SemanticScope = IMDataCoreController.Instance.BeginSemanticCaptureScope();
+            }
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(ContractAcceptedSnapshot __state)
         {
+            SemanticCaptureScope scope = __state != null ? __state.SemanticScope : null;
+            IMDataCoreController.Instance.EndSemanticCaptureScope(scope);
             try
             {
                 IMDataCoreController.Instance.CaptureContractAccepted(__state);
+                IMDataCoreController.Instance.CaptureBusinessProposalAccepted(
+                    __state != null ? __state.ProposalOccurrence : null,
+                    __state);
+                IMDataCoreController.Instance.CommitSemanticCaptureScope(scope);
             }
             finally
             {
-                ActivityEarningsSourceContext.Clear();
+                IMDataCoreController.Instance.CompleteContractAcceptanceIdentity(__state);
             }
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
-        private static Exception Finalizer(Exception __exception)
+        private static Exception Finalizer(Exception __exception, ContractAcceptedSnapshot __state)
         {
-            ActivityEarningsSourceContext.Clear();
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.AbortSemanticCaptureScope(__state != null ? __state.SemanticScope : null);
+            }
+            IMDataCoreController.Instance.CompleteContractAcceptanceIdentity(__state);
+            ActivityEarningsSourceContext.Restore();
             return __exception;
+        }
+    }
+
+
+    /// <summary>
+    /// Captures proposal birth at the exact post-generation popup boundary.
+    /// </summary>
+    [HarmonyPatch(typeof(business), CoreConstants.HarmonyBusinessSetProposalMethodName, new Type[] { typeof(business._proposal) })]
+    internal static class business_SetProposal_IMDataCoreCapture_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(business._proposal __0)
+        {
+            IMDataCoreController.Instance.CaptureBusinessProposalGenerated(__0);
+        }
+    }
+
+    /// <summary>
+    /// Captures the complete transient proposal before decline discards its history.
+    /// </summary>
+    [HarmonyPatch(typeof(business), nameof(business.Decline))]
+    internal static class business_Decline_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(business __instance, out BusinessProposalTerminalSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateBusinessProposalTerminalSnapshot(
+                __instance,
+                false);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(BusinessProposalTerminalSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureBusinessProposalDeclined(__state);
         }
     }
 
@@ -75,6 +128,10 @@ namespace IMDataCore
         private static void Postfix(business __instance, business._proposal prop, int __state)
         {
             business.active_proposal addedActiveProposal = ResolveAddedActiveProposal(__instance, __state, prop);
+            IMDataCoreController.Instance.BindContractActivationIdentity(
+                __instance,
+                addedActiveProposal,
+                prop);
             IMDataCoreController.Instance.CaptureContractActivated(addedActiveProposal, prop);
         }
 
@@ -287,7 +344,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix()
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceBusinessWeekly);
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceBusinessWeekly);
         }
 
         /// <summary>
@@ -297,21 +354,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(business __instance)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureContractWeeklyEarnings(__instance);
-            }
-            finally
-            {
-                ActivityEarningsSourceContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureContractWeeklyEarnings(__instance);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }
@@ -339,12 +389,47 @@ namespace IMDataCore
     internal static class business_CancelContract_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Records cancellation before the contract row is removed.
+        /// Captures membership and immutable identity/payload facts before vanilla mutates the list.
         /// </summary>
+        [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(business.active_proposal _Proposal, bool Damages)
+        private static void Prefix(
+            business __instance,
+            business.active_proposal _Proposal,
+            bool Damages,
+            out ContractCancellationSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureContractCancelled(_Proposal, Damages);
+            __state = IMDataCoreController.Instance.CreateContractCancellationSnapshot(
+                __instance,
+                _Proposal,
+                Damages);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(ContractCancellationSnapshot __state)
+        {
+            IMDataCoreController.Instance.CaptureContractCancelled(__state);
+            IMDataCoreController.Instance.RetireContractIdentityIfRemoved(
+                __state != null ? __state.BusinessSystem : null,
+                __state != null ? __state.ActiveContract : null);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(
+            Exception __exception,
+            business __instance,
+            business.active_proposal _Proposal)
+        {
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.RetireContractIdentityIfRemoved(
+                    __instance,
+                    _Proposal);
+            }
+
+            return __exception;
         }
     }
 
@@ -415,4 +500,18 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Rebinds staged v6 contract generations after vanilla reconstructs its
+    /// active-proposal list in serialized ordinal order.
+    /// </summary>
+    [HarmonyPatch(typeof(business), nameof(business.LoadFunction))]
+    internal static class business_LoadFunction_IMDataCoreContractIdentity_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(business __instance)
+        {
+            IMDataCoreController.Instance.AssociateLoadedContractIdentities(__instance);
+        }
+    }
+
 }

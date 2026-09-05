@@ -1,6 +1,6 @@
 # IM Data Core v5 sidecar schema
 
-This document describes the private sidecar representation written and accepted by IMDC 3.4.7. Consumer mods should use `IMDataCoreApi` instead of depending on these field names.
+This document describes the private sidecar representation written and accepted by IMDC 3.4.24. Consumer mods should use `IMDataCoreApi` instead of depending on these field names.
 
 Current persistence versions:
 
@@ -9,7 +9,9 @@ Current persistence versions:
 - journal `FormatName`: `IMDataCore.LightweightJournal`
 - journal `FormatVersion`: `2`
 
-This development build intentionally has no runtime read/migration compatibility for older sidecar formats.
+Normal runtime activation intentionally remains exact-v5. Wave 0 completed the staged v6/v3 storage foundation in 3.4.17. Version 3.4.24 cumulatively stages durable contract, clique, and bullying-episode generation identity. `business.Accept` reserves an opaque contract generation before nested activation; `Relationships.StartNewClique` allocates one opaque clique generation for the clique object's semantic lifetime; and a confirmed `AddBulliedGirl` false -> true transition allocates one opaque bullying episode generation parented to that clique generation. Exact checkpoints bind the three families through their vanilla serialized locators plus structural witnesses, with bullying additionally using `bullied_target:<idolId>`. The old contract tuple, sorted-member clique signature, and `leader|target` bullying key remain compatibility candidates rather than canonical aliases. Canonical generation emission is gated until sidecar v6 is the live writer. The live v5 event wire shape therefore contains none of the staged v6 identity members; the live transaction body/writer remains v2 and no v6 generation is published automatically. See `V6_IDENTITY_BINDING_SCHEMA.md`, `JOURNAL_V3_SCHEMA.md`, and `V6_MIGRATION_PROVENANCE_SCHEMA.md`.
+
+Version 3.4.24 adds the public #66 identity-resolution contract without pretending v5 can persist the new opaque-generation compatibility metadata. Current room/theater/cafe generation resolution and SSK/tour room-work resolution are safe because their durable inputs already exist in v5. Contract/clique/bullying/generated-task generation resolution and legacy candidate multimap lookup remain `Unresolved` on live v5; staged v6 owns those restart/F9-stable bindings and candidate links.
 
 ## Root
 
@@ -155,6 +157,8 @@ A healthy compact-base replacement may retain:
 ```
 
 A recovered backup must still contain an exact v5 checkpoint for the loaded vanilla save. Recovery never weakens checkpoint identity.
+
+Version 3.4.24 additionally prevents backup recovery from becoming a downgrade writer. If the primary IMDC sidecar declares an unsupported storage generation, or if an unsupported journal is positively bound by SHA-256 to the candidate base, the save scope becomes write-protected and an older `.imdc.bak` is not used to heal over those authoritative bytes. An unsupported journal whose hash belongs to another base remains a stale suffix under finding #58 and does not block the healthy candidate generation.
 
 ## Deleted-save archives
 

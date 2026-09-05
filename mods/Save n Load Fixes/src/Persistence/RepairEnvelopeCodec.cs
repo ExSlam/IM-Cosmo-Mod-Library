@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using SaveNLoadFixes.Repairs;
 using UnityEngine;
 
 namespace SaveNLoadFixes.Persistence
@@ -284,6 +285,125 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            FiniteJsonValue root;
+            if (!FiniteJsonParser.TryParse(envelopeJson, out root, out error) ||
+                root == null || root.Kind != FiniteJsonKind.Object)
+            {
+                return false;
+            }
+            FiniteJsonValue records;
+            if (!root.ObjectValues.TryGetValue("records", out records) ||
+                records == null || records.Kind != FiniteJsonKind.Object)
+            {
+                error = "Repair envelope raw JSON is missing the required records object.";
+                return false;
+            }
+            FiniteJsonValue marker;
+            if (!records.ObjectValues.TryGetValue("wide_numeric_state_version", out marker))
+            {
+                // Envelopes written before A33 remain valid legacy input.
+                return true;
+            }
+            if (marker == null ||
+                (marker.Kind != FiniteJsonKind.Number && marker.Kind != FiniteJsonKind.String) ||
+                (!string.Equals(marker.Text, "1", StringComparison.Ordinal) &&
+                 !string.Equals(marker.Text, "2", StringComparison.Ordinal)))
+            {
+                // The typed materializer/section validator reports zero or unsupported
+                // marker values. Only a claimed current section needs the raw presence proof.
+                return true;
+            }
+            FiniteJsonValue wide;
+            if (!records.ObjectValues.TryGetValue("wide_numeric_state", out wide) ||
+                wide == null || wide.Kind != FiniteJsonKind.Object)
+            {
+                error = "A33 wide_numeric_state marker is present but its raw state object is missing.";
+                return false;
+            }
+            return TryRequireCompleteRawSchema(
+                wide,
+                typeof(WideNumericStateRecordV1),
+                "$.records.wide_numeric_state",
+                string.Equals(marker.Text, "1", StringComparison.Ordinal),
+                out error);
+        }
+
+        private static bool TryRequireCompleteRawSchema(
+            FiniteJsonValue node,
+            Type targetType,
+            string path,
+            bool allowLegacyA33StoryFields,
+            out string error)
+        {
+            error = string.Empty;
+            if (node == null || targetType == null)
+            {
+                error = path + " is missing from the raw A33 section.";
+                return false;
+            }
+            if (typeof(IList).IsAssignableFrom(targetType))
+            {
+                if (node.Kind != FiniteJsonKind.Array || !targetType.IsGenericType)
+                {
+                    // The ordinary typed materializer supplies the exact type error.
+                    return true;
+                }
+                Type elementType = targetType.GetGenericArguments()[0];
+                for (int index = 0; index < node.ArrayValues.Count; index++)
+                {
+                    if (!TryRequireCompleteRawSchema(
+                            node.ArrayValues[index],
+                            elementType,
+                            path + "[" + index.ToString(CultureInfo.InvariantCulture) + "]",
+                            false,
+                            out error))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            if (targetType == typeof(string) || targetType == typeof(char) ||
+                targetType.IsPrimitive || targetType.IsEnum ||
+                targetType == typeof(decimal))
+            {
+                return true;
+            }
+            if (node.Kind != FiniteJsonKind.Object || !targetType.IsSerializable)
+            {
+                // The ordinary typed materializer supplies the exact type error.
+                return true;
+            }
+            FieldInfo[] fields = GetSerializableFields(targetType);
+            for (int index = 0; index < fields.Length; index++)
+            {
+                FieldInfo field = fields[index];
+                FiniteJsonValue child;
+                if (!node.ObjectValues.TryGetValue(field.Name, out child))
+                {
+                    if (allowLegacyA33StoryFields &&
+                        targetType == typeof(WideNumericStateRecordV1) &&
+                        (string.Equals(field.Name, "has_story_ch4_scandal_points",
+                             StringComparison.Ordinal) ||
+                         string.Equals(field.Name, "story_ch4_scandal_points",
+                             StringComparison.Ordinal)))
+                    {
+                        continue;
+                    }
+                    error = path + "." + field.Name +
+                        " is missing from a marker-present A33 section.";
+                    return false;
+                }
+                if (!TryRequireCompleteRawSchema(
+                        child,
+                        field.FieldType,
+                        path + "." + field.Name,
+                        false,
+                        out error))
+                {
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -338,6 +458,12 @@ namespace SaveNLoadFixes.Persistence
                 error = nullStringPath + " is a null string. SNLF requires non-null " +
                     "string fields so the literal text 'null' remains distinguishable " +
                     "from SimpleJSON's rewrite of a JSON null.";
+                return false;
+            }
+
+            if (!WideNumericState.TryValidateEnvelopeRecord(envelope.records, out error))
+            {
+                error = "Invalid A33 wide_numeric_state: " + error;
                 return false;
             }
 

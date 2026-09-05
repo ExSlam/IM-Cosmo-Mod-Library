@@ -21,7 +21,7 @@ namespace SaveWriteOrderingFix
         internal const string DataSaverSaveMethodName = "saveData";
         internal const string DataSaverLoadMethodName = "loadData";
 
-        internal const int LoadWaitTimeoutMilliseconds = 30000;
+        internal const int LoadWaitTimeoutMilliseconds = -1;
         internal const string LogPrefix = "[Save Write Ordering Fix] ";
     }
 
@@ -34,7 +34,7 @@ namespace SaveWriteOrderingFix
     /// </summary>
     public static class SaveWriteOrderingApi
     {
-        public const string Version = "1.4.0-dev.5";
+        public const string Version = "1.4.5";
 
         /// <summary>
         /// In standalone mode, true only after every known vanilla SavedData write
@@ -454,8 +454,16 @@ namespace SaveWriteOrderingFix
                 return false;
             }
 
-            normalizedPath = NormalizePath(absolutePath);
-            return !string.IsNullOrEmpty(normalizedPath);
+            try
+            {
+                normalizedPath = Path.GetFullPath(absolutePath);
+                return !string.IsNullOrEmpty(normalizedPath);
+            }
+            catch
+            {
+                normalizedPath = string.Empty;
+                return false;
+            }
         }
 
         private static string NormalizePath(string path)

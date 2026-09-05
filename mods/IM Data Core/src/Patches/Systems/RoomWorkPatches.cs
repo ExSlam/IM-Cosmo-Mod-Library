@@ -82,6 +82,23 @@ namespace IMDataCore
             if (__instance != null && __instance.girl == _girl && __instance.status == agency._room._status.girlTraining)
             {
                 IMDataCoreController.Instance.TrackRoomWorkAssignment(__instance);
+                IMDataCoreController.Instance.CaptureRoomWorkAssigned(__instance, CoreConstants.EventSourceRoomWorkAssignedPatch);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.assign_treatment))]
+    internal static class AgencyRoomAssignTreatment_IMDataCoreRoomWork_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(agency._room __instance, data_girls.girls _girl)
+        {
+            if (__instance != null && __instance.girl == _girl &&
+                (__instance.status == agency._room._status.injury_treatment ||
+                 __instance.status == agency._room._status.depression_treatment))
+            {
+                IMDataCoreController.Instance.TrackRoomWorkAssignment(__instance);
+                IMDataCoreController.Instance.CaptureRoomWorkAssigned(__instance, CoreConstants.EventSourceRoomTreatmentAssignedPatch);
             }
         }
     }
@@ -141,7 +158,7 @@ namespace IMDataCore
             SEvent_SSK._SSK election = __instance != null ? __instance.SSK : null;
             __state = IMDataCoreController.Instance.CreateRoomWorkCompletionSnapshot(
                 __instance,
-                "event",
+                "ssk",
                 election != null ? election.ID.ToString() : string.Empty,
                 election != null ? election.GetTitle() : string.Empty,
                 election != null ? __instance.SSKParamType(election).ToString() : string.Empty,
@@ -164,7 +181,7 @@ namespace IMDataCore
             SEvent_Tour.tour tour = __instance != null ? __instance.tour : null;
             __state = IMDataCoreController.Instance.CreateRoomWorkCompletionSnapshot(
                 __instance,
-                "event",
+                "tour",
                 tour != null ? tour.ID.ToString() : string.Empty,
                 tour != null ? string.Concat("Tour #", tour.ID.ToString()) : string.Empty,
                 tour != null ? __instance.TourParamType(tour).ToString() : string.Empty,
@@ -205,15 +222,36 @@ namespace IMDataCore
     internal static class AgencyRoomFinishPractice_IMDataCoreRoomWork_Patch
     {
         [HarmonyPriority(Priority.First)]
-        private static void Prefix(agency._room __instance, bool force, out TrainingCompletionSnapshot __state)
+        private static void Prefix(agency._room __instance, bool force, out RoomPracticeCaptureSnapshot __state)
         {
-            __state = IMDataCoreController.Instance.CreateTrainingCompletionSnapshot(__instance, force);
+            __state = new RoomPracticeCaptureSnapshot();
+            if (force && !RoomCancelJobContext.IsActive)
+            {
+                __state.ForcedCancellation = IMDataCoreController.Instance.CreateRoomWorkCancellationSnapshot(__instance);
+            }
+            else
+            {
+                __state.Completion = IMDataCoreController.Instance.CreateTrainingCompletionSnapshot(__instance, false);
+            }
         }
 
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(TrainingCompletionSnapshot __state)
+        private static void Postfix(RoomPracticeCaptureSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureTrainingCompleted(__state);
+            if (__state == null)
+            {
+                return;
+            }
+            if (__state.ForcedCancellation != null &&
+                IMDataCoreController.Instance.HasRoomWorkEnded(__state.ForcedCancellation))
+            {
+                IMDataCoreController.Instance.CaptureRoomWorkCancelled(
+                    __state.ForcedCancellation,
+                    CoreConstants.EventSourceRoomTrainingCancelledPatch);
+                IMDataCoreController.Instance.ClearRoomWorkAssignment(__state.ForcedCancellation.Room);
+                return;
+            }
+            IMDataCoreController.Instance.CaptureTrainingCompleted(__state.Completion);
         }
     }
 
@@ -225,7 +263,7 @@ namespace IMDataCore
     internal static class AgencyRoomDoTreatment_IMDataCoreMedicalAttribution_Patch
     {
         [HarmonyPriority(Priority.First)]
-        private static void Prefix(agency._room __instance, out StaffAttributionSnapshot __state)
+        private static void Prefix(agency._room __instance, out TreatmentCaptureSnapshot __state)
         {
             StaffAttributionSnapshot attribution = null;
             if (__instance != null &&
@@ -239,20 +277,63 @@ namespace IMDataCore
                 attribution = IMDataCoreController.CreateStaffAttribution(__instance.staffer);
             }
 
-            __state = MedicalStaffAttributionContext.Push(attribution);
+            __state = new TreatmentCaptureSnapshot
+            {
+                Completion = IMDataCoreController.Instance.CreateTreatmentCompletionSnapshot(__instance),
+                PreviousMedicalStaff = MedicalStaffAttributionContext.Push(attribution)
+            };
+            TreatmentCompletionContext.Enter();
         }
 
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(StaffAttributionSnapshot __state)
+        private static void Postfix(TreatmentCaptureSnapshot __state)
         {
-            MedicalStaffAttributionContext.Restore(__state);
+            try
+            {
+                if (__state != null)
+                {
+                    IMDataCoreController.Instance.CaptureRoomWorkCompleted(
+                        __state.Completion,
+                        CoreConstants.EventSourceRoomTreatmentCompletedPatch);
+                }
+            }
+            finally
+            {
+                TreatmentCompletionContext.Exit();
+                MedicalStaffAttributionContext.Restore(__state != null ? __state.PreviousMedicalStaff : null);
+            }
         }
 
         [HarmonyPriority(Priority.Last)]
-        private static Exception Finalizer(Exception __exception, StaffAttributionSnapshot __state)
+        private static Exception Finalizer(Exception __exception, TreatmentCaptureSnapshot __state)
         {
-            MedicalStaffAttributionContext.Restore(__state);
+            TreatmentCompletionContext.Exit();
+            MedicalStaffAttributionContext.Restore(__state != null ? __state.PreviousMedicalStaff : null);
             return __exception;
+        }
+    }
+
+    [HarmonyPatch(typeof(agency._room), nameof(agency._room.CancelTreatment))]
+    internal static class AgencyRoomCancelTreatment_IMDataCoreRoomWork_Patch
+    {
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(agency._room __instance, out RoomWorkCompletionSnapshot __state)
+        {
+            __state = TreatmentCompletionContext.IsActive || RoomCancelJobContext.IsActive
+                ? null
+                : IMDataCoreController.Instance.CreateRoomWorkCancellationSnapshot(__instance);
+        }
+
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(RoomWorkCompletionSnapshot __state)
+        {
+            if (__state != null && IMDataCoreController.Instance.HasRoomWorkEnded(__state))
+            {
+                IMDataCoreController.Instance.CaptureRoomWorkCancelled(
+                    __state,
+                    CoreConstants.EventSourceRoomTreatmentCancelledPatch);
+                IMDataCoreController.Instance.ClearRoomWorkAssignment(__state.Room);
+            }
         }
     }
 
@@ -260,16 +341,40 @@ namespace IMDataCore
     internal static class AgencyRoomCancelJob_IMDataCoreRoomWork_Patch
     {
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(agency._room __instance, out RoomWorkCompletionSnapshot __state)
+        private static void Prefix(agency._room __instance, out RoomCancelJobCaptureSnapshot __state)
         {
-            __state = IMDataCoreController.Instance.CreateRoomWorkCancellationSnapshot(__instance);
+            RoomCancelJobContext.Enter();
+            __state = new RoomCancelJobCaptureSnapshot
+            {
+                RoomWork = IMDataCoreController.Instance.CreateRoomWorkCancellationSnapshot(__instance),
+                DevelopingLoan = IMDataCoreController.Instance.CreateDevelopingLoanCancellationSnapshot(__instance)
+            };
         }
 
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(agency._room __instance, RoomWorkCompletionSnapshot __state)
+        private static void Postfix(agency._room __instance, RoomCancelJobCaptureSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureRoomWorkCancelled(__state);
-            IMDataCoreController.Instance.ClearRoomWorkAssignment(__instance);
+            try
+            {
+                if (__state != null)
+                {
+                    IMDataCoreController.Instance.CaptureRoomWorkCancelled(__state.RoomWork);
+                    IMDataCoreController.Instance.CaptureDevelopingLoanCancelled(__state.DevelopingLoan);
+                }
+                IMDataCoreController.Instance.ClearRoomWorkAssignment(__instance);
+            }
+            finally
+            {
+                RoomCancelJobContext.Exit();
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception)
+        {
+            RoomCancelJobContext.Exit();
+            return __exception;
         }
     }
 
@@ -299,6 +404,54 @@ namespace IMDataCore
                 ? Traverse.Create(popup).Field("Data").GetValue<Auditions.data>()
                 : null;
             IMDataCoreController.Instance.TrackAuditionHireCandidate(audition, __instance.Girl.girl);
+        }
+    }
+
+    internal static class RoomCancelJobContext
+    {
+        [ThreadStatic]
+        private static int depth;
+
+        internal static bool IsActive
+        {
+            get { return depth > 0; }
+        }
+
+        internal static void Enter()
+        {
+            depth++;
+        }
+
+        internal static void Exit()
+        {
+            if (depth > 0)
+            {
+                depth--;
+            }
+        }
+    }
+
+    internal static class TreatmentCompletionContext
+    {
+        [ThreadStatic]
+        private static int depth;
+
+        internal static bool IsActive
+        {
+            get { return depth > 0; }
+        }
+
+        internal static void Enter()
+        {
+            depth++;
+        }
+
+        internal static void Exit()
+        {
+            if (depth > 0)
+            {
+                depth--;
+            }
         }
     }
 

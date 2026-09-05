@@ -394,6 +394,25 @@ namespace SaveWriteOrderingFix
                     continue;
                 }
 
+                string assemblyName;
+                try
+                {
+                    AssemblyName identity = assembly.GetName();
+                    assemblyName = identity == null ? string.Empty : identity.Name;
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(
+                        assemblyName,
+                        SaveWriteOrderingConstants.SnlHarmonyId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 Type type;
                 try
                 {

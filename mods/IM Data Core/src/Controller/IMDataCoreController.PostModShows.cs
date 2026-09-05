@@ -316,6 +316,8 @@ namespace IMDataCore
                     CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime),
                 ShowCastCount = participantIds.Count,
                 ShowCastIdList = BuildDelimitedIdentifierList(participantIds),
+                ShowFanAppealSummary = BuildFanAppealSummary(show.FanAppeal),
+                ShowFanSegmentAudienceSummary = BuildShowFanSegmentAudienceSummary(show),
                 ShowPreviousAudience = previousAudience,
                 ShowLatestAudience = latestAudience,
                 ShowAudienceDelta = latestAudience - previousAudience,

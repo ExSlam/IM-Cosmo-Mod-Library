@@ -734,6 +734,8 @@ namespace IMDataCore
                 return snapshot;
             }
 
+            snapshot.LoanReference = loan;
+            snapshot.LoanContained = loans.Loans != null && loans.Loans.Contains(loan);
             snapshot.LoanId = loan.ID;
             snapshot.LoanActive = loan.Active;
             snapshot.LoanDebt = loan.GetDebt();
@@ -796,6 +798,104 @@ namespace IMDataCore
                 CoreConstants.EventTypeLoanPaidOff,
                 CoreConstants.LoanLifecycleActionPaidOff,
                 CoreConstants.EventSourceLoansPayOffPatch);
+        }
+
+        /// <summary>
+        /// Snapshots only loans that vanilla OnNewWeek is about to mature.
+        /// Already-inactive/precoverage rows are deliberately excluded.
+        /// </summary>
+        internal List<LoanMutationSnapshot> CreateNaturalLoanMaturitySnapshots()
+        {
+            List<LoanMutationSnapshot> snapshots = new List<LoanMutationSnapshot>();
+            if (loans.Loans == null)
+            {
+                return snapshots;
+            }
+
+            DateTime processingDate = staticVars.dateTime;
+            for (int loanIndex = CoreConstants.ZeroBasedListStartIndex; loanIndex < loans.Loans.Count; loanIndex++)
+            {
+                loans._loan loan = loans.Loans[loanIndex];
+                if (loan == null || !loan.Active || !(loan.EndDate < processingDate))
+                {
+                    continue;
+                }
+
+                LoanMutationSnapshot snapshot = CreateLoanMutationSnapshot(loan);
+                snapshot.LoanMaturityProcessingDate = processingDate;
+                snapshots.Add(snapshot);
+            }
+
+            return snapshots;
+        }
+
+        /// <summary>
+        /// Emits one natural-maturity terminal only when the exact snapshotted
+        /// loan changed from active to inactive during the observed weekly tick.
+        /// </summary>
+        internal void CaptureNaturalLoanMaturities(IReadOnlyList<LoanMutationSnapshot> snapshotsBefore)
+        {
+            if (snapshotsBefore == null)
+            {
+                return;
+            }
+
+            for (int snapshotIndex = CoreConstants.ZeroBasedListStartIndex; snapshotIndex < snapshotsBefore.Count; snapshotIndex++)
+            {
+                LoanMutationSnapshot snapshot = snapshotsBefore[snapshotIndex];
+                loans._loan loan = snapshot != null ? snapshot.LoanReference : null;
+                if (loan == null || !snapshot.LoanContained || !snapshot.LoanActive || loan.Active ||
+                    loans.Loans == null || !loans.Loans.Contains(loan))
+                {
+                    continue;
+                }
+
+                CaptureLoanLifecycleEvent(
+                    loan,
+                    snapshot,
+                    CoreConstants.EventTypeLoanMatured,
+                    CoreConstants.LoanLifecycleActionMatured,
+                    CoreConstants.EventSourceLoansMaturityPatch);
+            }
+        }
+
+        /// <summary>
+        /// Captures a still-developing room loan only when it is authoritatively
+        /// present in the global loan collection before CancelJob mutates it.
+        /// </summary>
+        internal LoanMutationSnapshot CreateDevelopingLoanCancellationSnapshot(agency._room room)
+        {
+            if (room == null || room.loan == null || loans.Loans == null ||
+                !room.loan.IsInDevelopment() || !loans.Loans.Contains(room.loan))
+            {
+                return null;
+            }
+
+            return CreateLoanMutationSnapshot(room.loan);
+        }
+
+        /// <summary>
+        /// Emits the developing-loan terminal only after CancelJob has proven the
+        /// exact before-contained loan reference is absent from loans.Loans.
+        /// </summary>
+        internal void CaptureDevelopingLoanCancelled(LoanMutationSnapshot snapshotBefore)
+        {
+            if (snapshotBefore == null ||
+                snapshotBefore.LoanReference == null ||
+                !snapshotBefore.LoanContained ||
+                !snapshotBefore.LoanInDevelopment ||
+                loans.Loans == null ||
+                loans.Loans.Contains(snapshotBefore.LoanReference))
+            {
+                return;
+            }
+
+            CaptureLoanLifecycleEvent(
+                snapshotBefore.LoanReference,
+                snapshotBefore,
+                CoreConstants.EventTypeLoanCancelled,
+                CoreConstants.LoanLifecycleActionCancelled,
+                CoreConstants.EventSourceLoansDevelopmentCancelledPatch);
         }
 
         /// <summary>
@@ -1130,6 +1230,7 @@ namespace IMDataCore
             int totalPaymentAfter = loans.GetTotalPaymentPerWeek();
             int activeLoanCountAfter = CountActiveLoans();
             int totalLoanCountAfter = loans.Loans != null ? loans.Loans.Count : CoreConstants.ZeroBasedListStartIndex;
+            bool loanContainedAfter = loans.Loans != null && loans.Loans.Contains(loan);
 
             LoanLifecycleEventPayload payload = new LoanLifecycleEventPayload
             {
@@ -1137,6 +1238,8 @@ namespace IMDataCore
                 loan_lifecycle_action = lifecycleAction ?? string.Empty,
                 loan_type = CoreEnumNameMapping.ToLoanTypeCode(loan.Type),
                 loan_duration = CoreEnumNameMapping.ToLoanDurationCode(loan.Duration),
+                loan_contained_before = snapshotBefore != null ? snapshotBefore.LoanContained : loanContainedAfter,
+                loan_contained_after = loanContainedAfter,
                 loan_active_before = snapshotBefore != null && snapshotBefore.LoanActive,
                 loan_active_after = loan.Active,
                 loan_amount = loan.Amount,
@@ -1144,6 +1247,9 @@ namespace IMDataCore
                 loan_interest_rate = loan.InterestRate,
                 loan_start_date = loan.StartDate == DateTime.MinValue ? string.Empty : CoreDateTimeUtility.ToRoundTripString(loan.StartDate),
                 loan_end_date = loan.EndDate == default(DateTime) ? string.Empty : CoreDateTimeUtility.ToRoundTripString(loan.EndDate),
+                loan_maturity_processed_date = snapshotBefore != null && snapshotBefore.LoanMaturityProcessingDate != default(DateTime)
+                    ? CoreDateTimeUtility.ToRoundTripString(snapshotBefore.LoanMaturityProcessingDate)
+                    : string.Empty,
                 loan_debt_before = snapshotBefore != null ? snapshotBefore.LoanDebt : loan.GetDebt(),
                 loan_debt_after = loan.GetDebt(),
                 loan_can_pay_off_after = loan.CanPayOff(),
@@ -2976,6 +3082,30 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Captures one authoritative task-fulfillment rollback.
+        /// </summary>
+        internal void CaptureTaskUnfulfilled(tasks._task task, TaskLifecycleSnapshot snapshotBefore)
+        {
+            if (task == null || snapshotBefore == null)
+            {
+                return;
+            }
+
+            if (!snapshotBefore.FulfilledBefore || task.Fulfilled)
+            {
+                return;
+            }
+
+            EmitTaskLifecycleEvent(
+                task,
+                snapshotBefore,
+                CoreConstants.EventTypeTaskUnfulfilled,
+                CoreConstants.EventSourceTasksTaskUnfulfillPatch,
+                CoreConstants.TaskLifecycleActionUnfulfilled,
+                false);
+        }
+
+        /// <summary>
         /// Captures one task failure event.
         /// </summary>
         internal void CaptureTaskFailed(tasks._task task, TaskLifecycleSnapshot snapshotBefore)
@@ -3055,7 +3185,6 @@ namespace IMDataCore
                 CoreEnumNameMapping.ToTaskRouteCode(tasks.Story_Data != null ? tasks.Story_Data.Route : tasks._route.NONE),
                 snapshotBefore.AvailableFrom ?? string.Empty);
 
-            string entityIdentifier = BuildTaskIdentifier(task, snapshotBefore);
             int idolIdForEvent = taskGirlId >= CoreConstants.MinimumValidIdolIdentifier
                 ? taskGirlId
                 : CoreConstants.InvalidIdValue;
@@ -3069,6 +3198,8 @@ namespace IMDataCore
                     return;
                 }
 
+                string entityIdentifier =
+                    ResolveTaskHistoryEntityIdentifierLocked(task, snapshotBefore);
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
                     idolIdForEvent,
@@ -3079,6 +3210,10 @@ namespace IMDataCore
                     CoreJsonUtility.SerializeObjectPayload(payload));
 
                 FlushAfterCaptureLocked();
+                if (!activeAfter)
+                {
+                    RetireGeneratedTaskIdentityIfRemovedLocked(task);
+                }
             }
         }
 
@@ -3112,6 +3247,14 @@ namespace IMDataCore
                 task_girl_id = taskGirlId,
                 task_skill = task != null ? CoreEnumNameMapping.ToIdolParameterCode(task.Skill) : CoreConstants.StatusCodeUnknown,
                 task_agent_name = task != null ? task.AgentName ?? string.Empty : string.Empty,
+                task_single_genre_id = task != null && task.Single_Genre != null ? task.Single_Genre.id : CoreConstants.InvalidIdValue,
+                task_single_genre_title = GetTaskConstraintTitleSafe(task != null ? task.Single_Genre : null),
+                task_single_lyrics_id = task != null && task.Single_Lyrics != null ? task.Single_Lyrics.id : CoreConstants.InvalidIdValue,
+                task_single_lyrics_title = GetTaskConstraintTitleSafe(task != null ? task.Single_Lyrics : null),
+                task_show_genre_id = task != null && task.Show_Genre != null ? task.Show_Genre.id : CoreConstants.InvalidIdValue,
+                task_show_genre_title = GetTaskConstraintTitleSafe(task != null ? task.Show_Genre : null),
+                task_show_medium_id = task != null && task.Show_Medium != null ? task.Show_Medium.id : CoreConstants.InvalidIdValue,
+                task_show_medium_title = GetTaskConstraintTitleSafe(task != null ? task.Show_Medium : null),
                 fulfilled_before = fulfilledBefore,
                 fulfilled_after = fulfilledAfter,
                 active_before = activeBefore,
@@ -3136,6 +3279,27 @@ namespace IMDataCore
             try
             {
                 return task.GetTitle() ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Safely resolves one authoritative task constraint title without parsing
+        /// the localized task description. Shows._param inherits singles._param.
+        /// </summary>
+        private static string GetTaskConstraintTitleSafe(singles._param constraint)
+        {
+            if (constraint == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                return constraint.GetTitle() ?? string.Empty;
             }
             catch
             {
@@ -4644,13 +4808,16 @@ namespace IMDataCore
             }
 
             string auditionTypeCode = ResolveAuditionTypeCode(auditionData.Type);
+            string auditionOccurrenceId = CreateAuditionOccurrenceId();
             int auditionCost = auditionData.GetCost();
             long moneyBefore = snapshotBefore != null ? snapshotBefore.MoneyBefore : resources.Money();
             long moneyAfter = resources.Money();
 
             AuditionStartedEventPayload startedPayload = new AuditionStartedEventPayload
             {
+                audition_occurrence_id = auditionOccurrenceId,
                 audition_type = auditionTypeCode,
+                candidate_count_at_start = auditionData.Girls != null ? auditionData.Girls.Count : CoreConstants.ZeroBasedListStartIndex,
                 should_pay = shouldPay,
                 cost = auditionCost,
                 progress_before = snapshotBefore != null ? snapshotBefore.ProgressBefore : 0f,
@@ -4668,6 +4835,7 @@ namespace IMDataCore
 
             AuditionCostPaidEventPayload costPayload = new AuditionCostPaidEventPayload
             {
+                audition_occurrence_id = auditionOccurrenceId,
                 audition_type = auditionTypeCode,
                 spend_reason = CoreConstants.EventTypeAuditionStarted,
                 cost = auditionCost,
@@ -4686,11 +4854,17 @@ namespace IMDataCore
                     return;
                 }
 
+                activeAuditionRunsByData[auditionData] = new AuditionRuntimeContext
+                {
+                    OccurrenceId = auditionOccurrenceId,
+                    AuditionType = auditionTypeCode
+                };
+
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
                     CoreConstants.InvalidIdValue,
                     CoreConstants.EventEntityKindAudition,
-                    auditionTypeCode,
+                    auditionOccurrenceId,
                     CoreConstants.EventTypeAuditionStarted,
                     CoreConstants.EventSourceAuditionsGeneratePatch,
                     CoreJsonUtility.SerializeObjectPayload(startedPayload));
@@ -4701,7 +4875,7 @@ namespace IMDataCore
                         staticVars.dateTime,
                         CoreConstants.InvalidIdValue,
                         CoreConstants.EventEntityKindAudition,
-                        auditionTypeCode,
+                        auditionOccurrenceId,
                         CoreConstants.EventTypeAuditionCostPaid,
                         CoreConstants.EventSourceAuditionsGeneratePatch,
                         CoreJsonUtility.SerializeObjectPayload(costPayload));
@@ -4881,6 +5055,8 @@ namespace IMDataCore
                     return;
                 }
 
+                PrepareRandomEventStartedHistoryLocked(activeEvent, randomEvent, payload);
+
                 EnqueueNarrativeEventForIdolsOrGlobalLocked(
                     staticVars.dateTime,
                     idolIds,
@@ -4927,6 +5103,7 @@ namespace IMDataCore
                 snapshot.EstimatedLiabilityBefore = businessSystem.GetLiability(snapshot.ActiveEventBefore.actors, reply.Effects);
             }
 
+            PrepareRandomEventConcludeSnapshot(snapshot);
             return snapshot;
         }
 
@@ -4998,6 +5175,13 @@ namespace IMDataCore
                     return;
                 }
 
+                if (randomEventTerminalCapturedByReference.Contains(activeEvent))
+                {
+                    return;
+                }
+
+                PrepareRandomEventConcludedHistoryLocked(activeEvent, snapshotBefore, payload);
+
                 EnqueueNarrativeEventForIdolsOrGlobalLocked(
                     staticVars.dateTime,
                     idolIds,
@@ -5007,6 +5191,9 @@ namespace IMDataCore
                     CoreConstants.EventSourceEventManagerConcludeEventPatch,
                     CoreJsonUtility.SerializeObjectPayload(payload));
 
+                randomEventTerminalCapturedByReference.Add(activeEvent);
+                randomEventSelectedContractByReference.Remove(activeEvent);
+                randomEventOccurrenceByReference.Remove(activeEvent);
                 FlushAfterCaptureLocked();
             }
         }
@@ -5017,7 +5204,7 @@ namespace IMDataCore
         internal SubstoryStartSnapshot CreateSubstoryStartSnapshot(data_dialogues._dialogue dialogue)
         {
             string dialogueId = dialogue != null ? (dialogue.id ?? string.Empty) : string.Empty;
-            return new SubstoryStartSnapshot
+            SubstoryStartSnapshot snapshot = new SubstoryStartSnapshot
             {
                 QueueCountBefore = Substories_Manager.dialogueQueue != null ? Substories_Manager.dialogueQueue.Count : CoreConstants.ZeroBasedListStartIndex,
                 DelayedCountBefore = Substories_Manager.Delayed_Queue != null ? Substories_Manager.Delayed_Queue.Count : CoreConstants.ZeroBasedListStartIndex,
@@ -5025,10 +5212,22 @@ namespace IMDataCore
                 WasDelayedBefore = !string.IsNullOrEmpty(dialogueId) && Substories_Manager.Delayed_Queue != null && Substories_Manager.Delayed_Queue.Contains(dialogueId),
                 WasQueuedBefore = !string.IsNullOrEmpty(dialogueId) && QueueContainsSubstoryId(dialogueId)
             };
+
+            if (Substories_Manager.dialogueQueue != null)
+            {
+                for (int index = CoreConstants.ZeroBasedListStartIndex;
+                    index < Substories_Manager.dialogueQueue.Count;
+                    index++)
+                {
+                    snapshot.QueueReferencesBefore.Add(Substories_Manager.dialogueQueue[index]);
+                }
+            }
+
+            return snapshot;
         }
 
         /// <summary>
-        /// Captures substory queue transitions as started or delayed lifecycle events.
+        /// Captures substory queue transitions as queued or delayed lifecycle events.
         /// </summary>
         internal void CaptureSubstoryStartOrDelay(
             data_dialogues._dialogue dialogue,
@@ -5047,9 +5246,9 @@ namespace IMDataCore
             bool usedAfter = Substories_Manager.IsUsed(dialogue.id);
             bool delayedAfter = Substories_Manager.Delayed_Queue != null && Substories_Manager.Delayed_Queue.Contains(dialogue.id);
             bool queuedAfter = QueueContainsSubstoryId(dialogue.id);
-            bool started = queuedAfter && (snapshotBefore == null || queueCountAfter > snapshotBefore.QueueCountBefore || !snapshotBefore.WasQueuedBefore);
+            bool queued = queuedAfter && (snapshotBefore == null || queueCountAfter > snapshotBefore.QueueCountBefore || !snapshotBefore.WasQueuedBefore);
             bool delayed = delayedAfter && (snapshotBefore == null || delayedCountAfter > snapshotBefore.DelayedCountBefore || !snapshotBefore.WasDelayedBefore);
-            if (!started && !delayed)
+            if (!queued && !delayed)
             {
                 return;
             }
@@ -5059,6 +5258,9 @@ namespace IMDataCore
                 : null;
             string actorSummary = BuildSubstoryActorSummary(substoryData);
             List<int> idolIds = ResolveDistinctSubstoryIdolIdentifiers(substoryData);
+            Substories_Manager._dialogueQueue createdQueueEntry = queued
+                ? ResolveNewSubstoryQueueEntry(dialogue, snapshotBefore)
+                : null;
 
             SubstoryLifecycleEventPayload payload = new SubstoryLifecycleEventPayload
             {
@@ -5088,22 +5290,26 @@ namespace IMDataCore
                     return;
                 }
 
-                if (started)
+                if (queued)
                 {
-                    payload.substory_lifecycle_action = CoreConstants.SubstoryLifecycleActionStarted;
+                    payload.substory_lifecycle_action = CoreConstants.SubstoryLifecycleActionQueued;
+                    if (dialogue.type == data_dialogues._dialogue._type.scene &&
+                        createdQueueEntry != null)
+                    {
+                        payload.substory_occurrence_id =
+                            TrackQueuedSubstorySceneOccurrenceLocked(
+                                createdQueueEntry,
+                                dialogue);
+                    }
                     EnqueueNarrativeEventForIdolsOrGlobalLocked(
                         staticVars.dateTime,
                         idolIds,
                         CoreConstants.EventEntityKindSubstory,
                         payload.substory_id,
-                        CoreConstants.EventTypeSubstoryStarted,
+                        CoreConstants.EventTypeSubstoryQueued,
                         CoreConstants.EventSourceSubstoriesStartDialoguePatch,
                         CoreJsonUtility.SerializeObjectPayload(payload));
 
-                    if (dialogue.type == data_dialogues._dialogue._type.dialogue)
-                    {
-                        TrackSubstoryQueuedLocked(payload.substory_id);
-                    }
                 }
 
                 if (delayed)
@@ -5119,6 +5325,108 @@ namespace IMDataCore
                         CoreJsonUtility.SerializeObjectPayload(payload));
                 }
 
+                FlushAfterCaptureLocked();
+            }
+        }
+
+        /// <summary>
+        /// Snapshots an ordinary dialogue queue row at the actual presentation boundary.
+        /// `_CheckDialogueQueue` invokes BeforeStart immediately before ActiveDialogueController.Set,
+        /// so the postfix observes the final actor assignment without invoking callbacks itself.
+        /// </summary>
+        internal SubstoryDialoguePresentationSnapshot CreateSubstoryDialoguePresentationSnapshot(
+            data_dialogues._dialogue dialogue)
+        {
+            SubstoryDialoguePresentationSnapshot snapshot = new SubstoryDialoguePresentationSnapshot
+            {
+                Dialogue = dialogue
+            };
+            if (dialogue == null || dialogue.type != data_dialogues._dialogue._type.dialogue ||
+                string.IsNullOrEmpty(dialogue.id) || Substories_Manager.dialogueQueue == null)
+            {
+                return snapshot;
+            }
+
+            for (int index = Substories_Manager.dialogueQueue.Count - 1;
+                index >= CoreConstants.ZeroBasedListStartIndex; index--)
+            {
+                Substories_Manager._dialogueQueue queued = Substories_Manager.dialogueQueue[index];
+                if (queued == null || !ReferenceEquals(queued.dialogue, dialogue) ||
+                    queued.launchTime > staticVars.dateTime)
+                {
+                    continue;
+                }
+
+                snapshot.QueueEntry = queued;
+                snapshot.QueueCountBefore = Substories_Manager.dialogueQueue.Count;
+                snapshot.DelayedCountBefore = Substories_Manager.Delayed_Queue != null
+                    ? Substories_Manager.Delayed_Queue.Count
+                    : CoreConstants.ZeroBasedListStartIndex;
+                snapshot.ScheduledLaunchTime = queued.launchTime;
+                snapshot.DebugMode = queued.debug;
+                snapshot.HadBeforeStartCallback = queued.BeforeStart != null;
+                break;
+            }
+
+            return snapshot;
+        }
+
+        internal void CaptureSubstoryDialoguePresented(
+            ActiveDialogueController dialogueController,
+            data_dialogues._dialogue dialogue,
+            SubstoryDialoguePresentationSnapshot snapshotBefore)
+        {
+            if (dialogueController == null || dialogue == null || snapshotBefore == null ||
+                snapshotBefore.QueueEntry == null ||
+                !ReferenceEquals(dialogue, snapshotBefore.Dialogue) ||
+                !ReferenceEquals(dialogueController.dialogue, dialogue) ||
+                string.IsNullOrEmpty(dialogue.id))
+            {
+                return;
+            }
+
+            Substories_Manager._substoryData substoryData = dialogueController.substoryData
+                ?? Substories_Manager.GetSubstoryData(dialogue.id);
+            string actorSummary = BuildSubstoryActorSummary(substoryData);
+            List<int> idolIds = ResolveDistinctSubstoryIdolIdentifiers(substoryData);
+            int queueCountNow = Substories_Manager.dialogueQueue != null
+                ? Substories_Manager.dialogueQueue.Count
+                : CoreConstants.ZeroBasedListStartIndex;
+            int delayedCountNow = Substories_Manager.Delayed_Queue != null
+                ? Substories_Manager.Delayed_Queue.Count
+                : CoreConstants.ZeroBasedListStartIndex;
+
+            SubstoryLifecycleEventPayload payload = BuildSubstoryLifecyclePayload(
+                dialogue.id,
+                dialogue.parent ?? string.Empty,
+                actorSummary,
+                ResolveSubstoryTypeCode(dialogue),
+                CoreConstants.SubstoryLifecycleActionPresented,
+                Substories_Manager.IsUsed(dialogue.id),
+                Substories_Manager.IsUsed(dialogue.id),
+                snapshotBefore.QueueCountBefore,
+                queueCountNow,
+                snapshotBefore.DelayedCountBefore,
+                delayedCountNow,
+                CoreDateTimeUtility.ToRoundTripString(snapshotBefore.ScheduledLaunchTime),
+                snapshotBefore.DebugMode,
+                snapshotBefore.HadBeforeStartCallback);
+
+            lock (runtimeLock)
+            {
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                EnqueueSubstoryLifecycleEventLocked(
+                    payload,
+                    CoreConstants.EventTypeSubstoryPresented,
+                    CoreConstants.EventSourceSubstoryDialoguePresentedPatch,
+                    idolIds);
+                TrackSubstoryPresentedLocked(payload.substory_id);
                 FlushAfterCaptureLocked();
             }
         }
@@ -5371,12 +5679,12 @@ namespace IMDataCore
                 Substories_Manager._substoryData targetSubstoryData = dialogueController.substoryData ?? Substories_Manager.GetSubstoryData(targetDialogue.id);
                 string targetActorSummary = BuildSubstoryActorSummary(targetSubstoryData);
                 List<int> targetIdolIds = ResolveDistinctSubstoryIdolIdentifiers(targetSubstoryData);
-                SubstoryLifecycleEventPayload startedPayload = BuildSubstoryLifecyclePayload(
+                SubstoryLifecycleEventPayload presentedPayload = BuildSubstoryLifecyclePayload(
                     targetDialogue.id ?? string.Empty,
                     targetDialogue.parent ?? string.Empty,
                     targetActorSummary,
                     ResolveSubstoryTypeCode(targetDialogue),
-                    CoreConstants.SubstoryLifecycleActionStarted,
+                    CoreConstants.SubstoryLifecycleActionPresented,
                     snapshotBefore.TargetWasUsedBefore,
                     targetUsedAfter,
                     snapshotBefore.QueueCountBefore,
@@ -5387,13 +5695,13 @@ namespace IMDataCore
                     Debug_Popup.DEBUG_ON,
                     false);
                 EnqueueSubstoryLifecycleEventLocked(
-                    startedPayload,
-                    CoreConstants.EventTypeSubstoryStarted,
+                    presentedPayload,
+                    CoreConstants.EventTypeSubstoryPresented,
                     CoreConstants.EventSourceActiveDialogueInstantTransitionPatch,
                     targetIdolIds);
                 if (targetDialogue.type == data_dialogues._dialogue._type.dialogue)
                 {
-                    TrackSubstoryQueuedLocked(startedPayload.substory_id);
+                    TrackSubstoryPresentedLocked(presentedPayload.substory_id);
                 }
 
                 FlushAfterCaptureLocked();
@@ -5587,29 +5895,37 @@ namespace IMDataCore
         /// <summary>
         /// Captures blackmail queue additions.
         /// </summary>
-        internal void CaptureInfluenceBlackmailQueued(data_girls.girls spy, data_girls.girls target)
+        internal void CaptureInfluenceBlackmailQueued(
+            data_girls.girls spy,
+            data_girls.girls target,
+            Date_Influence._blackmail blackmail)
         {
-            if (spy == null || target == null || spy.id < CoreConstants.MinimumValidIdolIdentifier || target.id < CoreConstants.MinimumValidIdolIdentifier)
+            if (spy == null || target == null || blackmail == null ||
+                !ReferenceEquals(blackmail.Spy, spy) || !ReferenceEquals(blackmail.Target, target) ||
+                spy.id < CoreConstants.MinimumValidIdolIdentifier || target.id < CoreConstants.MinimumValidIdolIdentifier)
             {
                 return;
             }
 
-            DateTime reportDate = staticVars.dateTime.AddDays(7.0);
-            InfluenceBlackmailEventPayload payload = new InfluenceBlackmailEventPayload
-            {
-                spy_id = spy.id,
-                target_id = target.id,
-                influence_action = CoreConstants.InfluenceLifecycleActionBlackmailQueued,
-                report_date = CoreDateTimeUtility.ToRoundTripString(reportDate),
-                days_until_report = 7,
-                queue_size_after = Date_Influence.Blackmail != null ? Date_Influence.Blackmail.Count : CoreConstants.ZeroBasedListStartIndex,
-                success_tier = CoreConstants.InvalidIdValue,
-                influence_award = CoreConstants.ZeroBasedListStartIndex,
-                event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
-            };
+            DateTime reportDate = blackmail.ReportDate;
 
             lock (runtimeLock)
             {
+                string occurrenceId = ResolveBlackmailOccurrenceIdLocked(blackmail);
+                InfluenceBlackmailEventPayload payload = new InfluenceBlackmailEventPayload
+                {
+                    spy_id = spy.id,
+                    target_id = target.id,
+                    influence_action = CoreConstants.InfluenceLifecycleActionBlackmailQueued,
+                    report_date = CoreDateTimeUtility.ToRoundTripString(reportDate),
+                    days_until_report = (int)(reportDate - staticVars.dateTime).TotalDays,
+                    blackmail_occurrence_id = occurrenceId,
+                    queue_size_after_enqueue = Date_Influence.Blackmail != null ? Date_Influence.Blackmail.Count : CoreConstants.ZeroBasedListStartIndex,
+                    success_tier = CoreConstants.InvalidIdValue,
+                    influence_award_planned = CoreConstants.ZeroBasedListStartIndex,
+                    influence_award_applied_known = false,
+                    event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
+                };
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
@@ -5655,21 +5971,24 @@ namespace IMDataCore
                 influenceAward = 5;
             }
 
-            InfluenceBlackmailEventPayload payload = new InfluenceBlackmailEventPayload
-            {
-                spy_id = blackmail.Spy.id,
-                target_id = blackmail.Target.id,
-                influence_action = CoreConstants.InfluenceLifecycleActionBlackmailTriggered,
-                report_date = ResolveDateString(blackmail.ReportDate),
-                days_until_report = (int)(blackmail.ReportDate - staticVars.dateTime).TotalDays,
-                queue_size_after = Date_Influence.Blackmail != null ? Date_Influence.Blackmail.Count : CoreConstants.ZeroBasedListStartIndex,
-                success_tier = successTier,
-                influence_award = influenceAward,
-                event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
-            };
-
             lock (runtimeLock)
             {
+                string occurrenceId = ResolveBlackmailOccurrenceIdLocked(blackmail);
+                InfluenceBlackmailEventPayload payload = new InfluenceBlackmailEventPayload
+                {
+                    spy_id = blackmail.Spy.id,
+                    target_id = blackmail.Target.id,
+                    influence_action = CoreConstants.InfluenceLifecycleActionBlackmailTriggered,
+                    report_date = ResolveDateString(blackmail.ReportDate),
+                    days_until_report = (int)(blackmail.ReportDate - staticVars.dateTime).TotalDays,
+                    blackmail_occurrence_id = occurrenceId,
+                    queue_size_before_dequeue = Date_Influence.Blackmail != null ? Date_Influence.Blackmail.Count : CoreConstants.ZeroBasedListStartIndex,
+                    success_tier = successTier,
+                    influence_award_planned = influenceAward,
+                    influence_award_applied_known = false,
+                    event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
+                };
+
                 string errorMessage;
                 if (!EnsureInitializedLocked(out errorMessage))
                 {
@@ -5928,7 +6247,8 @@ namespace IMDataCore
                 TrendLastUpdatedBefore = Rivals.Trend_Data != null ? (Rivals.Trend_Data.LastUpdated ?? string.Empty) : string.Empty,
                 TrendsGenreSummaryBefore = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Genres : null),
                 TrendsLyricsSummaryBefore = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Lyrics : null),
-                TrendsChoreoSummaryBefore = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Choreo : null)
+                TrendsChoreoSummaryBefore = BuildRivalTrendDataSummary(Rivals.Trend_Data != null ? Rivals.Trend_Data.Choreo : null),
+                GroupStatesBefore = CaptureRivalGroupStates(Rivals.Groups)
             };
         }
 
@@ -6058,6 +6378,11 @@ namespace IMDataCore
                     CoreLog.Warn(errorMessage);
                     return;
                 }
+
+                // Emit sparse per-group lifecycle rows from the exact same monthly
+                // before/after boundary. The aggregate market row remains exactly one
+                // row and intentionally does not absorb per-group identity semantics.
+                CaptureRivalGroupLifecycleRowsLocked(snapshotBefore);
 
                 EnqueueEventRecordLocked(
                     staticVars.dateTime,
@@ -6645,9 +6970,9 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Tracks started substories for deferred completion emission.
+        /// Tracks presented ordinary substories for deferred completion emission.
         /// </summary>
-        private void TrackSubstoryQueuedLocked(string dialogueId)
+        private void TrackSubstoryPresentedLocked(string dialogueId)
         {
             if (string.IsNullOrEmpty(dialogueId))
             {

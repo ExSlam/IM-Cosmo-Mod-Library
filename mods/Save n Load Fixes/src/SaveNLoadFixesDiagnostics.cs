@@ -2484,6 +2484,31 @@ namespace SaveNLoadFixes
             get { return WideNumericPatchHealth.ResolvedTargetMethodCount; }
         }
 
+        public static int WideNumericContinuationExpectedTargetMethodCount
+        {
+            get { return WideNumericContinuationPatchHealth.ExpectedTargetMethodCount; }
+        }
+
+        public static int WideNumericContinuationResolvedTargetMethodCount
+        {
+            get { return WideNumericContinuationPatchHealth.ResolvedTargetMethodCount; }
+        }
+
+        public static long WideNumericRestoredSectionCount
+        {
+            get { return WideNumericState.RestoredSectionCount; }
+        }
+
+        public static long WideNumericLegacySeedCount
+        {
+            get { return WideNumericState.LegacySeedCount; }
+        }
+
+        public static string LastWideNumericStateDiagnostic
+        {
+            get { return WideNumericState.LastDiagnostic; }
+        }
+
         public static long WideNumericCheckedOperationCount
         {
             get { return WideNumericRepair.CheckedOperationCount; }
@@ -2513,9 +2538,19 @@ namespace SaveNLoadFixes
                     return WideNumericPatchHealth.Failure;
                 }
 
+                if (!string.IsNullOrEmpty(WideNumericContinuationPatchHealth.Failure))
+                {
+                    return WideNumericContinuationPatchHealth.Failure;
+                }
+
                 if (!string.IsNullOrEmpty(WideNumericRepair.LastDiagnostic))
                 {
                     return WideNumericRepair.LastDiagnostic;
+                }
+
+                if (!string.IsNullOrEmpty(WideNumericState.LastDiagnostic))
+                {
+                    return WideNumericState.LastDiagnostic;
                 }
 
                 return WideNumericPatchHealth.LastDiagnostic;

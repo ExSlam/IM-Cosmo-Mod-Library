@@ -26,12 +26,16 @@ namespace SaveNLoadFixes.Repairs
 
         internal static bool IsImplemented
         {
-            get { return WideNumericPatchHealth.IsHealthy; }
+            get
+            {
+                return WideNumericPatchHealth.IsHealthy &&
+                    WideNumericContinuationPatchHealth.IsHealthy;
+            }
         }
 
         internal static bool IsHealthy
         {
-            get { return WideNumericPatchHealth.IsHealthy && !HasLatchedFailure; }
+            get { return IsImplemented && !HasLatchedFailure; }
         }
 
         internal static bool IsCheckpointSafe
@@ -97,9 +101,26 @@ namespace SaveNLoadFixes.Repairs
                         ")");
                 }
 
+                if (!WideNumericContinuationPatchHealth.IsHealthy)
+                {
+                    string failure = WideNumericContinuationPatchHealth.Failure;
+                    if (!string.IsNullOrEmpty(failure))
+                    {
+                        return "A33.2-A33.6 patch health failed: " + failure;
+                    }
+                    return string.Concat(
+                        "A33.2-A33.6 patch manifest is incomplete (",
+                        WideNumericContinuationPatchHealth.ResolvedTargetMethodCount.ToString(
+                            CultureInfo.InvariantCulture),
+                        "/",
+                        WideNumericContinuationPatchHealth.ExpectedTargetMethodCount.ToString(
+                            CultureInfo.InvariantCulture),
+                        ")");
+                }
+
                 if (HasLatchedFailure)
                 {
-                    return "A33.1 numeric failure is latched: " + LastDiagnostic;
+                    return "A33 numeric failure is latched: " + LastDiagnostic;
                 }
 
                 return string.Empty;
@@ -194,6 +215,158 @@ namespace SaveNLoadFixes.Repairs
                     value,
                     0L,
                     exception);
+            }
+        }
+
+        internal static long RoundSingleProductToEven(
+            long value,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.RoundSingleProductToEven(value, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(
+                    context,
+                    "exact Single-coefficient product",
+                    value,
+                    coefficients == null ? 0L : coefficients.Length,
+                    exception);
+            }
+        }
+
+        internal static long FloorSingleProduct(
+            long value,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.FloorSingleProduct(value, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(
+                    context,
+                    "exact Single-coefficient floor",
+                    value,
+                    coefficients == null ? 0L : coefficients.Length,
+                    exception);
+            }
+        }
+
+        internal static long CeilingSingleProduct(
+            long value,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.CeilingSingleProduct(value, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(
+                    context,
+                    "exact Single-coefficient ceiling",
+                    value,
+                    coefficients == null ? 0L : coefficients.Length,
+                    exception);
+            }
+        }
+
+        internal static long DivideRoundToEven(
+            long numerator,
+            long denominator,
+            string context)
+        {
+            try
+            {
+                long result = WideNumericMath.DivideRoundToEven(numerator, denominator);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(
+                    context,
+                    "divide-round-to-even",
+                    numerator,
+                    denominator,
+                    exception);
+            }
+        }
+
+        internal static long RoundRatioWithSingleProductsToEven(
+            long value,
+            long denominator,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.RoundRatioWithSingleProductsToEven(
+                    value, denominator, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(context, "exact rational/Single product",
+                    value, denominator, exception);
+            }
+        }
+
+        internal static long RoundProductRatioWithSingleProductsToEven(
+            long left,
+            long right,
+            long denominator,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.RoundProductRatioWithSingleProductsToEven(
+                    left, right, denominator, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(context,
+                    "exact product-ratio/Single product", left, right, exception);
+            }
+        }
+
+        internal static long RoundLinearCombinationWithSingleProductsToEven(
+            long first,
+            long firstFactor,
+            long second,
+            long secondFactor,
+            long denominator,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.RoundLinearCombinationWithSingleProductsToEven(
+                    first, firstFactor, second, secondFactor, denominator, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(context,
+                    "exact linear-combination/Single product", first, second, exception);
             }
         }
 
@@ -399,6 +572,7 @@ namespace SaveNLoadFixes.Repairs
             }
 
             business._proposal proposal = owner.ActiveProposal;
+            WideNumericContinuation.PreflightBusinessAcceptCounters(proposal);
             if (proposal.duration <= 0)
             {
                 // Vanilla already widens the immediate-payment branch before any
@@ -540,37 +714,36 @@ namespace SaveNLoadFixes.Repairs
                 "SEvent_Concerts._concert._projectedValues.GetProductionCost coefficient");
         }
 
-        internal static int CalculateSeveranceCompatibility()
+        internal static long CalculateStaffSeverance(staff._staff person)
         {
-            if (Staff_Fire.Staff == null)
-            {
-                return 0;
-            }
+            if (person == null) return 0L;
+            if ((staticVars.dateTime - person.HireDate).Days < 30) return 0L;
+            return Multiply(person.GetSalary(), 48L,
+                "staff._staff.Severance salary times 48 weeks");
+        }
 
-            long severance = (long)Staff_Fire.Staff.Severance();
+        internal static long CalculateStaffFireSeverance()
+        {
+            if (Staff_Fire.Staff == null) return 0L;
+
+            long severance = CalculateStaffSeverance(Staff_Fire.Staff);
             long availableMoney = resources.Money();
-            if (severance <= 0L || availableMoney <= 0L)
-            {
-                return 0;
-            }
+            if (severance <= 0L || availableMoney <= 0L) return 0L;
 
             long doubled = Multiply(
                 severance,
                 2L,
                 "Staff_Fire.GetSeverance doubled severance");
-            if (doubled < availableMoney / 2L)
-            {
-                return ToInt32Exact(doubled, "Staff_Fire.GetSeverance Int32 ABI result");
-            }
+            if (doubled < availableMoney / 2L) return doubled;
+            if (severance > availableMoney) return availableMoney;
+            return severance;
+        }
 
-            if (severance > availableMoney)
-            {
-                return ToInt32Exact(
-                    availableMoney,
-                    "Staff_Fire.GetSeverance available-money ABI result");
-            }
-
-            return ToInt32Exact(severance, "Staff_Fire.GetSeverance ABI result");
+        internal static int CalculateSeveranceCompatibility()
+        {
+            // The vanilla ABI is Int32. Keep it as a deterministic compatibility
+            // mirror only; exact SNLF consumers use CalculateStaffFireSeverance().
+            return WideNumericMath.ClampToInt32(CalculateStaffFireSeverance());
         }
 
         internal static long CalculateFansByType(
@@ -635,6 +808,48 @@ namespace SaveNLoadFixes.Repairs
             return total;
         }
 
+        internal static long CalculateGroupFansByType(
+            Groups._group group,
+            resources.fanType gender,
+            resources.fanType hardcoreness,
+            resources.fanType age)
+        {
+            if (group == null)
+            {
+                LatchInvariantFailure("Groups._group.GetFansOfType received a null group.");
+                throw new ArgumentNullException(nameof(group));
+            }
+
+            long total = 0L;
+            foreach (data_girls.girls girl in group.GetGirls(true, false, null))
+            {
+                total = Add(
+                    total,
+                    girl.GetFan_Count(gender, hardcoreness, age),
+                    "Groups._group.GetFansOfType(demographic)");
+            }
+            return total;
+        }
+
+        internal static long CalculateGroupFansByType(
+            Groups._group group,
+            resources.fanType? type)
+        {
+            if (group == null)
+            {
+                LatchInvariantFailure("Groups._group.GetFansOfType received a null group.");
+                throw new ArgumentNullException(nameof(group));
+            }
+
+            long total = 0L;
+            foreach (data_girls.girls girl in group.GetGirls(true, false, null))
+            {
+                total = Add(total, girl.GetFans_Total(type),
+                    "Groups._group.GetFansOfType(Nullable)");
+            }
+            return total;
+        }
+
         private static OverflowException CreateOverflowException(
             string context,
             string operation,
@@ -660,10 +875,31 @@ namespace SaveNLoadFixes.Repairs
                 inner);
         }
 
-        private static void LatchInvariantFailure(string diagnostic)
+        internal static void LatchInvariantFailure(string diagnostic)
         {
             Interlocked.Increment(ref invariantFailureCount);
-            LatchFailure("A33.1 invariant failure: " + diagnostic);
+            LatchFailure("A33 invariant failure: " + diagnostic);
+        }
+
+        internal static void RefuseIdentityExhaustion(string context)
+        {
+            string diagnostic = "A33.6 refused exhausted persistent Int32 identity at " +
+                (context ?? "<unknown>") + ". No wrapped or reused ID was allocated.";
+            LatchInvariantFailure(diagnostic);
+            throw new OverflowException(SaveNLoadFixesConstants.LogPrefix + diagnostic);
+        }
+
+        internal static void RefuseCounterExhaustion(
+            string context, int current, int delta)
+        {
+            string diagnostic = string.Concat(
+                "A33.6 refused an overflowing persistent Int32 lifetime counter at ",
+                context ?? "<unknown>", ": current=",
+                current.ToString(CultureInfo.InvariantCulture), ", delta=",
+                delta.ToString(CultureInfo.InvariantCulture),
+                ". The owning gameplay action was refused before mutation.");
+            LatchInvariantFailure(diagnostic);
+            throw new OverflowException(SaveNLoadFixesConstants.LogPrefix + diagnostic);
         }
 
         private static void LatchFailure(string diagnostic)

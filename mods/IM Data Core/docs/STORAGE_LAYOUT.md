@@ -1,4 +1,4 @@
-# IM Data Core 3.4.7 storage layout
+# IM Data Core 3.4.24 storage layout
 
 ## Physical mapping
 
@@ -36,7 +36,14 @@ All IMDC mutation paths are canonicalized and required to remain beneath the pri
 
 ## V5 document identity
 
-IMDC 3.4.7 writes and accepts sidecar format version 5 only. Transactional journals remain format version 2.
+IMDC 3.4.24 writes and accepts sidecar format version 5 only. Transactional journals remain format version 2.
+The source tree contains a bounded v1-v5 migration decoder that produces a v6-target logical result. The Wave-0 v6/v3 storage foundation is now fully staged, but normal activation/publication still remains v5/v2 so source generations are never overwritten automatically by this build.
+The staged v6 logical codec also adds exact-checkpoint identity bindings; see `V6_IDENTITY_BINDING_SCHEMA.md`. Version 3.4.24 additionally stages the journal-v3 boundary/row framing and applies the shared affinity-before-version header classifier to live v2 selection and staged v3 selection. The live writer still emits v5/v2 only. Version 3.4.24 also requires checkpoint-owned `IdentityCandidates` in staged v6 and adds deterministic legacy-unbound adoption plus branch-safe candidate replacement; these fields are intentionally absent from the live v5 wire.
+The staged v6 event row also carries `ParticipantSchemaVersion` for built-in shared-history compatibility. Loaded `show_cast_changed` history now normalizes only source-proven legacy per-idol fan-out to the shared envelope; canonical/source-distinct same-timestamp occurrences are preserved unless exact payload plus compatible historical source proves equivalence. Released v2-v5 shared envelopes are strict schema 1; only the bounded v1 archival/synthetic compatibility generation may derive a missing redundant participant count from an authoritative stored list. The v5 wire shape intentionally has no participant-schema field.
+The staged v6 document additionally requires `NamespaceOwnerBindings` as document-level, non-rewinding provenance. Populated legacy v1-v5 namespaces migrate only as explicit `legacy_unbound` revision chains; checkpoint `EnabledMods` is never an ownership authority. Task 7 also fills the matching `NAMESPACE_OWNER_BINDING` journal-v3 row codec while live v5/v2 remains unchanged.
+The staged v6 document also requires `CoverageModelVersion`, immutable `CoverageCapabilitySets`, branch-owned `CoverageTransitions`, and bounded branch-owned `HistoricalBaselineAssertions`. Task 8 fills the capability/transition rows; Task 9 fills the allow-listed #63 group-origin baseline carrier and the final `HISTORICAL_BASELINE_ASSERTION` v3 row. No frozen v3 semantic row family remains deferred.
+The staged v6 root additionally requires non-rewinding `MigrationProvenance`. Native v6 and bounded v1-v5 conversions are distinguished explicitly; a migrated record stores deterministic source/target metadata and a save-scope-bound conversion ID. Live v5 downgrade protection now treats an unsupported primary generation or matching-base unsupported journal as authoritative/write-protected rather than recovering an older backup over it. See `V6_MIGRATION_PROVENANCE_SCHEMA.md`.
+Version 3.4.24 cumulatively fills the first three Wave-1 generation families that those v6 checkpoint bindings are designed to carry. Accepted/activated contracts receive opaque `g:` generations, cliques receive opaque `q:` generations at `Relationships.StartNewClique`, and each real bullying interval receives an opaque `b:` episode generation when a target first enters `Bullied_Girls`. Contracts bind by `business__ActiveProposalsData` ordinal + saved-row witness; cliques bind by `Relationships__Cliques` ordinal + complete row witness; bullying episodes additionally require the parent clique generation, `bullied_target:<idolId>` child locator, and a target-specific witness. Legacy contract tuples, sorted-member clique signatures, and `leader|target` bullying keys are candidate metadata only. Because normal runtime still publishes v5/v2, canonical contract/clique/bullying `EntityId` emission and durable rebinding remain gated until the v6 cutover.
 
 ```json
 {
@@ -168,6 +175,14 @@ Built-in IMDC payloads use native arrays for known ID-list fields. Built-in mone
 }
 ```
 
+## Staged sidecar-v6 namespace-owner provenance
+
+Sidecar-v6 adds a required document-level `NamespaceOwnerBindings` collection. This is not checkpoint state. Exact F9/Save-As branch selection may rewind custom rows, but it must not rewind or erase who is authorized to reclaim durable namespaced state after restart.
+
+Bindings are immutable per-namespace revisions. Revision 1 establishes either a native known owner or explicit `legacy_unbound` migration provenance. A legitimate owner-schema/binary change appends revision 2+, preserving the stable owner lineage and retaining the prior strong assembly witness. Re-registering the same owner with the same schema and strong witness is idempotent and does not grow the revision chain.
+
+For v1-v5 migration, namespace tokens are derived only from persisted namespaced events and custom mutations. Migration never infers ownership from checkpoint `EnabledMods`, title/author/version metadata, DLL names, or the first current registrant. Explicit legacy adoption appends `migration_adopted`; it does not rewrite the unknown source revision. See `NAMESPACE_OWNER_PROVENANCE.md`.
+
 ## What is intentionally not persisted
 
 The sidecar does not persist runtime-derived structures such as timeline indexes, custom-data materialized dictionaries, quota counters, custom-event idempotency lookup sets, active mutation-sequence sets, `GameDateKey`, duplicated public `EventId`, or persistence synchronization epochs. Those values are derived from source records or are process-local bookkeeping.
@@ -240,6 +255,6 @@ Background journal compaction is normally requested when journal bytes reach a b
 
 ## Persistence format policy
 
-This development build accepts only `IMDataCore.LightweightSidecar` format version 5 and transactional journal format 2. Earlier sidecar formats are intentionally unsupported and are left untouched. No runtime migration path is provided.
+This development build activates only `IMDataCore.LightweightSidecar` format version 5 and transactional journal format 2. Earlier sidecar formats are left untouched by normal runtime activation. A bounded v1-v5 decoder now exists for the planned one-time v6 migration path, but publication is deliberately deferred until the complete v6/v3 storage foundation is present.
 
 Pre-2.0 database persistence is also outside the runtime path. Historical v2-v4 schema, migration, validation, and implementation-note files are intentionally not shipped with the runtime source tree; a future external migrator can own historical-format knowledge.

@@ -275,12 +275,46 @@ namespace IMDataCore
         public int FormatVersion = LightweightCoreStorageEngine.SidecarFormatVersion;
         public string RelativeSavePath = string.Empty;
         public long LastIssuedSequence;
+
+        // v6/v3 forward-only opaque extension lane. Optional records are
+        // preserved without interpretation; required unknown records make the
+        // physical generation read-only rather than risking a lossy rewrite.
+        public int ForwardCompatibilitySchemaVersion;
+        public List<LightweightForwardExtensionRecord> ForwardExtensions =
+            new List<LightweightForwardExtensionRecord>();
+
         public List<LightweightCheckpointRecord> Checkpoints =
             new List<LightweightCheckpointRecord>();
         public List<LightweightEventRecord> Events =
             new List<LightweightEventRecord>();
         public List<LightweightCustomMutationRecord> CustomMutations =
             new List<LightweightCustomMutationRecord>();
+
+        // v6-only non-rewinding physical-format provenance. A native v6
+        // generation says so explicitly; a converted generation retains its
+        // validated legacy source version and deterministic conversion identity.
+        // The live v5 codec deliberately omits this field.
+        public LightweightMigrationProvenanceRecord MigrationProvenance;
+
+        // v6-only non-rewinding namespace ownership provenance. The live v5
+        // codec deliberately omits this collection until the v6/v3 cutover.
+        public List<LightweightNamespaceOwnerBindingRecord> NamespaceOwnerBindings =
+            new List<LightweightNamespaceOwnerBindingRecord>();
+
+        // v6-only coverage/capability model. Capability-set descriptors are
+        // immutable non-rewinding provenance; transitions are sequence-owned
+        // branch state. The live v5 codec deliberately omits all three members.
+        public int CoverageModelVersion;
+        public List<LightweightCoverageCapabilitySetRecord> CoverageCapabilitySets =
+            new List<LightweightCoverageCapabilitySetRecord>();
+        public List<LightweightCoverageTransitionRecord> CoverageTransitions =
+            new List<LightweightCoverageTransitionRecord>();
+
+        // v6-only bounded historical-origin provenance for finding #63. These
+        // assertions are sequence-owned branch state and rewind with checkpoints.
+        public List<LightweightHistoricalBaselineAssertionRecord>
+            HistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
     }
 
     /// <summary>
@@ -305,9 +339,19 @@ namespace IMDataCore
         internal int BaseEventCount;
         internal int BaseCustomMutationCount;
         internal int BaseCheckpointCount;
+        internal int BaseCoverageCapabilitySetCount;
+        internal int BaseNamespaceOwnerBindingCount;
+        internal int BaseCoverageTransitionCount;
+        internal int BaseHistoricalBaselineAssertionCount;
+        internal int BaseForwardExtensionCount;
         internal int TotalEventCount;
         internal int TotalCustomMutationCount;
         internal int TotalCheckpointCount;
+        internal int TotalCoverageCapabilitySetCount;
+        internal int TotalNamespaceOwnerBindingCount;
+        internal int TotalCoverageTransitionCount;
+        internal int TotalHistoricalBaselineAssertionCount;
+        internal int TotalForwardExtensionCount;
         // Full snapshots contain complete lists. Incremental snapshots contain only
         // the immutable suffix beyond the committed base counts above.
         internal LightweightSidecarDocument Document;
@@ -329,6 +373,32 @@ namespace IMDataCore
         internal int JournalEntryCount;
         internal bool ForceFullSnapshot;
         internal string ReplayedJournalPath = string.Empty;
+
+        // Unsupported storage that is positively bound to the candidate primary
+        // generation is authoritative, not ordinary corruption. It must block
+        // backup fallback so an older runtime cannot heal newer bytes backward.
+        internal bool WriteProtectedByUnsupportedGeneration;
+        internal int UnsupportedSidecarFormatVersion;
+        internal int UnsupportedJournalFormatVersion;
+    }
+
+    /// <summary>
+    /// Detached read-only copy of the selected branch's structured coverage state.
+    /// The descriptor catalog is non-rewinding provenance; transitions are already
+    /// checkpoint-selected by the engine before they enter this snapshot.
+    /// </summary>
+    internal sealed class LightweightStructuredCoverageState
+    {
+        internal long LastIssuedSequence;
+        internal Dictionary<string, long> AnchorCheckpointSequences =
+            new Dictionary<string, long>(StringComparer.Ordinal);
+        internal List<LightweightCoverageCapabilitySetRecord> CapabilitySets =
+            new List<LightweightCoverageCapabilitySetRecord>();
+        internal List<LightweightCoverageTransitionRecord> Transitions =
+            new List<LightweightCoverageTransitionRecord>();
+        internal List<LightweightHistoricalBaselineAssertionRecord>
+            HistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
     }
 
     [Serializable]
@@ -366,6 +436,15 @@ namespace IMDataCore
             new List<LightweightModSnapshotRecord>();
         public List<LightweightAgencyRoomIdentityRecord> AgencyRoomIdentities =
             new List<LightweightAgencyRoomIdentityRecord>();
+
+        // v6-only checkpoint correlation schema. The live v5 codec deliberately
+        // does not serialize these members until the journal-v3 cutover.
+        public int IdentityBindingsVersion;
+        public bool IdentityBindingsComplete;
+        public List<LightweightIdentityBindingRecord> IdentityBindings =
+            new List<LightweightIdentityBindingRecord>();
+        public List<LightweightIdentityCandidateRecord> IdentityCandidates =
+            new List<LightweightIdentityCandidateRecord>();
     }
 
     [Serializable]
@@ -382,6 +461,9 @@ namespace IMDataCore
         public string NamespaceIdentifier = string.Empty;
         public string IdempotencyKey = string.Empty;
         public string PayloadJson = CoreConstants.EmptyJsonObject;
+        // v6 participant compatibility discriminator. The live v5 codec does
+        // not serialize this field.
+        public int ParticipantSchemaVersion;
         // Pre-transformed native sidecar storage representation. This is deliberately not a
         // public sidecar field; the manual codec writes it as the structural Payload
         // value. Records are immutable after insertion, so the expensive transform
@@ -410,11 +492,40 @@ namespace IMDataCore
     internal sealed class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
-        internal const int SidecarFormatVersion = 5;
+        internal const int SidecarFormatVersion = 6;
         internal const string CustomOperationSet = "SET";
         internal const string CustomOperationRemove = "REMOVE";
         internal const string JournalFormatName = "IMDataCore.LightweightJournal";
-        internal const int JournalFormatVersion = 2;
+        internal const int JournalFormatVersion = 3;
+
+        /// <summary>
+        /// The current durable runtime is the atomic sidecar-v6/journal-v3 generation.
+        /// Canonical identity/coverage behavior must never become live from a
+        /// split-generation edit.
+        /// </summary>
+        internal static bool DurableV6RuntimeEnabled
+        {
+            get
+            {
+                return SidecarFormatVersion ==
+                        LightweightIdentityBindingSchema.SidecarFormatVersion &&
+                    JournalFormatVersion ==
+                        LightweightJournalV3Schema.JournalFormatVersion;
+            }
+        }
+
+        /// <summary>
+        /// The shipping persistence generation must be the current atomic 6/3 pair.
+        /// A split or accidental rollback edit fails closed before physical storage is initialized.
+        /// </summary>
+        internal static bool LiveFormatGenerationConfigurationIsCoherent
+        {
+            get
+            {
+                return DurableV6RuntimeEnabled;
+            }
+        }
+
         private static readonly TimeSpan OrphanTemporaryFileMinimumAge =
             TimeSpan.FromHours(24.0);
         private const long MinimumJournalCompactionBytes = 1024L * 1024L;
@@ -604,6 +715,11 @@ namespace IMDataCore
             internal int EventCount;
             internal int CustomMutationCount;
             internal int CheckpointCount;
+            internal int CoverageCapabilitySetCount;
+            internal int NamespaceOwnerBindingCount;
+            internal int CoverageTransitionCount;
+            internal int HistoricalBaselineAssertionCount;
+            internal int ForwardExtensionCount;
             internal long LastIssuedSequence;
             internal long StateRevision;
         }
@@ -688,12 +804,36 @@ namespace IMDataCore
         private List<LightweightCheckpointRecord> durableCheckpoints =
             new List<LightweightCheckpointRecord>();
 
+        // Staged sidecar-v6 state. Descriptor/owner/migration provenance is
+        // non-rewinding physical provenance; transition/baseline rows are
+        // sequence-owned branch state and therefore maintain durable + active
+        // views just like events/custom mutations. These collections remain
+        // empty under the live v5/v2 gate, so this plumbing is behavior-neutral
+        // until the atomic v6/v3 cutover.
+        private LightweightMigrationProvenanceRecord migrationProvenance;
+        private List<LightweightForwardExtensionRecord> forwardExtensions =
+            new List<LightweightForwardExtensionRecord>();
+        private List<LightweightNamespaceOwnerBindingRecord> namespaceOwnerBindings =
+            new List<LightweightNamespaceOwnerBindingRecord>();
+        private List<LightweightCoverageCapabilitySetRecord> coverageCapabilitySets =
+            new List<LightweightCoverageCapabilitySetRecord>();
+        private List<LightweightCoverageTransitionRecord> durableCoverageTransitions =
+            new List<LightweightCoverageTransitionRecord>();
+        private List<LightweightHistoricalBaselineAssertionRecord>
+            durableHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
+
         private List<LightweightEventRecord> activeEvents =
             new List<LightweightEventRecord>();
         private List<LightweightCustomMutationRecord> activeCustomMutations =
             new List<LightweightCustomMutationRecord>();
         private List<LightweightCheckpointRecord> activeCheckpoints =
             new List<LightweightCheckpointRecord>();
+        private List<LightweightCoverageTransitionRecord> activeCoverageTransitions =
+            new List<LightweightCoverageTransitionRecord>();
+        private List<LightweightHistoricalBaselineAssertionRecord>
+            activeHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
 
         private string currentSidecarPath = string.Empty;
         private string currentRelativeSavePath = string.Empty;
@@ -706,6 +846,11 @@ namespace IMDataCore
         private long lastBaseSnapshotBytes;
         private long lastJournalBytes;
         private int lastJournalEntryCount;
+        // Structural branch/prefix revision used only when an existing durable
+        // prefix becomes incompatible with append-only journaling (rewind, trim,
+        // checkpoint replacement). Ordinary append-only v6 provenance/coverage
+        // additions must not advance this value; their collection counts and
+        // shared LastIssuedSequence are sufficient incremental baselines.
         private long activeStateRevision;
         private long maxActiveEventSequence;
         private long maxActiveCustomMutationSequence;
@@ -784,6 +929,30 @@ namespace IMDataCore
             }
         }
 
+        internal bool SupportsStructuredCoverageModel
+        {
+            get
+            {
+                return DurableV6RuntimeEnabled;
+            }
+        }
+
+        internal bool HasLegacyMigrationProvenance
+        {
+            get
+            {
+                lock (storageLock)
+                {
+                    return SupportsStructuredCoverageModel &&
+                        migrationProvenance != null &&
+                        string.Equals(
+                            migrationProvenance.Origin,
+                            LightweightMigrationProvenanceSchema.OriginLegacyMigration,
+                            StringComparison.Ordinal);
+                }
+            }
+        }
+
         internal long LastIssuedSequence
         {
             get
@@ -795,12 +964,1184 @@ namespace IMDataCore
             }
         }
 
+        internal bool TryCaptureStructuredCoverageState(
+            out LightweightStructuredCoverageState state)
+        {
+            state = null;
+            if (!SupportsStructuredCoverageModel)
+            {
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                ThrowIfDisposed();
+                state = new LightweightStructuredCoverageState
+                {
+                    LastIssuedSequence = lastIssuedSequence,
+                    AnchorCheckpointSequences =
+                        BuildCoverageAnchorSequenceSnapshotLocked(),
+                    CapabilitySets = CloneCoverageCapabilitySets(
+                        coverageCapabilitySets),
+                    Transitions = CloneCoverageTransitions(
+                        activeCoverageTransitions),
+                    HistoricalBaselineAssertions =
+                        CloneHistoricalBaselineAssertions(
+                            activeHistoricalBaselineAssertions)
+                };
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Ensures the non-rewinding durable owner lineage used by sidecar-v6
+        /// namespace coverage. Ordinary registration may refresh a known owner's
+        /// strong assembly witness, but it cannot adopt a legacy-unbound namespace.
+        /// </summary>
+        internal bool TryEnsureNamespaceOwnerBinding(
+            string namespaceIdentifier,
+            string stableOwnerId,
+            int ownerSchemaVersion,
+            string currentAssemblyWitness,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured namespace-owner provenance is unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightNamespaceOwnerBindingRecord existing =
+                        FindLatestNamespaceOwnerBindingLocked(
+                            namespaceIdentifier ?? string.Empty);
+                    if (existing == null)
+                    {
+                        LightweightNamespaceOwnerBindingRecord created =
+                            LightweightNamespaceOwnerSchema.CreateNativeBinding(
+                                namespaceIdentifier,
+                                stableOwnerId,
+                                ownerSchemaVersion,
+                                currentAssemblyWitness);
+                        namespaceOwnerBindings.Add(created);
+                            return true;
+                    }
+
+                    LightweightNamespaceOwnerBindingRecord updated;
+                    if (!LightweightNamespaceOwnerSchema.TryRefreshKnownOwnerBinding(
+                            existing,
+                            stableOwnerId,
+                            ownerSchemaVersion,
+                            currentAssemblyWitness,
+                            out updated,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    if (updated.BindingRevision == existing.BindingRevision)
+                    {
+                        // Same stable owner + same witness/schema is a restart-safe
+                        // logical no-op. Do not manufacture provenance revisions.
+                        return true;
+                    }
+
+                    namespaceOwnerBindings.Add(updated);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Updating durable namespace-owner provenance failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Explicitly adopts a migrated legacy-unbound namespace owner after an
+        /// external/user migration authorization has already been obtained. Ordinary
+        /// TryRegisterNamespace never calls this operation, so first claimant after
+        /// migration remains insufficient to establish durable ownership.
+        /// </summary>
+        internal bool TryAdoptLegacyUnboundNamespaceOwnerBinding(
+            string namespaceIdentifier,
+            string stableOwnerId,
+            int ownerSchemaVersion,
+            string currentAssemblyWitness,
+            bool explicitAdoptionAuthorized,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured namespace-owner provenance is unavailable from this storage generation.";
+                return false;
+            }
+            if (!explicitAdoptionAuthorized)
+            {
+                errorMessage =
+                    "Legacy namespace ownership adoption requires explicit external/user migration authorization.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightNamespaceOwnerBindingRecord existing =
+                        FindLatestNamespaceOwnerBindingLocked(
+                            namespaceIdentifier ?? string.Empty);
+                    if (existing == null)
+                    {
+                        errorMessage =
+                            "The namespace has no migrated owner record to adopt.";
+                        return false;
+                    }
+
+                    if (existing.OwnershipKnown)
+                    {
+                        // Lost-response/retry safety: once this exact migration owner has
+                        // been adopted, retrying the explicit operation is idempotent. A
+                        // different lineage is never converted by this path.
+                        if (string.Equals(
+                                existing.Origin,
+                                LightweightNamespaceOwnerSchema.OriginMigrationAdopted,
+                                StringComparison.Ordinal) &&
+                            string.Equals(
+                                existing.StableOwnerId,
+                                stableOwnerId ?? string.Empty,
+                                StringComparison.Ordinal))
+                        {
+                            LightweightNamespaceOwnerBindingRecord refreshed;
+                            if (!LightweightNamespaceOwnerSchema.TryRefreshKnownOwnerBinding(
+                                    existing,
+                                    stableOwnerId,
+                                    ownerSchemaVersion,
+                                    currentAssemblyWitness,
+                                    out refreshed,
+                                    out errorMessage))
+                            {
+                                return false;
+                            }
+                            if (refreshed.BindingRevision != existing.BindingRevision)
+                            {
+                                namespaceOwnerBindings.Add(refreshed);
+                                        }
+                            return true;
+                        }
+
+                        errorMessage =
+                            "The namespace already has a different durable owner provenance state.";
+                        return false;
+                    }
+
+                    LightweightNamespaceOwnerBindingRecord adopted;
+                    if (!LightweightNamespaceOwnerSchema.TryAdoptLegacyUnboundBinding(
+                            existing,
+                            stableOwnerId,
+                            ownerSchemaVersion,
+                            currentAssemblyWitness,
+                            explicitAdoptionAuthorized,
+                            out adopted,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    namespaceOwnerBindings.Add(adopted);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Adopting legacy namespace-owner provenance failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Records the one selected-branch backend adoption origin. LateAdoption
+        /// and LegacyResume are exact-checkpoint anchored; CareerStart is not.
+        /// The method is dormant while the live v5/v2 format gate is closed.
+        /// </summary>
+        internal bool TryRecordBackendCoverageOrigin(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            string origin,
+            VanillaSaveStamp anchorStamp,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured backend coverage is unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    bool careerStart = string.Equals(
+                        origin,
+                        LightweightCoverageSchema.OriginCareerStart,
+                        StringComparison.Ordinal);
+                    bool anchoredOrigin = string.Equals(
+                            origin,
+                            LightweightCoverageSchema.OriginLateAdoption,
+                            StringComparison.Ordinal) ||
+                        string.Equals(
+                            origin,
+                            LightweightCoverageSchema.OriginLegacyResume,
+                            StringComparison.Ordinal);
+                    if (!careerStart && !anchoredOrigin)
+                    {
+                        errorMessage =
+                            "The backend coverage origin is unsupported.";
+                        return false;
+                    }
+
+                    string anchorCheckpointKey = string.Empty;
+                    if (anchoredOrigin)
+                    {
+                        LightweightCheckpointRecord anchor;
+                        if (!TryResolveCoverageAnchorLocked(
+                                anchorStamp,
+                                out anchor,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+                        anchorCheckpointKey =
+                            LightweightCoverageSchema.BuildAnchorCheckpointKey(
+                                anchor);
+                    }
+                    else if (anchorStamp != null)
+                    {
+                        errorMessage =
+                            "CareerStart coverage must not carry a loaded-save checkpoint anchor.";
+                        return false;
+                    }
+
+                    LightweightCoverageTransitionRecord existing =
+                        FindLatestCoverageTransitionLocked(
+                            LightweightCoverageSchema.ScopeBackend,
+                            LightweightCoverageSchema.BackendScopeIdentifier);
+                    if (existing != null)
+                    {
+                        if (string.Equals(
+                                existing.Origin,
+                                origin,
+                                StringComparison.Ordinal) &&
+                            string.Equals(
+                                existing.AnchorCheckpointKey ?? string.Empty,
+                                anchorCheckpointKey,
+                                StringComparison.Ordinal))
+                        {
+                            return true;
+                        }
+
+                        errorMessage =
+                            "The selected branch already has a different backend coverage origin.";
+                        return false;
+                    }
+
+                    if (sequenceFactory == null)
+                    {
+                        errorMessage = "The IMDC sequence factory is missing.";
+                        return false;
+                    }
+                    long sequence = sequenceFactory();
+                    if (!TryReserveMutationSequenceLocked(
+                            sequence,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    activeCoverageTransitions.Add(
+                        new LightweightCoverageTransitionRecord
+                        {
+                            Sequence = sequence,
+                            GameDateTime =
+                                CoreDateTimeUtility.ToRoundTripString(gameDate),
+                            ScopeKind = LightweightCoverageSchema.ScopeBackend,
+                            ScopeIdentifier =
+                                LightweightCoverageSchema.BackendScopeIdentifier,
+                            State = LightweightCoverageSchema.StateActive,
+                            CapabilitySetId = string.Empty,
+                            Origin = origin,
+                            Reason = "backend_adoption",
+                            AnchorCheckpointKey = anchorCheckpointKey
+                        });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Recording backend coverage origin failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Activates the immutable current built-in durable-history capability set.
+        /// A changed descriptor starts a new selected-branch epoch; repeating the
+        /// already-active descriptor is idempotent and consumes no sequence. Loaded
+        /// upgrade/resume activations are anchored to the exact accepted checkpoint,
+        /// while the native CareerStart epoch is intentionally unanchored.
+        /// </summary>
+        internal bool TryActivateBuiltInCoverage(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            LightweightCoverageCapabilitySetRecord descriptor,
+            VanillaSaveStamp anchorStamp,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured built-in coverage is unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCoverageSchema.ValidateCapabilitySet(descriptor);
+                    if (!string.Equals(
+                            descriptor.ScopeKind,
+                            LightweightCoverageSchema.ScopeBuiltIn,
+                            StringComparison.Ordinal) ||
+                        !string.Equals(
+                            descriptor.ScopeIdentifier,
+                            LightweightCoverageSchema.BuiltInScopeIdentifier,
+                            StringComparison.Ordinal))
+                    {
+                        errorMessage =
+                            "A built-in coverage activation requires the built-in capability descriptor.";
+                        return false;
+                    }
+
+                    LightweightCoverageTransitionRecord backend =
+                        FindLatestCoverageTransitionLocked(
+                            LightweightCoverageSchema.ScopeBackend,
+                            LightweightCoverageSchema.BackendScopeIdentifier);
+                    if (backend == null ||
+                        !string.Equals(
+                            backend.State,
+                            LightweightCoverageSchema.StateActive,
+                            StringComparison.Ordinal))
+                    {
+                        errorMessage =
+                            "Built-in coverage cannot begin before the selected branch has a backend coverage origin.";
+                        return false;
+                    }
+
+                    LightweightCoverageTransitionRecord latest =
+                        FindLatestCoverageTransitionLocked(
+                            LightweightCoverageSchema.ScopeBuiltIn,
+                            LightweightCoverageSchema.BuiltInScopeIdentifier);
+                    if (latest != null &&
+                        string.Equals(
+                            latest.State,
+                            LightweightCoverageSchema.StateActive,
+                            StringComparison.Ordinal) &&
+                        string.Equals(
+                            latest.CapabilitySetId,
+                            descriptor.CapabilitySetId,
+                            StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    string anchorCheckpointKey = string.Empty;
+                    if (anchorStamp != null)
+                    {
+                        LightweightCheckpointRecord anchor;
+                        if (!TryResolveCoverageAnchorLocked(
+                                anchorStamp,
+                                out anchor,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+                        anchorCheckpointKey =
+                            LightweightCoverageSchema.BuildAnchorCheckpointKey(
+                                anchor);
+                    }
+                    else if (!string.Equals(
+                        backend.Origin,
+                        LightweightCoverageSchema.OriginCareerStart,
+                        StringComparison.Ordinal))
+                    {
+                        errorMessage =
+                            "Only native CareerStart built-in coverage may begin without an exact checkpoint anchor.";
+                        return false;
+                    }
+
+                    bool descriptorExists = false;
+                    for (int index = 0;
+                        index < coverageCapabilitySets.Count;
+                        index++)
+                    {
+                        LightweightCoverageCapabilitySetRecord current =
+                            coverageCapabilitySets[index];
+                        if (current != null &&
+                            string.Equals(
+                                current.CapabilitySetId,
+                                descriptor.CapabilitySetId,
+                                StringComparison.Ordinal))
+                        {
+                            descriptorExists = true;
+                            break;
+                        }
+                    }
+
+                    if (sequenceFactory == null)
+                    {
+                        errorMessage = "The IMDC sequence factory is missing.";
+                        return false;
+                    }
+                    long sequence = sequenceFactory();
+                    if (!TryReserveMutationSequenceLocked(
+                            sequence,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    if (!descriptorExists)
+                    {
+                        coverageCapabilitySets.Add(
+                            CloneCoverageCapabilitySets(
+                                new List<LightweightCoverageCapabilitySetRecord>
+                                {
+                                    descriptor
+                                })[0]);
+                    }
+                    activeCoverageTransitions.Add(
+                        new LightweightCoverageTransitionRecord
+                        {
+                            Sequence = sequence,
+                            GameDateTime =
+                                CoreDateTimeUtility.ToRoundTripString(gameDate),
+                            ScopeKind = LightweightCoverageSchema.ScopeBuiltIn,
+                            ScopeIdentifier =
+                                LightweightCoverageSchema.BuiltInScopeIdentifier,
+                            State = LightweightCoverageSchema.StateActive,
+                            CapabilitySetId = descriptor.CapabilitySetId,
+                            Origin =
+                                LightweightCoverageSchema.OriginBuiltInActivation,
+                            Reason = "builtin_capability_activation",
+                            AnchorCheckpointKey = anchorCheckpointKey
+                        });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Activating built-in history coverage failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Publishes an owner-authenticated namespace capability descriptor and
+        /// opens a selected-branch coverage epoch. Repeating an identical active
+        /// declaration is a logical no-op and consumes no sequence.
+        /// </summary>
+        internal bool TryDeclareNamespaceCoverage(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            LightweightCoverageCapabilitySetRecord descriptor,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured namespace coverage is unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCoverageSchema.ValidateCapabilitySet(descriptor);
+                    if (!string.Equals(
+                            descriptor.ScopeKind,
+                            LightweightCoverageSchema.ScopeNamespace,
+                            StringComparison.Ordinal))
+                    {
+                        errorMessage =
+                            "A namespace coverage declaration requires a namespace capability descriptor.";
+                        return false;
+                    }
+
+                    LightweightNamespaceOwnerBindingRecord owner =
+                        FindLatestNamespaceOwnerBindingLocked(
+                            descriptor.ScopeIdentifier);
+                    if (owner == null ||
+                        !owner.OwnershipKnown ||
+                        !string.Equals(
+                            owner.StableOwnerId,
+                            descriptor.OwnerStableId,
+                            StringComparison.Ordinal))
+                    {
+                        errorMessage =
+                            "The namespace coverage declaration does not match an authenticated durable owner lineage.";
+                        return false;
+                    }
+
+                    LightweightCoverageTransitionRecord latest =
+                        FindLatestCoverageTransitionLocked(
+                            LightweightCoverageSchema.ScopeNamespace,
+                            descriptor.ScopeIdentifier);
+                    if (latest != null &&
+                        string.Equals(
+                            latest.State,
+                            LightweightCoverageSchema.StateActive,
+                            StringComparison.Ordinal) &&
+                        string.Equals(
+                            latest.CapabilitySetId,
+                            descriptor.CapabilitySetId,
+                            StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    bool descriptorExists = false;
+                    for (int index = 0;
+                        index < coverageCapabilitySets.Count;
+                        index++)
+                    {
+                        LightweightCoverageCapabilitySetRecord current =
+                            coverageCapabilitySets[index];
+                        if (current != null &&
+                            string.Equals(
+                                current.CapabilitySetId,
+                                descriptor.CapabilitySetId,
+                                StringComparison.Ordinal))
+                        {
+                            descriptorExists = true;
+                            break;
+                        }
+                    }
+
+                    if (sequenceFactory == null)
+                    {
+                        errorMessage = "The IMDC sequence factory is missing.";
+                        return false;
+                    }
+                    long sequence = sequenceFactory();
+                    if (!TryReserveMutationSequenceLocked(
+                            sequence,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    if (!descriptorExists)
+                    {
+                        coverageCapabilitySets.Add(
+                            CloneCoverageCapabilitySets(
+                                new List<LightweightCoverageCapabilitySetRecord>
+                                {
+                                    descriptor
+                                })[0]);
+                    }
+                    activeCoverageTransitions.Add(
+                        new LightweightCoverageTransitionRecord
+                        {
+                            Sequence = sequence,
+                            GameDateTime =
+                                CoreDateTimeUtility.ToRoundTripString(gameDate),
+                            ScopeKind = LightweightCoverageSchema.ScopeNamespace,
+                            ScopeIdentifier = descriptor.ScopeIdentifier,
+                            State = LightweightCoverageSchema.StateActive,
+                            CapabilitySetId = descriptor.CapabilitySetId,
+                            Origin =
+                                LightweightCoverageSchema.OriginNamespaceDeclaration,
+                            Reason = "namespace_declaration",
+                            AnchorCheckpointKey = string.Empty
+                        });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Declaring namespace history coverage failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Closes an active namespace coverage epoch. Process-boundary gaps are
+        /// exact-checkpoint anchored; explicit unregister/stop gaps are not.
+        /// Re-closing an already-gapped namespace is idempotent.
+        /// </summary>
+        internal bool TryRecordNamespaceCoverageGap(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            string namespaceIdentifier,
+            string origin,
+            VanillaSaveStamp anchorStamp,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Structured namespace coverage is unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    bool processGap = string.Equals(
+                        origin,
+                        LightweightCoverageSchema.OriginNamespaceProcessGap,
+                        StringComparison.Ordinal);
+                    bool explicitGap = string.Equals(
+                        origin,
+                        LightweightCoverageSchema.OriginNamespaceExplicitGap,
+                        StringComparison.Ordinal);
+                    if (!processGap && !explicitGap)
+                    {
+                        errorMessage =
+                            "The namespace coverage gap origin is unsupported.";
+                        return false;
+                    }
+
+                    LightweightCoverageTransitionRecord latest =
+                        FindLatestCoverageTransitionLocked(
+                            LightweightCoverageSchema.ScopeNamespace,
+                            namespaceIdentifier ?? string.Empty);
+                    if (latest == null || string.Equals(
+                            latest.State,
+                            LightweightCoverageSchema.StateGap,
+                            StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    string anchorCheckpointKey = string.Empty;
+                    if (processGap)
+                    {
+                        LightweightCheckpointRecord anchor;
+                        if (!TryResolveCoverageAnchorLocked(
+                                anchorStamp,
+                                out anchor,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+                        anchorCheckpointKey =
+                            LightweightCoverageSchema.BuildAnchorCheckpointKey(
+                                anchor);
+                    }
+                    else if (anchorStamp != null)
+                    {
+                        errorMessage =
+                            "An explicit namespace coverage gap must not carry a load checkpoint anchor.";
+                        return false;
+                    }
+
+                    if (sequenceFactory == null)
+                    {
+                        errorMessage = "The IMDC sequence factory is missing.";
+                        return false;
+                    }
+                    long sequence = sequenceFactory();
+                    if (!TryReserveMutationSequenceLocked(
+                            sequence,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    activeCoverageTransitions.Add(
+                        new LightweightCoverageTransitionRecord
+                        {
+                            Sequence = sequence,
+                            GameDateTime =
+                                CoreDateTimeUtility.ToRoundTripString(gameDate),
+                            ScopeKind = LightweightCoverageSchema.ScopeNamespace,
+                            ScopeIdentifier = namespaceIdentifier ?? string.Empty,
+                            State = LightweightCoverageSchema.StateGap,
+                            CapabilitySetId = string.Empty,
+                            Origin = origin,
+                            Reason = processGap
+                                ? "namespace_process_boundary"
+                                : "namespace_unregister",
+                            AnchorCheckpointKey = anchorCheckpointKey
+                        });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Closing namespace history coverage failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reuses a previously committed anchored backend origin when F9 selects
+        /// the exact pre-origin checkpoint again. This does not infer history from
+        /// dates or event rows; only a durable transition with the same anchor is
+        /// eligible for re-issuance on the newly selected branch.
+        /// </summary>
+        internal bool TryGetDurableAnchoredBackendCoverageOrigin(
+            VanillaSaveStamp stamp,
+            out string origin,
+            out string errorMessage)
+        {
+            origin = string.Empty;
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                return true;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord anchor;
+                    if (!TryResolveCoverageAnchorLocked(
+                            stamp,
+                            out anchor,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+                    string anchorKey =
+                        LightweightCoverageSchema.BuildAnchorCheckpointKey(anchor);
+
+                    for (int index = 0;
+                        index < durableCoverageTransitions.Count;
+                        index++)
+                    {
+                        LightweightCoverageTransitionRecord candidate =
+                            durableCoverageTransitions[index];
+                        if (candidate == null ||
+                            !string.Equals(
+                                candidate.ScopeKind,
+                                LightweightCoverageSchema.ScopeBackend,
+                                StringComparison.Ordinal) ||
+                            !string.Equals(
+                                candidate.AnchorCheckpointKey,
+                                anchorKey,
+                                StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        if (!string.IsNullOrEmpty(origin) &&
+                            !string.Equals(
+                                origin,
+                                candidate.Origin,
+                                StringComparison.Ordinal))
+                        {
+                            errorMessage =
+                                "The exact checkpoint has conflicting durable backend coverage origins.";
+                            origin = string.Empty;
+                            return false;
+                        }
+                        origin = candidate.Origin ?? string.Empty;
+                    }
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Resolving durable backend coverage origin failed: " +
+                        exception.Message;
+                    origin = string.Empty;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Closes every currently active namespace epoch at an exact loaded-save
+        /// process boundary. A namespace that was already gapped at the selected
+        /// checkpoint remains a no-op. Declarations must explicitly reopen epochs.
+        /// </summary>
+        internal bool TryRecordNamespaceProcessBoundaryGaps(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            VanillaSaveStamp anchorStamp,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                return true;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord anchor;
+                    if (!TryResolveCoverageAnchorLocked(
+                            anchorStamp,
+                            out anchor,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+                    string anchorKey =
+                        LightweightCoverageSchema.BuildAnchorCheckpointKey(anchor);
+
+                    SortedSet<string> namespaces =
+                        new SortedSet<string>(StringComparer.Ordinal);
+                    for (int index = 0;
+                        index < activeCoverageTransitions.Count;
+                        index++)
+                    {
+                        LightweightCoverageTransitionRecord transition =
+                            activeCoverageTransitions[index];
+                        if (transition != null &&
+                            string.Equals(
+                                transition.ScopeKind,
+                                LightweightCoverageSchema.ScopeNamespace,
+                                StringComparison.Ordinal))
+                        {
+                            namespaces.Add(transition.ScopeIdentifier ?? string.Empty);
+                        }
+                    }
+
+                    List<LightweightCoverageTransitionRecord> plannedGaps =
+                        new List<LightweightCoverageTransitionRecord>();
+                    foreach (string namespaceIdentifier in namespaces)
+                    {
+                        LightweightCoverageTransitionRecord latest =
+                            FindLatestCoverageTransitionLocked(
+                                LightweightCoverageSchema.ScopeNamespace,
+                                namespaceIdentifier);
+                        if (latest == null ||
+                            !string.Equals(
+                                latest.State,
+                                LightweightCoverageSchema.StateActive,
+                                StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                        if (sequenceFactory == null)
+                        {
+                            errorMessage = "The IMDC sequence factory is missing.";
+                            return false;
+                        }
+                        long sequence = sequenceFactory();
+                        if (!TryReserveMutationSequenceLocked(
+                                sequence,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+
+                        plannedGaps.Add(
+                            new LightweightCoverageTransitionRecord
+                            {
+                                Sequence = sequence,
+                                GameDateTime =
+                                    CoreDateTimeUtility.ToRoundTripString(gameDate),
+                                ScopeKind =
+                                    LightweightCoverageSchema.ScopeNamespace,
+                                ScopeIdentifier = namespaceIdentifier,
+                                State = LightweightCoverageSchema.StateGap,
+                                CapabilitySetId = string.Empty,
+                                Origin =
+                                    LightweightCoverageSchema.OriginNamespaceProcessGap,
+                                Reason = "namespace_process_boundary",
+                                AnchorCheckpointKey = anchorKey
+                            });
+                    }
+
+                    // Publish the restart boundary as one logical batch. If any
+                    // sequence reservation above fails, no namespace is partially
+                    // closed while the caller receives a failure result. Sequence
+                    // numbers already issued by the external factory may remain
+                    // sparse, which is explicitly valid in the shared ordering model.
+                    activeCoverageTransitions.AddRange(plannedGaps);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Recording namespace process-boundary gaps failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Records the bounded finding-#63 historical baseline when IMDC directly
+        /// observes a real group creation. This is not a current-state snapshot:
+        /// only the immutable creation-time target-audience trio is admitted.
+        /// </summary>
+        internal bool TryRecordObservedGroupTargetAudienceBaseline(
+            Func<long> sequenceFactory,
+            DateTime gameDate,
+            string groupEntityIdentifier,
+            string appealGender,
+            string appealHardcoreness,
+            string appealAge,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!SupportsStructuredCoverageModel)
+            {
+                errorMessage =
+                    "Historical baseline assertions are unavailable from this storage generation.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightHistoricalBaselineAssertionRecord assertion =
+                        new LightweightHistoricalBaselineAssertionRecord
+                        {
+                            GameDateTime =
+                                CoreDateTimeUtility.ToRoundTripString(gameDate),
+                            BaselineKind = LightweightHistoricalBaselineSchema
+                                .BaselineKindGroupTargetAudienceOrigin,
+                            EntityKind = CoreConstants.EventEntityKindGroup,
+                            EntityId = groupEntityIdentifier ?? string.Empty,
+                            AssertionSchemaVersion =
+                                LightweightHistoricalBaselineSchema.AssertionSchemaVersion,
+                            Quality = LightweightHistoricalBaselineSchema.QualityExact,
+                            GroupAppealGender = appealGender ?? string.Empty,
+                            GroupAppealHardcoreness =
+                                appealHardcoreness ?? string.Empty,
+                            GroupAppealAge = appealAge ?? string.Empty,
+                            GenderCandidateCodes = new List<string>
+                            {
+                                appealGender ?? string.Empty
+                            },
+                            HardcorenessCandidateCodes = new List<string>
+                            {
+                                appealHardcoreness ?? string.Empty
+                            },
+                            AgeCandidateCodes = new List<string>
+                            {
+                                appealAge ?? string.Empty
+                            },
+                            SourceKind = LightweightHistoricalBaselineSchema
+                                .SourceObservedCreation,
+                            AnchorCheckpointKey = string.Empty
+                        };
+                    assertion.AssertionId =
+                        LightweightHistoricalBaselineSchema.BuildAssertionId(
+                            assertion);
+
+                    for (int index = 0;
+                        index < activeHistoricalBaselineAssertions.Count;
+                        index++)
+                    {
+                        LightweightHistoricalBaselineAssertionRecord existing =
+                            activeHistoricalBaselineAssertions[index];
+                        if (existing == null ||
+                            !string.Equals(
+                                existing.BaselineKind,
+                                assertion.BaselineKind,
+                                StringComparison.Ordinal) ||
+                            !string.Equals(
+                                existing.EntityKind,
+                                assertion.EntityKind,
+                                StringComparison.Ordinal) ||
+                            !string.Equals(
+                                existing.EntityId,
+                                assertion.EntityId,
+                                StringComparison.Ordinal) ||
+                            !string.Equals(
+                                existing.SourceKind,
+                                assertion.SourceKind,
+                                StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        if (string.Equals(
+                                existing.AssertionId,
+                                assertion.AssertionId,
+                                StringComparison.Ordinal))
+                        {
+                            return true;
+                        }
+
+                        errorMessage =
+                            "The selected branch already contains a conflicting observed group target-audience origin.";
+                        return false;
+                    }
+
+                    if (sequenceFactory == null)
+                    {
+                        errorMessage = "The IMDC sequence factory is missing.";
+                        return false;
+                    }
+                    long sequence = sequenceFactory();
+                    if (!TryReserveMutationSequenceLocked(
+                            sequence,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+                    assertion.Sequence = sequence;
+                    LightweightHistoricalBaselineSchema.ValidateAssertion(
+                        assertion,
+                        null);
+                    activeHistoricalBaselineAssertions.Add(assertion);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Recording the observed group target-audience historical baseline failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        private LightweightNamespaceOwnerBindingRecord
+            FindLatestNamespaceOwnerBindingLocked(string namespaceIdentifier)
+        {
+            LightweightNamespaceOwnerBindingRecord latest = null;
+            for (int index = 0; index < namespaceOwnerBindings.Count; index++)
+            {
+                LightweightNamespaceOwnerBindingRecord candidate =
+                    namespaceOwnerBindings[index];
+                if (candidate == null ||
+                    !string.Equals(
+                        candidate.NamespaceIdentifier,
+                        namespaceIdentifier ?? string.Empty,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (latest == null ||
+                    candidate.BindingRevision > latest.BindingRevision)
+                {
+                    latest = candidate;
+                }
+            }
+            return latest;
+        }
+
+        private LightweightCoverageTransitionRecord
+            FindLatestCoverageTransitionLocked(
+                string scopeKind,
+                string scopeIdentifier)
+        {
+            LightweightCoverageTransitionRecord latest = null;
+            for (int index = 0; index < activeCoverageTransitions.Count; index++)
+            {
+                LightweightCoverageTransitionRecord candidate =
+                    activeCoverageTransitions[index];
+                if (candidate == null ||
+                    !string.Equals(
+                        candidate.ScopeKind,
+                        scopeKind ?? string.Empty,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        candidate.ScopeIdentifier,
+                        scopeIdentifier ?? string.Empty,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (latest == null || candidate.Sequence > latest.Sequence)
+                {
+                    latest = candidate;
+                }
+            }
+            return latest;
+        }
+
+        private bool TryResolveCoverageAnchorLocked(
+            VanillaSaveStamp stamp,
+            out LightweightCheckpointRecord checkpoint,
+            out string errorMessage)
+        {
+            checkpoint = null;
+            errorMessage = string.Empty;
+            if (stamp == null)
+            {
+                errorMessage =
+                    "An exact vanilla-save checkpoint anchor is required.";
+                return false;
+            }
+
+            CheckpointIdentity identity = CheckpointIdentity.From(stamp);
+            if (activeCheckpointsByIdentity.TryGetValue(
+                    identity,
+                    out checkpoint) &&
+                checkpoint != null)
+            {
+                return true;
+            }
+            if (durableCheckpointsByIdentity.TryGetValue(
+                    identity,
+                    out checkpoint) &&
+                checkpoint != null)
+            {
+                return true;
+            }
+
+            checkpoint = null;
+            errorMessage =
+                "The exact vanilla-save checkpoint anchor is not available on the selected branch.";
+            return false;
+        }
+
         internal void InitializeTransient()
         {
             lock (storageLock)
             {
                 ThrowIfDisposed();
                 ResetStateLocked();
+                InitializeNativeV6ProvenanceLocked();
             }
         }
 
@@ -809,6 +2150,13 @@ namespace IMDataCore
             out string errorMessage)
         {
             errorMessage = string.Empty;
+            if (!LiveFormatGenerationConfigurationIsCoherent)
+            {
+                errorMessage =
+                    "The IM Data Core live storage generation is incoherent. " +
+                    "Sidecar v6 and journal v3 must be activated together.";
+                return false;
+            }
             if (saveScope == null || saveScope.IsTransient)
             {
                 errorMessage = "A physical vanilla save scope is required.";
@@ -869,6 +2217,7 @@ namespace IMDataCore
 
                 if (!File.Exists(currentSidecarPath))
                 {
+                    InitializeNativeV6ProvenanceLocked();
                     return true;
                 }
 
@@ -890,6 +2239,23 @@ namespace IMDataCore
                         primaryLoadInfo);
                     loadedExistingSidecarDocument = true;
                     return true;
+                }
+
+                if (primaryLoadInfo.WriteProtectedByUnsupportedGeneration)
+                {
+                    // A primary sidecar of another IMDC generation, or a journal
+                    // of another version whose base hash positively matches this
+                    // primary, may contain authoritative semantics this runtime
+                    // cannot represent. Do not fall back to an older .bak and then
+                    // heal the primary backward. Preserve every newer/unsupported
+                    // byte and make this physical save scope read-only.
+                    errorMessage =
+                        "The primary IM Data Core storage generation is unsupported " +
+                        "by this build and was preserved. Backup recovery was not " +
+                        "attempted because it could downgrade authoritative state. " +
+                        primaryError;
+                    BlockPersistenceForCurrentScopeLocked(errorMessage);
+                    return false;
                 }
 
                 string backupPath = currentSidecarPath + ".imdc.bak";
@@ -948,6 +2314,13 @@ namespace IMDataCore
             out string errorMessage)
         {
             errorMessage = string.Empty;
+            if (!LiveFormatGenerationConfigurationIsCoherent)
+            {
+                errorMessage =
+                    "The IM Data Core live storage generation is incoherent. " +
+                    "Sidecar v6 and journal v3 must be activated together.";
+                return false;
+            }
             if (saveScope == null || saveScope.IsTransient)
             {
                 errorMessage = "A physical vanilla save scope is required.";
@@ -984,6 +2357,7 @@ namespace IMDataCore
                         return false;
                     }
 
+                    InitializeNativeV6ProvenanceLocked();
                     return true;
                 }
                 catch (Exception exception)
@@ -1328,6 +2702,7 @@ namespace IMDataCore
                             StoragePayloadJson = storagePayloads[index]
                         };
 
+                        LightweightParticipantSchema.InitializeCurrentRecord(record);
                         activeEvents.Add(record);
                         activeMutationSequences.Add(record.Sequence);
                         IndexEventLocked(record);
@@ -1595,6 +2970,174 @@ namespace IMDataCore
             }
         }
 
+        /// <summary>
+        /// Finds the newest open scene-type substory occurrence for one reusable
+        /// definition ID on the active branch. This recovers correlation only.
+        /// </summary>
+        internal bool TryFindLatestOpenSubstoryOccurrence(
+            string dialogueId,
+            out string occurrenceId)
+        {
+            occurrenceId = string.Empty;
+            if (string.IsNullOrEmpty(dialogueId))
+            {
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                ThrowIfDisposed();
+                HashSet<string> completedOccurrenceIds =
+                    new HashSet<string>(StringComparer.Ordinal);
+                for (int index = activeEvents.Count - 1;
+                    index >= CoreConstants.ZeroBasedListStartIndex;
+                    index--)
+                {
+                    LightweightEventRecord record = activeEvents[index];
+                    if (record == null ||
+                        !string.Equals(record.EntityKind, CoreConstants.EventEntityKindSubstory, StringComparison.Ordinal) ||
+                        !string.Equals(record.EntityId, dialogueId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    string candidateOccurrenceId =
+                        ExtractSubstoryOccurrenceId(record.PayloadJson);
+                    if (string.IsNullOrEmpty(candidateOccurrenceId))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(record.EventType, CoreConstants.EventTypeSubstoryCompleted, StringComparison.Ordinal))
+                    {
+                        completedOccurrenceIds.Add(candidateOccurrenceId);
+                        continue;
+                    }
+
+                    if ((string.Equals(record.EventType, CoreConstants.EventTypeSubstoryQueued, StringComparison.Ordinal) ||
+                         string.Equals(record.EventType, CoreConstants.EventTypeSubstoryStarted, StringComparison.Ordinal)) &&
+                        !completedOccurrenceIds.Contains(candidateOccurrenceId))
+                    {
+                        occurrenceId = candidateOccurrenceId;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static string ExtractSubstoryOccurrenceId(string payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                return string.Empty;
+            }
+
+            const string fieldToken = "\"substory_occurrence_id\":\"";
+            int start = payloadJson.IndexOf(fieldToken, StringComparison.Ordinal);
+            if (start < CoreConstants.ZeroBasedListStartIndex)
+            {
+                return string.Empty;
+            }
+
+            start += fieldToken.Length;
+            int end = payloadJson.IndexOf('"', start);
+            if (end <= start)
+            {
+                return string.Empty;
+            }
+
+            string value = payloadJson.Substring(start, end - start);
+            return value.StartsWith("ss:", StringComparison.Ordinal)
+                ? value
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Recovers the newest random-event occurrence that has a start row on the
+        /// selected active branch but no matching terminal. This is history-only
+        /// correlation used after load/F9; it does not restore Event_Manager state.
+        /// </summary>
+        internal bool TryFindLatestOpenRandomEventOccurrence(
+            string randomEventId,
+            out string occurrenceId)
+        {
+            occurrenceId = string.Empty;
+            if (string.IsNullOrEmpty(randomEventId))
+            {
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                ThrowIfDisposed();
+                HashSet<string> completedOccurrenceIds =
+                    new HashSet<string>(StringComparer.Ordinal);
+                for (int index = activeEvents.Count - 1;
+                    index >= CoreConstants.ZeroBasedListStartIndex;
+                    index--)
+                {
+                    LightweightEventRecord record = activeEvents[index];
+                    if (record == null ||
+                        !string.Equals(record.EntityKind, CoreConstants.EventEntityKindRandomEvent, StringComparison.Ordinal) ||
+                        !string.Equals(record.EntityId, randomEventId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    string candidateOccurrenceId =
+                        ExtractRandomEventOccurrenceId(record.PayloadJson);
+                    if (string.IsNullOrEmpty(candidateOccurrenceId))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(record.EventType, CoreConstants.EventTypeRandomEventConcluded, StringComparison.Ordinal))
+                    {
+                        completedOccurrenceIds.Add(candidateOccurrenceId);
+                        continue;
+                    }
+
+                    if (string.Equals(record.EventType, CoreConstants.EventTypeRandomEventStarted, StringComparison.Ordinal) &&
+                        !completedOccurrenceIds.Contains(candidateOccurrenceId))
+                    {
+                        occurrenceId = candidateOccurrenceId;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static string ExtractRandomEventOccurrenceId(string payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson))
+            {
+                return string.Empty;
+            }
+
+            const string fieldToken = "\"random_event_occurrence_id\":\"";
+            int start = payloadJson.IndexOf(fieldToken, StringComparison.Ordinal);
+            if (start < CoreConstants.ZeroBasedListStartIndex)
+            {
+                return string.Empty;
+            }
+
+            start += fieldToken.Length;
+            int end = payloadJson.IndexOf('"', start);
+            if (end <= start)
+            {
+                return string.Empty;
+            }
+
+            string value = payloadJson.Substring(start, end - start);
+            return value.StartsWith("re:", StringComparison.Ordinal)
+                ? value
+                : string.Empty;
+        }
+
         internal bool TryReadRecentEventsForIdol(
             int idolId,
             int maxCount,
@@ -1716,8 +3259,75 @@ namespace IMDataCore
             }
         }
 
+        /// <summary>
+        /// Reads the selected branch's canonical physical event stream exactly once
+        /// per retained occurrence. Ordering and continuation use the durable shared
+        /// sequence, not game dates or any derived idol/global index.
+        /// </summary>
+        internal bool TryReadHistoryPage(
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            events = new List<IMDataCoreEvent>();
+            hasMore = false;
+            errorMessage = string.Empty;
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    if (maxCount <= 0)
+                    {
+                        return true;
+                    }
+
+                    int eventIndex = activeEvents.Count - 1;
+                    if (beforeEventIdExclusive > 0L)
+                    {
+                        int cursorIndex = FindActiveEventIndexBySequenceLocked(
+                            beforeEventIdExclusive);
+                        if (cursorIndex < 0)
+                        {
+                            errorMessage =
+                                "The requested history page cursor is no longer present in the active branch.";
+                            return false;
+                        }
+
+                        eventIndex = cursorIndex - 1;
+                    }
+
+                    while (events.Count < maxCount && eventIndex >= 0)
+                    {
+                        LightweightEventRecord record = activeEvents[eventIndex--];
+                        if (record != null)
+                        {
+                            events.Add(ToPublicEvent(record));
+                        }
+                    }
+
+                    hasMore = eventIndex >= 0;
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = CoreConstants.MessageTryReadHistoryPageFailedPrefix +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
         private LightweightEventRecord FindActiveEventBySequenceLocked(
             long sequence)
+        {
+            int index = FindActiveEventIndexBySequenceLocked(sequence);
+            return index >= 0 ? activeEvents[index] : null;
+        }
+
+        private int FindActiveEventIndexBySequenceLocked(long sequence)
         {
             int low = 0;
             int high = activeEvents.Count - 1;
@@ -1730,7 +3340,7 @@ namespace IMDataCore
                     : long.MinValue;
                 if (candidateSequence == sequence)
                 {
-                    return candidate;
+                    return middle;
                 }
 
                 if (candidateSequence < sequence)
@@ -1743,7 +3353,7 @@ namespace IMDataCore
                 }
             }
 
-            return null;
+            return -1;
         }
 
         private static int FindLastEventBeforeCursor(
@@ -1906,6 +3516,115 @@ namespace IMDataCore
                     return false;
                 }
             }
+        }
+
+        internal bool TryReadMoneyTransactionsPage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            long afterEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            transactions = new List<IMDataCoreMoneyTransaction>();
+            hasMore = false;
+            errorMessage = string.Empty;
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    int startDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(startInclusive);
+                    int endDateKey =
+                        CoreDateTimeUtility.BuildGameDateKey(endExclusive);
+                    int requestedCount = Math.Max(
+                        MoneyLedgerConstants.MinimumReadCount,
+                        maxCount);
+                    int eventIndex = CoreConstants.ZeroBasedListStartIndex;
+
+                    if (afterEventIdExclusive > 0L)
+                    {
+                        int cursorIndex = FindActiveEventIndexBySequenceLocked(
+                            afterEventIdExclusive);
+                        if (cursorIndex < 0)
+                        {
+                            errorMessage =
+                                "The requested money page cursor is no longer present in the active branch.";
+                            return false;
+                        }
+
+                        LightweightEventRecord cursor = activeEvents[cursorIndex];
+                        if (!IsMoneyTransactionInDateRange(
+                                cursor,
+                                startDateKey,
+                                endDateKey))
+                        {
+                            errorMessage =
+                                "The requested money page cursor does not belong to the requested date range.";
+                            return false;
+                        }
+
+                        eventIndex = cursorIndex + 1;
+                    }
+
+                    while (eventIndex < activeEvents.Count)
+                    {
+                        LightweightEventRecord record = activeEvents[eventIndex++];
+                        if (!IsMoneyTransactionInDateRange(
+                                record,
+                                startDateKey,
+                                endDateKey))
+                        {
+                            continue;
+                        }
+
+                        IMDataCoreEvent publicMoneyEvent = ToPublicEvent(record);
+                        publicMoneyEvent.PayloadJson =
+                            CorePayloadCompaction.ExpandMoneyTransactionPayloadForPublic(
+                                record);
+                        IMDataCoreMoneyTransaction transaction =
+                            MoneyLedgerPayloadUtility.ToPublicModel(publicMoneyEvent);
+                        if (transaction == null)
+                        {
+                            continue;
+                        }
+
+                        if (transactions.Count >= requestedCount)
+                        {
+                            hasMore = true;
+                            return true;
+                        }
+
+                        transactions.Add(transaction);
+                    }
+
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        CoreConstants.MessageTryReadRecentEventsFailedPrefix +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        private static bool IsMoneyTransactionInDateRange(
+            LightweightEventRecord record,
+            int startDateKey,
+            int endDateKey)
+        {
+            return record != null &&
+                string.IsNullOrEmpty(record.NamespaceIdentifier) &&
+                string.Equals(
+                    record.EventType,
+                    MoneyLedgerConstants.EventTypeTransaction,
+                    StringComparison.Ordinal) &&
+                record.GameDateKey >= startDateKey &&
+                record.GameDateKey < endDateKey;
         }
 
         internal bool TryGetMoneyTransactionTotals(
@@ -2168,11 +3887,116 @@ namespace IMDataCore
             }
         }
 
+        internal bool TryGetCheckpointIdentityBindings(
+            VanillaSaveStamp stamp,
+            out bool identityBindingsComplete,
+            out List<LightweightIdentityBindingRecord> identityBindings,
+            out string errorMessage)
+        {
+            identityBindingsComplete = false;
+            identityBindings = new List<LightweightIdentityBindingRecord>();
+            errorMessage = string.Empty;
+            if (stamp == null)
+            {
+                errorMessage = "The vanilla save stamp is missing.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord checkpoint;
+                    if (!durableCheckpointsByIdentity.TryGetValue(
+                            CheckpointIdentity.From(stamp),
+                            out checkpoint) ||
+                        checkpoint == null)
+                    {
+                        return true;
+                    }
+
+                    identityBindingsComplete = checkpoint.IdentityBindingsComplete;
+                    identityBindings = CloneIdentityBindings(checkpoint.IdentityBindings);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Reading the IMDC checkpoint identity-binding snapshot failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
+        internal bool TryGetCheckpointIdentityCandidates(
+            VanillaSaveStamp stamp,
+            out List<LightweightIdentityCandidateRecord> identityCandidates,
+            out string errorMessage)
+        {
+            identityCandidates = new List<LightweightIdentityCandidateRecord>();
+            errorMessage = string.Empty;
+            if (stamp == null)
+            {
+                errorMessage = "The vanilla save stamp is missing.";
+                return false;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    LightweightCheckpointRecord checkpoint;
+                    if (!durableCheckpointsByIdentity.TryGetValue(
+                            CheckpointIdentity.From(stamp),
+                            out checkpoint) ||
+                        checkpoint == null)
+                    {
+                        return true;
+                    }
+
+                    identityCandidates = CloneIdentityCandidates(
+                        checkpoint.IdentityCandidates);
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Reading the IMDC checkpoint identity-candidate snapshot failed: " +
+                        exception.Message;
+                    return false;
+                }
+            }
+        }
+
         internal bool AddOrReplaceCheckpoint(
             VanillaSaveStamp stamp,
             long sequence,
             IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
             IReadOnlyList<LightweightAgencyRoomIdentityRecord> agencyRoomIdentities,
+            out string errorMessage)
+        {
+            return AddOrReplaceCheckpoint(
+                stamp,
+                sequence,
+                enabledMods,
+                agencyRoomIdentities,
+                false,
+                new List<LightweightIdentityBindingRecord>(),
+                new List<LightweightIdentityCandidateRecord>(),
+                out errorMessage);
+        }
+
+        internal bool AddOrReplaceCheckpoint(
+            VanillaSaveStamp stamp,
+            long sequence,
+            IReadOnlyList<LightweightModSnapshotRecord> enabledMods,
+            IReadOnlyList<LightweightAgencyRoomIdentityRecord> agencyRoomIdentities,
+            bool identityBindingsComplete,
+            IReadOnlyList<LightweightIdentityBindingRecord> identityBindings,
+            IReadOnlyList<LightweightIdentityCandidateRecord> identityCandidates,
             out string errorMessage)
         {
             errorMessage = string.Empty;
@@ -2184,6 +4008,16 @@ namespace IMDataCore
             if (agencyRoomIdentities == null)
             {
                 errorMessage = "The agency-room identity snapshot is missing.";
+                return false;
+            }
+            if (identityBindings == null)
+            {
+                errorMessage = "The checkpoint identity-binding snapshot is missing.";
+                return false;
+            }
+            if (identityCandidates == null)
+            {
+                errorMessage = "The checkpoint identity-candidate snapshot is missing.";
                 return false;
             }
 
@@ -2237,7 +4071,12 @@ namespace IMDataCore
                             ContentFingerprint = stamp.ContentFingerprint,
                             Sequence = sequence,
                             EnabledMods = CloneModSnapshots(enabledMods),
-                            AgencyRoomIdentities = CloneAgencyRoomIdentities(agencyRoomIdentities)
+                            AgencyRoomIdentities = CloneAgencyRoomIdentities(agencyRoomIdentities),
+                            IdentityBindingsVersion =
+                                LightweightIdentityBindingSchema.IdentityBindingsVersion,
+                            IdentityBindingsComplete = identityBindingsComplete,
+                            IdentityBindings = CloneIdentityBindings(identityBindings),
+                            IdentityCandidates = CloneIdentityCandidates(identityCandidates)
                         };
                     activeCheckpoints.Add(newCheckpoint);
                     IndexCheckpointByPathLocked(newCheckpoint);
@@ -2440,7 +4279,12 @@ namespace IMDataCore
                 bool noPhysicalWriteRequired = false;
                 int eventDeltaStartIndex = 0;
                 int customMutationDeltaStartIndex = 0;
+                int forwardExtensionDeltaStartIndex = 0;
                 int checkpointDeltaStartIndex = 0;
+                int coverageCapabilitySetDeltaStartIndex = 0;
+                int namespaceOwnerBindingDeltaStartIndex = 0;
+                int coverageTransitionDeltaStartIndex = 0;
+                int historicalBaselineAssertionDeltaStartIndex = 0;
                 lock (storageLock)
                 {
                     if (disposed)
@@ -2480,6 +4324,26 @@ namespace IMDataCore
                                 snapshot.TotalCustomMutationCount ||
                             baselineState.CheckpointCount < snapshot.BaseCheckpointCount ||
                             baselineState.CheckpointCount > snapshot.TotalCheckpointCount ||
+                            baselineState.CoverageCapabilitySetCount <
+                                snapshot.BaseCoverageCapabilitySetCount ||
+                            baselineState.CoverageCapabilitySetCount >
+                                snapshot.TotalCoverageCapabilitySetCount ||
+                            baselineState.NamespaceOwnerBindingCount <
+                                snapshot.BaseNamespaceOwnerBindingCount ||
+                            baselineState.NamespaceOwnerBindingCount >
+                                snapshot.TotalNamespaceOwnerBindingCount ||
+                            baselineState.CoverageTransitionCount <
+                                snapshot.BaseCoverageTransitionCount ||
+                            baselineState.CoverageTransitionCount >
+                                snapshot.TotalCoverageTransitionCount ||
+                            baselineState.HistoricalBaselineAssertionCount <
+                                snapshot.BaseHistoricalBaselineAssertionCount ||
+                            baselineState.HistoricalBaselineAssertionCount >
+                                snapshot.TotalHistoricalBaselineAssertionCount ||
+                            baselineState.ForwardExtensionCount <
+                                snapshot.BaseForwardExtensionCount ||
+                            baselineState.ForwardExtensionCount >
+                                snapshot.TotalForwardExtensionCount ||
                             baselineState.LastIssuedSequence >
                                 snapshot.Document.LastIssuedSequence)
                         {
@@ -2493,14 +4357,39 @@ namespace IMDataCore
                         customMutationDeltaStartIndex =
                             baselineState.CustomMutationCount -
                             snapshot.BaseCustomMutationCount;
+                        forwardExtensionDeltaStartIndex =
+                            baselineState.ForwardExtensionCount -
+                            snapshot.BaseForwardExtensionCount;
                         checkpointDeltaStartIndex =
                             baselineState.CheckpointCount - snapshot.BaseCheckpointCount;
+                        coverageCapabilitySetDeltaStartIndex =
+                            baselineState.CoverageCapabilitySetCount -
+                                snapshot.BaseCoverageCapabilitySetCount;
+                        namespaceOwnerBindingDeltaStartIndex =
+                            baselineState.NamespaceOwnerBindingCount -
+                                snapshot.BaseNamespaceOwnerBindingCount;
+                        coverageTransitionDeltaStartIndex =
+                            baselineState.CoverageTransitionCount -
+                                snapshot.BaseCoverageTransitionCount;
+                        historicalBaselineAssertionDeltaStartIndex =
+                            baselineState.HistoricalBaselineAssertionCount -
+                                snapshot.BaseHistoricalBaselineAssertionCount;
 
                         if (eventDeltaStartIndex > snapshot.Document.Events.Count ||
                             customMutationDeltaStartIndex >
                                 snapshot.Document.CustomMutations.Count ||
+                            forwardExtensionDeltaStartIndex >
+                                snapshot.Document.ForwardExtensions.Count ||
                             checkpointDeltaStartIndex >
-                                snapshot.Document.Checkpoints.Count)
+                                snapshot.Document.Checkpoints.Count ||
+                            coverageCapabilitySetDeltaStartIndex >
+                                snapshot.Document.CoverageCapabilitySets.Count ||
+                            namespaceOwnerBindingDeltaStartIndex >
+                                snapshot.Document.NamespaceOwnerBindings.Count ||
+                            coverageTransitionDeltaStartIndex >
+                                snapshot.Document.CoverageTransitions.Count ||
+                            historicalBaselineAssertionDeltaStartIndex >
+                                snapshot.Document.HistoricalBaselineAssertions.Count)
                         {
                             errorMessage =
                                 "The IMDC incremental snapshot delta is inconsistent with its durable baseline.";
@@ -2513,6 +4402,16 @@ namespace IMDataCore
                                 snapshot.TotalCustomMutationCount &&
                             baselineState.CheckpointCount ==
                                 snapshot.TotalCheckpointCount &&
+                            baselineState.CoverageCapabilitySetCount ==
+                                snapshot.TotalCoverageCapabilitySetCount &&
+                            baselineState.NamespaceOwnerBindingCount ==
+                                snapshot.TotalNamespaceOwnerBindingCount &&
+                            baselineState.CoverageTransitionCount ==
+                                snapshot.TotalCoverageTransitionCount &&
+                            baselineState.HistoricalBaselineAssertionCount ==
+                                snapshot.TotalHistoricalBaselineAssertionCount &&
+                            baselineState.ForwardExtensionCount ==
+                                snapshot.TotalForwardExtensionCount &&
                             baselineState.LastIssuedSequence ==
                                 snapshot.Document.LastIssuedSequence;
 
@@ -2550,6 +4449,11 @@ namespace IMDataCore
                             checkpointDeltaStartIndex,
                             eventDeltaStartIndex,
                             customMutationDeltaStartIndex,
+                            forwardExtensionDeltaStartIndex,
+                            coverageCapabilitySetDeltaStartIndex,
+                            namespaceOwnerBindingDeltaStartIndex,
+                            coverageTransitionDeltaStartIndex,
+                            historicalBaselineAssertionDeltaStartIndex,
                             out appendedBytes,
                             out journalBytes,
                             out journalError))
@@ -2628,6 +4532,16 @@ namespace IMDataCore
                             CustomMutationCount =
                                 snapshot.TotalCustomMutationCount,
                             CheckpointCount = snapshot.TotalCheckpointCount,
+                            CoverageCapabilitySetCount =
+                                snapshot.TotalCoverageCapabilitySetCount,
+                            NamespaceOwnerBindingCount =
+                                snapshot.TotalNamespaceOwnerBindingCount,
+                            CoverageTransitionCount =
+                                snapshot.TotalCoverageTransitionCount,
+                            HistoricalBaselineAssertionCount =
+                                snapshot.TotalHistoricalBaselineAssertionCount,
+                            ForwardExtensionCount =
+                                snapshot.TotalForwardExtensionCount,
                             LastIssuedSequence = snapshot.Document.LastIssuedSequence,
                             StateRevision = snapshot.StateRevision
                         };
@@ -2676,6 +4590,19 @@ namespace IMDataCore
                             durableCheckpoints =
                                 new List<LightweightCheckpointRecord>(
                                     snapshot.Document.Checkpoints);
+                            migrationProvenance = snapshot.Document.MigrationProvenance;
+                            namespaceOwnerBindings =
+                                new List<LightweightNamespaceOwnerBindingRecord>(
+                                    snapshot.Document.NamespaceOwnerBindings);
+                            coverageCapabilitySets =
+                                new List<LightweightCoverageCapabilitySetRecord>(
+                                    snapshot.Document.CoverageCapabilitySets);
+                            durableCoverageTransitions =
+                                new List<LightweightCoverageTransitionRecord>(
+                                    snapshot.Document.CoverageTransitions);
+                            durableHistoricalBaselineAssertions =
+                                new List<LightweightHistoricalBaselineAssertionRecord>(
+                                    snapshot.Document.HistoricalBaselineAssertions);
                             RebuildDurableCheckpointIdentityIndexLocked();
 
                             // A New Save writes only checkpoints belonging to its target
@@ -2867,6 +4794,16 @@ namespace IMDataCore
                         expectedState.CustomMutationCount ||
                     compactionDocument.Checkpoints.Count !=
                         expectedState.CheckpointCount ||
+                    compactionDocument.CoverageCapabilitySets.Count !=
+                        expectedState.CoverageCapabilitySetCount ||
+                    compactionDocument.NamespaceOwnerBindings.Count !=
+                        expectedState.NamespaceOwnerBindingCount ||
+                    compactionDocument.CoverageTransitions.Count !=
+                        expectedState.CoverageTransitionCount ||
+                    compactionDocument.HistoricalBaselineAssertions.Count !=
+                        expectedState.HistoricalBaselineAssertionCount ||
+                    compactionDocument.ForwardExtensions.Count !=
+                        expectedState.ForwardExtensionCount ||
                     compactionDocument.LastIssuedSequence !=
                         expectedState.LastIssuedSequence)
                 {
@@ -2899,11 +4836,26 @@ namespace IMDataCore
                         BaseEventCount = 0,
                         BaseCustomMutationCount = 0,
                         BaseCheckpointCount = 0,
+                        BaseCoverageCapabilitySetCount = 0,
+                        BaseNamespaceOwnerBindingCount = 0,
+                        BaseCoverageTransitionCount = 0,
+                        BaseHistoricalBaselineAssertionCount = 0,
+                        BaseForwardExtensionCount = 0,
                         TotalEventCount = compactionDocument.Events.Count,
                         TotalCustomMutationCount =
                             compactionDocument.CustomMutations.Count,
                         TotalCheckpointCount =
                             compactionDocument.Checkpoints.Count,
+                        TotalCoverageCapabilitySetCount =
+                            compactionDocument.CoverageCapabilitySets.Count,
+                        TotalNamespaceOwnerBindingCount =
+                            compactionDocument.NamespaceOwnerBindings.Count,
+                        TotalCoverageTransitionCount =
+                            compactionDocument.CoverageTransitions.Count,
+                        TotalHistoricalBaselineAssertionCount =
+                            compactionDocument.HistoricalBaselineAssertions.Count,
+                        TotalForwardExtensionCount =
+                            compactionDocument.ForwardExtensions.Count,
                         Document = compactionDocument
                     };
 
@@ -2943,6 +4895,16 @@ namespace IMDataCore
                             expectedState.CustomMutationCount ||
                         currentState.CheckpointCount !=
                             expectedState.CheckpointCount ||
+                        currentState.CoverageCapabilitySetCount !=
+                            expectedState.CoverageCapabilitySetCount ||
+                        currentState.NamespaceOwnerBindingCount !=
+                            expectedState.NamespaceOwnerBindingCount ||
+                        currentState.CoverageTransitionCount !=
+                            expectedState.CoverageTransitionCount ||
+                        currentState.HistoricalBaselineAssertionCount !=
+                            expectedState.HistoricalBaselineAssertionCount ||
+                        currentState.ForwardExtensionCount !=
+                            expectedState.ForwardExtensionCount ||
                         currentState.LastIssuedSequence !=
                             expectedState.LastIssuedSequence ||
                         currentState.StateRevision != expectedState.StateRevision)
@@ -2978,14 +4940,25 @@ namespace IMDataCore
                 snapshot.StateRevision != activeStateRevision ||
                 activeEvents.Count < snapshot.TotalEventCount ||
                 activeCustomMutations.Count <
-                    snapshot.TotalCustomMutationCount)
+                    snapshot.TotalCustomMutationCount ||
+                coverageCapabilitySets.Count <
+                    snapshot.TotalCoverageCapabilitySetCount ||
+                namespaceOwnerBindings.Count <
+                    snapshot.TotalNamespaceOwnerBindingCount ||
+                activeCoverageTransitions.Count <
+                    snapshot.TotalCoverageTransitionCount ||
+                activeHistoricalBaselineAssertions.Count <
+                    snapshot.TotalHistoricalBaselineAssertionCount ||
+                forwardExtensions.Count <
+                    snapshot.TotalForwardExtensionCount)
             {
                 return false;
             }
 
-            IReadOnlyList<LightweightCheckpointRecord> pathCheckpoints =
-                GetActiveCheckpointsForPathLocked(snapshot.RelativeSavePath);
-            if (pathCheckpoints.Count < snapshot.TotalCheckpointCount)
+            IReadOnlyList<LightweightCheckpointRecord> documentCheckpoints =
+                GetActiveCheckpointsForDocumentLocked(
+                    snapshot.RelativeSavePath);
+            if (documentCheckpoints.Count < snapshot.TotalCheckpointCount)
             {
                 return false;
             }
@@ -2996,13 +4969,37 @@ namespace IMDataCore
                 FormatVersion = SidecarFormatVersion,
                 RelativeSavePath = snapshot.RelativeSavePath,
                 LastIssuedSequence = snapshot.Document.LastIssuedSequence,
+                ForwardCompatibilitySchemaVersion =
+                    SupportsStructuredCoverageModel
+                        ? LightweightForwardCompatibilitySchema
+                            .CompatibilitySchemaVersion
+                        : 0,
+                ForwardExtensions = CopyPrefix(
+                    forwardExtensions,
+                    snapshot.TotalForwardExtensionCount),
+                MigrationProvenance = migrationProvenance,
                 Events = CopyPrefix(activeEvents, snapshot.TotalEventCount),
                 CustomMutations = CopyPrefix(
                     activeCustomMutations,
                     snapshot.TotalCustomMutationCount),
                 Checkpoints = CopyPrefix(
-                    pathCheckpoints,
-                    snapshot.TotalCheckpointCount)
+                    documentCheckpoints,
+                    snapshot.TotalCheckpointCount),
+                NamespaceOwnerBindings = CopyPrefix(
+                    namespaceOwnerBindings,
+                    snapshot.TotalNamespaceOwnerBindingCount),
+                CoverageModelVersion = SupportsStructuredCoverageModel
+                    ? LightweightCoverageSchema.CoverageModelVersion
+                    : 0,
+                CoverageCapabilitySets = CopyPrefix(
+                    coverageCapabilitySets,
+                    snapshot.TotalCoverageCapabilitySetCount),
+                CoverageTransitions = CopyPrefix(
+                    activeCoverageTransitions,
+                    snapshot.TotalCoverageTransitionCount),
+                HistoricalBaselineAssertions = CopyPrefix(
+                    activeHistoricalBaselineAssertions,
+                    snapshot.TotalHistoricalBaselineAssertionCount)
             };
             return true;
         }
@@ -3227,6 +5224,8 @@ namespace IMDataCore
 
             LightweightSidecarDocument documentToWrite = snapshot.Document;
             if (snapshot.IsIncremental &&
+                snapshot.Document.FormatVersion !=
+                    LightweightIdentityBindingSchema.SidecarFormatVersion &&
                 !TryMaterializeIncrementalSnapshot(
                     snapshot,
                     baselineState,
@@ -3350,6 +5349,11 @@ namespace IMDataCore
             int checkpointStartIndex,
             int eventStartIndex,
             int customMutationStartIndex,
+            int forwardExtensionStartIndex,
+            int coverageCapabilitySetStartIndex,
+            int namespaceOwnerBindingStartIndex,
+            int coverageTransitionStartIndex,
+            int historicalBaselineAssertionStartIndex,
             out long appendedBytes,
             out long journalBytes,
             out string errorMessage)
@@ -3376,6 +5380,13 @@ namespace IMDataCore
             {
                 return false;
             }
+
+            bool useJournalV3 = document != null &&
+                document.FormatVersion ==
+                    LightweightIdentityBindingSchema.SidecarFormatVersion;
+            int supportedJournalFormatVersion = useJournalV3
+                ? LightweightJournalV3Schema.JournalFormatVersion
+                : JournalFormatVersion;
 
             bool createJournal = !File.Exists(normalizedJournalPath);
             if (createJournal &&
@@ -3419,28 +5430,37 @@ namespace IMDataCore
                         4096,
                         false))
                     {
-                        string existingBaseHash;
-                        int existingJournalVersion;
+                        LightweightJournalHeaderAffinityDecision affinityDecision;
+                        LightweightJournalHeaderEnvelope headerEnvelope;
                         string headerError;
-                        if (!LightweightSidecarJson.TryReadJournalHeader(
+                        if (!LightweightSidecarJson.TryClassifyJournalHeaderForCandidate(
                                 reader.ReadLine(),
-                                out existingBaseHash,
-                                out existingJournalVersion,
-                                out headerError) ||
-                            !string.Equals(
-                                existingBaseHash,
                                 baselineState.BaseFileHash,
-                                StringComparison.Ordinal))
+                                supportedJournalFormatVersion,
+                                out affinityDecision,
+                                out headerEnvelope,
+                                out headerError))
                         {
                             errorMessage =
-                                "The existing IMDC journal does not match its base snapshot. " +
+                                "The existing IMDC journal header is invalid. " +
                                 headerError;
                             return false;
                         }
-                        if (existingJournalVersion != JournalFormatVersion)
+                        if (affinityDecision ==
+                            LightweightJournalHeaderAffinityDecision.HeaderMismatch)
                         {
                             errorMessage =
-                                "The existing IMDC journal format is unsupported by this build.";
+                                "The existing IMDC journal does not match its base snapshot.";
+                            return false;
+                        }
+                        if (affinityDecision ==
+                            LightweightJournalHeaderAffinityDecision.HeaderMatchedUnsupported)
+                        {
+                            errorMessage =
+                                "The existing IMDC journal format " +
+                                headerEnvelope.FormatVersion.ToString(
+                                    CultureInfo.InvariantCulture) +
+                                " is unsupported by this build.";
                             return false;
                         }
                     }
@@ -3473,20 +5493,57 @@ namespace IMDataCore
                     if (createJournal)
                     {
                         writer.Write(
-                            LightweightSidecarJson.SerializeJournalHeader(
-                                baselineState.BaseFileHash));
+                            useJournalV3
+                                ? LightweightSidecarJson.SerializeJournalV3Header(
+                                    baselineState.BaseFileHash)
+                                : LightweightSidecarJson.SerializeJournalHeader(
+                                    baselineState.BaseFileHash));
                         writer.Write('\n');
                     }
 
-                    LightweightSidecarJson.SerializeJournalTransactionTo(
-                        writer,
-                        document,
-                        checkpointStartIndex,
-                        eventStartIndex,
-                        customMutationStartIndex,
-                        baselineState.CheckpointCount,
-                        baselineState.EventCount,
-                        baselineState.CustomMutationCount);
+                    if (useJournalV3)
+                    {
+                        LightweightSidecarJson.SerializeJournalV3TransactionTo(
+                            writer,
+                            document,
+                            checkpointStartIndex,
+                            eventStartIndex,
+                            customMutationStartIndex,
+                            forwardExtensionStartIndex,
+                            coverageCapabilitySetStartIndex,
+                            namespaceOwnerBindingStartIndex,
+                            coverageTransitionStartIndex,
+                            historicalBaselineAssertionStartIndex,
+                            new LightweightJournalV3Counts
+                            {
+                                CheckpointCount = baselineState.CheckpointCount,
+                                EventCount = baselineState.EventCount,
+                                CustomMutationCount =
+                                    baselineState.CustomMutationCount,
+                                ForwardExtensionCount =
+                                    baselineState.ForwardExtensionCount,
+                                CoverageCapabilitySetCount =
+                                    baselineState.CoverageCapabilitySetCount,
+                                NamespaceOwnerBindingCount =
+                                    baselineState.NamespaceOwnerBindingCount,
+                                CoverageTransitionCount =
+                                    baselineState.CoverageTransitionCount,
+                                HistoricalBaselineAssertionCount =
+                                    baselineState.HistoricalBaselineAssertionCount
+                            });
+                    }
+                    else
+                    {
+                        LightweightSidecarJson.SerializeJournalTransactionTo(
+                            writer,
+                            document,
+                            checkpointStartIndex,
+                            eventStartIndex,
+                            customMutationStartIndex,
+                            baselineState.CheckpointCount,
+                            baselineState.EventCount,
+                            baselineState.CustomMutationCount);
+                    }
                     writer.Flush();
                     stream.Flush(true);
                 }
@@ -4094,28 +6151,121 @@ namespace IMDataCore
             errorMessage = string.Empty;
             try
             {
-                using (FileStream stream = new FileStream(
-                    path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    64 * 1024,
-                    FileOptions.SequentialScan))
-                using (HashingReadStream hashingStream =
-                    new HashingReadStream(stream))
-                using (StreamReader reader = new StreamReader(
-                    hashingStream,
-                    Encoding.UTF8,
-                    true,
-                    64 * 1024,
-                    false))
+                bool loadedLegacyGenerationForV6 = false;
+                if (DurableV6RuntimeEnabled)
                 {
-                    document = LightweightSidecarJson.DeserializeFrom(reader);
-                    // DeserializeFrom stops at the end of the JSON document. Drain
-                    // legal trailing whitespace so the fingerprint covers every byte.
-                    reader.ReadToEnd();
-                    persistenceInfo.BaseFileBytes = stream.Length;
-                    persistenceInfo.BaseFileHash = hashingStream.GetHashHex();
+                    byte[] baseBytes = File.ReadAllBytes(path);
+                    string baseJson = DecodeUtf8Bytes(baseBytes);
+                    string physicalFormatName;
+                    int physicalFormatVersion;
+                    string envelopeError;
+                    if (!LightweightSidecarJson.TryReadSidecarFormatEnvelope(
+                            baseJson,
+                            out physicalFormatName,
+                            out physicalFormatVersion,
+                            out envelopeError))
+                    {
+                        errorMessage =
+                            "The IMDC sidecar format envelope is invalid: " +
+                            envelopeError;
+                        return false;
+                    }
+                    if (!string.Equals(
+                            physicalFormatName,
+                            SidecarFormatName,
+                            StringComparison.Ordinal))
+                    {
+                        errorMessage = "The IMDC sidecar format name is unsupported.";
+                        return false;
+                    }
+
+                    persistenceInfo.BaseFileBytes = baseBytes.LongLength;
+                    persistenceInfo.BaseFileHash = ComputeSha256Hex(baseBytes);
+                    if (physicalFormatVersion >= 1 &&
+                        physicalFormatVersion <
+                            LightweightIdentityBindingSchema.SidecarFormatVersion)
+                    {
+                        byte[] legacyJournalBytes;
+                        string selectedLegacyJournalPath;
+                        if (!TrySelectLegacyJournalForMigrationLocked(
+                                path,
+                                preferredJournalPath,
+                                persistenceInfo.BaseFileHash,
+                                persistenceInfo,
+                                out legacyJournalBytes,
+                                out selectedLegacyJournalPath,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+
+                        LightweightLegacyGenerationMigration.Result migrationResult;
+                        if (!LightweightLegacyGenerationMigration.TryMaterializeForV6(
+                                baseBytes,
+                                legacyJournalBytes,
+                                expectedRelativeSavePath,
+                                out migrationResult,
+                                out errorMessage))
+                        {
+                            return false;
+                        }
+                        document = migrationResult.Document;
+                        persistenceInfo.JournalEntryCount =
+                            migrationResult.ReplayedJournalEntryCount;
+                        persistenceInfo.ForceFullSnapshot = true;
+                        if (migrationResult.JournalHeaderMatched)
+                        {
+                            persistenceInfo.ReplayedJournalPath =
+                                selectedLegacyJournalPath;
+                        }
+                        loadedLegacyGenerationForV6 = true;
+                    }
+                    else if (physicalFormatVersion ==
+                        LightweightIdentityBindingSchema.SidecarFormatVersion)
+                    {
+                        using (StringReader reader = new StringReader(baseJson))
+                        {
+                            document = LightweightSidecarJson.DeserializeV6LogicalDocument(reader);
+                        }
+                    }
+                    else
+                    {
+                        persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                        persistenceInfo.UnsupportedSidecarFormatVersion =
+                            physicalFormatVersion;
+                        errorMessage =
+                            "The IMDC sidecar format " +
+                            physicalFormatVersion.ToString(
+                                CultureInfo.InvariantCulture) +
+                            " is unsupported by this IM Data Core version.";
+                        return false;
+                    }
+                }
+                else
+                {
+                    using (FileStream stream = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        64 * 1024,
+                        FileOptions.SequentialScan))
+                    using (HashingReadStream hashingStream =
+                        new HashingReadStream(stream))
+                    using (StreamReader reader = new StreamReader(
+                        hashingStream,
+                        Encoding.UTF8,
+                        true,
+                        64 * 1024,
+                        false))
+                    {
+                        document = LightweightSidecarJson.DeserializeFrom(reader);
+                        // DeserializeFrom stops at the end of the JSON document. Drain
+                        // legal trailing whitespace so the fingerprint covers every byte.
+                        reader.ReadToEnd();
+                        persistenceInfo.BaseFileBytes = stream.Length;
+                        persistenceInfo.BaseFileHash = hashingStream.GetHashHex();
+                    }
                 }
 
                 DocumentValidationState validationState;
@@ -4132,8 +6282,19 @@ namespace IMDataCore
                 int baseCheckpointCount = document.Checkpoints.Count;
                 int baseEventCount = document.Events.Count;
                 int baseCustomMutationCount = document.CustomMutations.Count;
+                int baseCoverageCapabilitySetCount =
+                    document.CoverageCapabilitySets.Count;
+                int baseNamespaceOwnerBindingCount =
+                    document.NamespaceOwnerBindings.Count;
+                int baseCoverageTransitionCount =
+                    document.CoverageTransitions.Count;
+                int baseHistoricalBaselineAssertionCount =
+                    document.HistoricalBaselineAssertions.Count;
+                int baseForwardExtensionCount =
+                    document.ForwardExtensions.Count;
 
-                if (!TryReplayJournalLocked(
+                if (!loadedLegacyGenerationForV6 &&
+                    !TryReplayJournalLocked(
                         path,
                         preferredJournalPath,
                         persistenceInfo.BaseFileHash,
@@ -4145,7 +6306,8 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (persistenceInfo.JournalEntryCount > 0 &&
+                if (!loadedLegacyGenerationForV6 &&
+                    persistenceInfo.JournalEntryCount > 0 &&
                     !TryValidateDocumentSuffixLocked(
                         document,
                         baseEventCount,
@@ -4157,13 +6319,232 @@ namespace IMDataCore
                     document = null;
                     return false;
                 }
+
+                if (document.FormatVersion ==
+                        LightweightIdentityBindingSchema.SidecarFormatVersion &&
+                    (document.CoverageCapabilitySets.Count <
+                        baseCoverageCapabilitySetCount ||
+                     document.NamespaceOwnerBindings.Count <
+                        baseNamespaceOwnerBindingCount ||
+                     document.CoverageTransitions.Count <
+                        baseCoverageTransitionCount ||
+                     document.HistoricalBaselineAssertions.Count <
+                        baseHistoricalBaselineAssertionCount ||
+                     document.ForwardExtensions.Count <
+                        baseForwardExtensionCount))
+                {
+                    errorMessage =
+                        "The IMDC journal-v3 replay shrank a durable v6 collection.";
+                    document = null;
+                    return false;
+                }
                 return true;
+            }
+            catch (LightweightUnsupportedForwardExtensionException exception)
+            {
+                persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                errorMessage = exception.Message;
+                document = null;
+                return false;
+            }
+            catch (LightweightUnsupportedSidecarFormatException exception)
+            {
+                persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                persistenceInfo.UnsupportedSidecarFormatVersion =
+                    exception.UnsupportedFormatVersion;
+                errorMessage = exception.Message;
+                document = null;
+                return false;
             }
             catch (Exception exception)
             {
                 errorMessage = exception.Message;
                 document = null;
                 return false;
+            }
+        }
+
+        private static string DecodeUtf8Bytes(byte[] bytes)
+        {
+            using (MemoryStream stream = new MemoryStream(bytes, false))
+            using (StreamReader reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                true,
+                4096,
+                false))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        private static string ComputeSha256Hex(byte[] bytes)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                return ToLowerHex(sha256.ComputeHash(bytes));
+            }
+        }
+
+        /// <summary>
+        /// Selects only a v2 journal positively bound to a legacy compact base.
+        /// Preferred recovery journals are considered before the base sibling,
+        /// matching the native replay crash-recovery order. Stale or first-header
+        /// torn candidates never become authoritative migration input.
+        /// </summary>
+        private bool TrySelectLegacyJournalForMigrationLocked(
+            string basePath,
+            string preferredJournalPath,
+            string baseFileHash,
+            LightweightLoadedPersistenceInfo persistenceInfo,
+            out byte[] selectedJournalBytes,
+            out string selectedJournalPath,
+            out string errorMessage)
+        {
+            selectedJournalBytes = null;
+            selectedJournalPath = string.Empty;
+            errorMessage = string.Empty;
+            string defaultJournalPath = basePath + ".imdc.journal";
+
+            if (!string.IsNullOrEmpty(preferredJournalPath) &&
+                !string.Equals(
+                    preferredJournalPath,
+                    defaultJournalPath,
+                    CorePaths.PathComparison) &&
+                File.Exists(preferredJournalPath))
+            {
+                LightweightJournalReplayStatus preferredStatus;
+                if (!TrySelectLegacyJournalCandidateLocked(
+                        preferredJournalPath,
+                        baseFileHash,
+                        persistenceInfo,
+                        out preferredStatus,
+                        out selectedJournalBytes,
+                        out selectedJournalPath,
+                        out errorMessage))
+                {
+                    return false;
+                }
+                if (preferredStatus ==
+                    LightweightJournalReplayStatus.HeaderMatched)
+                {
+                    return true;
+                }
+                ResetJournalReplayDiagnostics(persistenceInfo);
+            }
+
+            LightweightJournalReplayStatus defaultStatus;
+            if (!TrySelectLegacyJournalCandidateLocked(
+                    defaultJournalPath,
+                    baseFileHash,
+                    persistenceInfo,
+                    out defaultStatus,
+                    out selectedJournalBytes,
+                    out selectedJournalPath,
+                    out errorMessage))
+            {
+                return false;
+            }
+            if (defaultStatus == LightweightJournalReplayStatus.HeaderMismatch ||
+                defaultStatus == LightweightJournalReplayStatus.TornBeforeHeader)
+            {
+                persistenceInfo.ForceFullSnapshot = true;
+            }
+            return true;
+        }
+
+        private bool TrySelectLegacyJournalCandidateLocked(
+            string journalPath,
+            string baseFileHash,
+            LightweightLoadedPersistenceInfo persistenceInfo,
+            out LightweightJournalReplayStatus replayStatus,
+            out byte[] selectedJournalBytes,
+            out string selectedJournalPath,
+            out string errorMessage)
+        {
+            replayStatus = LightweightJournalReplayStatus.Missing;
+            selectedJournalBytes = null;
+            selectedJournalPath = string.Empty;
+            errorMessage = string.Empty;
+            string normalizedJournalPath;
+            if (!CorePaths.TryValidateContainedMutationPath(
+                    journalPath,
+                    false,
+                    out normalizedJournalPath,
+                    out errorMessage))
+            {
+                return false;
+            }
+            if (!File.Exists(normalizedJournalPath))
+            {
+                return true;
+            }
+
+            byte[] journalBytes = File.ReadAllBytes(normalizedJournalPath);
+            persistenceInfo.JournalBytes = journalBytes.LongLength;
+            if (journalBytes.Length == 0)
+            {
+                replayStatus = LightweightJournalReplayStatus.TornBeforeHeader;
+                persistenceInfo.ForceFullSnapshot = true;
+                return true;
+            }
+
+            string journalText = DecodeUtf8Bytes(journalBytes);
+            bool endsWithNewline =
+                journalText.EndsWith("\n", StringComparison.Ordinal);
+            using (StringReader reader = new StringReader(journalText))
+            {
+                string headerLine = reader.ReadLine();
+                LightweightJournalHeaderAffinityDecision affinityDecision;
+                LightweightJournalHeaderEnvelope headerEnvelope;
+                string headerError;
+                if (!LightweightSidecarJson.TryClassifyJournalHeaderForCandidate(
+                        headerLine,
+                        baseFileHash,
+                        2,
+                        out affinityDecision,
+                        out headerEnvelope,
+                        out headerError))
+                {
+                    if (!endsWithNewline && reader.Peek() < 0)
+                    {
+                        replayStatus =
+                            LightweightJournalReplayStatus.TornBeforeHeader;
+                        persistenceInfo.ForceFullSnapshot = true;
+                        return true;
+                    }
+                    errorMessage =
+                        "The legacy IMDC journal header is invalid: " +
+                        headerError;
+                    return false;
+                }
+
+                if (affinityDecision ==
+                    LightweightJournalHeaderAffinityDecision.HeaderMismatch)
+                {
+                    replayStatus =
+                        LightweightJournalReplayStatus.HeaderMismatch;
+                    return true;
+                }
+
+                replayStatus = LightweightJournalReplayStatus.HeaderMatched;
+                if (affinityDecision ==
+                    LightweightJournalHeaderAffinityDecision.HeaderMatchedUnsupported)
+                {
+                    persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                    persistenceInfo.UnsupportedJournalFormatVersion =
+                        headerEnvelope.FormatVersion;
+                    errorMessage =
+                        "The journal bound to the legacy IMDC base uses unsupported format " +
+                        headerEnvelope.FormatVersion.ToString(
+                            CultureInfo.InvariantCulture) +
+                        ".";
+                    return false;
+                }
+
+                selectedJournalBytes = journalBytes;
+                selectedJournalPath = normalizedJournalPath;
+                return true;
             }
         }
 
@@ -4324,13 +6705,20 @@ namespace IMDataCore
                 false))
             {
                 string headerLine = reader.ReadLine();
-                string journalBaseHash;
-                int journalFormatVersion;
+                bool useJournalV3 = document.FormatVersion ==
+                    LightweightIdentityBindingSchema.SidecarFormatVersion;
+                int supportedJournalFormatVersion = useJournalV3
+                    ? LightweightJournalV3Schema.JournalFormatVersion
+                    : JournalFormatVersion;
+                LightweightJournalHeaderAffinityDecision affinityDecision;
+                LightweightJournalHeaderEnvelope headerEnvelope;
                 string headerError;
-                if (!LightweightSidecarJson.TryReadJournalHeader(
+                if (!LightweightSidecarJson.TryClassifyJournalHeaderForCandidate(
                         headerLine,
-                        out journalBaseHash,
-                        out journalFormatVersion,
+                        baseFileHash,
+                        supportedJournalFormatVersion,
+                        out affinityDecision,
+                        out headerEnvelope,
                         out headerError))
                 {
                     if (!endsWithNewline && reader.Peek() < 0)
@@ -4349,10 +6737,8 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (!string.Equals(
-                        journalBaseHash,
-                        baseFileHash,
-                        StringComparison.Ordinal))
+                if (affinityDecision ==
+                    LightweightJournalHeaderAffinityDecision.HeaderMismatch)
                 {
                     replayStatus =
                         LightweightJournalReplayStatus.HeaderMismatch;
@@ -4362,24 +6748,85 @@ namespace IMDataCore
                 replayStatus = LightweightJournalReplayStatus.HeaderMatched;
                 persistenceInfo.ReplayedJournalPath = normalizedJournalPath;
 
-                if (journalFormatVersion != JournalFormatVersion)
+                if (affinityDecision ==
+                    LightweightJournalHeaderAffinityDecision.HeaderMatchedUnsupported)
                 {
+                    // Affinity was established before version support. Because
+                    // this unsupported journal is positively bound to the compact
+                    // base, it may contain authoritative committed semantics. Mark
+                    // the whole primary generation write-protected so Initialize
+                    // cannot recover an older backup and later overwrite it.
+                    persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                    persistenceInfo.UnsupportedJournalFormatVersion =
+                        headerEnvelope.FormatVersion;
                     errorMessage =
-                        "The IMDC journal format is unsupported by this IM Data Core version.";
+                        "The IMDC journal format " +
+                        headerEnvelope.FormatVersion.ToString(
+                            CultureInfo.InvariantCulture) +
+                        " is unsupported by this IM Data Core version.";
                     return false;
                 }
 
                 int replayedEntryCount;
                 bool forceFullSnapshot;
+                bool unsupportedRequiredExtension = false;
                 string replayError;
-                if (!LightweightSidecarJson.TryReplayJournalTransactions(
-                        reader,
-                        endsWithNewline,
-                        document,
-                        out replayedEntryCount,
-                        out forceFullSnapshot,
-                        out replayError))
+                bool replayedSuccessfully;
+                if (useJournalV3)
                 {
+                    LightweightJournalV3Counts finalCounts;
+                    replayedSuccessfully =
+                        LightweightSidecarJson.TryReplayJournalV3Transactions(
+                            reader,
+                            endsWithNewline,
+                            document,
+                            new LightweightJournalV3Counts
+                            {
+                                CheckpointCount = document.Checkpoints.Count,
+                                EventCount = document.Events.Count,
+                                CustomMutationCount =
+                                    document.CustomMutations.Count,
+                                ForwardExtensionCount =
+                                    document.ForwardExtensions.Count,
+                                CoverageCapabilitySetCount =
+                                    document.CoverageCapabilitySets.Count,
+                                NamespaceOwnerBindingCount =
+                                    document.NamespaceOwnerBindings.Count,
+                                CoverageTransitionCount =
+                                    document.CoverageTransitions.Count,
+                                HistoricalBaselineAssertionCount =
+                                    document.HistoricalBaselineAssertions.Count
+                            },
+                            out finalCounts,
+                            out replayedEntryCount,
+                            out forceFullSnapshot,
+                            out unsupportedRequiredExtension,
+                            out replayError);
+                }
+                else
+                {
+                    replayedSuccessfully =
+                        LightweightSidecarJson.TryReplayJournalTransactions(
+                            reader,
+                            endsWithNewline,
+                            document,
+                            out replayedEntryCount,
+                            out forceFullSnapshot,
+                            out replayError);
+                }
+
+                if (!replayedSuccessfully)
+                {
+                    if (unsupportedRequiredExtension)
+                    {
+                        persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                        errorMessage =
+                            "The IMDC journal contains a required forward extension " +
+                            "that this build cannot interpret. The bound generation " +
+                            "was preserved read-only. " + replayError;
+                        return false;
+                    }
+
                     errorMessage =
                         "The IMDC journal contains an invalid transaction: " +
                         replayError;
@@ -4414,6 +6861,12 @@ namespace IMDataCore
                 EventCount = activeEvents.Count,
                 CustomMutationCount = activeCustomMutations.Count,
                 CheckpointCount = activeCheckpoints.Count,
+                CoverageCapabilitySetCount = coverageCapabilitySets.Count,
+                NamespaceOwnerBindingCount = namespaceOwnerBindings.Count,
+                CoverageTransitionCount = activeCoverageTransitions.Count,
+                HistoricalBaselineAssertionCount =
+                    activeHistoricalBaselineAssertions.Count,
+                ForwardExtensionCount = forwardExtensions.Count,
                 LastIssuedSequence = lastIssuedSequence,
                 // Preserve the loaded base as an incremental baseline unless
                 // replay/retention/format cleanup actually changed its durable
@@ -4514,6 +6967,30 @@ namespace IMDataCore
             {
                 validationState = null;
                 return false;
+            }
+
+            if (document.FormatVersion ==
+                LightweightIdentityBindingSchema.SidecarFormatVersion)
+            {
+                try
+                {
+                    LightweightForwardCompatibilitySchema.ValidateDocumentForV6(
+                        document);
+                    LightweightNamespaceOwnerSchema.ValidateDocumentForV6(document);
+                    LightweightCoverageSchema.ValidateDocumentForV6(document);
+                    LightweightHistoricalBaselineSchema.ValidateDocumentForV6(
+                        document);
+                    LightweightMigrationProvenanceSchema.ValidateDocumentForV6(
+                        document);
+                    LightweightSidecarJson.ValidateV6SequenceEnvelope(
+                        document);
+                }
+                catch (Exception exception)
+                {
+                    errorMessage = exception.Message;
+                    validationState = null;
+                    return false;
+                }
             }
 
             return true;
@@ -4734,11 +7211,13 @@ namespace IMDataCore
 
             int sparseMoneyPayloadCount;
             int sharedParticipantRowsRemoved;
+            int sharedParticipantRowsNormalized;
             List<LightweightEventRecord> compactedEvents =
                 CorePayloadCompaction.CompactLoadedEvents(
                     retainedEvents,
                     out sparseMoneyPayloadCount,
-                    out sharedParticipantRowsRemoved);
+                    out sharedParticipantRowsRemoved,
+                    out sharedParticipantRowsNormalized);
 
             if (retiredTechnicalEventCount > 0)
             {
@@ -4749,17 +7228,22 @@ namespace IMDataCore
                     " redundant built-in telemetry rows while loading this sidecar.");
             }
 
-            if (sparseMoneyPayloadCount > 0 || sharedParticipantRowsRemoved > 0)
+            if (sparseMoneyPayloadCount > 0 ||
+                sharedParticipantRowsRemoved > 0 ||
+                sharedParticipantRowsNormalized > 0)
             {
                 CoreLog.Info(
                     "IM Data Core compacted " +
                     sparseMoneyPayloadCount.ToString(
                         CultureInfo.InvariantCulture) +
-                    " money-detail payloads and removed " +
+                    " money-detail payloads, removed " +
                     sharedParticipantRowsRemoved.ToString(
                         CultureInfo.InvariantCulture) +
-                    " duplicate shared-participant rows in memory. " +
-                    "The smaller format will be written at the next IMDC save boundary.");
+                    " duplicate shared-participant rows, and normalized " +
+                    sharedParticipantRowsNormalized.ToString(
+                        CultureInfo.InvariantCulture) +
+                    " legacy shared envelopes in memory. " +
+                    "The repaired format will be written at the next IMDC save boundary.");
             }
 
             // Records are immutable after validation/compaction. Keep separate
@@ -4771,6 +7255,32 @@ namespace IMDataCore
                     document.CustomMutations);
             durableCheckpoints =
                 new List<LightweightCheckpointRecord>(document.Checkpoints);
+            migrationProvenance = document.MigrationProvenance;
+            forwardExtensions =
+                document.ForwardExtensions != null
+                    ? new List<LightweightForwardExtensionRecord>(
+                        document.ForwardExtensions)
+                    : new List<LightweightForwardExtensionRecord>();
+            namespaceOwnerBindings =
+                document.NamespaceOwnerBindings != null
+                    ? new List<LightweightNamespaceOwnerBindingRecord>(
+                        document.NamespaceOwnerBindings)
+                    : new List<LightweightNamespaceOwnerBindingRecord>();
+            coverageCapabilitySets =
+                document.CoverageCapabilitySets != null
+                    ? new List<LightweightCoverageCapabilitySetRecord>(
+                        document.CoverageCapabilitySets)
+                    : new List<LightweightCoverageCapabilitySetRecord>();
+            durableCoverageTransitions =
+                document.CoverageTransitions != null
+                    ? new List<LightweightCoverageTransitionRecord>(
+                        document.CoverageTransitions)
+                    : new List<LightweightCoverageTransitionRecord>();
+            durableHistoricalBaselineAssertions =
+                document.HistoricalBaselineAssertions != null
+                    ? new List<LightweightHistoricalBaselineAssertionRecord>(
+                        document.HistoricalBaselineAssertions)
+                    : new List<LightweightHistoricalBaselineAssertionRecord>();
             RebuildDurableCheckpointIdentityIndexLocked();
             activeEvents = new List<LightweightEventRecord>(durableEvents);
             activeCustomMutations =
@@ -4778,11 +7288,18 @@ namespace IMDataCore
                     durableCustomMutations);
             activeCheckpoints =
                 new List<LightweightCheckpointRecord>(durableCheckpoints);
+            activeCoverageTransitions =
+                new List<LightweightCoverageTransitionRecord>(
+                    durableCoverageTransitions);
+            activeHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>(
+                    durableHistoricalBaselineAssertions);
             lastIssuedSequence = document.LastIssuedSequence;
             RebuildRuntimeIndexesLocked();
             return retiredTechnicalEventCount > 0 ||
                 sparseMoneyPayloadCount > 0 ||
-                sharedParticipantRowsRemoved > 0;
+                sharedParticipantRowsRemoved > 0 ||
+                sharedParticipantRowsNormalized > 0;
         }
 
         private void ActivateThroughSequenceLocked(
@@ -4793,6 +7310,10 @@ namespace IMDataCore
             activeEvents = new List<LightweightEventRecord>();
             activeCustomMutations = new List<LightweightCustomMutationRecord>();
             activeCheckpoints = new List<LightweightCheckpointRecord>();
+            activeCoverageTransitions =
+                new List<LightweightCoverageTransitionRecord>();
+            activeHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
 
             for (int index = 0; index < durableEvents.Count; index++)
             {
@@ -4825,6 +7346,36 @@ namespace IMDataCore
                     CheckpointIsAtOrBefore(checkpoint, cutoffGameDate))
                 {
                     activeCheckpoints.Add(checkpoint);
+                }
+            }
+
+            for (int index = 0; index < durableCoverageTransitions.Count; index++)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    durableCoverageTransitions[index];
+                if (transition != null &&
+                    transition.Sequence <= sequence &&
+                    SequenceOwnedV6RowIsAtOrBefore(
+                        transition.GameDateTime,
+                        cutoffGameDate))
+                {
+                    activeCoverageTransitions.Add(transition);
+                }
+            }
+
+            for (int index = 0;
+                index < durableHistoricalBaselineAssertions.Count;
+                index++)
+            {
+                LightweightHistoricalBaselineAssertionRecord assertion =
+                    durableHistoricalBaselineAssertions[index];
+                if (assertion != null &&
+                    assertion.Sequence <= sequence &&
+                    SequenceOwnedV6RowIsAtOrBefore(
+                        assertion.GameDateTime,
+                        cutoffGameDate))
+                {
+                    activeHistoricalBaselineAssertions.Add(assertion);
                 }
             }
 
@@ -4896,6 +7447,40 @@ namespace IMDataCore
                         activeCheckpoints.RemoveAt(index);
                         checkpointTrimmed = true;
                     }
+                }
+            }
+
+            for (int index = activeCoverageTransitions.Count - 1;
+                index >= 0;
+                index--)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    activeCoverageTransitions[index];
+                if (transition == null ||
+                    transition.Sequence > sequence ||
+                    !SequenceOwnedV6RowIsAtOrBefore(
+                        transition.GameDateTime,
+                        cutoffGameDate))
+                {
+                    activeCoverageTransitions.RemoveAt(index);
+                    activeMutationTrimmed = true;
+                }
+            }
+
+            for (int index = activeHistoricalBaselineAssertions.Count - 1;
+                index >= 0;
+                index--)
+            {
+                LightweightHistoricalBaselineAssertionRecord assertion =
+                    activeHistoricalBaselineAssertions[index];
+                if (assertion == null ||
+                    assertion.Sequence > sequence ||
+                    !SequenceOwnedV6RowIsAtOrBefore(
+                        assertion.GameDateTime,
+                        cutoffGameDate))
+                {
+                    activeHistoricalBaselineAssertions.RemoveAt(index);
+                    activeMutationTrimmed = true;
                 }
             }
 
@@ -4986,6 +7571,32 @@ namespace IMDataCore
                         mutation.ValueJson);
                 }
                 UpdateCustomMutationWatermarkLocked(mutation);
+            }
+
+            // Coverage transitions and historical-baseline assertions consume
+            // the same global durable sequence space as event/custom mutations.
+            // Reserve their active-branch sequences before any new mutation is
+            // allocated so F9 rewinds cannot create cross-family collisions.
+            for (int index = 0; index < activeCoverageTransitions.Count; index++)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    activeCoverageTransitions[index];
+                if (transition != null)
+                {
+                    activeMutationSequences.Add(transition.Sequence);
+                }
+            }
+
+            for (int index = 0;
+                index < activeHistoricalBaselineAssertions.Count;
+                index++)
+            {
+                LightweightHistoricalBaselineAssertionRecord assertion =
+                    activeHistoricalBaselineAssertions[index];
+                if (assertion != null)
+                {
+                    activeMutationSequences.Add(assertion.Sequence);
+                }
             }
 
             for (int index = 0; index < activeCheckpoints.Count; index++)
@@ -5108,7 +7719,56 @@ namespace IMDataCore
                 maxActiveCheckpointSequence <= sequence &&
                 maxActiveEventGameDate <= cutoffGameDate &&
                 maxActiveCustomMutationGameDate <= cutoffGameDate &&
-                maxActiveCheckpointGameDate <= cutoffGameDate;
+                maxActiveCheckpointGameDate <= cutoffGameDate &&
+                ActiveSequenceOwnedV6StateFitsCheckpointLocked(
+                    sequence,
+                    cutoffGameDate);
+        }
+
+        /// <summary>
+        /// Coverage transitions and historical-baseline assertions are branch-owned
+        /// v6 rows even when no ordinary event/custom mutation exists after an older
+        /// checkpoint. They must therefore participate in the fast-path checkpoint
+        /// fit test; otherwise F9 can leave future knownness/baseline state active
+        /// simply because the legacy v5 watermarks happen to fit. Immutable
+        /// descriptor/owner/migration provenance is intentionally excluded because
+        /// those families do not rewind.
+        /// </summary>
+        private bool ActiveSequenceOwnedV6StateFitsCheckpointLocked(
+            long sequence,
+            DateTime cutoffGameDate)
+        {
+            for (int index = 0; index < activeCoverageTransitions.Count; index++)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    activeCoverageTransitions[index];
+                if (transition == null ||
+                    transition.Sequence > sequence ||
+                    !SequenceOwnedV6RowIsAtOrBefore(
+                        transition.GameDateTime,
+                        cutoffGameDate))
+                {
+                    return false;
+                }
+            }
+
+            for (int index = 0;
+                index < activeHistoricalBaselineAssertions.Count;
+                index++)
+            {
+                LightweightHistoricalBaselineAssertionRecord assertion =
+                    activeHistoricalBaselineAssertions[index];
+                if (assertion == null ||
+                    assertion.Sequence > sequence ||
+                    !SequenceOwnedV6RowIsAtOrBefore(
+                        assertion.GameDateTime,
+                        cutoffGameDate))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void RebuildDurableCheckpointIdentityIndexLocked()
@@ -5174,6 +7834,79 @@ namespace IMDataCore
                 ? pathRows
                 : (IReadOnlyList<LightweightCheckpointRecord>)
                     Array.Empty<LightweightCheckpointRecord>();
+        }
+
+        private IReadOnlyList<LightweightCheckpointRecord>
+            GetActiveCheckpointsForDocumentLocked(string relativeSavePath)
+        {
+            IReadOnlyList<LightweightCheckpointRecord> pathRows =
+                GetActiveCheckpointsForPathLocked(relativeSavePath);
+            if (!SupportsStructuredCoverageModel)
+            {
+                return pathRows;
+            }
+
+            HashSet<string> referencedAnchorKeys =
+                new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0;
+                index < activeCoverageTransitions.Count;
+                index++)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    activeCoverageTransitions[index];
+                if (transition != null &&
+                    !string.IsNullOrEmpty(transition.AnchorCheckpointKey))
+                {
+                    referencedAnchorKeys.Add(transition.AnchorCheckpointKey);
+                }
+            }
+            for (int index = 0;
+                index < activeHistoricalBaselineAssertions.Count;
+                index++)
+            {
+                LightweightHistoricalBaselineAssertionRecord assertion =
+                    activeHistoricalBaselineAssertions[index];
+                if (assertion != null &&
+                    !string.IsNullOrEmpty(assertion.AnchorCheckpointKey))
+                {
+                    referencedAnchorKeys.Add(assertion.AnchorCheckpointKey);
+                }
+            }
+            if (referencedAnchorKeys.Count == 0)
+            {
+                return pathRows;
+            }
+
+            List<LightweightCheckpointRecord> documentRows =
+                new List<LightweightCheckpointRecord>();
+            HashSet<CheckpointIdentity> included =
+                new HashSet<CheckpointIdentity>();
+            for (int index = 0; index < activeCheckpoints.Count; index++)
+            {
+                LightweightCheckpointRecord checkpoint =
+                    activeCheckpoints[index];
+                if (checkpoint == null)
+                {
+                    continue;
+                }
+
+                bool currentPath = string.Equals(
+                    VanillaSaveStamp.NormalizeRelativePath(
+                        checkpoint.RelativeSavePath),
+                    VanillaSaveStamp.NormalizeRelativePath(relativeSavePath),
+                    StringComparison.OrdinalIgnoreCase);
+                string anchorKey = currentPath
+                    ? string.Empty
+                    : LightweightCoverageSchema.BuildAnchorCheckpointKey(
+                        checkpoint);
+                if ((currentPath ||
+                        referencedAnchorKeys.Contains(anchorKey)) &&
+                    included.Add(CheckpointIdentity.From(checkpoint)))
+                {
+                    documentRows.Add(checkpoint);
+                }
+            }
+            return documentRows;
         }
 
         private static bool TryParseRoundTripDate(
@@ -5345,6 +8078,14 @@ namespace IMDataCore
             }
 
             if (participantResolution ==
+                SharedTimelineParticipantResolution.Unknown)
+            {
+                // The occurrence remains in the canonical durable event stream,
+                // but no idol index is guessed from current live objects.
+                return;
+            }
+
+            if (participantResolution ==
                 SharedTimelineParticipantResolution.Malformed)
             {
                 return;
@@ -5470,6 +8211,11 @@ namespace IMDataCore
                 normalizedTargetPath);
             IReadOnlyList<LightweightCheckpointRecord> pathCheckpointRows =
                 GetActiveCheckpointsForPathLocked(normalizedRelativePath);
+            IReadOnlyList<LightweightCheckpointRecord> documentCheckpointRows =
+                SupportsStructuredCoverageModel
+                    ? GetActiveCheckpointsForDocumentLocked(
+                        normalizedRelativePath)
+                    : pathCheckpointRows;
 
             CommittedPathState baselineState = null;
             bool canUseIncrementalSnapshot =
@@ -5484,10 +8230,43 @@ namespace IMDataCore
                 lastIssuedSequence >= baselineState.LastIssuedSequence &&
                 activeEvents.Count >= baselineState.EventCount &&
                 activeCustomMutations.Count >= baselineState.CustomMutationCount &&
-                pathCheckpointRows.Count >= baselineState.CheckpointCount;
+                documentCheckpointRows.Count >= baselineState.CheckpointCount &&
+                coverageCapabilitySets.Count >=
+                    baselineState.CoverageCapabilitySetCount &&
+                namespaceOwnerBindings.Count >=
+                    baselineState.NamespaceOwnerBindingCount &&
+                activeCoverageTransitions.Count >=
+                    baselineState.CoverageTransitionCount &&
+                activeHistoricalBaselineAssertions.Count >=
+                    baselineState.HistoricalBaselineAssertionCount &&
+                forwardExtensions.Count >=
+                    baselineState.ForwardExtensionCount;
 
             if (canUseIncrementalSnapshot)
             {
+                bool completeV6Document = SupportsStructuredCoverageModel;
+                LightweightSidecarDocument incrementalDocument =
+                    completeV6Document
+                        ? BuildDocumentLocked(
+                            normalizedRelativePath,
+                            CloneCheckpoints(documentCheckpointRows))
+                        : new LightweightSidecarDocument
+                        {
+                            FormatName = SidecarFormatName,
+                            FormatVersion = SidecarFormatVersion,
+                            RelativeSavePath = normalizedRelativePath,
+                            LastIssuedSequence = lastIssuedSequence,
+                            Events = CopySuffix(
+                                activeEvents,
+                                baselineState.EventCount),
+                            CustomMutations = CopySuffix(
+                                activeCustomMutations,
+                                baselineState.CustomMutationCount),
+                            Checkpoints = CopySuffix(
+                                pathCheckpointRows,
+                                baselineState.CheckpointCount)
+                        };
+
                 return new LightweightPersistenceSnapshot
                 {
                     TargetPath = normalizedTargetPath,
@@ -5497,36 +8276,44 @@ namespace IMDataCore
                     PreserveExistingBackup = false,
                     StateRevision = activeStateRevision,
                     IsIncremental = true,
-                    BaseEventCount = baselineState.EventCount,
-                    BaseCustomMutationCount =
-                        baselineState.CustomMutationCount,
-                    BaseCheckpointCount = baselineState.CheckpointCount,
+                    // v3 validates descriptor/owner/anchor relationships against the
+                    // complete logical document, so v6 snapshots retain full lists and
+                    // use the durable counts as append start indexes. v5 keeps its
+                    // existing suffix-only representation unchanged.
+                    BaseEventCount = completeV6Document
+                        ? 0
+                        : baselineState.EventCount,
+                    BaseCustomMutationCount = completeV6Document
+                        ? 0
+                        : baselineState.CustomMutationCount,
+                    BaseCheckpointCount = completeV6Document
+                        ? 0
+                        : baselineState.CheckpointCount,
+                    BaseCoverageCapabilitySetCount = 0,
+                    BaseNamespaceOwnerBindingCount = 0,
+                    BaseCoverageTransitionCount = 0,
+                    BaseHistoricalBaselineAssertionCount = 0,
+                    BaseForwardExtensionCount = 0,
                     TotalEventCount = activeEvents.Count,
                     TotalCustomMutationCount = activeCustomMutations.Count,
-                    TotalCheckpointCount = pathCheckpointRows.Count,
-                    Document = new LightweightSidecarDocument
-                    {
-                        FormatName = SidecarFormatName,
-                        FormatVersion = SidecarFormatVersion,
-                        RelativeSavePath = normalizedRelativePath,
-                        LastIssuedSequence = lastIssuedSequence,
-                        Events = CopySuffix(
-                            activeEvents,
-                            baselineState.EventCount),
-                        CustomMutations = CopySuffix(
-                            activeCustomMutations,
-                            baselineState.CustomMutationCount),
-                        Checkpoints = CopySuffix(
-                            pathCheckpointRows,
-                            baselineState.CheckpointCount)
-                    }
+                    TotalCheckpointCount = documentCheckpointRows.Count,
+                    TotalCoverageCapabilitySetCount =
+                        coverageCapabilitySets.Count,
+                    TotalNamespaceOwnerBindingCount =
+                        namespaceOwnerBindings.Count,
+                    TotalCoverageTransitionCount =
+                        activeCoverageTransitions.Count,
+                    TotalHistoricalBaselineAssertionCount =
+                        activeHistoricalBaselineAssertions.Count,
+                    TotalForwardExtensionCount = forwardExtensions.Count,
+                    Document = incrementalDocument
                 };
             }
 
             LightweightSidecarDocument fullDocument =
                 BuildDocumentLocked(
                     relativeSavePath,
-                    CloneCheckpoints(pathCheckpointRows));
+                    CloneCheckpoints(documentCheckpointRows));
             return new LightweightPersistenceSnapshot
             {
                 TargetPath = normalizedTargetPath,
@@ -5542,9 +8329,24 @@ namespace IMDataCore
                 BaseEventCount = 0,
                 BaseCustomMutationCount = 0,
                 BaseCheckpointCount = 0,
+                BaseCoverageCapabilitySetCount = 0,
+                BaseNamespaceOwnerBindingCount = 0,
+                BaseCoverageTransitionCount = 0,
+                BaseHistoricalBaselineAssertionCount = 0,
+                BaseForwardExtensionCount = 0,
                 TotalEventCount = fullDocument.Events.Count,
                 TotalCustomMutationCount = fullDocument.CustomMutations.Count,
                 TotalCheckpointCount = fullDocument.Checkpoints.Count,
+                TotalCoverageCapabilitySetCount =
+                    fullDocument.CoverageCapabilitySets.Count,
+                TotalNamespaceOwnerBindingCount =
+                    fullDocument.NamespaceOwnerBindings.Count,
+                TotalCoverageTransitionCount =
+                    fullDocument.CoverageTransitions.Count,
+                TotalHistoricalBaselineAssertionCount =
+                    fullDocument.HistoricalBaselineAssertions.Count,
+                TotalForwardExtensionCount =
+                    fullDocument.ForwardExtensions.Count,
                 Document = fullDocument
             };
         }
@@ -5574,7 +8376,7 @@ namespace IMDataCore
             return BuildDocumentLocked(
                 relativeSavePath,
                 CloneCheckpoints(
-                    GetActiveCheckpointsForPathLocked(relativeSavePath)));
+                    GetActiveCheckpointsForDocumentLocked(relativeSavePath)));
         }
 
         private LightweightSidecarDocument BuildDocumentLocked(
@@ -5588,12 +8390,36 @@ namespace IMDataCore
                 RelativeSavePath = VanillaSaveStamp.NormalizeRelativePath(
                     relativeSavePath),
                 LastIssuedSequence = lastIssuedSequence,
+                ForwardCompatibilitySchemaVersion =
+                    SupportsStructuredCoverageModel
+                        ? LightweightForwardCompatibilitySchema
+                            .CompatibilitySchemaVersion
+                        : 0,
+                ForwardExtensions =
+                    new List<LightweightForwardExtensionRecord>(
+                        forwardExtensions),
                 Checkpoints = pathCheckpoints ??
                     new List<LightweightCheckpointRecord>(),
                 Events = new List<LightweightEventRecord>(activeEvents),
                 CustomMutations =
                     new List<LightweightCustomMutationRecord>(
-                        activeCustomMutations)
+                        activeCustomMutations),
+                MigrationProvenance = migrationProvenance,
+                NamespaceOwnerBindings =
+                    new List<LightweightNamespaceOwnerBindingRecord>(
+                        namespaceOwnerBindings),
+                CoverageModelVersion = SupportsStructuredCoverageModel
+                    ? LightweightCoverageSchema.CoverageModelVersion
+                    : 0,
+                CoverageCapabilitySets =
+                    new List<LightweightCoverageCapabilitySetRecord>(
+                        coverageCapabilitySets),
+                CoverageTransitions =
+                    new List<LightweightCoverageTransitionRecord>(
+                        activeCoverageTransitions),
+                HistoricalBaselineAssertions =
+                    new List<LightweightHistoricalBaselineAssertionRecord>(
+                        activeHistoricalBaselineAssertions)
             };
         }
 
@@ -5655,7 +8481,17 @@ namespace IMDataCore
                         65536,
                         true))
                     {
-                        LightweightSidecarJson.SerializeTo(writer, document);
+                        if (document.FormatVersion ==
+                            LightweightIdentityBindingSchema.SidecarFormatVersion)
+                        {
+                            LightweightSidecarJson.SerializeV6LogicalDocumentTo(
+                                writer,
+                                document);
+                        }
+                        else
+                        {
+                            LightweightSidecarJson.SerializeTo(writer, document);
+                        }
                     }
 
                     // Finalize only after StreamWriter.Dispose has flushed its
@@ -5723,6 +8559,12 @@ namespace IMDataCore
                 new List<LightweightCustomMutationRecord>(activeCustomMutations);
             durableCheckpoints =
                 new List<LightweightCheckpointRecord>(activeCheckpoints);
+            durableCoverageTransitions =
+                new List<LightweightCoverageTransitionRecord>(
+                    activeCoverageTransitions);
+            durableHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>(
+                    activeHistoricalBaselineAssertions);
             RebuildDurableCheckpointIdentityIndexLocked();
         }
 
@@ -5745,16 +8587,40 @@ namespace IMDataCore
                     CorePaths.PathComparison);
         }
 
+        private void InitializeNativeV6ProvenanceLocked()
+        {
+            if (SupportsStructuredCoverageModel && migrationProvenance == null)
+            {
+                migrationProvenance =
+                    LightweightMigrationProvenanceSchema.CreateNativeV6();
+            }
+        }
+
         private void ResetStateLocked()
         {
             durableEvents = new List<LightweightEventRecord>();
             durableCustomMutations =
                 new List<LightweightCustomMutationRecord>();
             durableCheckpoints = new List<LightweightCheckpointRecord>();
+            migrationProvenance = null;
+            forwardExtensions =
+                new List<LightweightForwardExtensionRecord>();
+            namespaceOwnerBindings =
+                new List<LightweightNamespaceOwnerBindingRecord>();
+            coverageCapabilitySets =
+                new List<LightweightCoverageCapabilitySetRecord>();
+            durableCoverageTransitions =
+                new List<LightweightCoverageTransitionRecord>();
+            durableHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
             activeEvents = new List<LightweightEventRecord>();
             activeCustomMutations =
                 new List<LightweightCustomMutationRecord>();
             activeCheckpoints = new List<LightweightCheckpointRecord>();
+            activeCoverageTransitions =
+                new List<LightweightCoverageTransitionRecord>();
+            activeHistoricalBaselineAssertions =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
             activeCheckpointsByIdentity.Clear();
             durableCheckpointsByIdentity.Clear();
             backgroundCompactionsInFlight.Clear();
@@ -5854,8 +8720,34 @@ namespace IMDataCore
                 SourcePatch = record.SourcePatch ?? string.Empty,
                 PayloadJson = record.PayloadJson ?? CoreConstants.EmptyJsonObject,
                 NamespaceId = record.NamespaceIdentifier ?? string.Empty,
-                IdempotencyKey = record.IdempotencyKey ?? string.Empty
+                IdempotencyKey = record.IdempotencyKey ?? string.Empty,
+                ParticipantSchemaVersion = record.ParticipantSchemaVersion,
+                ParticipantKnownness = ResolvePublicParticipantKnownness(record)
             };
+        }
+
+        private static IMDataCoreParticipantKnownness
+            ResolvePublicParticipantKnownness(LightweightEventRecord record)
+        {
+            List<int> ignored;
+            SharedTimelineParticipantResolution resolution =
+                SharedTimelineParticipants.ResolveParticipantIds(
+                    record,
+                    out ignored);
+            if (resolution == SharedTimelineParticipantResolution.Shared ||
+                resolution == SharedTimelineParticipantResolution.ValidEmpty)
+            {
+                return IMDataCoreParticipantKnownness.Exact;
+            }
+            if (resolution == SharedTimelineParticipantResolution.Unknown)
+            {
+                return IMDataCoreParticipantKnownness.Unknown;
+            }
+            if (resolution == SharedTimelineParticipantResolution.Malformed)
+            {
+                return IMDataCoreParticipantKnownness.Malformed;
+            }
+            return IMDataCoreParticipantKnownness.NotApplicable;
         }
 
         private static bool EventIsAtOrBefore(
@@ -5893,6 +8785,15 @@ namespace IMDataCore
 
             return mutation.GameDateKey <=
                 CoreDateTimeUtility.BuildGameDateKey(cutoff);
+        }
+
+        private static bool SequenceOwnedV6RowIsAtOrBefore(
+            string gameDateTime,
+            DateTime cutoff)
+        {
+            DateTime parsed;
+            return TryParseRoundTripDate(gameDateTime, out parsed) &&
+                parsed <= cutoff;
         }
 
         private static bool CheckpointIsAtOrBefore(
@@ -6247,6 +9148,139 @@ namespace IMDataCore
             return left.Sequence.CompareTo(right.Sequence);
         }
 
+        private static List<LightweightCoverageCapabilitySetRecord>
+            CloneCoverageCapabilitySets(
+                IReadOnlyList<LightweightCoverageCapabilitySetRecord> source)
+        {
+            List<LightweightCoverageCapabilitySetRecord> clone =
+                new List<LightweightCoverageCapabilitySetRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightCoverageCapabilitySetRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+
+                List<LightweightCoverageCapabilityRevisionRecord> capabilities =
+                    new List<LightweightCoverageCapabilityRevisionRecord>();
+                if (record.Capabilities != null)
+                {
+                    for (int capabilityIndex = 0;
+                        capabilityIndex < record.Capabilities.Count;
+                        capabilityIndex++)
+                    {
+                        LightweightCoverageCapabilityRevisionRecord capability =
+                            record.Capabilities[capabilityIndex];
+                        if (capability != null)
+                        {
+                            capabilities.Add(
+                                new LightweightCoverageCapabilityRevisionRecord
+                                {
+                                    Token = capability.Token ?? string.Empty,
+                                    Revision = capability.Revision
+                                });
+                        }
+                    }
+                }
+
+                clone.Add(new LightweightCoverageCapabilitySetRecord
+                {
+                    CapabilitySetId = record.CapabilitySetId ?? string.Empty,
+                    ScopeKind = record.ScopeKind ?? string.Empty,
+                    ScopeIdentifier = record.ScopeIdentifier ?? string.Empty,
+                    OwnerStableId = record.OwnerStableId ?? string.Empty,
+                    Capabilities = capabilities
+                });
+            }
+            return clone;
+        }
+
+        private static List<LightweightCoverageTransitionRecord>
+            CloneCoverageTransitions(
+                IReadOnlyList<LightweightCoverageTransitionRecord> source)
+        {
+            List<LightweightCoverageTransitionRecord> clone =
+                new List<LightweightCoverageTransitionRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightCoverageTransitionRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+                clone.Add(new LightweightCoverageTransitionRecord
+                {
+                    Sequence = record.Sequence,
+                    GameDateTime = record.GameDateTime ?? string.Empty,
+                    ScopeKind = record.ScopeKind ?? string.Empty,
+                    ScopeIdentifier = record.ScopeIdentifier ?? string.Empty,
+                    State = record.State ?? string.Empty,
+                    CapabilitySetId = record.CapabilitySetId ?? string.Empty,
+                    Origin = record.Origin ?? string.Empty,
+                    Reason = record.Reason ?? string.Empty,
+                    AnchorCheckpointKey = record.AnchorCheckpointKey ?? string.Empty
+                });
+            }
+            return clone;
+        }
+
+        private static List<LightweightHistoricalBaselineAssertionRecord>
+            CloneHistoricalBaselineAssertions(
+                IReadOnlyList<LightweightHistoricalBaselineAssertionRecord> source)
+        {
+            List<LightweightHistoricalBaselineAssertionRecord> clone =
+                new List<LightweightHistoricalBaselineAssertionRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightHistoricalBaselineAssertionRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+                clone.Add(new LightweightHistoricalBaselineAssertionRecord
+                {
+                    AssertionId = record.AssertionId ?? string.Empty,
+                    Sequence = record.Sequence,
+                    GameDateTime = record.GameDateTime ?? string.Empty,
+                    BaselineKind = record.BaselineKind ?? string.Empty,
+                    EntityKind = record.EntityKind ?? string.Empty,
+                    EntityId = record.EntityId ?? string.Empty,
+                    AssertionSchemaVersion = record.AssertionSchemaVersion,
+                    Quality = record.Quality ?? string.Empty,
+                    GroupAppealGender = record.GroupAppealGender ?? string.Empty,
+                    GroupAppealHardcoreness =
+                        record.GroupAppealHardcoreness ?? string.Empty,
+                    GroupAppealAge = record.GroupAppealAge ?? string.Empty,
+                    GenderCandidateCodes = new List<string>(
+                        record.GenderCandidateCodes ?? new List<string>()),
+                    HardcorenessCandidateCodes = new List<string>(
+                        record.HardcorenessCandidateCodes ?? new List<string>()),
+                    AgeCandidateCodes = new List<string>(
+                        record.AgeCandidateCodes ?? new List<string>()),
+                    SourceKind = record.SourceKind ?? string.Empty,
+                    AnchorCheckpointKey =
+                        record.AnchorCheckpointKey ?? string.Empty
+                });
+            }
+            return clone;
+        }
+
         private static List<LightweightEventRecord> CloneEvents(
             IReadOnlyList<LightweightEventRecord> source)
         {
@@ -6284,6 +9318,7 @@ namespace IMDataCore
                 NamespaceIdentifier = source.NamespaceIdentifier ?? string.Empty,
                 IdempotencyKey = source.IdempotencyKey ?? string.Empty,
                 PayloadJson = source.PayloadJson ?? CoreConstants.EmptyJsonObject,
+                ParticipantSchemaVersion = source.ParticipantSchemaVersion,
                 StoragePayloadJson = source.StoragePayloadJson ?? string.Empty
             };
         }
@@ -6323,6 +9358,37 @@ namespace IMDataCore
                 ValueJson = source.ValueJson ?? string.Empty,
                 StorageValueJson = source.StorageValueJson ?? string.Empty
             };
+        }
+
+        private Dictionary<string, long>
+            BuildCoverageAnchorSequenceSnapshotLocked()
+        {
+            Dictionary<string, long> anchors =
+                new Dictionary<string, long>(StringComparer.Ordinal);
+            HashSet<string> duplicates =
+                new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < activeCheckpoints.Count; index++)
+            {
+                LightweightCheckpointRecord checkpoint = activeCheckpoints[index];
+                if (checkpoint == null)
+                {
+                    continue;
+                }
+                string key =
+                    LightweightCoverageSchema.BuildAnchorCheckpointKey(checkpoint);
+                if (duplicates.Contains(key))
+                {
+                    continue;
+                }
+                if (anchors.ContainsKey(key))
+                {
+                    anchors.Remove(key);
+                    duplicates.Add(key);
+                    continue;
+                }
+                anchors.Add(key, checkpoint.Sequence);
+            }
+            return anchors;
         }
 
         private static List<LightweightCheckpointRecord> CloneCheckpoints(
@@ -6379,6 +9445,38 @@ namespace IMDataCore
             return clone;
         }
 
+        private static List<LightweightIdentityCandidateRecord> CloneIdentityCandidates(
+            IReadOnlyList<LightweightIdentityCandidateRecord> source)
+        {
+            List<LightweightIdentityCandidateRecord> clone =
+                new List<LightweightIdentityCandidateRecord>();
+            if (source == null)
+            {
+                return clone;
+            }
+
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightIdentityCandidateRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+                clone.Add(new LightweightIdentityCandidateRecord
+                {
+                    LegacyEntityKind = record.LegacyEntityKind ?? string.Empty,
+                    LegacyEntityId = record.LegacyEntityId ?? string.Empty,
+                    CanonicalEntityKind = record.CanonicalEntityKind ?? string.Empty,
+                    CanonicalEntityId = record.CanonicalEntityId ?? string.Empty,
+                    ExactAlias = record.ExactAlias,
+                    ExactSequenceStartInclusive = record.ExactSequenceStartInclusive,
+                    ExactSequenceEndInclusive = record.ExactSequenceEndInclusive,
+                    SourceKind = record.SourceKind ?? string.Empty
+                });
+            }
+            return clone;
+        }
+
         private static LightweightCheckpointRecord CloneCheckpoint(
             LightweightCheckpointRecord source)
         {
@@ -6391,7 +9489,11 @@ namespace IMDataCore
                 ContentFingerprint = source.ContentFingerprint ?? string.Empty,
                 Sequence = source.Sequence,
                 EnabledMods = CloneModSnapshots(source.EnabledMods),
-                AgencyRoomIdentities = CloneAgencyRoomIdentities(source.AgencyRoomIdentities)
+                AgencyRoomIdentities = CloneAgencyRoomIdentities(source.AgencyRoomIdentities),
+                IdentityBindingsVersion = source.IdentityBindingsVersion,
+                IdentityBindingsComplete = source.IdentityBindingsComplete,
+                IdentityBindings = CloneIdentityBindings(source.IdentityBindings),
+                IdentityCandidates = CloneIdentityCandidates(source.IdentityCandidates)
             };
         }
 
@@ -6423,6 +9525,44 @@ namespace IMDataCore
                 });
             }
 
+            return clone;
+        }
+
+        private static List<LightweightIdentityBindingRecord> CloneIdentityBindings(
+            IReadOnlyList<LightweightIdentityBindingRecord> source)
+        {
+            if (source == null)
+            {
+                return new List<LightweightIdentityBindingRecord>();
+            }
+
+            List<LightweightIdentityBindingRecord> clone =
+                new List<LightweightIdentityBindingRecord>(source.Count);
+            for (int index = 0; index < source.Count; index++)
+            {
+                LightweightIdentityBindingRecord record = source[index];
+                if (record == null)
+                {
+                    continue;
+                }
+
+                clone.Add(new LightweightIdentityBindingRecord
+                {
+                    EntityKind = record.EntityKind ?? string.Empty,
+                    EntityId = record.EntityId ?? string.Empty,
+                    ContainerKind = record.ContainerKind ?? string.Empty,
+                    ContainerOrdinal = record.ContainerOrdinal,
+                    ParentEntityKind = record.ParentEntityKind ?? string.Empty,
+                    ParentEntityId = record.ParentEntityId ?? string.Empty,
+                    ChildLocator = record.ChildLocator ?? string.Empty,
+                    ValidationFingerprint = record.ValidationFingerprint ?? string.Empty,
+                    Origin = record.Origin ?? string.Empty,
+                    CoverageStartSequence = record.CoverageStartSequence,
+                    LegacyCandidateKeys = record.LegacyCandidateKeys != null
+                        ? new List<string>(record.LegacyCandidateKeys)
+                        : new List<string>()
+                });
+            }
             return clone;
         }
 

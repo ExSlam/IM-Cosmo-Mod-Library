@@ -142,6 +142,121 @@ namespace SaveNLoadFixes.Persistence
         public int sns_messages_version;
         public List<SnsMessageNodeRecordV1> sns_message_nodes =
             new List<SnsMessageNodeRecordV1>();
+
+        // A33 keeps ABI-narrow gameplay quantities in load-epoch-bound Int64
+        // shadows. Every value below is an intentional canonical decimal string,
+        // not a scalar damaged by SimpleJSON's historical rewrite.
+        public int wide_numeric_state_version;
+        public WideNumericStateRecordV1 wide_numeric_state =
+            new WideNumericStateRecordV1();
+    }
+
+    [Serializable]
+    internal sealed class WideNumericStateRecordV1
+    {
+        public List<WideTourRecordV1> tours = new List<WideTourRecordV1>();
+        public List<WideSingleReleaseRecordV1> single_releases =
+            new List<WideSingleReleaseRecordV1>();
+        public List<WideShowFansRecordV1> show_fans =
+            new List<WideShowFansRecordV1>();
+        public List<WideTheaterSubscriberRecordV1> theater_subscribers =
+            new List<WideTheaterSubscriberRecordV1>();
+        public List<WideTheaterStatRecordV1> theater_stats =
+            new List<WideTheaterStatRecordV1>();
+        public List<string> stats_total_fans_per_week = new List<string>();
+        public List<string> stats_fans_change_per_week = new List<string>();
+        public bool has_story_ch3_aya_fans;
+        public string story_ch3_aya_fans = "0";
+        public bool has_story_ch4_fans_needed;
+        public string story_ch4_fans_needed = "0";
+        public bool has_story_ch4_scandal_points;
+        public string story_ch4_scandal_points = "0";
+        public List<WideLoanPaymentRecordV1> loan_payments =
+            new List<WideLoanPaymentRecordV1>();
+        public List<WideCafeProfitRecordV1> cafe_profits =
+            new List<WideCafeProfitRecordV1>();
+    }
+
+    [Serializable]
+    internal sealed class WideTourRecordV1
+    {
+        public int tour_id = -1;
+        public string production_cost = "0";
+        public string expected_revenue = "0";
+        public string saving = "0";
+        public string revenue = "0";
+        public string new_fans = "0";
+        public List<WideTourCountryRecordV1> countries =
+            new List<WideTourCountryRecordV1>();
+    }
+
+    [Serializable]
+    internal sealed class WideTourCountryRecordV1
+    {
+        public int country;
+        public int ordinal;
+        public int level;
+        public int attendance;
+        public bool discount;
+        public string audience = "0";
+        public string new_fans = "0";
+        public string revenue = "0";
+    }
+
+    [Serializable]
+    internal sealed class WideSingleReleaseRecordV1
+    {
+        public int single_id = -1;
+        public string new_fans = "0";
+        public string new_hardcore_fans = "0";
+        public string new_casual_fans = "0";
+    }
+
+    [Serializable]
+    internal sealed class WideShowFansRecordV1
+    {
+        public int show_id = -1;
+        public int episode_count;
+        public List<string> episode_fans = new List<string>();
+    }
+
+    [Serializable]
+    internal sealed class WideTheaterSubscriberRecordV1
+    {
+        public int theater_id = -1;
+        public int ordinal;
+        public int gender;
+        public int hardcoreness;
+        public int age;
+        public string people = "0";
+    }
+
+    [Serializable]
+    internal sealed class WideTheaterStatRecordV1
+    {
+        public int theater_id = -1;
+        public int ordinal;
+        public string date = string.Empty;
+        public string subscribers = "0";
+    }
+
+    [Serializable]
+    internal sealed class WideLoanPaymentRecordV1
+    {
+        public int loan_id = -1;
+        public int duration;
+        public string amount = "0";
+        public string payment_per_week = "0";
+    }
+
+    [Serializable]
+    internal sealed class WideCafeProfitRecordV1
+    {
+        public int cafe_id = -1;
+        public int stat_ordinal;
+        public int dish_id = -1;
+        public string profit = "0";
+        public string new_fans = "0";
     }
 
 
@@ -749,6 +864,15 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            WideNumericStateRecordV1 wideNumericState;
+            if (!WideNumericState.TryCaptureForEnvelope(
+                    dataToSave,
+                    out wideNumericState,
+                    out error))
+            {
+                return false;
+            }
+
             envelope = new RepairEnvelopeV1
             {
                 checkpoint_id = Guid.NewGuid().ToString("D"),
@@ -796,7 +920,9 @@ namespace SaveNLoadFixes.Persistence
                     external_portrait_identities_version = ExternalPortraitIdentityRepair.SectionVersion,
                     external_portrait_identities = externalPortraitIdentities,
                     sns_messages_version = SnsMessageRepair.SectionVersion,
-                    sns_message_nodes = snsMessageNodes
+                    sns_message_nodes = snsMessageNodes,
+                    wide_numeric_state_version = WideNumericState.SectionVersion,
+                    wide_numeric_state = wideNumericState
                 }
             };
 

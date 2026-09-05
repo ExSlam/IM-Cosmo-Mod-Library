@@ -428,6 +428,16 @@ namespace IMDataCore
             agencyRoomEntityIdByReference.Clear();
             pendingLoadedAgencyRoomIdentities = null;
             pendingLoadedAgencyRoomIdentityIndex = 0;
+            ResetContractIdentityRuntimeStateLocked();
+            ResetCliqueIdentityRuntimeStateLocked();
+            ResetBullyingIdentityRuntimeStateLocked();
+            ResetTaskIdentityRuntimeStateLocked();
+            ResetTaskSubstoryHistoryRuntimeStateLocked();
+            ResetSharedIdentityCompatibilityRuntimeStateLocked();
+            ResetPeopleAuditionDateRuntimeStateLocked();
+            ResetBusinessProposalRuntimeStateLocked();
+            ResetSplitEventRelationshipHistoryRuntimeStateLocked();
+            ResetPayloadTimingRuntimeStateLocked();
         }
 
         private void CancelPendingAgencyRoomIdentityLoadLocked()

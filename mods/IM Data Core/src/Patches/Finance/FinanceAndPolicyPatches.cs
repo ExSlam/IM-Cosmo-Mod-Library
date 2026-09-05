@@ -23,13 +23,31 @@ namespace IMDataCore
         private static void Prefix(loans._loan __0, out LoanMutationSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateLoanMutationSnapshot(__0);
+            if (__state != null)
+            {
+                __state.SemanticScope = IMDataCoreController.Instance.BeginSemanticCaptureScope();
+            }
         }
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(loans._loan __0, LoanMutationSnapshot __state)
         {
+            SemanticCaptureScope scope = __state != null ? __state.SemanticScope : null;
+            IMDataCoreController.Instance.EndSemanticCaptureScope(scope);
             IMDataCoreController.Instance.CaptureLoanAdded(__0, __state);
+            IMDataCoreController.Instance.CommitSemanticCaptureScope(scope);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception, LoanMutationSnapshot __state)
+        {
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.AbortSemanticCaptureScope(__state != null ? __state.SemanticScope : null);
+            }
+            return __exception;
         }
     }
 
@@ -72,6 +90,27 @@ namespace IMDataCore
         private static void Postfix(loans._loan __instance, LoanMutationSnapshot __state)
         {
             IMDataCoreController.Instance.CaptureLoanPaidOff(__instance, __state);
+        }
+    }
+
+    /// <summary>
+    /// Captures observed natural loan maturity on the authoritative weekly boundary.
+    /// </summary>
+    [HarmonyPatch(typeof(loans), nameof(loans.OnNewWeek))]
+    internal static class loans_OnNewWeek_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(out List<LoanMutationSnapshot> __state)
+        {
+            __state = IMDataCoreController.Instance.CreateNaturalLoanMaturitySnapshots();
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(List<LoanMutationSnapshot> __state)
+        {
+            IMDataCoreController.Instance.CaptureNaturalLoanMaturities(__state);
         }
     }
 

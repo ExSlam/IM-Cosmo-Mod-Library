@@ -66,14 +66,6 @@ namespace IMDataCore
     internal static class VanillaSavedDataWrite_IMDataCoreSaveScope_Patch
     {
         private const string DataSaverSaveMethodName = "saveData";
-        private const string SaveWriteOrderingAssemblyName =
-            "com.cosmo.savewriteorderingfix";
-        private const string SaveWriteOrderingApiTypeName =
-            "SaveWriteOrderingFix.SaveWriteOrderingApi";
-        private const string SaveWriteOrderingHealthPropertyName =
-            "SavedDataInterceptionHealthy";
-        private static readonly object SaveWriteOrderingLookupLock = new object();
-        private static PropertyInfo saveWriteOrderingHealthProperty;
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
@@ -223,12 +215,12 @@ namespace IMDataCore
                 return null;
             }
 
-            // Save Write Ordering Fix runs after IMDC's caller transpiler and
-            // freezes the exact SavedData payload synchronously. When it is loaded,
-            // a second full JsonUtility round-trip here only doubles save-time CPU
-            // and allocation cost for large campaigns. Only a positively verified healthy
-            // interception set is trusted; assembly presence alone is insufficient.
-            if (IsSaveWriteOrderingFixInterceptionHealthy())
+            // A healthy ordered transport provider freezes the exact SavedData
+            // payload synchronously after IMDC's caller transpiler. Prefer authoritative
+            // Save n Load Fixes, otherwise healthy Save Write Ordering Fix. When either
+            // provider owns transport, a second JsonUtility round-trip here only doubles
+            // save-time CPU/allocation cost. Assembly presence alone is never trusted.
+            if (OrderedTransportProviderInterop.IsSavedDataTransportHealthy())
             {
                 return source;
             }
@@ -276,67 +268,6 @@ namespace IMDataCore
                 "continue with the original object. " +
                 errorMessage);
             return source;
-        }
-
-        private static bool IsSaveWriteOrderingFixInterceptionHealthy()
-        {
-            try
-            {
-                PropertyInfo healthProperty = saveWriteOrderingHealthProperty;
-                if (healthProperty == null)
-                {
-                    lock (SaveWriteOrderingLookupLock)
-                    {
-                        healthProperty = saveWriteOrderingHealthProperty;
-                        if (healthProperty == null)
-                        {
-                            Assembly[] assemblies =
-                                AppDomain.CurrentDomain.GetAssemblies();
-                            for (int index = 0; index < assemblies.Length; index++)
-                            {
-                                Assembly assembly = assemblies[index];
-                                AssemblyName name = assembly != null
-                                    ? assembly.GetName()
-                                    : null;
-                                if (name == null || !string.Equals(
-                                        name.Name,
-                                        SaveWriteOrderingAssemblyName,
-                                        StringComparison.OrdinalIgnoreCase))
-                                {
-                                    continue;
-                                }
-
-                                Type apiType = assembly.GetType(
-                                    SaveWriteOrderingApiTypeName,
-                                    false);
-                                healthProperty = apiType != null
-                                    ? apiType.GetProperty(
-                                        SaveWriteOrderingHealthPropertyName,
-                                        BindingFlags.Public | BindingFlags.Static)
-                                    : null;
-                                if (healthProperty != null &&
-                                    healthProperty.PropertyType == typeof(bool) &&
-                                    healthProperty.GetIndexParameters().Length == 0)
-                                {
-                                    saveWriteOrderingHealthProperty = healthProperty;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                return healthProperty != null &&
-                    (bool)healthProperty.GetValue(null, null);
-            }
-            catch (Exception exception)
-            {
-                CoreLog.Warn(
-                    "IM Data Core could not verify Save Write Ordering Fix health; " +
-                    "using its standalone SavedData snapshot fallback. " +
-                    exception.Message);
-                return false;
-            }
         }
 
         private static bool IsSavedDataWrite(CodeInstruction instruction)

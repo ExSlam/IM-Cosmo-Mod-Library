@@ -70,6 +70,21 @@ namespace IMDataCore
                     List<LightweightAgencyRoomIdentityRecord> roomIdentities =
                         CaptureAgencyRoomIdentitySnapshotForCheckpointLocked(
                             savedData);
+                    List<LightweightIdentityBindingRecord> identityBindings =
+                        CaptureContractIdentityBindingsForCheckpointLocked(savedData);
+                    identityBindings.AddRange(
+                        CaptureCliqueIdentityBindingsForCheckpointLocked(savedData));
+                    identityBindings.AddRange(
+                        CaptureBullyingIdentityBindingsForCheckpointLocked(savedData));
+                    identityBindings.AddRange(
+                        CaptureTaskIdentityBindingsForCheckpointLocked(savedData));
+                    bool identityBindingsComplete =
+                        CanonicalContractIdentityRuntimeEnabled &&
+                        CanonicalCliqueIdentityRuntimeEnabled &&
+                        CanonicalBullyingIdentityRuntimeEnabled &&
+                        CanonicalTaskIdentityRuntimeEnabled;
+                    List<LightweightIdentityCandidateRecord> identityCandidates =
+                        CaptureIdentityCandidateSnapshotLocked(identityBindings);
 
                     VanillaSaveStamp stamp;
                     if (!VanillaSaveStamp.TryCreate(
@@ -82,6 +97,9 @@ namespace IMDataCore
                             captureSequence,
                             enabledMods,
                             roomIdentities,
+                            identityBindingsComplete,
+                            identityBindings,
+                            identityCandidates,
                             out errorMessage) ||
                         !storageEngine.TryCreatePersistenceSnapshot(
                             targetScope,
@@ -254,6 +272,11 @@ namespace IMDataCore
                     long activatedSequence = 0L;
                     List<LightweightAgencyRoomIdentityRecord> checkpointRoomIdentities =
                         new List<LightweightAgencyRoomIdentityRecord>();
+                    List<LightweightIdentityBindingRecord> checkpointIdentityBindings =
+                        new List<LightweightIdentityBindingRecord>();
+                    List<LightweightIdentityCandidateRecord> checkpointIdentityCandidates =
+                        new List<LightweightIdentityCandidateRecord>();
+                    bool checkpointIdentityBindingsComplete = false;
                     bool hasExistingSidecarDocument =
                         sidecarLoaded && loadedEngine.HasLoadedSidecarDocument;
 
@@ -325,6 +348,28 @@ namespace IMDataCore
                             checkpointRoomIdentities =
                                 new List<LightweightAgencyRoomIdentityRecord>();
                         }
+
+                        if (!loadedEngine.TryGetCheckpointIdentityBindings(
+                                stamp,
+                                out checkpointIdentityBindingsComplete,
+                                out checkpointIdentityBindings,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(errorMessage);
+                            checkpointIdentityBindingsComplete = false;
+                            checkpointIdentityBindings =
+                                new List<LightweightIdentityBindingRecord>();
+                        }
+
+                        if (!loadedEngine.TryGetCheckpointIdentityCandidates(
+                                stamp,
+                                out checkpointIdentityCandidates,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(errorMessage);
+                            checkpointIdentityCandidates =
+                                new List<LightweightIdentityCandidateRecord>();
+                        }
                     }
                     if (hasExistingSidecarDocument && !checkpointFound)
                     {
@@ -342,10 +387,50 @@ namespace IMDataCore
                         loadedEngine,
                         targetScope,
                         loadedGameDate);
+                    lock (runtimeLock)
+                    {
+                        if (!TryApplyStructuredCoverageLoadBoundaryLocked(
+                                loadedEngine,
+                                stamp,
+                                loadedGameDate,
+                                hasExistingSidecarDocument,
+                                checkpointFound,
+                                out errorMessage))
+                        {
+                            CoreLog.Warn(
+                                "IM Data Core detached structured coverage after " +
+                                "an unsafe load-boundary transition: " + errorMessage);
+                            loadedEngine.EnterReadOnlyEmptyForCurrentScope(
+                                "Structured coverage could not establish an exact " +
+                                "load boundary, so this sidecar was preserved read-only.");
+                        }
+                    }
                     PrepareAgencyRoomIdentitiesForLoad(
                         loadedSaveData,
                         checkpointFound,
                         checkpointRoomIdentities);
+                    PrepareSharedIdentityCompatibilityForLoad(
+                        checkpointFound,
+                        checkpointIdentityBindingsComplete,
+                        stamp,
+                        activatedSequence,
+                        checkpointIdentityCandidates);
+                    PrepareContractIdentityBindingsForLoad(
+                        checkpointFound,
+                        checkpointIdentityBindingsComplete,
+                        checkpointIdentityBindings);
+                    PrepareCliqueIdentityBindingsForLoad(
+                        checkpointFound,
+                        checkpointIdentityBindingsComplete,
+                        checkpointIdentityBindings);
+                    PrepareBullyingIdentityBindingsForLoad(
+                        checkpointFound,
+                        checkpointIdentityBindingsComplete,
+                        checkpointIdentityBindings);
+                    PrepareTaskIdentityBindingsForLoad(
+                        checkpointFound,
+                        checkpointIdentityBindingsComplete,
+                        checkpointIdentityBindings);
                     engineInstalled = true;
                     }
                 }
@@ -421,6 +506,114 @@ namespace IMDataCore
             safeEngine.InitializeTransient();
             return safeEngine;
         }
+        /// <summary>
+        /// Establishes sidecar-v6 selected-branch coverage only after vanilla has
+        /// supplied an exact accepted checkpoint. No date-only or event-count
+        /// inference is permitted at this boundary.
+        /// </summary>
+        private bool TryApplyStructuredCoverageLoadBoundaryLocked(
+            LightweightCoreStorageEngine loadedEngine,
+            VanillaSaveStamp stamp,
+            DateTime loadedGameDate,
+            bool hasExistingSidecarDocument,
+            bool checkpointFound,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (loadedEngine == null ||
+                !ReferenceEquals(storageEngine, loadedEngine) ||
+                !loadedEngine.SupportsStructuredCoverageModel ||
+                loadedEngine.IsPersistenceBlocked)
+            {
+                return true;
+            }
+            if (!checkpointFound || loadedGameDate == DateTime.MinValue)
+            {
+                errorMessage =
+                    "Structured coverage requires an exact loaded checkpoint and game date.";
+                return false;
+            }
+
+            string backendOrigin = string.Empty;
+            if (!hasExistingSidecarDocument)
+            {
+                backendOrigin = LightweightCoverageSchema.OriginLateAdoption;
+            }
+            else if (loadedEngine.HasLegacyMigrationProvenance)
+            {
+                backendOrigin = LightweightCoverageSchema.OriginLegacyResume;
+            }
+            else if (!loadedEngine.TryGetDurableAnchoredBackendCoverageOrigin(
+                stamp,
+                out backendOrigin,
+                out errorMessage))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(backendOrigin) &&
+                !loadedEngine.TryRecordBackendCoverageOrigin(
+                    NextCaptureSequenceLocked,
+                    loadedGameDate,
+                    backendOrigin,
+                    stamp,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            LightweightStructuredCoverageState selectedState;
+            if (!loadedEngine.TryCaptureStructuredCoverageState(
+                    out selectedState) ||
+                selectedState == null ||
+                selectedState.Transitions == null)
+            {
+                errorMessage =
+                    "The selected structured coverage state is unavailable after load.";
+                return false;
+            }
+
+            bool hasBackendOrigin = false;
+            for (int index = 0; index < selectedState.Transitions.Count; index++)
+            {
+                LightweightCoverageTransitionRecord transition =
+                    selectedState.Transitions[index];
+                if (transition != null &&
+                    string.Equals(
+                        transition.ScopeKind,
+                        LightweightCoverageSchema.ScopeBackend,
+                        StringComparison.Ordinal))
+                {
+                    hasBackendOrigin = true;
+                    break;
+                }
+            }
+            if (!hasBackendOrigin)
+            {
+                errorMessage =
+                    "The selected sidecar-v6 branch has no authenticated backend coverage origin.";
+                return false;
+            }
+
+            LightweightCoverageCapabilitySetRecord builtInDescriptor =
+                LightweightBuiltInCapabilityCatalog.CreateCurrentDescriptor();
+            if (!loadedEngine.TryActivateBuiltInCoverage(
+                    NextCaptureSequenceLocked,
+                    loadedGameDate,
+                    builtInDescriptor,
+                    stamp,
+                    out errorMessage))
+            {
+                return false;
+            }
+
+            return loadedEngine.TryRecordNamespaceProcessBoundaryGaps(
+                NextCaptureSequenceLocked,
+                loadedGameDate,
+                stamp,
+                out errorMessage);
+        }
+
         private void InstallLoadedEngine(
             LightweightCoreStorageEngine loadedEngine,
             CoreSaveScope targetScope,
@@ -490,6 +683,30 @@ namespace IMDataCore
                 captureSequence = 0L;
                 bufferedEvents.Clear();
                 ResetRuntimeCaptureStateLocked();
+
+                if (storageEngine.SupportsStructuredCoverageModel)
+                {
+                    string coverageError;
+                    DateTime careerStartDate = staticVars.StartDate;
+                    if (!storageEngine.TryRecordBackendCoverageOrigin(
+                            NextCaptureSequenceLocked,
+                            careerStartDate,
+                            LightweightCoverageSchema.OriginCareerStart,
+                            null,
+                            out coverageError) ||
+                        !storageEngine.TryActivateBuiltInCoverage(
+                            NextCaptureSequenceLocked,
+                            careerStartDate,
+                            LightweightBuiltInCapabilityCatalog
+                                .CreateCurrentDescriptor(),
+                            null,
+                            out coverageError))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not establish native new-career structured coverage: " +
+                            coverageError);
+                    }
+                }
             }
         }
         /// <summary>
@@ -629,6 +846,7 @@ namespace IMDataCore
                 {
                     SeedResolvedSingleChartPositionsFromVanillaLocked();
                     SeedPendingSubstoryCompletionsFromVanillaLocked();
+                    ClearIdentityAdoptionContextLocked();
                 }
                 catch (Exception exception)
                 {
@@ -651,6 +869,10 @@ namespace IMDataCore
                 preparedLoadGameDate = DateTime.MinValue;
                 preparedLoadGameDateValid = false;
                 CancelPendingAgencyRoomIdentityLoadLocked();
+                // A failed vanilla load must not leave the target branch's
+                // candidate multimap or migration-adoption anchor visible.
+                // A later load will rebuild both from its selected checkpoint.
+                ResetSharedIdentityCompatibilityRuntimeStateLocked();
             }
         }
         private bool EnsureInitialized(out string errorMessage)
@@ -831,38 +1053,11 @@ namespace IMDataCore
         /// </summary>
         private void SeedPendingSubstoryCompletionsFromVanillaLocked()
         {
+            // Wave 3 separates durable queue insertion from actual presentation.
+            // A restored queue row has not necessarily been shown yet, so it must
+            // not pre-seed a completion token. Active presentation hooks create
+            // the token only when vanilla actually shows the dialogue.
             pendingSubstoryCompletionCountByDialogueId.Clear();
-            if (Substories_Manager.dialogueQueue == null)
-            {
-                return;
-            }
-
-            for (int index = CoreConstants.ZeroBasedListStartIndex;
-                index < Substories_Manager.dialogueQueue.Count;
-                index++)
-            {
-                Substories_Manager._dialogueQueue queued =
-                    Substories_Manager.dialogueQueue[index];
-                data_dialogues._dialogue dialogue =
-                    queued != null ? queued.dialogue : null;
-                if (dialogue == null ||
-                    dialogue.type != data_dialogues._dialogue._type.dialogue ||
-                    string.IsNullOrEmpty(dialogue.id))
-                {
-                    continue;
-                }
-
-                int count;
-                if (!pendingSubstoryCompletionCountByDialogueId.TryGetValue(
-                        dialogue.id,
-                        out count))
-                {
-                    count = CoreConstants.ZeroBasedListStartIndex;
-                }
-
-                pendingSubstoryCompletionCountByDialogueId[dialogue.id] =
-                    count + 1;
-            }
         }
 
         /// <summary>

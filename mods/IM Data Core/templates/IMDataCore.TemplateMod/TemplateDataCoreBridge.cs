@@ -20,18 +20,14 @@ namespace IMDataCore.TemplateMod
         private static IMDataCoreSession sharedSession;
 
         /// <summary>
-        /// Attempts one-time namespace registration once IM Data Core reports ready.
+        /// Attempts namespace registration directly. TryRegisterNamespace owns safe runtime initialization,
+        /// so IsReady is intentionally not used as a one-shot prerequisite.
         /// </summary>
         internal static bool InitializeIfAvailable()
         {
             if (sharedSession != null)
             {
                 return true;
-            }
-
-            if (!IMDataCoreApi.IsReady())
-            {
-                return false;
             }
 
             string errorMessage;

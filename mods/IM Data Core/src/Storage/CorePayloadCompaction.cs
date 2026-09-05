@@ -124,10 +124,12 @@ namespace IMDataCore
         internal static List<LightweightEventRecord> CompactLoadedEvents(
             IReadOnlyList<LightweightEventRecord> source,
             out int sparseMoneyPayloadCount,
-            out int sharedParticipantRowsRemoved)
+            out int sharedParticipantRowsRemoved,
+            out int sharedParticipantRowsNormalized)
         {
             sparseMoneyPayloadCount = 0;
             sharedParticipantRowsRemoved = 0;
+            sharedParticipantRowsNormalized = 0;
             List<LightweightEventRecord> result =
                 new List<LightweightEventRecord>();
             if (source == null || source.Count == 0)
@@ -220,7 +222,8 @@ namespace IMDataCore
                 AppendLoadedCastChangeRepresentatives(
                     pair.Value,
                     result,
-                    ref sharedParticipantRowsRemoved);
+                    ref sharedParticipantRowsRemoved,
+                    ref sharedParticipantRowsNormalized);
             }
 
             result.Sort(CompareEventsBySequenceAscending);
@@ -603,40 +606,24 @@ namespace IMDataCore
         private static void AppendLoadedCastChangeRepresentatives(
             List<LightweightEventRecord> group,
             List<LightweightEventRecord> result,
-            ref int removedCount)
+            ref int removedCount,
+            ref int normalizedCount)
         {
-            bool hasCanonical = false;
-            for (int index = 0; index < group.Count; index++)
+            if (group == null || group.Count == 0)
             {
-                if (group[index] != null &&
-                    IsCanonicalShowCastSource(group[index].SourcePatch))
-                {
-                    hasCanonical = true;
-                    break;
-                }
-            }
-
-            if (hasCanonical)
-            {
-                for (int index = 0; index < group.Count; index++)
-                {
-                    LightweightEventRecord row = group[index];
-                    if (row == null)
-                    {
-                        continue;
-                    }
-                    if (!IsCanonicalShowCastSource(row.SourcePatch))
-                    {
-                        removedCount++;
-                        continue;
-                    }
-                    result.Add(row);
-                }
                 return;
             }
 
-            Dictionary<string, LightweightEventRecord> byPayload =
-                new Dictionary<string, LightweightEventRecord>(StringComparer.Ordinal);
+            // Loaded history has no live settlement boundary. A canonical
+            // post-mod observation at one show/timestamp therefore cannot prove
+            // that every noncanonical row in the same coarse bucket represents
+            // the same occurrence. Preserve canonical/shared rows independently
+            // and normalize only source-proven legacy per-idol fan-out.
+            Dictionary<string, LightweightEventRecord> legacyFanOutByIdentity =
+                new Dictionary<string, LightweightEventRecord>(
+                    StringComparer.Ordinal);
+            int normalizableLegacyRowCount = 0;
+
             for (int index = 0; index < group.Count; index++)
             {
                 LightweightEventRecord row = group[index];
@@ -644,19 +631,93 @@ namespace IMDataCore
                 {
                     continue;
                 }
-                string payload = row.PayloadJson ?? CoreConstants.EmptyJsonObject;
-                LightweightEventRecord existing;
-                if (!byPayload.TryGetValue(payload, out existing) ||
-                    row.Sequence < existing.Sequence)
+
+                LightweightEventRecord normalizedLegacyRow;
+                if (!TryNormalizeLoadedLegacyCastFanOutRow(
+                        row,
+                        out normalizedLegacyRow))
                 {
-                    byPayload[payload] = row;
+                    result.Add(row);
+                    continue;
+                }
+
+                normalizableLegacyRowCount++;
+                normalizedCount++;
+
+                // Historical fan-out rows from one occurrence share the exact
+                // payload and source patch. Source patch is part of the proof so
+                // two semantically distinct observations at the same paused-clock
+                // timestamp are not merged merely because their payloads happen
+                // to be byte-identical. Keep the earliest sequence representative.
+                string identity = BuildLoadedLegacyCastFanOutIdentity(
+                    normalizedLegacyRow.PayloadJson,
+                    normalizedLegacyRow.SourcePatch);
+                LightweightEventRecord existing;
+                if (!legacyFanOutByIdentity.TryGetValue(identity, out existing) ||
+                    normalizedLegacyRow.Sequence < existing.Sequence)
+                {
+                    legacyFanOutByIdentity[identity] = normalizedLegacyRow;
                 }
             }
-            foreach (LightweightEventRecord row in byPayload.Values)
+
+            foreach (LightweightEventRecord row in
+                legacyFanOutByIdentity.Values)
             {
                 result.Add(row);
             }
-            removedCount += Math.Max(0, group.Count - byPayload.Count);
+
+            removedCount += Math.Max(
+                0,
+                normalizableLegacyRowCount - legacyFanOutByIdentity.Count);
+        }
+
+        private static bool TryNormalizeLoadedLegacyCastFanOutRow(
+            LightweightEventRecord row,
+            out LightweightEventRecord normalized)
+        {
+            normalized = row;
+            if (row == null ||
+                IsCanonicalShowCastSource(row.SourcePatch) ||
+                row.IdolId < CoreConstants.MinimumValidIdolIdentifier)
+            {
+                return false;
+            }
+
+            LightweightEventRecord candidate = CloneEvent(row);
+            int legacyEnvelopeIdolId = row.IdolId;
+            candidate.IdolId = CoreConstants.InvalidIdValue;
+            candidate.ParticipantSchemaVersion =
+                LightweightParticipantSchema.CurrentSchemaVersion;
+
+            List<int> participantIds;
+            SharedTimelineParticipantResolution resolution =
+                SharedTimelineParticipants.ResolveParticipantIdsCurrentSchema(
+                    candidate,
+                    out participantIds);
+            if (resolution != SharedTimelineParticipantResolution.Shared ||
+                !participantIds.Contains(legacyEnvelopeIdolId))
+            {
+                // The immutable payload does not prove a complete participant
+                // set containing this historical envelope idol. Keep the row as
+                // stored and let #57's knownness rules remain authoritative.
+                normalized = row;
+                return false;
+            }
+
+            normalized = candidate;
+            return true;
+        }
+
+        private static string BuildLoadedLegacyCastFanOutIdentity(
+            string payloadJson,
+            string sourcePatch)
+        {
+            StringBuilder builder = new StringBuilder(256);
+            AppendIdentityPart(
+                builder,
+                payloadJson ?? CoreConstants.EmptyJsonObject);
+            AppendIdentityPart(builder, sourcePatch);
+            return builder.ToString();
         }
 
         private static int ComparePendingEventsBySequenceAscending(
@@ -716,6 +777,7 @@ namespace IMDataCore
                 IdempotencyKey = source.IdempotencyKey ?? string.Empty,
                 PayloadJson =
                     source.PayloadJson ?? CoreConstants.EmptyJsonObject,
+                ParticipantSchemaVersion = source.ParticipantSchemaVersion,
                 StoragePayloadJson = source.StoragePayloadJson ?? string.Empty
             };
         }

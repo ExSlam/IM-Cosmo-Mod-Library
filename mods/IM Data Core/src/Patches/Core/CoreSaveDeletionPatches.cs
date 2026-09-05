@@ -13,126 +13,6 @@ namespace IMDataCore
         internal IDisposable SaveWriteDirectoryLease;
     }
 
-    internal static class SaveWriteOrderingDeletionInterop
-    {
-        private const string AssemblyName = "com.cosmo.savewriteorderingfix";
-        private const string ApiTypeName =
-            "SaveWriteOrderingFix.SaveWriteOrderingApi";
-        private const string AcquireDirectoryMethodName =
-            "TryAcquireExclusiveDirectoryAccess";
-        private const int AcquireTimeoutMilliseconds = 30000;
-
-        private static readonly object LookupLock = new object();
-        private static MethodInfo acquireDirectoryMethod;
-
-        internal static bool TryAcquireDirectoryLease(
-            string vanillaDirectoryPath,
-            out IDisposable lease,
-            out string errorMessage)
-        {
-            lease = null;
-            errorMessage = string.Empty;
-
-            Assembly swofAssembly = null;
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int index = 0; index < assemblies.Length; index++)
-            {
-                Assembly candidate = assemblies[index];
-                System.Reflection.AssemblyName name = candidate != null ? candidate.GetName() : null;
-                if (name != null && string.Equals(
-                        name.Name,
-                        AssemblyName,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    swofAssembly = candidate;
-                    break;
-                }
-            }
-
-            // SWOF remains optional. If it is not loaded, vanilla deletion proceeds
-            // and IMDC's own archive topology protection remains sufficient.
-            if (swofAssembly == null)
-            {
-                return true;
-            }
-
-            MethodInfo method = acquireDirectoryMethod;
-            if (method == null)
-            {
-                lock (LookupLock)
-                {
-                    method = acquireDirectoryMethod;
-                    if (method == null)
-                    {
-                        Type apiType = swofAssembly.GetType(ApiTypeName, false);
-                        method = apiType != null
-                            ? apiType.GetMethod(
-                                AcquireDirectoryMethodName,
-                                BindingFlags.Public | BindingFlags.Static)
-                            : null;
-                        if (method != null)
-                        {
-                            acquireDirectoryMethod = method;
-                        }
-                    }
-                }
-            }
-
-            if (method == null)
-            {
-                errorMessage =
-                    "Save Write Ordering Fix is loaded without the required " +
-                    "exclusive-directory lease API.";
-                return false;
-            }
-
-            try
-            {
-                object[] arguments = new object[]
-                {
-                    vanillaDirectoryPath,
-                    AcquireTimeoutMilliseconds,
-                    null,
-                    string.Empty
-                };
-                object result = method.Invoke(null, arguments);
-                bool acquired = result is bool && (bool)result;
-                lease = arguments[2] as IDisposable;
-                errorMessage = arguments[3] as string ?? string.Empty;
-
-                if (!acquired || lease == null)
-                {
-                    if (string.IsNullOrEmpty(errorMessage))
-                    {
-                        errorMessage =
-                            "Save Write Ordering Fix did not grant an exclusive " +
-                            "directory lease.";
-                    }
-                    if (lease != null)
-                    {
-                        lease.Dispose();
-                        lease = null;
-                    }
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                errorMessage =
-                    "Save Write Ordering Fix directory coordination failed: " +
-                    exception.Message;
-                if (lease != null)
-                {
-                    lease.Dispose();
-                    lease = null;
-                }
-                return false;
-            }
-        }
-    }
-
     internal static class DeletedSaveDirectoryArchiveBinding
     {
         internal static DeletedSaveDirectoryArchiveState Capture(
@@ -152,16 +32,16 @@ namespace IMDataCore
                     };
 
                 string coordinationError;
-                if (!SaveWriteOrderingDeletionInterop.TryAcquireDirectoryLease(
+                if (!OrderedTransportProviderInterop.TryAcquireDirectoryLease(
                         state.VanillaDirectoryPath,
                         out state.SaveWriteDirectoryLease,
                         out coordinationError))
                 {
                     state.DeletionAllowed = false;
                     CoreLog.Warn(
-                        "IM Data Core blocked save deletion because Save Write " +
-                        "Ordering Fix could not establish an exclusive directory " +
-                        "boundary: " + coordinationError);
+                        "IM Data Core blocked save deletion because the effective " +
+                        "ordered transport provider could not establish an exclusive " +
+                        "directory boundary: " + coordinationError);
                 }
 
                 return state;
@@ -212,8 +92,8 @@ namespace IMDataCore
                     catch (Exception exception)
                     {
                         CoreLog.Warn(
-                            "IM Data Core could not release Save Write Ordering " +
-                            "Fix deletion coordination: " + exception.Message);
+                            "IM Data Core could not release ordered transport " +
+                            "deletion coordination: " + exception.Message);
                     }
                     state.SaveWriteDirectoryLease = null;
                 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -54,7 +54,7 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix(SEvent_Tour __instance, out TourFinishSnapshot __state)
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceTourFinish);
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceTourFinish);
             __state = IMDataCoreController.Instance.CreateTourFinishSnapshot(__instance);
         }
 
@@ -62,21 +62,14 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(TourFinishSnapshot __state)
         {
-            try
-            {
-                IMDataCoreController.Instance.CaptureTourFinished(__state);
-            }
-            finally
-            {
-                ActivityEarningsSourceContext.Clear();
-            }
+            IMDataCoreController.Instance.CaptureTourFinished(__state);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
             return __exception;
         }
     }

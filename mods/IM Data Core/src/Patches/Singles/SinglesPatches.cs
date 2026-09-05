@@ -12,6 +12,96 @@ using UnityEngine;
 
 namespace IMDataCore
 {
+    internal sealed class SingleCancellationReferenceSnapshot
+    {
+        internal int LinkedElectionId = CoreConstants.InvalidIdValue;
+        internal bool LinkedElectionReferenceKnown;
+    }
+
+    internal sealed class SingleCancellationElectionContextFrame
+    {
+        internal singles._single Single;
+        internal int LinkedElectionId = CoreConstants.InvalidIdValue;
+        internal bool LinkedElectionReferenceKnown;
+    }
+
+    internal static class SingleCancellationElectionContext
+    {
+        [ThreadStatic]
+        private static List<SingleCancellationElectionContextFrame> frames;
+
+        internal static SingleCancellationElectionContextFrame Push(singles._single single)
+        {
+            SingleCancellationElectionContextFrame frame = new SingleCancellationElectionContextFrame
+            {
+                Single = single,
+                LinkedElectionReferenceKnown = single != null
+            };
+            if (single != null && single.IsElectionSingle)
+            {
+                SEvent_SSK._SSK linkedElection = single.GetParentSSK();
+                frame.LinkedElectionId = linkedElection != null
+                    ? linkedElection.ID
+                    : CoreConstants.InvalidIdValue;
+            }
+
+            if (frames == null)
+            {
+                frames = new List<SingleCancellationElectionContextFrame>();
+            }
+            frames.Add(frame);
+            return frame;
+        }
+
+        internal static void Pop(SingleCancellationElectionContextFrame frame)
+        {
+            if (frame == null || frames == null)
+            {
+                return;
+            }
+
+            for (int index = frames.Count - 1; index >= CoreConstants.ZeroBasedListStartIndex; index--)
+            {
+                if (ReferenceEquals(frames[index], frame))
+                {
+                    frames.RemoveAt(index);
+                    break;
+                }
+            }
+            if (frames.Count == CoreConstants.ZeroBasedListStartIndex)
+            {
+                frames = null;
+            }
+        }
+
+        internal static bool TryResolve(
+            singles._single single,
+            out int linkedElectionId,
+            out bool referenceKnown)
+        {
+            linkedElectionId = CoreConstants.InvalidIdValue;
+            referenceKnown = false;
+            if (single == null || frames == null)
+            {
+                return false;
+            }
+
+            for (int index = frames.Count - 1; index >= CoreConstants.ZeroBasedListStartIndex; index--)
+            {
+                SingleCancellationElectionContextFrame frame = frames[index];
+                if (frame == null || !ReferenceEquals(frame.Single, single))
+                {
+                    continue;
+                }
+
+                linkedElectionId = frame.LinkedElectionId;
+                referenceKnown = frame.LinkedElectionReferenceKnown;
+                return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>
     /// Captures single-creation lifecycle events.
     /// </summary>
@@ -127,21 +217,43 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Prefix()
         {
-            ActivityEarningsSourceContext.Set(CoreConstants.EarningsSourceSingleRelease);
-        }
-
-        [HarmonyPostfix]
-        [HarmonyPriority(Priority.Last)]
-        private static void Postfix()
-        {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceSingleRelease);
         }
 
         [HarmonyFinalizer]
         [HarmonyPriority(Priority.Last)]
         private static Exception Finalizer(Exception __exception)
         {
-            ActivityEarningsSourceContext.Clear();
+            ActivityEarningsSourceContext.Restore();
+            return __exception;
+        }
+    }
+
+    /// <summary>
+    /// Preserves the election-release parent before the UI clears ReleaseSingle.
+    /// The frame is thread-local, keyed to the exact single, nesting-safe, and
+    /// always removed by a Harmony finalizer.
+    /// </summary>
+    [HarmonyPatch(typeof(SingleInDevelopmentButton), nameof(SingleInDevelopmentButton.OnCancel))]
+    internal static class SingleInDevelopmentButton_OnCancel_IMDataCoreReference_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(
+            SingleInDevelopmentButton __instance,
+            out SingleCancellationElectionContextFrame __state)
+        {
+            __state = SingleCancellationElectionContext.Push(
+                __instance != null ? __instance.single : null);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(
+            Exception __exception,
+            SingleCancellationElectionContextFrame __state)
+        {
+            SingleCancellationElectionContext.Pop(__state);
             return __exception;
         }
     }
@@ -152,13 +264,25 @@ namespace IMDataCore
     [HarmonyPatch(typeof(singles), nameof(singles.CancelSingle))]
     internal static class singles_CancelSingle_IMDataCoreCapture_Patch
     {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            singles._single __0,
+            out SingleCancellationReferenceSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateSingleCancellationReferenceSnapshot(__0);
+        }
+
         /// <summary>
         /// Records one single-cancel event after cancellation logic completes.
         /// </summary>
+        [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(singles._single __0)
+        private static void Postfix(
+            singles._single __0,
+            SingleCancellationReferenceSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureSingleCancelled(__0);
+            IMDataCoreController.Instance.CaptureSingleCancelled(__0, __state);
         }
     }
 

@@ -20,15 +20,30 @@ namespace SaveNLoadFixes.Repairs
         }
 
         /// <summary>
-        /// Validate the exact current-value plus delta before vanilla mutates its resource
-        /// slot or invokes any resource observers. Vanilla then retains ownership of its
-        /// nonnegative/buzz clamps, fan distribution, statistics, and events.
+        /// Precompute the exact current-value plus delta before any mutation, then reproduce
+        /// vanilla's nonnegative/buzz clamps, fan distribution, statistics, and observer
+        /// order with the checked Int64 result as the authoritative value.
         /// </summary>
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
-        private static void Prefix(resources.type __0, long __1)
+        private static bool Prefix(
+            resources.type __0,
+            long __1,
+            resources.money ___onMoneyChange,
+            resources.fans ___onFansChange,
+            resources.scandalPoints ___onScandalPointsChange,
+            resources.fame ___onFameChange,
+            resources.resourceChanged ___onResourceChange)
         {
-            WideNumericRepair.ValidateResourceAdd(__0, __1);
+            WideNumericContinuation.AddResource(
+                __0,
+                __1,
+                ___onMoneyChange,
+                ___onFansChange,
+                ___onScandalPointsChange,
+                ___onFameChange,
+                ___onResourceChange);
+            return false;
         }
     }
 

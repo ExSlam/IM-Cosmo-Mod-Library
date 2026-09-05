@@ -55,6 +55,7 @@ namespace IMDataCore
 
         internal const string EventTypeSingleCreated = "single_created";
         internal const string EventTypeSingleReleased = "single_released";
+        internal const string EventTypeSingleChartResult = "single_chart_result";
         internal const string EventTypeSingleCancelled = "single_cancelled";
         internal const string EventTypeSingleStatusChanged = "single_status_changed";
         internal const string EventTypeSingleCastChanged = "single_cast_changed";
@@ -72,6 +73,9 @@ namespace IMDataCore
         internal const string EventTypeContractActivated = "contract_activated";
         internal const string EventTypeContractWindowOpened = "contract_window_opened";
         internal const string EventTypeContractAccepted = "contract_accepted";
+        internal const string EventTypeBusinessProposalGenerated = "business_proposal_generated";
+        internal const string EventTypeBusinessProposalAccepted = "business_proposal_accepted";
+        internal const string EventTypeBusinessProposalDeclined = "business_proposal_declined";
         internal const string EventTypeContractCancelled = "contract_cancelled";
         internal const string EventTypeContractFinished = "contract_finished";
         internal const string EventTypeContractWeeklyEarningsApplied = "contract_weekly_earnings_applied";
@@ -80,6 +84,8 @@ namespace IMDataCore
         internal const string EventTypeShowCreated = "show_created";
         internal const string EventTypeShowReleased = "show_released";
         internal const string EventTypeShowCancelled = "show_cancelled";
+        internal const string EventTypeShowCancellationScheduled = "show_cancellation_scheduled";
+        internal const string EventTypeShowCancellationWithdrawn = "show_cancellation_withdrawn";
         internal const string EventTypeShowStatusChanged = "show_status_changed";
         internal const string EventTypeShowEpisodeReleased = "show_episode_released";
         internal const string EventTypeShowCastChanged = "show_cast_changed";
@@ -91,6 +97,7 @@ namespace IMDataCore
         internal const string EventTypeTourFinished = "tour_finished";
         internal const string EventTypeTourCancelled = "tour_cancelled";
         internal const string EventTypeTourCountryResult = "tour_country_result";
+        internal const string EventTypeTourCountryLevelUp = "tour_country_level_up";
         internal const string EventTypeTourStatusChanged = "tour_status_changed";
         internal const string EventTypeElectionCreated = "election_created";
         internal const string EventTypeElectionFinished = "election_finished";
@@ -113,11 +120,13 @@ namespace IMDataCore
         internal const string EventTypeConcertConfigurationChanged = "concert_configuration_changed";
         internal const string EventTypeAwardNominated = "award_nominated";
         internal const string EventTypeAwardResult = "award_result";
+        internal const string EventTypeAwardSpeechDelivered = "award_speech_delivered";
         internal const string EventTypePushWindowStarted = "push_window_started";
         internal const string EventTypePushWindowEnded = "push_window_ended";
         internal const string EventTypePushWindowDayIncrement = "push_window_day_increment";
         internal const string EventTypeIdolDatingStarted = "idol_dating_started";
         internal const string EventTypeIdolDatingEnded = "idol_dating_ended";
+        internal const string EventTypeCliqueCreated = "clique_created";
         internal const string EventTypeCliqueJoined = "clique_joined";
         internal const string EventTypeCliqueLeft = "clique_left";
         internal const string EventTypeBullyingStarted = "bullying_started";
@@ -125,7 +134,13 @@ namespace IMDataCore
         internal const string EventTypeScandalMitigated = "scandal_mitigated";
         internal const string EventTypePlayerRelationshipChanged = "player_relationship_changed";
         internal const string EventTypePlayerDateInteraction = "player_date_interaction";
+        internal const string EventTypePlayerGenericDatePresented = "player_generic_date_presented";
+        internal const string EventTypePlayerGenericDateCompleted = "player_generic_date_completed";
+        internal const string EventTypePlayerFlirtOutcome = "player_flirt_outcome";
+        internal const string EventTypePlayerBullyingIntervention = "player_bullying_intervention";
+        internal const string EventTypePlayerForcedBreakup = "player_forced_breakup";
         internal const string EventTypePlayerMarriageOutcome = "player_marriage_outcome";
+        internal const string EventTypeIdolRelationshipCreated = "idol_relationship_created";
         internal const string EventTypeIdolRelationshipStatusChanged = "idol_relationship_status_changed";
         internal const string EventTypeIdolRelationshipRemoved = "idol_relationship_removed";
         internal const string EventTypeIdolHired = "idol_hired";
@@ -136,14 +151,19 @@ namespace IMDataCore
         internal const string EventTypeLoanAdded = "loan_added";
         internal const string EventTypeLoanInitialized = "loan_initialized";
         internal const string EventTypeLoanPaidOff = "loan_paid_off";
+        internal const string EventTypeLoanMatured = "loan_matured";
+        internal const string EventTypeLoanCancelled = "loan_cancelled";
         internal const string EventTypeBankruptcyDangerSet = "bankruptcy_danger_set";
         internal const string EventTypeBankruptcyCheck = "bankruptcy_check";
         internal const string EventTypeScandalCheck = "scandal_check";
         internal const string EventTypeAuditionFailureTriggered = "audition_failure_triggered";
+        internal const string EventTypeAuditionCandidatesGenerated = "audition_candidates_generated";
+        internal const string EventTypeAuditionCompleted = "audition_completed";
         internal const string EventTypePolicyDecisionSelected = "policy_decision_selected";
         internal const string EventTypeActivityPerformance = "activity_performance";
         internal const string EventTypeActivityPromotion = "activity_promotion";
         internal const string EventTypeActivitySpaTreatment = "activity_spa_treatment";
+        internal const string EventTypeActivityLevelUp = "activity_level_up";
         internal const string EventTypeIdolEarningsRecorded = "idol_earnings_recorded";
         internal const string EventTypeTheaterCreated = "theater_created";
         internal const string EventTypeTheaterDestroyed = "theater_destroyed";
@@ -161,6 +181,7 @@ namespace IMDataCore
         internal const string EventTypeStoryRouteLocked = "story_route_locked";
         internal const string EventTypeTaskAdded = "task_added";
         internal const string EventTypeTaskCompleted = "task_completed";
+        internal const string EventTypeTaskUnfulfilled = "task_unfulfilled";
         internal const string EventTypeTaskFailed = "task_failed";
         internal const string EventTypeTaskDone = "task_done";
         internal const string EventTypeTaskRemovedOnGraduation = "task_removed_on_graduation";
@@ -179,6 +200,7 @@ namespace IMDataCore
         internal const string EventTypeAgencyRoomCostPaid = "agency_room_cost_paid";
         // Room work is persisted once with an explicit participant list. The derived
         // timeline index fans the same occurrence into every involved idol's diary.
+        internal const string EventTypeRoomWorkAssigned = "room_work_assigned";
         internal const string EventTypeRoomWorkCompleted = "room_work_completed";
         internal const string EventTypeRoomWorkCancelled = "room_work_cancelled";
         internal const string EventTypeAuditionStarted = "audition_started";
@@ -186,7 +208,13 @@ namespace IMDataCore
         internal const string EventTypeAuditionCooldownReset = "audition_cooldown_reset";
         internal const string EventTypeRandomEventStarted = "random_event_started";
         internal const string EventTypeRandomEventConcluded = "random_event_concluded";
+        internal const string EventTypeTemplateEventPresented = "template_event_presented";
+        internal const string EventTypeTemplateEventConcluded = "template_event_concluded";
+        // Legacy rows may contain substory_started. New captures distinguish queueing
+        // from actual presentation (Wave 3 payload/timing semantics).
         internal const string EventTypeSubstoryStarted = "substory_started";
+        internal const string EventTypeSubstoryQueued = "substory_queued";
+        internal const string EventTypeSubstoryPresented = "substory_presented";
         internal const string EventTypeSubstoryDelayed = "substory_delayed";
         internal const string EventTypeSubstoryCompleted = "substory_completed";
         internal const string EventTypeEconomyWeeklyExpenseApplied = "economy_weekly_expense_applied";
@@ -195,11 +223,15 @@ namespace IMDataCore
         internal const string EventTypeMoneyLedgerCoverageStarted = "money_ledger_coverage_started";
         internal const string EventTypeInfluenceBlackmailQueued = "influence_blackmail_queued";
         internal const string EventTypeInfluenceBlackmailTriggered = "influence_blackmail_triggered";
+        internal const string EventTypeInfluenceBlackmailDequeued = "influence_blackmail_dequeued";
         internal const string EventTypeMentorshipStarted = "mentorship_started";
         internal const string EventTypeMentorshipEnded = "mentorship_ended";
         internal const string EventTypeMentorshipWeeklyTick = "mentorship_weekly_tick";
         internal const string EventTypeRivalTrendsUpdated = "rival_trends_updated";
         internal const string EventTypeRivalMonthlyRecalculated = "rival_monthly_recalculated";
+        internal const string EventTypeRivalGroupCreated = "rival_group_created";
+        internal const string EventTypeRivalGroupRetired = "rival_group_retired";
+        internal const string EventTypeSummerGamesObjectiveActivated = "summer_games_objective_activated";
         internal const string EventTypeSummerGamesFinalized = "summer_games_finalized";
 
         internal const string EventEntityKindSingle = "single";
@@ -209,6 +241,7 @@ namespace IMDataCore
         internal const string EventEntityKindDatingRelationship = "dating_relationship";
         internal const string EventEntityKindIdolDatingState = "idol_dating_state";
         internal const string EventEntityKindContract = "contract";
+        internal const string EventEntityKindBusinessProposal = "business_proposal";
         internal const string EventEntityKindShow = "show";
         internal const string EventEntityKindTour = "tour";
         internal const string EventEntityKindElection = "election";
@@ -239,11 +272,13 @@ namespace IMDataCore
         internal const string EventEntityKindRoomWork = "room_work";
         internal const string EventEntityKindAudition = "audition";
         internal const string EventEntityKindRandomEvent = "random_event";
+        internal const string EventEntityKindTemplateEvent = "template_event";
         internal const string EventEntityKindSubstory = "substory";
         internal const string EventEntityKindEconomy = "economy";
         internal const string EventEntityKindInfluence = "influence";
         internal const string EventEntityKindMentorship = "mentorship";
         internal const string EventEntityKindRivalMarket = "rival_market";
+        internal const string EventEntityKindRivalGroup = "rival_group";
         internal const string EventEntityKindSummerGames = "summer_games";
 
         internal const string EventSourceSingleAddNewPatch = "patch.singles.AddNewSingle.Postfix";
@@ -264,6 +299,9 @@ namespace IMDataCore
         internal const string EventSourceIdolDatingStatusPatch = "patch.data_girls.girls._dating_data.SetDatingStatus.Postfix";
         internal const string EventSourceContractActivationPatch = "patch.business.AddActiveProposal.Postfix";
         internal const string EventSourceContractAcceptPatch = "patch.business.Accept.Postfix";
+        internal const string EventSourceBusinessProposalGeneratedPatch = "patch.business.SetProposal.Postfix";
+        internal const string EventSourceBusinessProposalAcceptedPatch = "patch.business.Accept.Postfix";
+        internal const string EventSourceBusinessProposalDeclinedPatch = "patch.business.Decline.Postfix";
         internal const string EventSourceContractCancellationPatch = "patch.business.CancelContract.Prefix";
         internal const string EventSourceContractNaturalCompletionPatch = "patch.business.CheckActiveProposals.Postfix";
         internal const string EventSourceContractWeeklyEarningsPatch = "patch.business.AddWeeklyEarnings.Postfix";
@@ -274,6 +312,7 @@ namespace IMDataCore
         internal const string EventSourceShowReleasePatch = "patch.Shows.ReleaseShow.Postfix";
         internal const string EventSourceShowCancelPatch = "patch.Shows.CancelShow.Postfix";
         internal const string EventSourceShowCancelMethodPatch = "patch.Shows._show.Cancel.Postfix";
+        internal const string EventSourceShowDontCancelMethodPatch = "patch.Shows._show.DontCancel.Postfix";
         internal const string EventSourceShowStatusPatch = "patch.Shows._show.SetStatus.Postfix";
         internal const string EventSourceShowEpisodePatch = "patch.Shows._show.NewEpisode.Postfix";
         internal const string EventSourceShowRemoveGirlPatch = "patch.Shows._show.RemoveGirl.Postfix";
@@ -285,6 +324,7 @@ namespace IMDataCore
         internal const string EventSourceTourFinishPatch = "patch.SEvent_Tour.FinishTour.Postfix";
         internal const string EventSourceTourCancelPatch = "patch.SEvent_Tour.CancelTour.Postfix";
         internal const string EventSourceTourStatusPatch = "patch.SEvent_Tour.tour.SetStatus.Postfix";
+        internal const string EventSourceTourCountryLevelUpPatch = "patch.SEvent_Tour.country.LevelUp.Postfix";
         internal const string EventSourceElectionSetPatch = "patch.SEvent_SSK.SetSSK.Postfix";
         internal const string EventSourceElectionCancelPatch = "patch.SEvent_SSK.CancelSSK.Postfix";
         internal const string EventSourceElectionGenerateResultsPatch = "patch.SEvent_SSK._SSK.GenerateResults.Postfix";
@@ -307,9 +347,13 @@ namespace IMDataCore
         internal const string EventSourceConcertNewPopupContinuePatch = "patch.Concert_New_Popup.OnContinue.Postfix";
         internal const string EventSourceAwardNominationsPatch = "patch.Awards.GenerateTempNominations.Postfix";
         internal const string EventSourceAwardResultsPatch = "patch.Awards.SetWins.Postfix";
+        internal const string EventSourceAwardSpeechGetThanksPatch = "patch.Awards._speech.GetThanks.Postfix";
+        internal const string AwardSpeechSoloThanksFormula = "awards_solo_thanks";
+        internal const string AwardSpeechGroupThanksFormula = "awards_group_thanks";
         internal const string EventSourcePushSetPushesPatch = "patch.Pushes.SetPushes.Postfix";
         internal const string EventSourcePushRemovePatch = "patch.Pushes.RemovePush.Prefix";
         internal const string EventSourcePushOnNewDayPatch = "patch.Pushes.OnNewDay.Postfix";
+        internal const string EventSourceIdolRelationshipCreatedPatch = "patch.Relationships.GetRelationship.Postfix";
         internal const string EventSourceIdolRelationshipStartPatch = "patch.Relationships._relationship.StartDating.Postfix";
         internal const string EventSourceIdolRelationshipBreakPatch = "patch.Relationships._relationship.BreakUp.Postfix";
         internal const string EventSourceCliqueAddMemberPatch = "patch.Relationships._clique.AddMember.Postfix";
@@ -321,6 +365,9 @@ namespace IMDataCore
         internal const string EventSourcePlayerRelationshipAddPointsPatch = "patch.Relationships_Player.AddPoints.Postfix";
         internal const string EventSourcePlayerDateGoOnDatePatch = "patch.Dating.GoOnDate.Postfix";
         internal const string EventSourcePlayerDateGoOnSpecificDatePatch = "patch.Dating.GoOnSpecificDate.Postfix";
+        internal const string EventSourcePlayerGenericDateGeneratePatch = "patch.Dating.GenerateGenericDate.Postfix";
+        internal const string EventSourcePlayerGenericDateEffectPatch = "patch.vn_actions.Do.Postfix.dating.add_points";
+        internal const string EventSourcePlayerFlirtPatch = "patch.Date_Flirt.DoFlirt.Postfix";
         internal const string EventSourcePlayerMarriageGirlQuitsPatch = "patch.Dating.Marriage_Girl_Quits.Postfix";
         internal const string EventSourcePlayerMarriageAfterPatch = "patch.Dating.AfterMarriage.Postfix";
         internal const string EventSourceIdolRelationshipAddPatch = "patch.Relationships._relationship.Add.Postfix";
@@ -334,6 +381,8 @@ namespace IMDataCore
         internal const string EventSourceLoansAddLoanPatch = "patch.loans.AddLoan.Postfix";
         internal const string EventSourceLoansInitializePatch = "patch.loans._loan.Initialize.Postfix";
         internal const string EventSourceLoansPayOffPatch = "patch.loans._loan.PayOff.Postfix";
+        internal const string EventSourceLoansMaturityPatch = "patch.loans.OnNewWeek.Postfix";
+        internal const string EventSourceLoansDevelopmentCancelledPatch = "patch.agency._room.CancelJob.Postfix";
         internal const string EventSourceLoansSetBankruptcyDangerPatch = "patch.loans.SetBankruptcyDanger.Postfix";
         internal const string EventSourceBankruptcyCheckBankruptcyPatch = "patch.Bankruptcy.CheckBankruptcy.Postfix";
         internal const string EventSourceBankruptcyCheckScandalPatch = "patch.Bankruptcy.CheckScandal.Postfix";
@@ -342,6 +391,7 @@ namespace IMDataCore
         internal const string EventSourceActivitiesPerformancePatch = "patch.Activities.Performance.Postfix";
         internal const string EventSourceActivitiesPromotionPatch = "patch.Activities.Promotion.Postfix";
         internal const string EventSourceActivitiesSpaTreatmentPatch = "patch.Activities.SpaTreatment.Postfix";
+        internal const string EventSourceActivityLevelUpPatch = "patch.Activities._activity.LevelUp.Postfix";
         internal const string EventSourceDataGirlsEarnPatch = "patch.data_girls.girls.Earn.Postfix";
         internal const string EventSourceTheatersNewTheaterPatch = "patch.Theaters.NewTheater.Postfix";
         internal const string EventSourceTheatersDestroyTheaterPatch = "patch.Theaters.DestroyTheater.Postfix";
@@ -359,13 +409,19 @@ namespace IMDataCore
         internal const string EventSourceTasksLockRoutePatch = "patch.tasks.LockRoute.Postfix";
         internal const string EventSourceTasksTaskOnCompletePatch = "patch.tasks._task.OnComplete.Postfix";
         internal const string EventSourceTasksTaskOnFailPatch = "patch.tasks._task.OnFail.Postfix";
+        internal const string EventSourceTasksTaskUnfulfillPatch = "patch.tasks._task.Unfulfill.Postfix";
         internal const string EventSourceTasksTaskDonePatch = "patch.tasks._task.Done.Postfix";
         internal const string EventSourceTasksOnGraduationPatch = "patch.tasks.OnGraduation.Postfix";
         internal const string EventSourceConcertUseCardPatch = "patch.SEvent_Concerts.UseCard.Postfix";
         internal const string EventSourceConcertCrisisOptionPatch = "patch.Concert_CrisisPopup.Option.Postfix";
         internal const string EventSourceConcertCrisisClosePatch = "patch.Concert_CrisisPopup.Close.Postfix";
         internal const string EventSourceConcertPopupFinishPatch = "patch.Concert_Popup.FinishConcert.Postfix";
+        internal const string EventSourceRoomWorkAssignedPatch = "patch.agency._room.assign.Postfix";
+        internal const string EventSourceRoomTreatmentAssignedPatch = "patch.agency._room.assign_treatment.Postfix";
         internal const string EventSourceRoomWorkCancelJobPatch = "patch.agency._room.CancelJob.Postfix";
+        internal const string EventSourceRoomTrainingCancelledPatch = "patch.agency._room.FinishPractice.Postfix";
+        internal const string EventSourceRoomTreatmentCancelledPatch = "patch.agency._room.CancelTreatment.Postfix";
+        internal const string EventSourceRoomTreatmentCompletedPatch = "patch.agency._room.DoTreatment.Postfix";
         internal const string EventSourceElectionStartPatch = "patch.SEvent_SSK.StartSSK.Postfix";
         internal const string EventSourceDataGirlsWishGeneratePatch = "patch.data_girls.girls.Wish_Generate.Postfix";
         internal const string EventSourceDataGirlsWishFulfillPatch = "patch.data_girls.girls.Wish_Fullfill.Postfix";
@@ -376,24 +432,38 @@ namespace IMDataCore
         internal const string EventSourceRoomWorkCompletedPatch = "patch.agency._room.work_completed.Postfix";
         internal const string EventSourceRoomTrainingCompletedPatch = "patch.agency._room.FinishPractice.Postfix";
         internal const string EventSourceAuditionsGeneratePatch = "patch.Auditions.GenerateAudition.Postfix";
+        internal const string EventSourceAuditionsGenerateGirlsPatch = "patch.Auditions.GenerateGirls.Postfix";
+        internal const string EventSourceAuditionsCompletePatch = "patch.Popup_Audition.Close.Postfix";
         internal const string EventSourceAuditionsResetCooldownPatch = "patch.Auditions.ResetCooldown.Postfix";
         internal const string EventSourceTasksAddTaskPatch = "patch.tasks.AddTask.Postfix";
         internal const string EventSourceTasksAddTaskContinuePatch = "patch.tasks.AddTaskContinue.Postfix";
+        internal const string EventSourceTasksGenerateTaskPatch = "patch.tasks.GenerateTask.Postfix";
+        internal const string EventSourceSummerGamesObjectivePatch = "patch.tasks.AddTask_SummerGames.Postfix";
+        internal const string EventSourceVnStoryStatusRestorePatch = "patch.vn_actions.DoCustom.Postfix";
         internal const string EventSourceEventManagerStartEventPatch = "patch.Event_Manager.StartEvent.Postfix";
         internal const string EventSourceEventManagerConcludeEventPatch = "patch.Event_Manager.ConcludeEvent.Postfix";
+        internal const string EventSourceEventManagerSnsOnlyTerminalPatch = "patch.Event_Manager.<OpenPopup>d__46.MoveNext.Postfix";
+        internal const string EventSourceTemplatePopupSetPatch = "patch.Event_Popup.Set(Event_Templates._active_template).Postfix";
+        internal const string EventSourceTemplateConcludePatch = "patch.Event_Templates.ConcludeEvent.Postfix";
+        internal const string EventSourceDatePopupForceBreakupPatch = "patch.Date_Popup.OnClick_ForceBreakup.Postfix";
         internal const string EventSourceSubstoriesStartDialoguePatch = "patch.Substories_Manager.StartDialogue.Postfix";
+        internal const string EventSourceSubstoryDialoguePresentedPatch = "patch.ActiveDialogueController.Set.Postfix";
+        internal const string EventSourceSubstoryScenePresentedPatch = "patch.Scenes.Set.Postfix";
+        internal const string EventSourceRoomSubstoryFinishPatch = "patch.agency._room.SubstoryFinish.Postfix";
         internal const string EventSourceActiveDialogueInstantTransitionPatch = "patch.ActiveDialogueController.DoIntstantTransition.Postfix";
         internal const string EventSourceVnActionsDoActorPatch = "patch.vn_actions.DoActor.Postfix";
         internal const string EventSourceEroEventsCoffeeDateMenuSaveOutfitPatch = "patch.EroEvents.Coffee_Date_Menu.SaveOutfit.Postfix";
         internal const string EventSourceResourcesOnNewWeekPatch = "patch.resources.OnNewWeek.Postfix";
         internal const string EventSourceResourcesOnNewDayPatch = "patch.resources.OnNewDay.Postfix";
         internal const string EventSourceDateInfluenceAddBlackmailPatch = "patch.Date_Influence.AddBlackmail.Postfix";
+        internal const string EventSourceDateInfluenceBullyingTextPatch = "patch.Date_Influence.Bullying_Text.Postfix";
         internal const string EventSourceDateInfluenceBlackmailTriggerPatch = "patch.Date_Influence.Blackmail_Trigger.Postfix";
         internal const string EventSourceGirlsMentorsAddKohaiPatch = "patch.Girls_Mentors.AddKohai.Postfix";
         internal const string EventSourceGirlsMentorsRemoveKohaiPatch = "patch.Girls_Mentors.RemoveKohai.Postfix";
         internal const string EventSourceGirlsMentorsOnNewWeekPatch = "patch.Girls_Mentors.OnNewWeek.Postfix";
         internal const string EventSourceRivalsUpdateTrendsPatch = "patch.Rivals.UpdateTrends.Postfix";
         internal const string EventSourceRivalsOnNewMonthPatch = "patch.Rivals.OnNewMonth.Postfix";
+        internal const string EventSourceRelationshipsStartNewCliquePatch = "patch.Relationships.StartNewClique.Postfix";
         internal const string EventSourceSummerGamesOnProceedPatch = "patch.Summer_Games._data.OnProceed.Postfix";
         internal const string EventSourceCustomApi = "api.IMDataCore.CustomEvent";
         internal const string EventSourceSaveFlushPatch = "patch.SaveManager.SaveData.Prefix";
@@ -426,6 +496,8 @@ namespace IMDataCore
         internal const string LoanLifecycleActionAdded = "added";
         internal const string LoanLifecycleActionInitialized = "initialized";
         internal const string LoanLifecycleActionPaidOff = "paid_off";
+        internal const string LoanLifecycleActionMatured = "matured";
+        internal const string LoanLifecycleActionCancelled = "cancelled";
         internal const string EarningsSourceUnknown = "unknown";
         internal const string EarningsSourceActivitiesPerformance = "activities.performance";
         internal const string EarningsSourceActivitiesPromotion = "activities.promotion";
@@ -443,6 +515,7 @@ namespace IMDataCore
         internal const string ElectionLifecycleActionStarted = "started";
         internal const string TaskLifecycleActionAdded = "added";
         internal const string TaskLifecycleActionCompleted = "completed";
+        internal const string TaskLifecycleActionUnfulfilled = "unfulfilled";
         internal const string TaskLifecycleActionFailed = "failed";
         internal const string TaskLifecycleActionDone = "done";
         internal const string TaskLifecycleActionRemovedOnGraduation = "removed_on_graduation";
@@ -455,7 +528,9 @@ namespace IMDataCore
         internal const string StaffLifecycleActionLevelUp = "level_up";
         internal const string AgencyRoomLifecycleActionBuilt = "built";
         internal const string AgencyRoomLifecycleActionDestroyed = "destroyed";
-        internal const string SubstoryLifecycleActionStarted = "started";
+        internal const string SubstoryLifecycleActionStarted = "started"; // legacy decode only
+        internal const string SubstoryLifecycleActionQueued = "queued";
+        internal const string SubstoryLifecycleActionPresented = "presented";
         internal const string SubstoryLifecycleActionDelayed = "delayed";
         internal const string SubstoryLifecycleActionCompleted = "completed";
         internal const string OutfitChangeActionChangeOutfit = "change_outfit";
@@ -468,8 +543,40 @@ namespace IMDataCore
         internal const string MentorshipLifecycleActionWeeklyTick = "weekly_tick";
         internal const string RivalLifecycleActionTrendsUpdated = "trends_updated";
         internal const string RivalLifecycleActionMonthlyRecalculated = "monthly_recalculated";
+        internal const string RivalGroupLifecycleActionCreated = "created";
+        internal const string RivalGroupLifecycleActionRetired = "retired";
+        internal const string BullyingInterventionResultPartialStop = "partial_stop";
+        internal const string BullyingInterventionResultFullStop = "full_stop";
         internal const string InfluenceLifecycleActionBlackmailQueued = "blackmail_queued";
         internal const string InfluenceLifecycleActionBlackmailTriggered = "blackmail_triggered";
+        internal const string InfluenceLifecycleActionBlackmailDequeued = "blackmail_dequeued";
+
+        internal const string ProvenanceUnknown = "unknown";
+        internal const string IdolDepartureCauseScheduledGraduation = "scheduled_graduation";
+        internal const string IdolDepartureCausePlayerFired = "player_fired";
+        internal const string IdolDepartureCauseMarriage = "marriage";
+        internal const string IdolDepartureCauseBankruptcy = "bankruptcy_mass_departure";
+        internal const string IdolDepartureCauseStory = "story_vn";
+        internal const string StatusCauseInjury = "injury";
+        internal const string StatusCauseDepression = "depression";
+        internal const string StatusCauseHiatus = "hiatus";
+        internal const string StatusCauseHiatusReturn = "hiatus_return";
+        internal const string StatusCauseRoomPractice = "room_practice";
+        internal const string StatusCauseRoomPracticeComplete = "room_practice_complete";
+        internal const string StatusCauseCafeWork = "cafe_work";
+        internal const string StatusCauseCafeWorkComplete = "cafe_work_complete";
+        internal const string StatusCauseSceneAssignment = "scene_assignment";
+        internal const string StatusCauseSceneCleanup = "scene_cleanup";
+        internal const string StatusCauseMedicalTreatment = "medical_treatment";
+        internal const string StatusCauseGraduationAnnounced = "graduation_announced";
+        internal const string StatusCauseGraduated = "graduated";
+        internal const string StatusCauseStory = "story_vn";
+        internal const string StatusSourceKindMedical = "medical";
+        internal const string StatusSourceKindRoom = "agency_room";
+        internal const string StatusSourceKindCafe = "cafe";
+        internal const string StatusSourceKindScene = "scene";
+        internal const string StatusSourceKindGraduation = "graduation";
+        internal const string StatusSourceKindStory = "story";
         internal const string TheaterScheduleFanTypeEveryone = "everyone";
         internal const string SubstoryFlagBankruptcyBailOut = "bankruptcy_bail_out";
         internal const string SubstoryFlagStoryRecruit = "story_recruit";
@@ -574,6 +681,7 @@ namespace IMDataCore
         internal const string MessageNamespaceKeyQuotaExceeded = "Namespace key quota exceeded.";
         internal const string MessageNamespaceDataBudgetExceeded = "Namespace data budget exceeded.";
         internal const string MessageTryReadRecentEventsFailedPrefix = "TryReadRecentEventsForIdol failed: ";
+        internal const string MessageTryReadHistoryPageFailedPrefix = "TryReadHistoryPage failed: ";
         internal const string MessageNamespaceInvalid = "Namespace must contain only safe token characters and meet minimum length.";
         internal const string MessageNamespaceAlreadyClaimed = "Namespace is already registered by another assembly.";
         internal const string MessageSessionNull = "Session cannot be null.";
@@ -604,12 +712,14 @@ namespace IMDataCore
         internal const string ReflectionConcertCrisisPopupResultFieldName = "Result";
         internal const string HarmonyPopupManagerStartMethodName = "Start";
         internal const string HarmonyBusinessCheckActiveProposalsMethodName = "CheckActiveProposals";
+        internal const string HarmonyBusinessSetProposalMethodName = "SetProposal";
         internal const string HarmonyLoansSetBankruptcyDangerMethodName = "SetBankruptcyDanger";
         internal const string HarmonyBankruptcyCheckBankruptcyMethodName = "CheckBankruptcy";
         internal const string HarmonyBankruptcyCheckScandalMethodName = "CheckScandal";
         internal const string HarmonyAgencyAddRoomMethodName = "addRoom";
         internal const string HarmonyAgencyDestroyRoomMethodName = "DestroyRoom";
         internal const string HarmonyAuditionsGenerateMethodName = "GenerateAudition";
+        internal const string HarmonyAuditionsGenerateGirlsMethodName = "GenerateGirls";
         internal const string HarmonyAuditionsResetCooldownMethodName = "ResetCooldown";
         internal const string HarmonySubstoriesStartDialogueMethodName = "StartDialogue";
         internal const string HarmonyActiveDialogueInstantTransitionMethodName = "DoIntstantTransition";
@@ -618,6 +728,9 @@ namespace IMDataCore
         internal const string HarmonyResourcesOnNewWeekMethodName = "OnNewWeek";
         internal const string HarmonyResourcesOnNewDayMethodName = "OnNewDay";
         internal const string HarmonyDateInfluenceBlackmailTriggerMethodName = "Blackmail_Trigger";
+        internal const string HarmonyDateInfluenceCheckBlackmailQueueMethodName = "CheckBlackmailQueue";
+        internal const string HarmonyDatePopupFireImmediatelyMethodName = "OnClick_Fire_Immediately";
+        internal const string HarmonyAgencyRoomDoTreatmentMethodName = "DoTreatment";
         internal const string HarmonyGirlsMentorsOnNewWeekMethodName = "OnNewWeek";
         internal const string HarmonyRivalsUpdateTrendsMethodName = "UpdateTrends";
         internal const string HarmonyRivalsOnNewMonthMethodName = "OnNewMonth";
@@ -679,6 +792,7 @@ namespace IMDataCore
         internal const string JsonFieldSingleRemovedIdolId = "single_removed_idol_id";
         internal const string JsonFieldSingleIsDigital = "single_is_digital";
         internal const string JsonFieldSingleLinkedElectionId = "single_linked_election_id";
+        internal const string JsonFieldSingleLinkedElectionReferenceKnown = "single_linked_election_reference_known";
         internal const string JsonFieldFromGroupId = "from_group_id";
         internal const string JsonFieldFromGroupTitle = "from_group_title";
         internal const string JsonFieldFromGroupStatus = "from_group_status";
@@ -793,12 +907,36 @@ namespace IMDataCore
         internal const string JsonFieldSingleFanAppealTeen = "single_fan_appeal_teen";
         internal const string JsonFieldSingleFanAppealYoungAdult = "single_fan_appeal_young_adult";
         internal const string JsonFieldSingleFanAppealAdult = "single_fan_appeal_adult";
+        internal const string JsonFieldSingleOpinionFanAppealMale = "single_opinion_fan_appeal_male";
+        internal const string JsonFieldSingleOpinionFanAppealFemale = "single_opinion_fan_appeal_female";
+        internal const string JsonFieldSingleOpinionFanAppealCasual = "single_opinion_fan_appeal_casual";
+        internal const string JsonFieldSingleOpinionFanAppealHardcore = "single_opinion_fan_appeal_hardcore";
+        internal const string JsonFieldSingleOpinionFanAppealTeen = "single_opinion_fan_appeal_teen";
+        internal const string JsonFieldSingleOpinionFanAppealYoungAdult = "single_opinion_fan_appeal_young_adult";
+        internal const string JsonFieldSingleOpinionFanAppealAdult = "single_opinion_fan_appeal_adult";
         internal const string JsonFieldSingleFanSegmentSalesSummary = "single_fan_segment_sales_summary";
         internal const string JsonFieldSingleFanSegmentNewFansSummary = "single_fan_segment_new_fans_summary";
         internal const string JsonFieldSingleSenbatsuStatsSnapshot = "single_senbatsu_stats_snapshot";
         internal const string JsonFieldChartPosition = "chart_position";
+        internal const string JsonFieldChartResultDate = "chart_result_date";
+        internal const string JsonFieldTaskSingleGenreId = "task_single_genre_id";
+        internal const string JsonFieldTaskSingleGenreTitle = "task_single_genre_title";
+        internal const string JsonFieldTaskSingleLyricsId = "task_single_lyrics_id";
+        internal const string JsonFieldTaskSingleLyricsTitle = "task_single_lyrics_title";
+        internal const string JsonFieldTaskShowGenreId = "task_show_genre_id";
+        internal const string JsonFieldTaskShowGenreTitle = "task_show_genre_title";
+        internal const string JsonFieldTaskShowMediumId = "task_show_medium_id";
+        internal const string JsonFieldTaskShowMediumTitle = "task_show_medium_title";
+        internal const string JsonFieldBlackmailOccurrenceId = "blackmail_occurrence_id";
+        internal const string JsonFieldQueueSizeAfterEnqueue = "queue_size_after_enqueue";
+        internal const string JsonFieldQueueSizeBeforeDequeue = "queue_size_before_dequeue";
+        internal const string JsonFieldQueueSizeAfterDequeue = "queue_size_after_dequeue";
+        internal const string JsonFieldInfluenceAwardPlanned = "influence_award_planned";
+        internal const string JsonFieldInfluenceAwardAppliedKnown = "influence_award_applied_known";
         internal const string JsonFieldPreviousStatus = "previous_status";
         internal const string JsonFieldNewStatus = "new_status";
+        internal const string JsonFieldStatusCause = "status_cause";
+        internal const string JsonFieldStatusSourceKind = "status_source_kind";
         internal const string JsonFieldDatingRoute = "dating_route";
         internal const string JsonFieldDatingRouteStage = "dating_route_stage";
         internal const string JsonFieldPreviousPartnerStatus = "previous_partner_status";
@@ -827,6 +965,7 @@ namespace IMDataCore
         internal const string JsonFieldContractBreakContext = "contract_break_context";
         internal const string JsonFieldContractWeeklyAction = "contract_weekly_action";
         internal const string JsonFieldContractWeeklyTrainingPoints = "contract_weekly_training_points";
+        internal const string JsonFieldShowId = "show_id";
         internal const string JsonFieldShowTitle = "show_title";
         internal const string JsonFieldShowTitleBefore = "show_title_before";
         internal const string JsonFieldShowTitleAfter = "show_title_after";
@@ -859,6 +998,10 @@ namespace IMDataCore
         internal const string JsonFieldShowProductionCostAfter = "show_production_cost_after";
         internal const string JsonFieldShowFanAppealSummaryBefore = "show_fan_appeal_summary_before";
         internal const string JsonFieldShowFanAppealSummaryAfter = "show_fan_appeal_summary_after";
+        internal const string JsonFieldShowFanAppealSummary = "show_fan_appeal_summary";
+        internal const string JsonFieldShowFanSegmentAudienceSummary = "show_fan_segment_audience_summary";
+        internal const string JsonFieldShowToCancelBefore = "show_to_cancel_before";
+        internal const string JsonFieldShowToCancelAfter = "show_to_cancel_after";
         internal const string JsonFieldShowLatestAudience = "show_latest_audience";
         internal const string JsonFieldShowLatestRevenue = "show_latest_revenue";
         internal const string JsonFieldShowLatestNewFans = "show_latest_new_fans";
@@ -929,6 +1072,12 @@ namespace IMDataCore
         internal const string JsonFieldAwardIsNomination = "award_is_nomination";
         internal const string JsonFieldAwardWon = "award_won";
         internal const string JsonFieldAwardSingleId = "award_single_id";
+        internal const string JsonFieldAwardSubjectIdolId = "award_subject_idol_id";
+        internal const string JsonFieldAwardSpeechGiverId = "award_speech_giver_id";
+        internal const string JsonFieldAwardConfiguredThanks = "award_configured_thanks";
+        internal const string JsonFieldAwardResolvedThanks = "award_resolved_thanks";
+        internal const string JsonFieldAwardTargetIdolId = "award_target_idol_id";
+        internal const string JsonFieldAwardTargetStaffId = "award_target_staff_id";
         internal const string JsonFieldPushSlotIndex = "push_slot_index";
         internal const string JsonFieldPushPreviousIdolId = "push_previous_idol_id";
         internal const string JsonFieldPushCurrentIdolId = "push_current_idol_id";
@@ -951,6 +1100,7 @@ namespace IMDataCore
         internal const string JsonFieldCliqueMemberCount = "clique_member_count";
         internal const string JsonFieldCliqueSignature = "clique_signature";
         internal const string JsonFieldCliqueQuitWasViolent = "clique_quit_was_violent";
+        internal const string JsonFieldCliqueGenerationId = "clique_generation_id";
         internal const string JsonFieldBullyingTargetId = "bullying_target_id";
         internal const string JsonFieldBullyingLeaderId = "bullying_leader_id";
         internal const string JsonFieldBullyingKnownToPlayer = "bullying_known_to_player";
@@ -981,6 +1131,10 @@ namespace IMDataCore
         internal const string JsonFieldDateCaughtAfter = "date_caught_after";
         internal const string JsonFieldDateRelationshipLevelBefore = "date_relationship_level_before";
         internal const string JsonFieldDateRelationshipLevelAfter = "date_relationship_level_after";
+        internal const string JsonFieldIdolHireProvenance = "idol_hire_provenance";
+        internal const string JsonFieldIdolDepartureCause = "idol_departure_cause";
+        internal const string JsonFieldIdolDepartureSource = "idol_departure_source";
+        internal const string JsonFieldIdolHireProfile = "idol_hire_profile";
         internal const string JsonFieldReplyEffectEntries = "reply_effect_entries";
         internal const string JsonFieldReplyEffectTarget = "target";
         internal const string JsonFieldReplyEffectParameter = "parameter";
@@ -1053,6 +1207,7 @@ namespace IMDataCore
         internal const string JsonFieldRoomWorkParticipantIdList = "room_work_participant_id_list";
         internal const string JsonFieldActorsSummary = "actors_summary";
         internal const string JsonFieldRandomEventActorIdList = "random_event_actor_id_list";
+        internal const string JsonFieldTemplateEventActorIdList = "template_event_actor_id_list";
         internal const string JsonFieldSubstoryActorIdList = "substory_actor_id_list";
         internal const string JsonFieldMentorId = "mentor_id";
         internal const string JsonFieldKohaiId = "kohai_id";
@@ -1243,6 +1398,28 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns one canonical newest-to-oldest page of every retained durable
+        /// event in the selected career branch. Each physical occurrence appears
+        /// exactly once. Pass beforeEventIdExclusive &lt;= 0 for the newest page;
+        /// for the next page, pass the EventId of the last row returned.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadHistoryPage(
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadHistoryPage(
+                beforeEventIdExclusive,
+                maxCount,
+                out events,
+                out hasMore,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns exact cash mutations inside a half-open game-date range.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1260,6 +1437,33 @@ namespace IMDataCore
                 maxCount,
                 out transactions,
                 out wasTruncated,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns one oldest-to-newest page of exact cash mutations inside a
+        /// half-open game-date range. Pass afterEventIdExclusive &lt;= 0 for the
+        /// first page; for the next page, pass the EventId of the last row
+        /// returned. The cursor advances within a single game day, so dense
+        /// histories remain exhaustively readable beyond 10,000 rows.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadMoneyTransactionsPage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            long afterEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadMoneyTransactionsPage(
+                startInclusive,
+                endExclusive,
+                afterEventIdExclusive,
+                maxCount,
+                out transactions,
+                out hasMore,
                 out errorMessage);
         }
 
@@ -1295,6 +1499,173 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns authoritative structured knownness for exact money-transaction history.
+        /// Unlike TryGetMoneyLedgerCoverageStart, this frontier can represent known-zero
+        /// observation and exact same-GameDateTime ordering through shared sequence/anchors.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyHistoryCoverage(
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyHistoryCoverage(
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for money history.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessMoneyHistoryRange(
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessMoneyHistoryRange(
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the selected branch's durable backend adoption/observation origin.
+        /// Legacy/live formats that cannot prove an origin return Knownness.Unknown.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetBackendCoverageOrigin(
+            out IMDataCoreBackendCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBackendCoverageOrigin(
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the selected branch's bounded #63 group target-audience historical baseline.
+        /// A null assertion means no authoritative/qualified baseline record is available.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetGroupTargetAudienceHistoricalBaseline(
+            int groupId,
+            out IMDataCoreHistoricalBaselineAssertion assertion,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance
+                .TryGetGroupTargetAudienceHistoricalBaseline(
+                    groupId,
+                    out assertion,
+                    out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns branch-selected coverage intervals for one built-in semantic capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetBuiltInHistoryCoverage(
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBuiltInHistoryCoverage(
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for one built-in capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessBuiltInHistoryRange(
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessBuiltInHistoryRange(
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Authenticated declaration that begins/resumes namespace capability coverage.
+        /// Namespace registration alone never claims semantic completeness.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryDeclareNamespaceCapabilities(
+            IMDataCoreSession session,
+            IList<IMDataCoreCapabilityRevision> capabilities,
+            out string capabilitySetId,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryDeclareNamespaceCapabilities(
+                session,
+                callingAssembly,
+                capabilities,
+                out capabilitySetId,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns branch-selected coverage intervals for one authenticated namespace capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetNamespaceHistoryCoverage(
+            IMDataCoreSession session,
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryGetNamespaceHistoryCoverage(
+                session,
+                callingAssembly,
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for one authenticated namespace capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessNamespaceHistoryRange(
+            IMDataCoreSession session,
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryAssessNamespaceHistoryRange(
+                session,
+                callingAssembly,
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Forces immediate persistence of the current in-memory IMDC branch.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1313,6 +1684,42 @@ namespace IMDataCore
         {
             return IMDataCoreController.Instance.TryGetPersistenceDiagnostics(
                 out diagnostics,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Resolves a current generation-scoped entity from a stable, documented
+        /// locator descriptor without exposing runtime CLR object references.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryResolveCurrentIdentity(
+            string entityKind,
+            string stableLocator,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveCurrentIdentity(
+                entityKind,
+                stableLocator,
+                out resolution,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns every canonical candidate advertised by one legacy coarse key.
+        /// Ambiguity is preserved and never collapsed to a guessed generation.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryResolveLegacyIdentityCandidates(
+            string entityKind,
+            string legacyEntityId,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveLegacyIdentityCandidates(
+                entityKind,
+                legacyEntityId,
+                out resolution,
                 out errorMessage);
         }
 
@@ -1393,6 +1800,213 @@ namespace IMDataCore
                 consumerAssembly,
                 dataKey,
                 out jsonValue,
+                out errorMessage);
+        }
+
+        public static bool TryReadHistoryPage(
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadHistoryPage(
+                beforeEventIdExclusive,
+                maxCount,
+                out events,
+                out hasMore,
+                out errorMessage);
+        }
+
+        public static bool TryReadMoneyTransactionsPage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            long afterEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadMoneyTransactionsPage(
+                startInclusive,
+                endExclusive,
+                afterEventIdExclusive,
+                maxCount,
+                out transactions,
+                out hasMore,
+                out errorMessage);
+        }
+
+        public static bool TryGetBackendCoverageOrigin(
+            out IMDataCoreBackendCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBackendCoverageOrigin(
+                out coverage,
+                out errorMessage);
+        }
+
+        public static bool TryGetMoneyHistoryCoverage(
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyHistoryCoverage(
+                out coverage,
+                out errorMessage);
+        }
+
+        public static bool TryAssessMoneyHistoryRange(
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessMoneyHistoryRange(
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        public static bool TryGetGroupTargetAudienceHistoricalBaseline(
+            int groupId,
+            out IMDataCoreHistoricalBaselineAssertion assertion,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance
+                .TryGetGroupTargetAudienceHistoricalBaseline(
+                    groupId,
+                    out assertion,
+                    out errorMessage);
+        }
+
+        public static bool TryGetBuiltInHistoryCoverage(
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBuiltInHistoryCoverage(
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        public static bool TryAssessBuiltInHistoryRange(
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessBuiltInHistoryRange(
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        public static bool TryDeclareNamespaceCapabilities(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            IList<IMDataCoreCapabilityRevision> capabilities,
+            out string capabilitySetId,
+            out string errorMessage)
+        {
+            capabilitySetId = string.Empty;
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryDeclareNamespaceCapabilities(
+                session,
+                consumerAssembly,
+                capabilities,
+                out capabilitySetId,
+                out errorMessage);
+        }
+
+        public static bool TryGetNamespaceHistoryCoverage(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            coverage = null;
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryGetNamespaceHistoryCoverage(
+                session,
+                consumerAssembly,
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        public static bool TryAssessNamespaceHistoryRange(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            assessment = null;
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryAssessNamespaceHistoryRange(
+                session,
+                consumerAssembly,
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        public static bool TryResolveCurrentIdentity(
+            string entityKind,
+            string stableLocator,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveCurrentIdentity(
+                entityKind,
+                stableLocator,
+                out resolution,
+                out errorMessage);
+        }
+
+        public static bool TryResolveLegacyIdentityCandidates(
+            string entityKind,
+            string legacyEntityId,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveLegacyIdentityCandidates(
+                entityKind,
+                legacyEntityId,
+                out resolution,
                 out errorMessage);
         }
     }
@@ -1552,6 +2166,28 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns one canonical newest-to-oldest page of every retained durable
+        /// event in the selected career branch. Each physical occurrence appears
+        /// exactly once. Pass beforeEventIdExclusive &lt;= 0 for the newest page;
+        /// for the next page, pass the EventId of the last row returned.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadHistoryPage(
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadHistoryPage(
+                beforeEventIdExclusive,
+                maxCount,
+                out events,
+                out hasMore,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Returns exact cash mutations inside a half-open game-date range.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1569,6 +2205,33 @@ namespace IMDataCore
                 maxCount,
                 out transactions,
                 out wasTruncated,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns one oldest-to-newest page of exact cash mutations inside a
+        /// half-open game-date range. Pass afterEventIdExclusive &lt;= 0 for the
+        /// first page; for the next page, pass the EventId of the last row
+        /// returned. The cursor advances within a single game day, so dense
+        /// histories remain exhaustively readable beyond 10,000 rows.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryReadMoneyTransactionsPage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            long afterEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryReadMoneyTransactionsPage(
+                startInclusive,
+                endExclusive,
+                afterEventIdExclusive,
+                maxCount,
+                out transactions,
+                out hasMore,
                 out errorMessage);
         }
 
@@ -1604,6 +2267,173 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Returns authoritative structured knownness for exact money-transaction history.
+        /// Unlike TryGetMoneyLedgerCoverageStart, this frontier can represent known-zero
+        /// observation and exact same-GameDateTime ordering through shared sequence/anchors.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetMoneyHistoryCoverage(
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetMoneyHistoryCoverage(
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for money history.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessMoneyHistoryRange(
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessMoneyHistoryRange(
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the selected branch's durable backend adoption/observation origin.
+        /// Legacy/live formats that cannot prove an origin return Knownness.Unknown.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetBackendCoverageOrigin(
+            out IMDataCoreBackendCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBackendCoverageOrigin(
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns the selected branch's bounded #63 group target-audience historical baseline.
+        /// A null assertion means no authoritative/qualified baseline record is available.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetGroupTargetAudienceHistoricalBaseline(
+            int groupId,
+            out IMDataCoreHistoricalBaselineAssertion assertion,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance
+                .TryGetGroupTargetAudienceHistoricalBaseline(
+                    groupId,
+                    out assertion,
+                    out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns branch-selected coverage intervals for one built-in semantic capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetBuiltInHistoryCoverage(
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryGetBuiltInHistoryCoverage(
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for one built-in capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessBuiltInHistoryRange(
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryAssessBuiltInHistoryRange(
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Authenticated declaration that begins/resumes namespace capability coverage.
+        /// Namespace registration alone never claims semantic completeness.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryDeclareNamespaceCapabilities(
+            IMDataCoreSession session,
+            IList<IMDataCoreCapabilityRevision> capabilities,
+            out string capabilitySetId,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryDeclareNamespaceCapabilities(
+                session,
+                callingAssembly,
+                capabilities,
+                out capabilitySetId,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns branch-selected coverage intervals for one authenticated namespace capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryGetNamespaceHistoryCoverage(
+            IMDataCoreSession session,
+            string capabilityToken,
+            int minimumRevision,
+            out IMDataCoreHistoryCoverage coverage,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryGetNamespaceHistoryCoverage(
+                session,
+                callingAssembly,
+                capabilityToken,
+                minimumRevision,
+                out coverage,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Assesses a half-open exact shared-sequence range for one authenticated namespace capability.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryAssessNamespaceHistoryRange(
+            IMDataCoreSession session,
+            string capabilityToken,
+            int minimumRevision,
+            IMDataCoreHistoryBoundary startBoundary,
+            IMDataCoreHistoryBoundary endBoundary,
+            out IMDataCoreCoverageAssessment assessment,
+            out string errorMessage)
+        {
+            Assembly callingAssembly = Assembly.GetCallingAssembly();
+            return IMDataCoreController.Instance.TryAssessNamespaceHistoryRange(
+                session,
+                callingAssembly,
+                capabilityToken,
+                minimumRevision,
+                startBoundary,
+                endBoundary,
+                out assessment,
+                out errorMessage);
+        }
+
+        /// <summary>
         /// Forces immediate persistence of the current in-memory IMDC branch.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1622,6 +2452,42 @@ namespace IMDataCore
         {
             return IMDataCoreController.Instance.TryGetPersistenceDiagnostics(
                 out diagnostics,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Resolves a current generation-scoped entity from a stable, documented
+        /// locator descriptor without exposing runtime CLR object references.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryResolveCurrentIdentity(
+            string entityKind,
+            string stableLocator,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveCurrentIdentity(
+                entityKind,
+                stableLocator,
+                out resolution,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Returns every canonical candidate advertised by one legacy coarse key.
+        /// Ambiguity is preserved and never collapsed to a guessed generation.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool TryResolveLegacyIdentityCandidates(
+            string entityKind,
+            string legacyEntityId,
+            out IMDataCoreIdentityResolution resolution,
+            out string errorMessage)
+        {
+            return IMDataCoreController.Instance.TryResolveLegacyIdentityCandidates(
+                entityKind,
+                legacyEntityId,
+                out resolution,
                 out errorMessage);
         }
 
@@ -1737,6 +2603,9 @@ namespace IMDataCore
                 }
 
                 string callingAssemblyIdentity = BuildAssemblyIdentity(callingAssembly);
+                string stableOwnerId =
+                    LightweightNamespaceOwnerSchema.BuildStableAssemblyOwnerId(
+                        callingAssembly);
                 NamespaceSessionRegistration existingRegistration;
                 if (namespaceRegistrations.TryGetValue(sanitizedNamespaceIdentifier, out existingRegistration))
                 {
@@ -1747,12 +2616,26 @@ namespace IMDataCore
                     }
                 }
 
+                if (storageEngine.SupportsStructuredCoverageModel &&
+                    !storageEngine.TryEnsureNamespaceOwnerBinding(
+                        sanitizedNamespaceIdentifier,
+                        stableOwnerId,
+                        LightweightNamespaceOwnerSchema.BindingSchemaVersion,
+                        callingAssemblyIdentity,
+                        out errorMessage))
+                {
+                    return false;
+                }
+
                 string sessionToken = Guid.NewGuid().ToString(CoreConstants.SessionTokenFormat, CultureInfo.InvariantCulture);
                 NamespaceSessionRegistration registration = new NamespaceSessionRegistration
                 {
                     NamespaceIdentifier = sanitizedNamespaceIdentifier,
                     SessionToken = sessionToken,
-                    CallingAssemblyIdentity = callingAssemblyIdentity
+                    CallingAssemblyIdentity = callingAssemblyIdentity,
+                    StableOwnerId = stableOwnerId,
+                    OwnerSchemaVersion =
+                        LightweightNamespaceOwnerSchema.BindingSchemaVersion
                 };
 
                 namespaceRegistrations[sanitizedNamespaceIdentifier] = registration;
@@ -1774,6 +2657,24 @@ namespace IMDataCore
                 if (!TryValidateSessionLocked(session, callingAssembly, out registration, out errorMessage))
                 {
                     return false;
+                }
+
+                if (storageEngine.SupportsStructuredCoverageModel)
+                {
+                    DateTime mutationGameDate;
+                    if (!TryResolvePublicMutationGameDateLocked(
+                            out mutationGameDate,
+                            out errorMessage) ||
+                        !storageEngine.TryRecordNamespaceCoverageGap(
+                            NextCaptureSequenceLocked,
+                            mutationGameDate,
+                            registration.NamespaceIdentifier,
+                            LightweightCoverageSchema.OriginNamespaceExplicitGap,
+                            null,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
                 }
 
                 namespaceRegistrations.Remove(registration.NamespaceIdentifier);
@@ -2238,6 +3139,44 @@ namespace IMDataCore
 
                 return storageEngine.TryReadEventsForIdolPage(
                     idolId,
+                    beforeEventIdExclusive,
+                    clampedMaxCount,
+                    out events,
+                    out hasMore,
+                    out errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Reads one canonical newest-to-oldest page from the selected branch's
+        /// physical durable event stream. This view does not expand shared rows
+        /// into participant-specific copies and does not depend on live objects.
+        /// </summary>
+        internal bool TryReadHistoryPage(
+            long beforeEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreEvent> events,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            events = new List<IMDataCoreEvent>();
+            hasMore = false;
+            errorMessage = string.Empty;
+
+            lock (runtimeLock)
+            {
+                if (!EnsureInitializedLocked(out errorMessage) ||
+                    !FlushLocked(true, out errorMessage))
+                {
+                    return false;
+                }
+
+                int clampedMaxCount = Mathf.Clamp(
+                    maxCount,
+                    CoreConstants.MinimumRecentEventRequestCount,
+                    CoreConstants.MaximumRecentEventRequestCount);
+
+                return storageEngine.TryReadHistoryPage(
                     beforeEventIdExclusive,
                     clampedMaxCount,
                     out events,
@@ -2899,18 +3838,37 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Returns fan-appeal ratio for one target fan type from single release data.
+        /// Returns actual release-time fan appeal. Vanilla computes this into
+        /// `_single.FanAppeal` during GenerateSales before opinion processing.
         /// </summary>
-        private static float ResolveReleaseFanAppealRatio(singles._single releasedSingle, resources.fanType fanType)
+        private static float ResolveSingleReleaseFanAppealRatio(singles._single releasedSingle, resources.fanType fanType)
         {
-            if (releasedSingle == null || releasedSingle.ReleaseData == null || releasedSingle.ReleaseData.FanAppeal == null)
+            return ResolveFanAppealRatio(releasedSingle != null ? releasedSingle.FanAppeal : null, fanType);
+        }
+
+        /// <summary>
+        /// Returns the opinion-time appeal vector written by AddOpinion into
+        /// ReleaseData.FanAppeal. This is intentionally separate from release appeal.
+        /// </summary>
+        private static float ResolveSingleOpinionFanAppealRatio(singles._single releasedSingle, resources.fanType fanType)
+        {
+            return ResolveFanAppealRatio(
+                releasedSingle != null && releasedSingle.ReleaseData != null
+                    ? releasedSingle.ReleaseData.FanAppeal
+                    : null,
+                fanType);
+        }
+
+        private static float ResolveFanAppealRatio(List<singles._fanAppeal> fanAppealValues, resources.fanType fanType)
+        {
+            if (fanAppealValues == null)
             {
                 return 0f;
             }
 
-            for (int appealIndex = CoreConstants.ZeroBasedListStartIndex; appealIndex < releasedSingle.ReleaseData.FanAppeal.Count; appealIndex++)
+            for (int appealIndex = CoreConstants.ZeroBasedListStartIndex; appealIndex < fanAppealValues.Count; appealIndex++)
             {
-                singles._fanAppeal fanAppeal = releasedSingle.ReleaseData.FanAppeal[appealIndex];
+                singles._fanAppeal fanAppeal = fanAppealValues[appealIndex];
                 if (fanAppeal != null && fanAppeal.type == fanType)
                 {
                     return fanAppeal.ratio;
@@ -3185,7 +4143,7 @@ namespace IMDataCore
             // settlement scope used to materialize the ordinary row too early.
             // Explicit/forced persistence boundaries still call FlushLocked(true)
             // directly and are intentionally not suppressed here.
-            if (postModShowSettlementDepth > 0)
+            if (postModShowSettlementDepth > 0 || semanticCaptureScopes.Count > 0)
             {
                 return;
             }
@@ -3215,6 +4173,21 @@ namespace IMDataCore
             // APIs remain available and operate on the restored in-memory branch.
             if (saveLoadPreparationActive)
             {
+                return;
+            }
+
+            if (semanticCaptureScopes.Count > 0)
+            {
+                semanticCaptureScopes.Peek().Events.Add(new DeferredSemanticEvent
+                {
+                    GameDate = gameDate,
+                    IdolId = idolId,
+                    EntityKind = entityKind ?? string.Empty,
+                    EntityId = entityId ?? string.Empty,
+                    EventType = eventType ?? string.Empty,
+                    SourcePatch = sourcePatch ?? string.Empty,
+                    PayloadJson = payloadJson ?? CoreConstants.EmptyJsonObject
+                });
                 return;
             }
 
@@ -3576,7 +4549,8 @@ namespace IMDataCore
                 SingleCastCount = castIdentifiers.Count,
                 SingleCastIdList = BuildDelimitedIdentifierList(castIdentifiers),
                 SingleIsDigital = single.IsDigital(),
-                SingleLinkedElectionId = linkedElection != null ? linkedElection.ID : CoreConstants.InvalidIdValue
+                SingleLinkedElectionId = linkedElection != null ? linkedElection.ID : CoreConstants.InvalidIdValue,
+                SingleLinkedElectionReferenceKnown = true
             };
         }
 
@@ -4011,7 +4985,10 @@ namespace IMDataCore
             string lifecycleActionCode,
             string customTrivia,
             bool graduatedWithDialogue,
-            StaffAttributionSnapshot staffAttribution = null)
+            StaffAttributionSnapshot staffAttribution = null,
+            string hireProvenance = "",
+            string departureCause = "",
+            string departureSource = "")
         {
             if (idol == null)
             {
@@ -4038,8 +5015,16 @@ namespace IMDataCore
                 IdolGraduationOutcome = idol.Graduation_Trivia_Text ?? string.Empty,
                 IdolTrivia = idol.GetTriviaString() ?? string.Empty,
                 IdolCustomTrivia = customTrivia ?? string.Empty,
-                IdolGraduationWithDialogue = graduatedWithDialogue
+                IdolGraduationWithDialogue = graduatedWithDialogue,
+                IdolDepartureCause = departureCause ?? string.Empty,
+                IdolDepartureSource = departureSource ?? string.Empty
             };
+
+            if (string.Equals(lifecycleActionCode, CoreConstants.IdolLifecycleActionHired, StringComparison.Ordinal))
+            {
+                payload.IdolHireProvenance = hireProvenance ?? string.Empty;
+                payload.IdolHireProfile = BuildIdolHireProfilePayload(idol);
+            }
 
             ApplyIdolPortraitIdentity(payload, idol);
             ApplyStaffAttribution(payload, staffAttribution);
@@ -4355,6 +5340,47 @@ namespace IMDataCore
             }
 
             return showParameter.title ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Builds the canonical 12-segment audience summary for the latest show episode.
+        /// </summary>
+        private static string BuildShowFanSegmentAudienceSummary(Shows._show show)
+        {
+            if (show == null)
+            {
+                return string.Empty;
+            }
+
+            resources.fanType[] genders = { resources.fanType.male, resources.fanType.female };
+            resources.fanType[] hardcorenessValues = { resources.fanType.casual, resources.fanType.hardcore };
+            resources.fanType[] ages = { resources.fanType.teen, resources.fanType.youngAdult, resources.fanType.adult };
+
+            StringBuilder summaryBuilder = new StringBuilder();
+            for (int genderIndex = CoreConstants.ZeroBasedListStartIndex; genderIndex < genders.Length; genderIndex++)
+            {
+                resources.fanType gender = genders[genderIndex];
+                for (int hardcorenessIndex = CoreConstants.ZeroBasedListStartIndex; hardcorenessIndex < hardcorenessValues.Length; hardcorenessIndex++)
+                {
+                    resources.fanType hardcoreness = hardcorenessValues[hardcorenessIndex];
+                    for (int ageIndex = CoreConstants.ZeroBasedListStartIndex; ageIndex < ages.Length; ageIndex++)
+                    {
+                        resources.fanType age = ages[ageIndex];
+                        if (summaryBuilder.Length > CoreConstants.ZeroBasedListStartIndex)
+                        {
+                            summaryBuilder.Append(CoreConstants.SingleFanSegmentEntrySeparator);
+                        }
+
+                        singles._single._sales sale = show.GetFanSales(gender, hardcoreness, age);
+                        long audience = sale != null ? sale.sales : CoreConstants.ZeroLongValue;
+                        summaryBuilder.Append(BuildSingleFanSegmentKey(gender, hardcoreness, age));
+                        summaryBuilder.Append(CoreConstants.SingleFanSegmentValueSeparator);
+                        summaryBuilder.Append(audience.ToString(CultureInfo.InvariantCulture));
+                    }
+                }
+            }
+
+            return summaryBuilder.ToString();
         }
 
         /// <summary>
@@ -5915,6 +6941,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleCastIdList, payload.SingleCastIdList ?? string.Empty, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldSingleIsDigital, payload.SingleIsDigital, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldSingleLinkedElectionId, payload.SingleLinkedElectionId, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldSingleLinkedElectionReferenceKnown, payload.SingleLinkedElectionReferenceKnown, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -6162,6 +7189,19 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitHairAssetId, payload.IdolPortraitHairAssetId ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitFaceAssetId, payload.IdolPortraitFaceAssetId ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldIdolPortraitAccessoryAssetId, payload.IdolPortraitAccessoryAssetId ?? string.Empty, ref isFirstProperty);
+            if (!string.IsNullOrEmpty(payload.IdolHireProvenance))
+            {
+                AppendStringProperty(builder, CoreConstants.JsonFieldIdolHireProvenance, payload.IdolHireProvenance, ref isFirstProperty);
+            }
+            if (!string.IsNullOrEmpty(payload.IdolDepartureCause))
+            {
+                AppendStringProperty(builder, CoreConstants.JsonFieldIdolDepartureCause, payload.IdolDepartureCause, ref isFirstProperty);
+                AppendStringProperty(builder, CoreConstants.JsonFieldIdolDepartureSource, payload.IdolDepartureSource ?? CoreConstants.ProvenanceUnknown, ref isFirstProperty);
+            }
+            if (payload.IdolHireProfile != null)
+            {
+                AppendRawJsonProperty(builder, CoreConstants.JsonFieldIdolHireProfile, SerializeObjectPayload(payload.IdolHireProfile), ref isFirstProperty);
+            }
             AppendStaffAttributionProperties(builder, payload.StaffId, payload.StaffName, payload.StaffRole, payload.StaffType, payload.StaffTypeRaw, payload.StaffUniqueTypeRaw, payload.StaffIsPro, payload.StaffIsProducer, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -6242,6 +7282,13 @@ namespace IMDataCore
             AppendFloatProperty(builder, CoreConstants.JsonFieldSingleFanAppealTeen, payload.SingleFanAppealTeen, ref isFirstProperty);
             AppendFloatProperty(builder, CoreConstants.JsonFieldSingleFanAppealYoungAdult, payload.SingleFanAppealYoungAdult, ref isFirstProperty);
             AppendFloatProperty(builder, CoreConstants.JsonFieldSingleFanAppealAdult, payload.SingleFanAppealAdult, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealMale, payload.SingleOpinionFanAppealMale, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealFemale, payload.SingleOpinionFanAppealFemale, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealCasual, payload.SingleOpinionFanAppealCasual, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealHardcore, payload.SingleOpinionFanAppealHardcore, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealTeen, payload.SingleOpinionFanAppealTeen, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealYoungAdult, payload.SingleOpinionFanAppealYoungAdult, ref isFirstProperty);
+            AppendFloatProperty(builder, CoreConstants.JsonFieldSingleOpinionFanAppealAdult, payload.SingleOpinionFanAppealAdult, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleFanSegmentSalesSummary, payload.SingleFanSegmentSalesSummary ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleFanSegmentNewFansSummary, payload.SingleFanSegmentNewFansSummary ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldSingleSenbatsuStatsSnapshot, payload.SingleSenbatsuStatsSnapshot ?? string.Empty, ref isFirstProperty);
@@ -6268,6 +7315,8 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldIdolId, payload.IdolId, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldPreviousStatus, payload.PreviousStatus ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldNewStatus, payload.NewStatus ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldStatusCause, payload.StatusCause ?? CoreConstants.ProvenanceUnknown, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldStatusSourceKind, payload.StatusSourceKind ?? CoreConstants.ProvenanceUnknown, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -6477,6 +7526,8 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldShowEpisodeDate, payload.ShowEpisodeDate ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowCastCount, payload.ShowCastCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastIdList, payload.ShowCastIdList ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowFanAppealSummary, payload.ShowFanAppealSummary ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowFanSegmentAudienceSummary, payload.ShowFanSegmentAudienceSummary ?? string.Empty, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowPreviousAudience, payload.ShowPreviousAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestAudience, payload.ShowLatestAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowAudienceDelta, payload.ShowAudienceDelta, ref isFirstProperty);
@@ -6710,6 +7761,62 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Serializes show cancellation intent transitions into compact JSON.
+        /// </summary>
+        internal static string SerializeShowCancellationTransitionPayload(ShowCancellationTransitionPayload payload)
+        {
+            if (payload == null)
+            {
+                return CoreConstants.EmptyJsonObject;
+            }
+
+            StringBuilder builder = new StringBuilder(CoreConstants.JsonBuilderDefaultCapacity);
+            builder.Append(CoreConstants.JsonObjectStartCharacter);
+            bool isFirstProperty = true;
+
+            AppendIntProperty(builder, CoreConstants.JsonFieldShowId, payload.ShowId, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowTitle, payload.ShowTitle ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldShowEpisodeCount, payload.ShowEpisodeCount, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowPreviousStatus, payload.PreviousShowStatus ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldShowNewStatus, payload.NewShowStatus ?? string.Empty, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldShowToCancelBefore, payload.ShowToCancelBefore, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldShowToCancelAfter, payload.ShowToCancelAfter, ref isFirstProperty);
+
+            builder.Append(CoreConstants.JsonObjectEndCharacter);
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// Serializes one delivered award-speech occurrence into compact JSON.
+        /// </summary>
+        internal static string SerializeAwardSpeechPayload(AwardSpeechPayload payload)
+        {
+            if (payload == null)
+            {
+                return CoreConstants.EmptyJsonObject;
+            }
+
+            StringBuilder builder = new StringBuilder(CoreConstants.JsonBuilderDefaultCapacity);
+            builder.Append(CoreConstants.JsonObjectStartCharacter);
+            bool isFirstProperty = true;
+
+            AppendStringProperty(builder, CoreConstants.JsonFieldAwardType, payload.AwardType ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardYear, payload.AwardYear, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldAwardIsNomination, payload.AwardIsNomination, ref isFirstProperty);
+            AppendBooleanProperty(builder, CoreConstants.JsonFieldAwardWon, payload.AwardWon, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardSingleId, payload.AwardSingleId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardSubjectIdolId, payload.AwardSubjectIdolId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardSpeechGiverId, payload.AwardSpeechGiverId, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldAwardConfiguredThanks, payload.AwardConfiguredThanks ?? string.Empty, ref isFirstProperty);
+            AppendStringProperty(builder, CoreConstants.JsonFieldAwardResolvedThanks, payload.AwardResolvedThanks ?? string.Empty, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardTargetIdolId, payload.AwardTargetIdolId, ref isFirstProperty);
+            AppendIntProperty(builder, CoreConstants.JsonFieldAwardTargetStaffId, payload.AwardTargetStaffId, ref isFirstProperty);
+
+            builder.Append(CoreConstants.JsonObjectEndCharacter);
+            return builder.ToString();
+        }
+
+        /// <summary>
         /// Serializes award lifecycle payloads into compact JSON.
         /// </summary>
         internal static string SerializeAwardLifecyclePayload(AwardLifecyclePayload payload)
@@ -6833,6 +7940,10 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldCliqueLeaderIdAfter, payload.CliqueLeaderIdAfter, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldCliqueMemberCount, payload.CliqueMemberCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldCliqueSignature, payload.CliqueSignature ?? string.Empty, ref isFirstProperty);
+            if (!string.IsNullOrEmpty(payload.CliqueGenerationId))
+            {
+                AppendStringProperty(builder, CoreConstants.JsonFieldCliqueGenerationId, payload.CliqueGenerationId, ref isFirstProperty);
+            }
             AppendBooleanProperty(builder, CoreConstants.JsonFieldCliqueQuitWasViolent, payload.CliqueQuitWasViolent, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -6859,6 +7970,14 @@ namespace IMDataCore
             AppendBooleanProperty(builder, CoreConstants.JsonFieldBullyingKnownToPlayer, payload.BullyingKnownToPlayer, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldCliqueMemberCount, payload.CliqueMemberCount, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldCliqueSignature, payload.CliqueSignature ?? string.Empty, ref isFirstProperty);
+            if (!string.IsNullOrEmpty(payload.CliqueGenerationId))
+            {
+                AppendStringProperty(
+                    builder,
+                    CoreConstants.JsonFieldCliqueGenerationId,
+                    payload.CliqueGenerationId,
+                    ref isFirstProperty);
+            }
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
             return builder.ToString();
@@ -7315,6 +8434,16 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Writes one trusted internal JSON object/array value without string-escaping it.
+        /// Callers must pass JSON produced by IMDataCore serializers, never external text.
+        /// </summary>
+        private static void AppendRawJsonProperty(StringBuilder builder, string propertyName, string rawJson, ref bool isFirstProperty)
+        {
+            AppendPropertyPrefix(builder, propertyName, ref isFirstProperty);
+            builder.Append(string.IsNullOrEmpty(rawJson) ? CoreConstants.EmptyJsonObject : rawJson);
+        }
+
+        /// <summary>
         /// Writes a string JSON property.
         /// </summary>
         private static void AppendStringProperty(StringBuilder builder, string propertyName, string value, ref bool isFirstProperty)
@@ -7590,6 +8719,22 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Maps configured award-speech thanks enum values to lowercase string codes.
+        /// </summary>
+        internal static string ToAwardSpeechThanksCode(Awards._speech._thanks thanks)
+        {
+            return ToLowerInvariantEnumCode(thanks);
+        }
+
+        /// <summary>
+        /// Maps resolved dialogue thanks categories to lowercase string codes.
+        /// </summary>
+        internal static string ToAwardResolvedThanksCode(Date_GroupTalk._message._category category)
+        {
+            return ToLowerInvariantEnumCode(category);
+        }
+
+        /// <summary>
         /// Maps idol-idol relationship status enum values to lowercase string codes.
         /// </summary>
         internal static string ToRelationshipStatusCode(Relationships._relationship._status relationshipStatus)
@@ -7823,6 +8968,7 @@ namespace IMDataCore
         public string SingleCastIdList = string.Empty;
         public bool SingleIsDigital;
         public int SingleLinkedElectionId = CoreConstants.InvalidIdValue;
+        public bool SingleLinkedElectionReferenceKnown;
     }
 
     /// <summary>
@@ -7987,6 +9133,10 @@ namespace IMDataCore
         public string IdolPortraitHairAssetId = string.Empty;
         public string IdolPortraitFaceAssetId = string.Empty;
         public string IdolPortraitAccessoryAssetId = string.Empty;
+        public string IdolHireProvenance = string.Empty;
+        public string IdolDepartureCause = string.Empty;
+        public string IdolDepartureSource = string.Empty;
+        public IdolHireProfilePayload IdolHireProfile;
         public int StaffId = CoreConstants.InvalidIdValue;
         public string StaffName = string.Empty;
         public string StaffRole = string.Empty;
@@ -8054,10 +9204,27 @@ namespace IMDataCore
         public float SingleFanAppealTeen;
         public float SingleFanAppealYoungAdult;
         public float SingleFanAppealAdult;
+        public float SingleOpinionFanAppealMale;
+        public float SingleOpinionFanAppealFemale;
+        public float SingleOpinionFanAppealCasual;
+        public float SingleOpinionFanAppealHardcore;
+        public float SingleOpinionFanAppealTeen;
+        public float SingleOpinionFanAppealYoungAdult;
+        public float SingleOpinionFanAppealAdult;
         public string SingleFanSegmentSalesSummary = string.Empty;
         public string SingleFanSegmentNewFansSummary = string.Empty;
         public string SingleSenbatsuStatsSnapshot = string.Empty;
         public int ChartPosition;
+    }
+
+    [Serializable]
+    internal sealed class SingleChartResultPayload
+    {
+        public string single_title = string.Empty;
+        public string single_cast_id_list = string.Empty;
+        public string single_release_date = string.Empty;
+        public int chart_position;
+        public string chart_result_date = string.Empty;
     }
 
     /// <summary>
@@ -8069,6 +9236,8 @@ namespace IMDataCore
         public int IdolId;
         public string PreviousStatus = string.Empty;
         public string NewStatus = string.Empty;
+        public string StatusCause = CoreConstants.ProvenanceUnknown;
+        public string StatusSourceKind = CoreConstants.ProvenanceUnknown;
     }
 
     /// <summary>
@@ -8206,6 +9375,8 @@ namespace IMDataCore
         public string ShowEpisodeDate = string.Empty;
         public int ShowCastCount;
         public string ShowCastIdList = string.Empty;
+        public string ShowFanAppealSummary = string.Empty;
+        public string ShowFanSegmentAudienceSummary = string.Empty;
         public long ShowPreviousAudience;
         public long ShowLatestAudience;
         public long ShowAudienceDelta;
@@ -8449,6 +9620,7 @@ namespace IMDataCore
         public int CliqueLeaderIdAfter = CoreConstants.InvalidIdValue;
         public int CliqueMemberCount;
         public string CliqueSignature = string.Empty;
+        public string CliqueGenerationId = string.Empty;
         public bool CliqueQuitWasViolent;
     }
 
@@ -8464,6 +9636,7 @@ namespace IMDataCore
         public bool BullyingKnownToPlayer;
         public int CliqueMemberCount;
         public string CliqueSignature = string.Empty;
+        public string CliqueGenerationId = string.Empty;
     }
 
     /// <summary>
@@ -8768,6 +9941,8 @@ namespace IMDataCore
         public string loan_lifecycle_action = string.Empty;
         public string loan_type = string.Empty;
         public string loan_duration = string.Empty;
+        public bool loan_contained_before;
+        public bool loan_contained_after;
         public bool loan_active_before;
         public bool loan_active_after;
         public long loan_amount;
@@ -8775,6 +9950,7 @@ namespace IMDataCore
         public int loan_interest_rate;
         public string loan_start_date = string.Empty;
         public string loan_end_date = string.Empty;
+        public string loan_maturity_processed_date = string.Empty;
         public long loan_debt_before;
         public long loan_debt_after;
         public bool loan_can_pay_off_after;
@@ -9145,6 +10321,14 @@ namespace IMDataCore
         public int task_girl_id = CoreConstants.InvalidIdValue;
         public string task_skill = string.Empty;
         public string task_agent_name = string.Empty;
+        public int task_single_genre_id = CoreConstants.InvalidIdValue;
+        public string task_single_genre_title = string.Empty;
+        public int task_single_lyrics_id = CoreConstants.InvalidIdValue;
+        public string task_single_lyrics_title = string.Empty;
+        public int task_show_genre_id = CoreConstants.InvalidIdValue;
+        public string task_show_genre_title = string.Empty;
+        public int task_show_medium_id = CoreConstants.InvalidIdValue;
+        public string task_show_medium_title = string.Empty;
         public bool fulfilled_before;
         public bool fulfilled_after;
         public bool active_before;
@@ -9351,7 +10535,9 @@ namespace IMDataCore
     [Serializable]
     internal sealed class AuditionStartedEventPayload
     {
+        public string audition_occurrence_id = string.Empty;
         public string audition_type = string.Empty;
+        public int candidate_count_at_start;
         public bool should_pay;
         public int cost;
         public float progress_before;
@@ -9373,6 +10559,7 @@ namespace IMDataCore
     [Serializable]
     internal sealed class AuditionCostPaidEventPayload
     {
+        public string audition_occurrence_id = string.Empty;
         public string audition_type = string.Empty;
         public string spend_reason = string.Empty;
         public int cost;
@@ -9414,11 +10601,19 @@ namespace IMDataCore
     internal sealed class RandomEventStartedEventPayload
     {
         public string random_event_id = string.Empty;
+        public string random_event_occurrence_id = string.Empty;
         public string random_event_title = string.Empty;
         public string random_event_state = string.Empty;
         public bool random_event_force;
         public string random_event_mod_name = string.Empty;
         public string scheduled_date = string.Empty;
+        public bool selected_contract_present;
+        public string selected_contract_instance_id = string.Empty;
+        public int selected_contract_target_idol_id = CoreConstants.InvalidIdValue;
+        public string selected_contract_type = string.Empty;
+        public string selected_contract_agent_name = string.Empty;
+        public string selected_contract_product_name = string.Empty;
+        public string selected_contract_end_date = string.Empty;
         public int actor_count;
         public string random_event_actor_id_list = string.Empty;
         public string actors_summary = string.Empty;
@@ -9458,9 +10653,20 @@ namespace IMDataCore
     internal sealed class RandomEventConcludedEventPayload
     {
         public string random_event_id = string.Empty;
+        public string random_event_occurrence_id = string.Empty;
         public string random_event_title = string.Empty;
         public string random_event_state_before = string.Empty;
         public string random_event_state_after = string.Empty;
+        public string terminal_path = string.Empty;
+        public bool reply_effects_applied;
+        public bool resource_delta_known;
+        public bool selected_contract_present;
+        public string selected_contract_instance_id = string.Empty;
+        public int selected_contract_target_idol_id = CoreConstants.InvalidIdValue;
+        public string selected_contract_type = string.Empty;
+        public string selected_contract_agent_name = string.Empty;
+        public string selected_contract_product_name = string.Empty;
+        public string selected_contract_end_date = string.Empty;
         public int reply_index = CoreConstants.InvalidIdValue;
         public string reply_text = string.Empty;
         public string reply_description = string.Empty;
@@ -9492,6 +10698,7 @@ namespace IMDataCore
     internal sealed class SubstoryLifecycleEventPayload
     {
         public string substory_id = string.Empty;
+        public string substory_occurrence_id = string.Empty;
         public string substory_parent_id = string.Empty;
         public string substory_actor_id_list = string.Empty;
         public string actors_summary = string.Empty;
@@ -9565,9 +10772,13 @@ namespace IMDataCore
         public string influence_action = string.Empty;
         public string report_date = string.Empty;
         public int days_until_report;
-        public int queue_size_after;
+        public string blackmail_occurrence_id = string.Empty;
+        public int queue_size_after_enqueue = CoreConstants.InvalidIdValue;
+        public int queue_size_before_dequeue = CoreConstants.InvalidIdValue;
+        public int queue_size_after_dequeue = CoreConstants.InvalidIdValue;
         public int success_tier = CoreConstants.InvalidIdValue;
-        public int influence_award;
+        public int influence_award_planned;
+        public bool influence_award_applied_known;
         public string event_date = string.Empty;
     }
 
@@ -9697,14 +10908,30 @@ namespace IMDataCore
     /// </summary>
     internal sealed class ContractAcceptedSnapshot
     {
+        internal SemanticCaptureScope SemanticScope;
         internal business._proposal AcceptedProposal;
+        internal BusinessProposalTerminalSnapshot ProposalOccurrence;
+        internal business._proposal SourceProposalReference;
         internal DateTime AcceptedDate = default(DateTime);
         internal List<int> TargetIdolIdentifiers = new List<int>();
+        internal string ContractGenerationId = string.Empty;
+        internal long ContractCoverageStartSequence;
+        internal string LegacyCandidateKey = string.Empty;
     }
 
     /// <summary>
     /// Portable contract state captured before BreakContracts deletes it.
     /// </summary>
+    internal sealed class ContractCancellationSnapshot
+    {
+        internal business BusinessSystem;
+        internal business.active_proposal ActiveContract;
+        internal bool ContainedBefore;
+        internal int IdolId = CoreConstants.InvalidIdValue;
+        internal string EntityIdentifier = string.Empty;
+        internal ContractLifecyclePayload Payload;
+    }
+
     internal sealed class ContractBreakSnapshot
     {
         internal business BusinessSystem;
@@ -9812,6 +11039,7 @@ namespace IMDataCore
     internal sealed class IdolHireSnapshot
     {
         internal bool WasAlreadyHired;
+        internal string HireProvenance = string.Empty;
     }
 
     /// <summary>
@@ -9828,6 +11056,7 @@ namespace IMDataCore
     /// </summary>
     internal sealed class LoanMutationSnapshot
     {
+        internal SemanticCaptureScope SemanticScope;
         internal int LoanId = CoreConstants.InvalidIdValue;
         internal bool LoanActive;
         internal long LoanDebt;
@@ -9841,6 +11070,9 @@ namespace IMDataCore
         internal int TotalPaymentPerWeek;
         internal int ActiveLoanCount;
         internal int TotalLoanCount;
+        internal bool LoanContained;
+        internal loans._loan LoanReference;
+        internal DateTime LoanMaturityProcessingDate;
     }
 
     /// <summary>
@@ -10078,6 +11310,18 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Snapshot captured before one generated non-custom task birth. Runtime
+    /// object references are used only to identify the single object appended
+    /// by the authoritative GenerateTask call.
+    /// </summary>
+    internal sealed class GeneratedTaskBirthSnapshot
+    {
+        internal tasks._task._type RequestedTaskType;
+        internal List<tasks._task> ActiveTaskReferencesBefore =
+            new List<tasks._task>();
+    }
+
+    /// <summary>
     /// Snapshot captured before one direct idol outfit/body mutation.
     /// </summary>
     internal sealed class IdolOutfitChangeSnapshot
@@ -10210,14 +11454,27 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Snapshot captured before one clique-member join mutation.
+    /// </summary>
+    internal sealed class CliqueJoinSnapshot
+    {
+        internal bool WasMemberBeforeJoin;
+        internal int PreviousLeaderId = CoreConstants.InvalidIdValue;
+        internal int MemberCountBefore;
+        internal string CliqueSignatureBefore = string.Empty;
+    }
+
+    /// <summary>
     /// Snapshot captured before one clique-member quit mutation.
     /// </summary>
     internal sealed class CliqueQuitSnapshot
     {
+        internal SemanticCaptureScope SemanticScope;
         internal bool WasMemberBeforeQuit;
         internal int PreviousLeaderId = CoreConstants.InvalidIdValue;
         internal int MemberCountBefore;
         internal string CliqueSignatureBefore = string.Empty;
+        internal string CliqueGenerationId = string.Empty;
         internal List<BullyingStateSnapshot> BulliedTargetsBefore =
             new List<BullyingStateSnapshot>();
     }
@@ -10234,6 +11491,8 @@ namespace IMDataCore
         internal bool WasKnownToPlayer;
         internal int CliqueMemberCount;
         internal string CliqueSignature = string.Empty;
+        internal string BullyingEpisodeId = string.Empty;
+        internal string ParentCliqueGenerationId = string.Empty;
     }
 
     /// <summary>
@@ -10284,6 +11543,7 @@ namespace IMDataCore
     /// </summary>
     internal sealed class AgencyRoomBuildSnapshot
     {
+        internal SemanticCaptureScope SemanticScope;
         internal long MoneyBefore;
         internal int RequestedTypeRaw;
         internal bool BuildFlag;
@@ -10355,6 +11615,8 @@ namespace IMDataCore
     {
         internal Event_Manager._activeEvent ActiveEventBefore;
         internal string ActiveEventStateBefore = string.Empty;
+        internal string RandomEventOccurrenceId = string.Empty;
+        internal SelectedContractHistoryContext SelectedContractContext;
         internal string ActorSummaryBefore = string.Empty;
         internal List<int> ActorIdolIdentifiersBefore = new List<int>();
         internal long EstimatedLiabilityBefore;
@@ -10374,8 +11636,24 @@ namespace IMDataCore
         internal bool WasUsedBefore;
         internal bool WasDelayedBefore;
         internal bool WasQueuedBefore;
+        internal List<Substories_Manager._dialogueQueue> QueueReferencesBefore =
+            new List<Substories_Manager._dialogueQueue>();
         internal string ActorSummary = string.Empty;
         internal List<int> IdolIds = new List<int>();
+    }
+
+    /// <summary>
+    /// Snapshot captured at ordinary queued-dialogue presentation.
+    /// </summary>
+    internal sealed class SubstoryDialoguePresentationSnapshot
+    {
+        internal data_dialogues._dialogue Dialogue;
+        internal Substories_Manager._dialogueQueue QueueEntry;
+        internal int QueueCountBefore;
+        internal int DelayedCountBefore;
+        internal DateTime ScheduledLaunchTime;
+        internal bool DebugMode;
+        internal bool HadBeforeStartCallback;
     }
 
     /// <summary>
@@ -10389,6 +11667,33 @@ namespace IMDataCore
         internal bool ShouldEmit;
         internal string ActorSummary = string.Empty;
         internal List<int> IdolIds = new List<int>();
+    }
+
+    /// <summary>
+    /// Snapshot captured at the scene presentation boundary while the exact queue
+    /// row still exists. The occurrence id is history-only correlation state.
+    /// </summary>
+    internal sealed class SubstoryScenePresentationSnapshot
+    {
+        internal data_dialogues._dialogue Dialogue;
+        internal Substories_Manager._dialogueQueue QueueEntry;
+        internal agency._room ExpectedRoom;
+        internal string OccurrenceId = string.Empty;
+    }
+
+    /// <summary>
+    /// Snapshot captured before a room clears one active scene-type substory.
+    /// </summary>
+    internal sealed class SubstorySceneCompletionSnapshot
+    {
+        internal agency._room Room;
+        internal string DialogueId = string.Empty;
+        internal string ParentDialogueId = string.Empty;
+        internal string DialogueTypeCode = string.Empty;
+        internal string OccurrenceId = string.Empty;
+        internal string ActorSummary = string.Empty;
+        internal List<int> IdolIds = new List<int>();
+        internal bool WasSceneActiveBefore;
     }
 
     /// <summary>
@@ -10463,6 +11768,7 @@ namespace IMDataCore
         internal string TrendsGenreSummaryBefore = string.Empty;
         internal string TrendsLyricsSummaryBefore = string.Empty;
         internal string TrendsChoreoSummaryBefore = string.Empty;
+        internal List<RivalGroupStateSnapshot> GroupStatesBefore = new List<RivalGroupStateSnapshot>();
     }
 
     /// <summary>
@@ -10508,6 +11814,80 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Public quality for canonical current-generation and legacy-candidate identity resolution.
+    /// </summary>
+    public enum IMDataCoreIdentityResolutionQuality
+    {
+        Unresolved = 0,
+        Ambiguous = 1,
+        Exact = 2
+    }
+
+    /// <summary>
+    /// Read-only identity-resolution result. CanonicalEntityIds contains the full
+    /// candidate set; CanonicalEntityId is populated only when Quality is Exact.
+    /// </summary>
+    public sealed class IMDataCoreIdentityResolution
+    {
+        public IMDataCoreIdentityResolutionQuality Quality { get; internal set; }
+        public string EntityKind { get; internal set; }
+        public string RequestedKey { get; internal set; }
+        public string CanonicalEntityId { get; internal set; }
+        public List<string> CanonicalEntityIds { get; internal set; } =
+            new List<string>();
+    }
+
+    /// <summary>
+    /// Source quality of a bounded historical-baseline assertion.
+    /// Only Exact permits consumers to treat the asserted value as authoritative.
+    /// </summary>
+    public enum IMDataCoreHistoricalBaselineQuality
+    {
+        Unknown = 0,
+        Ambiguous = 1,
+        Exact = 2
+    }
+
+    /// <summary>
+    /// Public read-model shape reserved for bounded historical-baseline queries.
+    /// Task 9 stages the quality vocabulary and immutable projection shape while
+    /// the live v5 runtime still has no persisted v6 assertion collection.
+    /// </summary>
+    public sealed class IMDataCoreHistoricalBaselineAssertion
+    {
+        public string AssertionId { get; internal set; }
+        public long Sequence { get; internal set; }
+        public string GameDateTime { get; internal set; }
+        public string BaselineKind { get; internal set; }
+        public string EntityKind { get; internal set; }
+        public string EntityId { get; internal set; }
+        public int AssertionSchemaVersion { get; internal set; }
+        public IMDataCoreHistoricalBaselineQuality Quality { get; internal set; }
+        public string GroupAppealGender { get; internal set; }
+        public string GroupAppealHardcoreness { get; internal set; }
+        public string GroupAppealAge { get; internal set; }
+        public List<string> GenderCandidateCodes { get; internal set; } =
+            new List<string>();
+        public List<string> HardcorenessCandidateCodes { get; internal set; } =
+            new List<string>();
+        public List<string> AgeCandidateCodes { get; internal set; } =
+            new List<string>();
+        public string SourceKind { get; internal set; }
+        public string AnchorCheckpointKey { get; internal set; }
+    }
+
+    /// <summary>
+    /// Knownness of a built-in shared event's historical participant identity.
+    /// </summary>
+    public enum IMDataCoreParticipantKnownness
+    {
+        NotApplicable = 0,
+        Exact = 1,
+        Unknown = 2,
+        Malformed = 3
+    }
+
+    /// <summary>
     /// Public immutable event model returned to API consumers.
     /// </summary>
     public sealed class IMDataCoreEvent
@@ -10523,6 +11903,148 @@ namespace IMDataCore
         public string PayloadJson { get; internal set; }
         public string NamespaceId { get; internal set; }
         public string IdempotencyKey { get; internal set; }
+        public int ParticipantSchemaVersion { get; internal set; }
+        public IMDataCoreParticipantKnownness ParticipantKnownness
+        { get; internal set; }
+    }
+
+    /// <summary>
+    /// Public completeness classification for durable history queries.
+    /// Empty history is meaningful only when the corresponding coverage is Complete.
+    /// </summary>
+    public enum IMDataCoreHistoryKnownness
+    {
+        Unknown = 0,
+        Partial = 1,
+        Complete = 2,
+        NotApplicable = 3
+    }
+
+    /// <summary>
+    /// Source of the backend observation frontier for the selected career branch.
+    /// Unknown is deliberately preserved for legacy/live formats that cannot prove it.
+    /// </summary>
+    public enum IMDataCoreCoverageOrigin
+    {
+        Unknown = 0,
+        CareerStart = 1,
+        LateAdoption = 2,
+        LegacyResume = 3
+    }
+
+    /// <summary>
+    /// Public state of one coverage interval.
+    /// </summary>
+    public enum IMDataCoreCoverageIntervalState
+    {
+        Active = 0,
+        Gap = 1
+    }
+
+    /// <summary>
+    /// Exact shared-sequence boundary used by coverage assessments.
+    /// Sequence is the authoritative ordering key; GameDateTime is display context.
+    /// </summary>
+    public sealed class IMDataCoreHistoryBoundary
+    {
+        public IMDataCoreHistoryBoundary(
+            long sequence,
+            DateTime gameDateTime,
+            string anchorCheckpointKey)
+        {
+            Sequence = sequence;
+            GameDateTime = gameDateTime;
+            AnchorCheckpointKey = anchorCheckpointKey ?? string.Empty;
+        }
+
+        public long Sequence { get; private set; }
+        public DateTime GameDateTime { get; private set; }
+        public string AnchorCheckpointKey { get; private set; }
+
+        // For a sparse load/F9-origin transition, Sequence remains the durable
+        // issued ordering token while this internal value records the exact
+        // checkpoint frontier at which the transition becomes semantically active.
+        // It is deliberately not exposed as a second public ordering surface.
+        internal long SemanticAnchorSequence { get; set; }
+
+        public bool HasAnchorCheckpoint
+        {
+            get { return !string.IsNullOrEmpty(AnchorCheckpointKey); }
+        }
+    }
+
+    /// <summary>
+    /// Stable semantic capability token and revision. Package versions are not
+    /// capability identities.
+    /// </summary>
+    public sealed class IMDataCoreCapabilityRevision
+    {
+        public IMDataCoreCapabilityRevision(string token, int revision)
+        {
+            Token = token ?? string.Empty;
+            Revision = revision;
+        }
+
+        public string Token { get; private set; }
+        public int Revision { get; private set; }
+    }
+
+    /// <summary>
+    /// One selected-branch coverage interval for a semantic capability.
+    /// EndBoundary == null means the interval remains open at the active branch tip.
+    /// </summary>
+    public sealed class IMDataCoreCoverageInterval
+    {
+        public IMDataCoreHistoryBoundary StartBoundary { get; internal set; }
+        public IMDataCoreHistoryBoundary EndBoundary { get; internal set; }
+        public string CapabilitySetId { get; internal set; }
+        public IMDataCoreCoverageIntervalState State { get; internal set; }
+        public string Origin { get; internal set; }
+        public string Reason { get; internal set; }
+    }
+
+    /// <summary>
+    /// Branch-selected coverage for one semantic capability/revision request.
+    /// Knownness is never inferred from event-row count.
+    /// </summary>
+    public sealed class IMDataCoreHistoryCoverage
+    {
+        public IMDataCoreHistoryKnownness Knownness { get; internal set; }
+        public string ScopeKind { get; internal set; }
+        public string ScopeIdentifier { get; internal set; }
+        public string CapabilityToken { get; internal set; }
+        public int MinimumRevision { get; internal set; }
+        public List<IMDataCoreCoverageInterval> Intervals { get; internal set; }
+
+        // Internal semantic frontier used by the range evaluator when a durable
+        // transition is provably coextensive with an earlier backend boundary.
+        // This is intentionally not part of the public API surface.
+        internal IMDataCoreHistoryBoundary SemanticStartBoundary
+        { get; set; }
+    }
+
+    /// <summary>
+    /// Knownness result for an exact shared-sequence range.
+    /// </summary>
+    public sealed class IMDataCoreCoverageAssessment
+    {
+        public IMDataCoreHistoryKnownness Knownness { get; internal set; }
+        public IMDataCoreHistoryBoundary StartBoundary { get; internal set; }
+        public IMDataCoreHistoryBoundary EndBoundary { get; internal set; }
+        public List<IMDataCoreCoverageInterval> IntersectingIntervals
+        { get; internal set; }
+        public List<IMDataCoreCoverageInterval> IntersectingGaps
+        { get; internal set; }
+    }
+
+    /// <summary>
+    /// Global backend adoption/observation frontier for the selected branch.
+    /// </summary>
+    public sealed class IMDataCoreBackendCoverage
+    {
+        public IMDataCoreHistoryKnownness Knownness { get; internal set; }
+        public IMDataCoreCoverageOrigin Origin { get; internal set; }
+        public IMDataCoreHistoryBoundary FirstBoundary { get; internal set; }
     }
 
     /// <summary>
@@ -10549,6 +12071,10 @@ namespace IMDataCore
         internal string NamespaceIdentifier = string.Empty;
         internal string SessionToken = string.Empty;
         internal string CallingAssemblyIdentity = string.Empty;
+        // Stable lineage intentionally excludes assembly version/MVID/content hash;
+        // CallingAssemblyIdentity remains the stronger same-process witness.
+        internal string StableOwnerId = string.Empty;
+        internal int OwnerSchemaVersion;
     }
 
 

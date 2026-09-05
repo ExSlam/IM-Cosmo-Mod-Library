@@ -9,13 +9,13 @@ HarmonyX recomposition. SWOF now distinguishes a complete already-installed loca
 replacement from an untouched vanilla call and from authoritative SNLF delegation;
 mixed, partial, duplicate, or changed shapes still fail closed.
 
-## Important: 1.4.0-dev.5 retains the Mono-safe 1.3 architecture
+## Important: 1.4.5 retains the Mono-safe 1.3 architecture
 
 Do not use 1.0.0 or 1.0.1.
 
 Those versions Harmony-patched constructed `DataSaver<T>` methods. That is unsafe on Idol Manager's Mono runtime because reference-type generic instantiations may share runtime code. In practice, a `SavedData` patch can interfere with other `DataSaver<T>` uses such as `GlobalData`.
 
-Version 1.4.0-dev.5 contains **no Harmony patch on `DataSaver<T>`**.
+Version 1.4.5 contains **no Harmony patch on `DataSaver<T>`**.
 
 ## Development 1.4 change 5: transport-coexistence source qualification
 

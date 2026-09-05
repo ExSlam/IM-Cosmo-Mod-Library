@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -129,14 +129,21 @@ namespace IMDataCore
     {
         public bool is_talk;
         public string title = string.Empty;
+        public int single_id = CoreConstants.InvalidIdValue;
+        public bool single_reference_known;
         public string center_name = string.Empty;
+        public int center_idol_id = CoreConstants.InvalidIdValue;
+        public bool center_reference_known;
         public List<string> idol_names = new List<string>();
+        public List<int> idol_ids = new List<int>();
+        public bool idol_references_known;
     }
 
     [Serializable]
     internal sealed class MoneyLedgerDetailPayload
     {
         public string kind = string.Empty;
+        public int reference_schema_version;
         public string contract_type_code = string.Empty;
         public string contractor_name = string.Empty;
         public string product_name = string.Empty;
@@ -145,17 +152,27 @@ namespace IMDataCore
         public long liability_amount;
         public int idol_id = CoreConstants.InvalidIdValue;
         public string idol_name = string.Empty;
+        public string contract_entity_id = string.Empty;
+        public bool contract_reference_known;
         public float multiplier;
         public int negotiations;
+        public int single_id = CoreConstants.InvalidIdValue;
+        public bool single_reference_known;
         public string single_title = string.Empty;
+        public int single_group_id = CoreConstants.InvalidIdValue;
+        public bool single_group_reference_known;
         public string single_group_name = string.Empty;
         public string single_genre_token = string.Empty;
         public string single_lyrics_token = string.Empty;
         public string single_choreography_token = string.Empty;
         public List<string> single_marketing_tokens = new List<string>();
         public List<string> participant_names = new List<string>();
+        public List<int> participant_ids = new List<int>();
+        public bool participant_references_known;
         public long gross_revenue;
         public long production_cost;
+        public int show_id = CoreConstants.InvalidIdValue;
+        public bool show_reference_known;
         public string show_title = string.Empty;
         public string show_medium_token = string.Empty;
         public string show_genre_token = string.Empty;
@@ -166,6 +183,8 @@ namespace IMDataCore
         public long show_fan_audience;
         public float show_fatigue;
         public long show_weekly_budget;
+        public int staff_id = CoreConstants.InvalidIdValue;
+        public bool staff_reference_known;
         public string staff_name = string.Empty;
         public string staff_role_code = string.Empty;
         public long salary_amount;
@@ -173,6 +192,9 @@ namespace IMDataCore
         public int idol_scandal_points;
         public List<MoneyLedgerStaffSkillPayload> staff_skills = new List<MoneyLedgerStaffSkillPayload>();
         public int theater_id = CoreConstants.InvalidIdValue;
+        public string facility_entity_kind = string.Empty;
+        public string facility_entity_id = string.Empty;
+        public bool facility_reference_known;
         public string theater_title = string.Empty;
         public string theater_income_type = string.Empty;
         public int theater_ticket_price;
@@ -184,9 +206,13 @@ namespace IMDataCore
         public long theater_subscriber_total;
         public int cafe_id = CoreConstants.InvalidIdValue;
         public string cafe_title = string.Empty;
+        public int cafe_dish_id = CoreConstants.InvalidIdValue;
+        public bool cafe_dish_reference_known;
         public string cafe_dish_title = string.Empty;
         public string cafe_dish_type = string.Empty;
         public List<string> cafe_staff_names = new List<string>();
+        public List<int> cafe_working_idol_ids = new List<int>();
+        public bool cafe_working_idol_references_known;
         public int cafe_new_fans;
         public string cafe_appeal_type = string.Empty;
         public int concert_id = CoreConstants.InvalidIdValue;
@@ -217,13 +243,20 @@ namespace IMDataCore
     {
         public bool IsTalk { get; internal set; }
         public string Title { get; internal set; }
+        public int SingleId { get; internal set; }
+        public bool SingleReferenceKnown { get; internal set; }
         public string CenterName { get; internal set; }
+        public int CenterIdolId { get; internal set; }
+        public bool CenterReferenceKnown { get; internal set; }
         public List<string> IdolNames { get; internal set; }
+        public List<int> IdolIds { get; internal set; }
+        public bool IdolReferencesKnown { get; internal set; }
     }
 
     public sealed class IMDataCoreMoneyTransactionDetail
     {
         public string Kind { get; internal set; }
+        public int ReferenceSchemaVersion { get; internal set; }
         public string ContractTypeCode { get; internal set; }
         public string ContractorName { get; internal set; }
         public string ProductName { get; internal set; }
@@ -232,17 +265,27 @@ namespace IMDataCore
         public long LiabilityAmount { get; internal set; }
         public int IdolId { get; internal set; }
         public string IdolName { get; internal set; }
+        public string ContractEntityId { get; internal set; }
+        public bool ContractReferenceKnown { get; internal set; }
         public float Multiplier { get; internal set; }
         public int Negotiations { get; internal set; }
+        public int SingleId { get; internal set; }
+        public bool SingleReferenceKnown { get; internal set; }
         public string SingleTitle { get; internal set; }
+        public int SingleGroupId { get; internal set; }
+        public bool SingleGroupReferenceKnown { get; internal set; }
         public string SingleGroupName { get; internal set; }
         public string SingleGenreToken { get; internal set; }
         public string SingleLyricsToken { get; internal set; }
         public string SingleChoreographyToken { get; internal set; }
         public List<string> SingleMarketingTokens { get; internal set; }
         public List<string> ParticipantNames { get; internal set; }
+        public List<int> ParticipantIds { get; internal set; }
+        public bool ParticipantReferencesKnown { get; internal set; }
         public long GrossRevenue { get; internal set; }
         public long ProductionCost { get; internal set; }
+        public int ShowId { get; internal set; }
+        public bool ShowReferenceKnown { get; internal set; }
         public string ShowTitle { get; internal set; }
         public string ShowMediumToken { get; internal set; }
         public string ShowGenreToken { get; internal set; }
@@ -253,6 +296,8 @@ namespace IMDataCore
         public long ShowFanAudience { get; internal set; }
         public float ShowFatigue { get; internal set; }
         public long ShowWeeklyBudget { get; internal set; }
+        public int StaffId { get; internal set; }
+        public bool StaffReferenceKnown { get; internal set; }
         public string StaffName { get; internal set; }
         public string StaffRoleCode { get; internal set; }
         public long SalaryAmount { get; internal set; }
@@ -260,6 +305,9 @@ namespace IMDataCore
         public int IdolScandalPoints { get; internal set; }
         public List<IMDataCoreMoneyTransactionStaffSkill> StaffSkills { get; internal set; }
         public int TheaterId { get; internal set; }
+        public string FacilityEntityKind { get; internal set; }
+        public string FacilityEntityId { get; internal set; }
+        public bool FacilityReferenceKnown { get; internal set; }
         public string TheaterTitle { get; internal set; }
         public string TheaterIncomeType { get; internal set; }
         public int TheaterTicketPrice { get; internal set; }
@@ -271,9 +319,13 @@ namespace IMDataCore
         public long TheaterSubscriberTotal { get; internal set; }
         public int CafeId { get; internal set; }
         public string CafeTitle { get; internal set; }
+        public int CafeDishId { get; internal set; }
+        public bool CafeDishReferenceKnown { get; internal set; }
         public string CafeDishTitle { get; internal set; }
         public string CafeDishType { get; internal set; }
         public List<string> CafeStaffNames { get; internal set; }
+        public List<int> CafeWorkingIdolIds { get; internal set; }
+        public bool CafeWorkingIdolReferencesKnown { get; internal set; }
         public int CafeNewFans { get; internal set; }
         public string CafeAppealType { get; internal set; }
         public int ConcertId { get; internal set; }
@@ -392,6 +444,77 @@ namespace IMDataCore
             };
         }
 
+        private static void NormalizeMoneyReferenceDefaults(MoneyLedgerDetailPayload payload)
+        {
+            if (payload == null)
+            {
+                return;
+            }
+
+            if (!payload.contract_reference_known)
+            {
+                payload.contract_entity_id = string.Empty;
+            }
+            if (!payload.single_reference_known)
+            {
+                payload.single_id = CoreConstants.InvalidIdValue;
+            }
+            if (!payload.single_group_reference_known)
+            {
+                payload.single_group_id = CoreConstants.InvalidIdValue;
+            }
+            if (!payload.participant_references_known)
+            {
+                payload.participant_ids = new List<int>();
+            }
+            if (!payload.show_reference_known)
+            {
+                payload.show_id = CoreConstants.InvalidIdValue;
+            }
+            if (!payload.staff_reference_known)
+            {
+                payload.staff_id = CoreConstants.InvalidIdValue;
+            }
+            if (!payload.facility_reference_known)
+            {
+                payload.facility_entity_kind = string.Empty;
+                payload.facility_entity_id = string.Empty;
+            }
+            if (!payload.cafe_dish_reference_known)
+            {
+                payload.cafe_dish_id = CoreConstants.InvalidIdValue;
+            }
+            if (!payload.cafe_working_idol_references_known)
+            {
+                payload.cafe_working_idol_ids = new List<int>();
+            }
+
+            if (payload.concert_setlist == null)
+            {
+                return;
+            }
+            for (int itemIndex = MoneyLedgerConstants.CollectionStartIndex; itemIndex < payload.concert_setlist.Count; itemIndex++)
+            {
+                MoneyLedgerConcertSetlistItemPayload item = payload.concert_setlist[itemIndex];
+                if (item == null)
+                {
+                    continue;
+                }
+                if (!item.single_reference_known)
+                {
+                    item.single_id = CoreConstants.InvalidIdValue;
+                }
+                if (!item.center_reference_known)
+                {
+                    item.center_idol_id = CoreConstants.InvalidIdValue;
+                }
+                if (!item.idol_references_known)
+                {
+                    item.idol_ids = new List<int>();
+                }
+            }
+        }
+
         private static IMDataCoreMoneyTransactionDetail ParsePublicDetails(string detailJson)
         {
             if (string.IsNullOrEmpty(detailJson))
@@ -413,6 +536,8 @@ namespace IMDataCore
             {
                 return null;
             }
+
+            NormalizeMoneyReferenceDefaults(payload);
 
             List<IMDataCoreMoneyTransactionStaffSkill> skills = new List<IMDataCoreMoneyTransactionStaffSkill>();
             if (payload.staff_skills != null)
@@ -450,8 +575,14 @@ namespace IMDataCore
                     {
                         IsTalk = item.is_talk,
                         Title = item.title ?? string.Empty,
+                        SingleId = item.single_id,
+                        SingleReferenceKnown = item.single_reference_known,
                         CenterName = item.center_name ?? string.Empty,
-                        IdolNames = item.idol_names ?? new List<string>()
+                        CenterIdolId = item.center_idol_id,
+                        CenterReferenceKnown = item.center_reference_known,
+                        IdolNames = item.idol_names ?? new List<string>(),
+                        IdolIds = item.idol_ids ?? new List<int>(),
+                        IdolReferencesKnown = item.idol_references_known
                     });
                 }
             }
@@ -459,6 +590,7 @@ namespace IMDataCore
             return new IMDataCoreMoneyTransactionDetail
             {
                 Kind = payload.kind ?? string.Empty,
+                ReferenceSchemaVersion = payload.reference_schema_version,
                 ContractTypeCode = payload.contract_type_code ?? string.Empty,
                 ContractorName = payload.contractor_name ?? string.Empty,
                 ProductName = payload.product_name ?? string.Empty,
@@ -467,17 +599,27 @@ namespace IMDataCore
                 LiabilityAmount = payload.liability_amount,
                 IdolId = payload.idol_id,
                 IdolName = payload.idol_name ?? string.Empty,
+                ContractEntityId = payload.contract_entity_id ?? string.Empty,
+                ContractReferenceKnown = payload.contract_reference_known,
                 Multiplier = payload.multiplier,
                 Negotiations = payload.negotiations,
+                SingleId = payload.single_id,
+                SingleReferenceKnown = payload.single_reference_known,
                 SingleTitle = payload.single_title ?? string.Empty,
+                SingleGroupId = payload.single_group_id,
+                SingleGroupReferenceKnown = payload.single_group_reference_known,
                 SingleGroupName = payload.single_group_name ?? string.Empty,
                 SingleGenreToken = payload.single_genre_token ?? string.Empty,
                 SingleLyricsToken = payload.single_lyrics_token ?? string.Empty,
                 SingleChoreographyToken = payload.single_choreography_token ?? string.Empty,
                 SingleMarketingTokens = payload.single_marketing_tokens ?? new List<string>(),
                 ParticipantNames = payload.participant_names ?? new List<string>(),
+                ParticipantIds = payload.participant_ids ?? new List<int>(),
+                ParticipantReferencesKnown = payload.participant_references_known,
                 GrossRevenue = payload.gross_revenue,
                 ProductionCost = payload.production_cost,
+                ShowId = payload.show_id,
+                ShowReferenceKnown = payload.show_reference_known,
                 ShowTitle = payload.show_title ?? string.Empty,
                 ShowMediumToken = payload.show_medium_token ?? string.Empty,
                 ShowGenreToken = payload.show_genre_token ?? string.Empty,
@@ -488,6 +630,8 @@ namespace IMDataCore
                 ShowFanAudience = payload.show_fan_audience,
                 ShowFatigue = payload.show_fatigue,
                 ShowWeeklyBudget = payload.show_weekly_budget,
+                StaffId = payload.staff_id,
+                StaffReferenceKnown = payload.staff_reference_known,
                 StaffName = payload.staff_name ?? string.Empty,
                 StaffRoleCode = payload.staff_role_code ?? string.Empty,
                 SalaryAmount = payload.salary_amount,
@@ -495,6 +639,9 @@ namespace IMDataCore
                 IdolScandalPoints = payload.idol_scandal_points,
                 StaffSkills = skills,
                 TheaterId = payload.theater_id,
+                FacilityEntityKind = payload.facility_entity_kind ?? string.Empty,
+                FacilityEntityId = payload.facility_entity_id ?? string.Empty,
+                FacilityReferenceKnown = payload.facility_reference_known,
                 TheaterTitle = payload.theater_title ?? string.Empty,
                 TheaterIncomeType = payload.theater_income_type ?? string.Empty,
                 TheaterTicketPrice = payload.theater_ticket_price,
@@ -506,9 +653,13 @@ namespace IMDataCore
                 TheaterSubscriberTotal = payload.theater_subscriber_total,
                 CafeId = payload.cafe_id,
                 CafeTitle = payload.cafe_title ?? string.Empty,
+                CafeDishId = payload.cafe_dish_id,
+                CafeDishReferenceKnown = payload.cafe_dish_reference_known,
                 CafeDishTitle = payload.cafe_dish_title ?? string.Empty,
                 CafeDishType = payload.cafe_dish_type ?? string.Empty,
                 CafeStaffNames = payload.cafe_staff_names ?? new List<string>(),
+                CafeWorkingIdolIds = payload.cafe_working_idol_ids ?? new List<int>(),
+                CafeWorkingIdolReferencesKnown = payload.cafe_working_idol_references_known,
                 CafeNewFans = payload.cafe_new_fans,
                 CafeAppealType = payload.cafe_appeal_type ?? string.Empty,
                 ConcertId = payload.concert_id,
@@ -801,6 +952,50 @@ namespace IMDataCore
             }
         }
 
+        internal bool TryReadMoneyTransactionsPage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            long afterEventIdExclusive,
+            int maxCount,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out bool hasMore,
+            out string errorMessage)
+        {
+            transactions = new List<IMDataCoreMoneyTransaction>();
+            hasMore = false;
+            errorMessage = string.Empty;
+
+            if (endExclusive <= startInclusive)
+            {
+                errorMessage = MoneyLedgerConstants.MessageInvalidDateRange;
+                return false;
+            }
+
+            if (maxCount < MoneyLedgerConstants.MinimumReadCount)
+            {
+                errorMessage = MoneyLedgerConstants.MessageInvalidReadCount;
+                return false;
+            }
+
+            lock (runtimeLock)
+            {
+                if (!EnsureInitializedLocked(out errorMessage) || !FlushLocked(true, out errorMessage))
+                {
+                    return false;
+                }
+
+                int boundedCount = Math.Min(maxCount, MoneyLedgerConstants.MaximumReadCount);
+                return storageEngine.TryReadMoneyTransactionsPage(
+                    startInclusive,
+                    endExclusive,
+                    afterEventIdExclusive,
+                    boundedCount,
+                    out transactions,
+                    out hasMore,
+                    out errorMessage);
+            }
+        }
+
         internal bool TryGetMoneyTransactionTotals(
             DateTime startInclusive,
             DateTime endExclusive,
@@ -971,6 +1166,11 @@ namespace IMDataCore
             MoneyMutationSnapshot snapshot,
             MoneyLedgerDetailPayload details)
         {
+            if (details != null)
+            {
+                details.reference_schema_version = 1;
+            }
+
             MoneyLedgerTransactionPayload payload = new MoneyLedgerTransactionPayload
             {
                 amount = amount,

@@ -1,4 +1,4 @@
-﻿# IM Data Core Naming Conventions and Rename Safety
+# IM Data Core Naming Conventions and Rename Safety
 
 This guide explains which names are implementation detail and which names are API contracts.
 

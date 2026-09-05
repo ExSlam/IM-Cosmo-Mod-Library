@@ -1,6 +1,6 @@
 # IM Data Core - Start Here (Beginner-Friendly)
 
-This guide explains exactly how to use IM Data Core 3.4.7 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
+This guide explains exactly how to use IM Data Core 3.4.24 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
 
 IM Data Core stores each sidecar under a mirrored representation of its exact
 vanilla save path. This development build accepts sidecar format 5 only. For
@@ -64,9 +64,11 @@ internal static class DataCoreBridge
 Why one shared session:
 
 - Registration is namespace-scoped and assembly-bound.
+- In live 3.4.24 v5/v2 persistence, this authorization is still process-local. The staged sidecar-v6 model adds durable document-level owner provenance, but it is intentionally not the normal runtime authority until a later deliberate v6/v3 runtime cutover.
+- Do not treat checkpoint `EnabledMods` or being first to register after restart as proof of historical namespace ownership. Migrated v1-v5 namespaces remain explicitly legacy-unbound until a separate adoption policy authorizes a durable owner.
 - Reusing one session avoids duplicate registration logic.
 
-## Step 3: Initialize when IM Data Core is ready
+## Step 3: Register directly at a safe gameplay point
 
 Patch a late game point such as `PopupManager.Start` and register once:
 
@@ -86,12 +88,6 @@ internal static class PopupManager_Start_YourModInit_Patch
             return;
         }
 
-        if (!IMDataCoreApi.IsReady())
-        {
-            Debug.Log("[YourMod] IM Data Core not ready yet.");
-            return;
-        }
-
         string error;
         if (!IMDataCoreApi.TryRegisterNamespace(DataCoreBridge.NamespaceId, out DataCoreBridge.Session, out error))
         {
@@ -105,6 +101,29 @@ Important:
 
 - `NamespaceId` must be unique and token-safe.
 - Recommended format: reverse-domain (`com.author.modname`).
+- `TryRegisterNamespace(...)` owns safe IM Data Core initialization under the runtime lock. Call it directly at your chosen safe gameplay point.
+- `IsReady()` is observational only. Do not use it as a one-shot prerequisite for registration, because Harmony postfix ordering against another mod is not guaranteed.
+- If registration fails, keep the error visible and retry from a bounded later safe point rather than permanently treating a null session as absence.
+
+## Optional: resolve current durable history identity
+
+Version 3.4.24 exposes a read-only #66 resolver for generation-scoped identities. It accepts stable locator descriptors, not game CLR object references.
+
+```csharp
+IMDataCoreIdentityResolution identity;
+string identityError;
+if (IMDataCoreApi.TryResolveCurrentIdentity(
+        "agency_room",
+        "floor=0;room=1",
+        out identity,
+        out identityError) &&
+    identity.Quality == IMDataCoreIdentityResolutionQuality.Exact)
+{
+    string canonicalRoomId = identity.CanonicalEntityId;
+}
+```
+
+Supported locator shapes are documented in `IMDC_WAVE1_TASK6.md`. Legacy coarse keys use `TryResolveLegacyIdentityCandidates`; always inspect `Quality` and the full `CanonicalEntityIds` list. `Ambiguous` is a successful compatibility answer, not an error to be guessed away. On live v5, opaque contract/clique/bullying/task generations and the durable candidate multimap remain `Unresolved` until v6 persistence can preserve them across restart.
 
 ## Step 4: Save custom JSON
 
@@ -256,12 +275,12 @@ internal static List<IMDataCoreEvent> ReadRecentEvents(int idolId, int maxCount)
 }
 ```
 
-### Read complete history in pages
+### Read complete career-wide history in pages
 
-For UI or analysis that must reach beyond the recent-event cap, walk the paged API. The returned list is newest-to-oldest.
+For a complete durable history browser, walk the canonical #67 paginator. It returns each retained physical occurrence once and does not require a live idol ID.
 
 ```csharp
-internal static List<IMDataCoreEvent> ReadAllEvents(int idolId)
+internal static List<IMDataCoreEvent> ReadAllHistory()
 {
     List<IMDataCoreEvent> all = new List<IMDataCoreEvent>();
     long before = 0L;
@@ -271,8 +290,7 @@ internal static List<IMDataCoreEvent> ReadAllEvents(int idolId)
     {
         List<IMDataCoreEvent> page;
         string error;
-        if (!IMDataCoreApi.TryReadEventsForIdolPage(
-                idolId,
+        if (!IMDataCoreApi.TryReadHistoryPage(
                 before,
                 500,
                 out page,
@@ -280,7 +298,7 @@ internal static List<IMDataCoreEvent> ReadAllEvents(int idolId)
                 out error))
         {
             UnityEngine.Debug.LogWarning(
-                "[YourMod] TryReadEventsForIdolPage failed: " + error);
+                "[YourMod] TryReadHistoryPage failed: " + error);
             break;
         }
 
@@ -298,7 +316,11 @@ internal static List<IMDataCoreEvent> ReadAllEvents(int idolId)
 }
 ```
 
-Do not use the numerically smallest EventId as a cursor. Pass the EventId of the **last row returned**, because timeline ordering is `(GameDateKey, Sequence)` rather than EventId alone.
+`TryReadHistoryPage(...)` is newest-to-oldest by durable shared sequence. Always continue with the `EventId` of the **last row returned**. If F9/load discarded that cursor's branch, the call fails closed and the consumer should restart from `beforeEventIdExclusive <= 0` for the newly selected branch.
+
+`TryReadEventsForIdolPage(...)` remains available when you specifically want one known idol's participant-expanded compatibility view. Its ordering remains `(GameDateKey, Sequence)` and its cursor should likewise be the last row returned.
+
+Row absence is not a completeness proof. Use the structured coverage APIs when you need to distinguish Complete, Partial, and Unknown history.
 
 ## Step 8: Optional explicit flush
 
@@ -351,8 +373,8 @@ When the player deletes a vanilla save through the supported vanilla UI, IMDC pr
 - Reads seem stale:
   - Check the session and returned error. Reads already include in-memory
     mutations; no disk flush is required first.
-- `IsReady()` never true at early startup:
-  - Initialize later in lifecycle.
+- `IsReady()` is false at an early observation point:
+  - That does not block registration. Call `TryRegisterNamespace(...)` at your chosen safe gameplay point; the registration API owns initialization.
 
 ## What to read next
 

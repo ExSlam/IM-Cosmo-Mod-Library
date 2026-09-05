@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -154,13 +154,23 @@ namespace IMDataCore
                 bool singleMostPopularGenre = ResolveMostPopularGenre(releasedSingle);
                 bool singleMostPopularLyrics = ResolveMostPopularLyrics(releasedSingle);
                 bool singleMostPopularChoreo = ResolveMostPopularChoreo(releasedSingle);
-                float singleFanAppealMale = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.male);
-                float singleFanAppealFemale = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.female);
-                float singleFanAppealCasual = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.casual);
-                float singleFanAppealHardcore = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.hardcore);
-                float singleFanAppealTeen = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.teen);
-                float singleFanAppealYoungAdult = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.youngAdult);
-                float singleFanAppealAdult = ResolveReleaseFanAppealRatio(releasedSingle, resources.fanType.adult);
+                // Preserve two distinct vanilla vectors: FanAppeal is the actual release-time
+                // vector after RecalcFanAppeal(..., release:true); ReleaseData.FanAppeal is
+                // later overwritten by AddOpinion with GetAppealForOpinion().
+                float singleFanAppealMale = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.male);
+                float singleFanAppealFemale = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.female);
+                float singleFanAppealCasual = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.casual);
+                float singleFanAppealHardcore = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.hardcore);
+                float singleFanAppealTeen = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.teen);
+                float singleFanAppealYoungAdult = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.youngAdult);
+                float singleFanAppealAdult = ResolveSingleReleaseFanAppealRatio(releasedSingle, resources.fanType.adult);
+                float singleOpinionFanAppealMale = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.male);
+                float singleOpinionFanAppealFemale = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.female);
+                float singleOpinionFanAppealCasual = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.casual);
+                float singleOpinionFanAppealHardcore = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.hardcore);
+                float singleOpinionFanAppealTeen = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.teen);
+                float singleOpinionFanAppealYoungAdult = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.youngAdult);
+                float singleOpinionFanAppealAdult = ResolveSingleOpinionFanAppealRatio(releasedSingle, resources.fanType.adult);
                 string singleFanSegmentSalesSummary = BuildSingleFanSegmentSalesSummary(releasedSingle);
                 string singleFanSegmentNewFansSummary = BuildSingleFanSegmentNewFansSummary(releasedSingle);
                 string singleSenbatsuStatsSnapshot = BuildSingleSenbatsuStatsSnapshot(releasedSingle);
@@ -218,6 +228,13 @@ namespace IMDataCore
                     SingleFanAppealTeen = singleFanAppealTeen,
                     SingleFanAppealYoungAdult = singleFanAppealYoungAdult,
                     SingleFanAppealAdult = singleFanAppealAdult,
+                    SingleOpinionFanAppealMale = singleOpinionFanAppealMale,
+                    SingleOpinionFanAppealFemale = singleOpinionFanAppealFemale,
+                    SingleOpinionFanAppealCasual = singleOpinionFanAppealCasual,
+                    SingleOpinionFanAppealHardcore = singleOpinionFanAppealHardcore,
+                    SingleOpinionFanAppealTeen = singleOpinionFanAppealTeen,
+                    SingleOpinionFanAppealYoungAdult = singleOpinionFanAppealYoungAdult,
+                    SingleOpinionFanAppealAdult = singleOpinionFanAppealAdult,
                     SingleFanSegmentSalesSummary = singleFanSegmentSalesSummary,
                     SingleFanSegmentNewFansSummary = singleFanSegmentNewFansSummary,
                     SingleSenbatsuStatsSnapshot = singleSenbatsuStatsSnapshot,
@@ -280,17 +297,38 @@ namespace IMDataCore
             string resolvedSourcePatch = string.IsNullOrEmpty(sourcePatch)
                 ? CoreConstants.EventSourceSingleChartPopupPatch
                 : sourcePatch;
-            if (!CaptureSingleReleased(releasedSingle, resolvedSourcePatch))
-            {
-                return;
-            }
 
             lock (runtimeLock)
             {
-                resolvedSingleChartPositionBySingleId[releasedSingle.id] =
-                    chartPosition;
-                pendingSingleChartResolutionBySingleId.Remove(
-                    releasedSingle.id);
+                string errorMessage;
+                if (!EnsureInitializedLocked(out errorMessage))
+                {
+                    CoreLog.Warn(errorMessage);
+                    return;
+                }
+
+                List<int> castSlotIdolIdentifiers =
+                    ResolveHistoricalSingleCastSlotIdolIdentifiersLocked(releasedSingle, null);
+                SingleChartResultPayload payload = new SingleChartResultPayload
+                {
+                    single_title = releasedSingle.title ?? string.Empty,
+                    single_cast_id_list = BuildDelimitedIdentifierList(castSlotIdolIdentifiers),
+                    single_release_date = ResolveReleaseDate(releasedSingle, staticVars.dateTime),
+                    chart_position = chartPosition,
+                    chart_result_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
+                };
+                EnqueueEventRecordLocked(
+                    staticVars.dateTime,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindSingle,
+                    releasedSingle.id.ToString(CultureInfo.InvariantCulture),
+                    CoreConstants.EventTypeSingleChartResult,
+                    resolvedSourcePatch,
+                    CoreJsonUtility.SerializeObjectPayload(payload));
+
+                resolvedSingleChartPositionBySingleId[releasedSingle.id] = chartPosition;
+                pendingSingleChartResolutionBySingleId.Remove(releasedSingle.id);
+                FlushAfterCaptureLocked();
             }
         }
 
@@ -401,9 +439,52 @@ namespace IMDataCore
         }
 
         /// <summary>
+        /// Snapshots the linked election before singles.CancelSingle mutates/removes
+        /// the single. UI cancellation consumes the outer pre-clear frame; direct
+        /// callers fall back to the still-live parent link when it is provable.
+        /// </summary>
+        internal SingleCancellationReferenceSnapshot CreateSingleCancellationReferenceSnapshot(
+            singles._single cancelledSingle)
+        {
+            SingleCancellationReferenceSnapshot snapshot = new SingleCancellationReferenceSnapshot();
+            if (cancelledSingle == null)
+            {
+                return snapshot;
+            }
+
+            int linkedElectionId;
+            bool referenceKnown;
+            if (SingleCancellationElectionContext.TryResolve(
+                    cancelledSingle,
+                    out linkedElectionId,
+                    out referenceKnown))
+            {
+                snapshot.LinkedElectionId = linkedElectionId;
+                snapshot.LinkedElectionReferenceKnown = referenceKnown;
+                return snapshot;
+            }
+
+            if (!cancelledSingle.IsElectionSingle)
+            {
+                snapshot.LinkedElectionReferenceKnown = true;
+                return snapshot;
+            }
+
+            SEvent_SSK._SSK linkedElection = cancelledSingle.GetParentSSK();
+            if (linkedElection != null)
+            {
+                snapshot.LinkedElectionId = linkedElection.ID;
+                snapshot.LinkedElectionReferenceKnown = true;
+            }
+            return snapshot;
+        }
+
+        /// <summary>
         /// Captures one shared canceled-single event for its historical cast.
         /// </summary>
-        internal void CaptureSingleCancelled(singles._single cancelledSingle)
+        internal void CaptureSingleCancelled(
+            singles._single cancelledSingle,
+            SingleCancellationReferenceSnapshot referenceSnapshot)
         {
             if (cancelledSingle == null)
             {
@@ -415,6 +496,11 @@ namespace IMDataCore
                 cancelledSingle,
                 castIdolIdentifiers,
                 CoreConstants.SingleLifecycleActionCancelled);
+            payload.SingleLinkedElectionId = referenceSnapshot != null
+                ? referenceSnapshot.LinkedElectionId
+                : CoreConstants.InvalidIdValue;
+            payload.SingleLinkedElectionReferenceKnown = referenceSnapshot != null &&
+                referenceSnapshot.LinkedElectionReferenceKnown;
 
             lock (runtimeLock)
             {
@@ -805,31 +891,14 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (memberIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
-                {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindGroup,
-                        groupEntityIdentifier,
-                        CoreConstants.EventTypeGroupDisbanded,
-                        CoreConstants.EventSourceGroupsDisbandPatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < memberIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
-                            gameDate,
-                            memberIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindGroup,
-                            groupEntityIdentifier,
-                            CoreConstants.EventTypeGroupDisbanded,
-                            CoreConstants.EventSourceGroupsDisbandPatch,
-                            eventPayloadJson);
-                    }
-                }
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindGroup,
+                    groupEntityIdentifier,
+                    CoreConstants.EventTypeGroupDisbanded,
+                    CoreConstants.EventSourceGroupsDisbandPatch,
+                    eventPayloadJson);
 
                 FlushAfterCaptureLocked();
             }
@@ -879,29 +948,32 @@ namespace IMDataCore
                 }
 
                 DateTime gameDate = staticVars.dateTime;
-                if (memberIdolIdentifiers.Count < CoreConstants.MinimumNonEmptyCollectionCount)
+                EnqueueEventRecordLocked(
+                    gameDate,
+                    CoreConstants.InvalidIdValue,
+                    CoreConstants.EventEntityKindGroup,
+                    groupEntityIdentifier,
+                    CoreConstants.EventTypeGroupCreated,
+                    CoreConstants.EventSourceNewGroupPopupOnContinuePatch,
+                    eventPayloadJson);
+
+                if (!saveLoadPreparationActive &&
+                    semanticCaptureScopes.Count == 0 &&
+                    storageEngine.SupportsStructuredCoverageModel)
                 {
-                    EnqueueEventRecordLocked(
-                        gameDate,
-                        CoreConstants.InvalidIdValue,
-                        CoreConstants.EventEntityKindGroup,
-                        groupEntityIdentifier,
-                        CoreConstants.EventTypeGroupCreated,
-                        CoreConstants.EventSourceNewGroupPopupOnContinuePatch,
-                        eventPayloadJson);
-                }
-                else
-                {
-                    for (int idolIndex = CoreConstants.ZeroBasedListStartIndex; idolIndex < memberIdolIdentifiers.Count; idolIndex++)
-                    {
-                        EnqueueEventRecordLocked(
+                    string baselineError;
+                    if (!storageEngine.TryRecordObservedGroupTargetAudienceBaseline(
+                            NextCaptureSequenceLocked,
                             gameDate,
-                            memberIdolIdentifiers[idolIndex],
-                            CoreConstants.EventEntityKindGroup,
                             groupEntityIdentifier,
-                            CoreConstants.EventTypeGroupCreated,
-                            CoreConstants.EventSourceNewGroupPopupOnContinuePatch,
-                            eventPayloadJson);
+                            payload.GroupAppealGender,
+                            payload.GroupAppealHardcoreness,
+                            payload.GroupAppealAge,
+                            out baselineError))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not record the exact group target-audience origin baseline: " +
+                            baselineError);
                     }
                 }
 
@@ -1092,7 +1164,8 @@ namespace IMDataCore
             {
                 WasAlreadyHired = idol != null &&
                     data_girls.girl != null &&
-                    data_girls.girl.Contains(idol)
+                    data_girls.girl.Contains(idol),
+                HireProvenance = ResolveHireProvenance(idol, IdolHireProvenanceContext.Current)
             };
         }
 
@@ -1122,7 +1195,8 @@ namespace IMDataCore
                 CoreConstants.IdolLifecycleActionHired,
                 string.Empty,
                 false,
-                hiringStaff);
+                hiringStaff,
+                snapshotBefore.HireProvenance);
         }
 
         /// <summary>
@@ -1144,13 +1218,28 @@ namespace IMDataCore
         /// </summary>
         internal void CaptureIdolGraduated(data_girls.girls idol, bool graduatedWithDialogue, string customTrivia)
         {
+            string departureCause = IdolDepartureProvenanceContext.CurrentCause;
+            string departureSource = IdolDepartureProvenanceContext.CurrentSource;
+            if (string.IsNullOrEmpty(departureCause))
+            {
+                departureCause = CoreConstants.ProvenanceUnknown;
+            }
+            if (string.IsNullOrEmpty(departureSource))
+            {
+                departureSource = "data_girls.girls.Graduate";
+            }
+
             CaptureIdolLifecycleEvent(
                 idol,
                 CoreConstants.EventTypeIdolGraduated,
                 CoreConstants.EventSourceDataGirlsGraduatePatch,
                 CoreConstants.IdolLifecycleActionGraduated,
                 customTrivia,
-                graduatedWithDialogue);
+                graduatedWithDialogue,
+                null,
+                string.Empty,
+                departureCause,
+                departureSource);
 
             // Vanilla (and JSON-only graduation_trivia additions) resolves the fate
             // text before Graduate's postfix runs and stores the final localized text
@@ -1164,7 +1253,11 @@ namespace IMDataCore
                     CoreConstants.EventSourceDataGirlsGraduatePatch,
                     CoreConstants.IdolLifecycleActionGraduationOutcome,
                     customTrivia,
-                    graduatedWithDialogue);
+                    graduatedWithDialogue,
+                    null,
+                    string.Empty,
+                    departureCause,
+                    departureSource);
             }
         }
 
@@ -1238,14 +1331,25 @@ namespace IMDataCore
             string lifecycleActionCode,
             string customTrivia,
             bool graduatedWithDialogue,
-            StaffAttributionSnapshot staffAttribution = null)
+            StaffAttributionSnapshot staffAttribution = null,
+            string hireProvenance = "",
+            string departureCause = "",
+            string departureSource = "")
         {
             if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
             {
                 return;
             }
 
-            IdolLifecyclePayload payload = BuildIdolLifecyclePayload(idol, lifecycleActionCode, customTrivia, graduatedWithDialogue, staffAttribution);
+            IdolLifecyclePayload payload = BuildIdolLifecyclePayload(
+                idol,
+                lifecycleActionCode,
+                customTrivia,
+                graduatedWithDialogue,
+                staffAttribution,
+                hireProvenance,
+                departureCause,
+                departureSource);
 
             lock (runtimeLock)
             {
@@ -1273,7 +1377,13 @@ namespace IMDataCore
         /// <summary>
         /// Captures one idol status transition and updates status-window projections.
         /// </summary>
-        internal void CaptureStatusTransition(data_girls.girls idol, data_girls._status previousStatus, data_girls._status newStatus)
+        internal void CaptureStatusTransition(
+            data_girls.girls idol,
+            data_girls._status previousStatus,
+            data_girls._status newStatus,
+            string sourcePatchCode = null,
+            string statusCause = null,
+            string statusSourceKind = null)
         {
             if (idol == null || idol.id < CoreConstants.MinimumValidIdolIdentifier)
             {
@@ -1305,11 +1415,25 @@ namespace IMDataCore
                 string transitionDate = CoreDateTimeUtility.ToRoundTripString(gameDate);
                 string idolEntityIdentifier = idol.id.ToString(CultureInfo.InvariantCulture);
 
+                string resolvedStatusCause = !string.IsNullOrEmpty(statusCause)
+                    ? statusCause
+                    : IdolStatusProvenanceContext.CurrentCause;
+                string resolvedStatusSourceKind = !string.IsNullOrEmpty(statusSourceKind)
+                    ? statusSourceKind
+                    : IdolStatusProvenanceContext.CurrentSourceKind;
+                if (string.Equals(sourcePatchCode, CoreConstants.EventSourceVnStoryStatusRestorePatch, StringComparison.Ordinal))
+                {
+                    resolvedStatusCause = CoreConstants.StatusCauseStory;
+                    resolvedStatusSourceKind = CoreConstants.StatusSourceKindStory;
+                }
+
                 StatusTransitionPayload payload = new StatusTransitionPayload
                 {
                     IdolId = idol.id,
                     PreviousStatus = previousStatusCode,
-                    NewStatus = newStatusCode
+                    NewStatus = newStatusCode,
+                    StatusCause = string.IsNullOrEmpty(resolvedStatusCause) ? CoreConstants.ProvenanceUnknown : resolvedStatusCause,
+                    StatusSourceKind = string.IsNullOrEmpty(resolvedStatusSourceKind) ? CoreConstants.ProvenanceUnknown : resolvedStatusSourceKind
                 };
                 string eventPayloadJson = CoreJsonUtility.SerializeStatusTransitionPayload(payload);
 
@@ -1322,7 +1446,7 @@ namespace IMDataCore
                     EntityKind = CoreConstants.EventEntityKindStatus,
                     EntityId = idolEntityIdentifier,
                     EventType = CoreConstants.EventTypeStatusChanged,
-                    SourcePatch = CoreConstants.EventSourceStatusTransitionPatch,
+                    SourcePatch = sourcePatchCode ?? CoreConstants.EventSourceStatusTransitionPatch,
                     PayloadJson = eventPayloadJson
                 };
 
@@ -1478,15 +1602,27 @@ namespace IMDataCore
                 return snapshot;
             }
 
-            business._proposal proposalSnapshot = businessSystem.ActiveProposal.Clone();
+            BusinessProposalTerminalSnapshot proposalOccurrence =
+                CreateBusinessProposalTerminalSnapshot(businessSystem, true);
+            business._proposal proposalSnapshot = proposalOccurrence != null
+                ? proposalOccurrence.Proposal
+                : null;
             if (proposalSnapshot == null)
             {
                 return snapshot;
             }
 
             snapshot.AcceptedProposal = proposalSnapshot;
+            snapshot.ProposalOccurrence = proposalOccurrence;
             snapshot.AcceptedDate = staticVars.dateTime;
             snapshot.TargetIdolIdentifiers = ResolveProposalTargetIdolIdentifiers(proposalSnapshot);
+            lock (runtimeLock)
+            {
+                ReserveContractGenerationForAcceptanceLocked(
+                    businessSystem,
+                    businessSystem.ActiveProposal,
+                    snapshot);
+            }
             return snapshot;
         }
 

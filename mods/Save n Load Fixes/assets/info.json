@@ -2,7 +2,7 @@
   "Title": "Save n Load Fixes",
   "Description": "Implements several general vanilla fixes, and save continuity issues.",
   "Author": "Cosmo",
-  "Version": "0.53.0",
+  "Version": "0.54.0",
   "Tags": [
     "save",
     "load",

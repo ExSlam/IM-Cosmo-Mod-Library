@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -201,18 +201,97 @@ namespace IMDataCore
     }
 
     /// <summary>
+    /// Allocates one forward clique generation at the authoritative vanilla
+    /// clique birth seam. StartNewClique is private, so the Harmony target uses
+    /// its source name rather than nameof.
+    /// </summary>
+    [HarmonyPatch(typeof(Relationships), "StartNewClique")]
+    internal static class Relationships_StartNewClique_IMDataCoreIdentity_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(out int __state)
+        {
+            __state = Relationships.Cliques != null
+                ? Relationships.Cliques.Count
+                : CoreConstants.ZeroBasedListStartIndex;
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(data_girls.girls Girl, int __state)
+        {
+            IMDataCoreController.Instance.BindNewCliqueIdentity(__state, Girl);
+            IMDataCoreController.Instance.CaptureCliqueCreated(__state, Girl);
+        }
+    }
+
+    /// <summary>
+    /// Captures the semantic player-facing anti-bullying intervention after
+    /// Date_Influence has committed its partial/full stop outcome.
+    /// </summary>
+    [HarmonyPatch(typeof(Date_Influence), nameof(Date_Influence.Bullying_Text))]
+    internal static class Date_Influence_Bullying_Text_IMDataCoreCapture_Patch
+    {
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(
+            data_girls.girls Bully,
+            data_girls.girls Target,
+            out PlayerBullyingInterventionSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance
+                .CreatePlayerBullyingInterventionSnapshot(Bully, Target);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix(PlayerBullyingInterventionSnapshot __state)
+        {
+            IMDataCoreController.Instance.CapturePlayerBullyingIntervention(__state);
+        }
+    }
+
+    /// <summary>
+    /// Rebinds staged v6 clique generations after vanilla reconstructs the
+    /// Relationships__Cliques list in serialized row order.
+    /// </summary>
+    [HarmonyPatch(typeof(Relationships), nameof(Relationships.LoadFunction))]
+    internal static class Relationships_LoadFunction_IMDataCoreCliqueIdentity_Patch
+    {
+        [HarmonyPostfix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Postfix()
+        {
+            IMDataCoreController.Instance.AssociateLoadedCliqueIdentities();
+            IMDataCoreController.Instance.AssociateLoadedBullyingIdentities();
+        }
+    }
+
+    /// <summary>
     /// Captures clique join events.
     /// </summary>
     [HarmonyPatch(typeof(Relationships._clique), nameof(Relationships._clique.AddMember))]
     internal static class Relationships_clique_AddMember_IMDataCoreCapture_Patch
     {
         /// <summary>
+        /// Freezes the pre-join leader before AddMember can call UpdateLeader().
+        /// </summary>
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(Relationships._clique __instance, data_girls.girls Girl, out CliqueJoinSnapshot __state)
+        {
+            __state = IMDataCoreController.Instance.CreateCliqueJoinSnapshot(__instance, Girl);
+        }
+
+        /// <summary>
         /// Records clique join event after one idol is added to a clique.
         /// </summary>
+        [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(Relationships._clique __instance, data_girls.girls Girl)
+        private static void Postfix(Relationships._clique __instance, data_girls.girls Girl, CliqueJoinSnapshot __state)
         {
-            IMDataCoreController.Instance.CaptureCliqueMemberJoined(__instance, Girl);
+            IMDataCoreController.Instance.CaptureCliqueMemberJoined(__instance, Girl, __state);
         }
     }
 
@@ -229,6 +308,10 @@ namespace IMDataCore
         private static void Prefix(Relationships._clique __instance, data_girls.girls Girl, out CliqueQuitSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateCliqueQuitSnapshot(__instance, Girl);
+            if (__state != null)
+            {
+                __state.SemanticScope = IMDataCoreController.Instance.BeginSemanticCaptureScope();
+            }
         }
 
         /// <summary>
@@ -237,7 +320,21 @@ namespace IMDataCore
         [HarmonyPriority(Priority.Last)]
         private static void Postfix(Relationships._clique __instance, data_girls.girls Girl, bool violent, CliqueQuitSnapshot __state)
         {
+            SemanticCaptureScope scope = __state != null ? __state.SemanticScope : null;
+            IMDataCoreController.Instance.EndSemanticCaptureScope(scope);
             IMDataCoreController.Instance.CaptureCliqueMemberLeft(__instance, Girl, violent, __state);
+            IMDataCoreController.Instance.CommitSemanticCaptureScope(scope);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        private static Exception Finalizer(Exception __exception, CliqueQuitSnapshot __state)
+        {
+            if (__exception != null)
+            {
+                IMDataCoreController.Instance.AbortSemanticCaptureScope(__state != null ? __state.SemanticScope : null);
+            }
+            return __exception;
         }
     }
 
