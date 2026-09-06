@@ -52,6 +52,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(SEvent_Tour __instance, out TourFinishSnapshot __state)
         {
             ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceTourFinish);

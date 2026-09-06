@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -352,8 +352,8 @@ namespace IMDataCore
             List<int> idolIds = ResolveDistinctRandomEventIdolIdentifiers(activeEvent.actors);
             long money = resources.Money();
             long fans = resources.GetFansTotal(null);
-            int fame = (int)resources.Get(resources.type.fame, true);
-            int buzz = (int)resources.Get(resources.type.buzz, true);
+            long fame = resources.Get(resources.type.fame, true);
+            long buzz = resources.Get(resources.type.buzz, true);
 
             lock (runtimeLock)
             {

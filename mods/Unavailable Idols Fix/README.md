@@ -4,7 +4,7 @@ Planned lifecycle and assignment fix for idols who announce graduation, become t
 
 ## Status
 
-Implementation in progress. The current code covers lifecycle-safe cast handling, strict launch validation, localized notifications, announced-graduation contract eligibility, transactional cast editors, and the optional IM Data Core pre-cleanup snapshot bridge. Pass 6 interoperability edits are source/static validated here; a live game build/run is still required before release.
+Implementation in progress. The current code covers lifecycle-safe cast handling, strict launch validation, localized notifications, announced-graduation contract eligibility, transactional cast editors, and the optional owner-safe IM Data Core v6 pre-cleanup snapshot bridge. The IM Data Core v6 bridge now uses explicit-owner registration plus deterministic append-once final snapshots; a live game build/run is still required before release.
 
 In-game lifecycle testing is still required before release.
 

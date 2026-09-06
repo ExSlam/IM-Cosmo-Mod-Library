@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -1803,6 +1803,76 @@ namespace IMDataCore
                 out errorMessage);
         }
 
+        /// <summary>
+        /// Appends a custom event on behalf of an optional/reflection-based consumer.
+        /// The consumer assembly is supplied explicitly so namespace ownership is not
+        /// affected by MethodInfo.Invoke or other reflection frames.
+        /// </summary>
+        public static bool TryAppendCustomEvent(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryAppendCustomEvent(
+                session,
+                consumerAssembly,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Appends a custom event at most once on behalf of an optional/reflection-based
+        /// consumer. Ownership is authenticated with the explicitly supplied assembly;
+        /// the idempotency key remains scoped to that namespace and active branch.
+        /// </summary>
+        public static bool TryAppendCustomEventOnce(
+            IMDataCoreSession session,
+            Assembly consumerAssembly,
+            string idempotencyKey,
+            int idolId,
+            string entityKind,
+            string entityId,
+            string eventType,
+            string payloadJson,
+            string sourcePatch,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (consumerAssembly == null)
+            {
+                errorMessage = "The consumer assembly is required.";
+                return false;
+            }
+            return IMDataCoreController.Instance.TryAppendCustomEventOnce(
+                session,
+                consumerAssembly,
+                idempotencyKey,
+                idolId,
+                entityKind,
+                entityId,
+                eventType,
+                payloadJson,
+                sourcePatch,
+                out errorMessage);
+        }
+
         public static bool TryReadHistoryPage(
             long beforeEventIdExclusive,
             int maxCount,
@@ -3538,40 +3608,40 @@ namespace IMDataCore
         /// <summary>
         /// Returns total new fans metric from single release data.
         /// </summary>
-        private static int ResolveNewFans(singles._single releasedSingle)
+        private static long ResolveNewFans(singles._single releasedSingle)
         {
-            if (releasedSingle != null && releasedSingle.ReleaseData != null)
-            {
-                return releasedSingle.ReleaseData.NewFans;
-            }
-
-            return CoreConstants.ZeroBasedListStartIndex;
+            long ordinary;
+            long hardcore;
+            long casual;
+            SaveNLoadFixesWideNumericInterop.GetSingleReleaseFans(
+                releasedSingle, out ordinary, out hardcore, out casual);
+            return ordinary;
         }
 
         /// <summary>
         /// Returns new hardcore-fans metric from single release data.
         /// </summary>
-        private static int ResolveNewHardcoreFans(singles._single releasedSingle)
+        private static long ResolveNewHardcoreFans(singles._single releasedSingle)
         {
-            if (releasedSingle != null && releasedSingle.ReleaseData != null)
-            {
-                return releasedSingle.ReleaseData.NewHardcoreFans;
-            }
-
-            return CoreConstants.ZeroBasedListStartIndex;
+            long ordinary;
+            long hardcore;
+            long casual;
+            SaveNLoadFixesWideNumericInterop.GetSingleReleaseFans(
+                releasedSingle, out ordinary, out hardcore, out casual);
+            return hardcore;
         }
 
         /// <summary>
         /// Returns new casual-fans metric from single release data.
         /// </summary>
-        private static int ResolveNewCasualFans(singles._single releasedSingle)
+        private static long ResolveNewCasualFans(singles._single releasedSingle)
         {
-            if (releasedSingle != null && releasedSingle.ReleaseData != null)
-            {
-                return releasedSingle.ReleaseData.NewCasualFans;
-            }
-
-            return CoreConstants.ZeroBasedListStartIndex;
+            long ordinary;
+            long hardcore;
+            long casual;
+            SaveNLoadFixesWideNumericInterop.GetSingleReleaseFans(
+                releasedSingle, out ordinary, out hardcore, out casual);
+            return casual;
         }
 
         /// <summary>
@@ -5212,7 +5282,7 @@ namespace IMDataCore
                 ShowCastIdList = BuildDelimitedIdentifierList(castIdentifiers),
                 ShowLatestAudience = ResolveLatestLongMetric(show.audience),
                 ShowLatestRevenue = ResolveLatestLongMetric(show.revenue),
-                ShowLatestNewFans = ResolveLatestIntMetric(show.fans),
+                ShowLatestNewFans = ResolveLatestLongMetric(SaveNLoadFixesWideNumericInterop.GetShowFans(show)),
                 ShowLatestBuzz = ResolveLatestIntMetric(show.buzz),
                 ShowRelaunchCount = show.NumberOfRelaunches,
                 ShowWasRelaunched = show.WasRelaunched,
@@ -5463,24 +5533,9 @@ namespace IMDataCore
                 return new TourLifecyclePayload();
             }
 
-            long totalAudience = CoreConstants.ZeroLongValue;
-            long totalRevenue = CoreConstants.ZeroLongValue;
-            long totalNewFans = CoreConstants.ZeroLongValue;
-            if (tour.SelectedCountries != null)
-            {
-                for (int countryIndex = CoreConstants.ZeroBasedListStartIndex; countryIndex < tour.SelectedCountries.Count; countryIndex++)
-                {
-                    SEvent_Tour.tour.selectedCountry selectedCountry = tour.SelectedCountries[countryIndex];
-                    if (selectedCountry == null)
-                    {
-                        continue;
-                    }
-
-                    totalAudience += selectedCountry.Audience;
-                    totalRevenue += selectedCountry.Revenue;
-                    totalNewFans += selectedCountry.NewFans;
-                }
-            }
+            long totalAudience = SaveNLoadFixesWideNumericInterop.GetTourTotalAudience(tour);
+            long totalRevenue = SaveNLoadFixesWideNumericInterop.GetTourRevenue(tour);
+            long totalNewFans = SaveNLoadFixesWideNumericInterop.GetTourTotalCountryFans(tour);
 
             IReadOnlyList<int> participants = participantIdolIdentifiers ?? new List<int>();
             return new TourLifecyclePayload
@@ -5495,11 +5550,11 @@ namespace IMDataCore
                 TourTotalAudience = totalAudience,
                 TourTotalRevenue = totalRevenue,
                 TourTotalNewFans = totalNewFans,
-                TourProductionCost = tour.ProductionCost,
-                TourExpectedRevenue = tour.ExpectedRevenue,
-                TourSaving = tour.Saving,
+                TourProductionCost = SaveNLoadFixesWideNumericInterop.GetTourProductionCost(tour),
+                TourExpectedRevenue = SaveNLoadFixesWideNumericInterop.GetTourExpectedRevenue(tour),
+                TourSaving = SaveNLoadFixesWideNumericInterop.GetTourSaving(tour),
                 TourStaminaCost = tour.Stamina,
-                TourProfit = tour.GetProfit(),
+                TourProfit = SaveNLoadFixesWideNumericInterop.GetTourProfit(tour),
                 TourStartDate = tourStartDate ?? string.Empty,
                 TourFinishDate = tour.FinishDate == default(DateTime)
                     ? string.Empty
@@ -5552,6 +5607,10 @@ namespace IMDataCore
                 return new TourCountryResultPayload();
             }
 
+            int countryOrdinal = tour.SelectedCountries != null
+                ? tour.SelectedCountries.IndexOf(selectedCountry)
+                : CoreConstants.InvalidIdValue;
+
             return new TourCountryResultPayload
             {
                 TourId = tour.ID,
@@ -5567,9 +5626,18 @@ namespace IMDataCore
                 TourCountryCode = CoreEnumNameMapping.ToTourCountryCode(selectedCountry.Country.Type),
                 TourCountryLevel = selectedCountry.Level,
                 TourCountryAttendance = selectedCountry.Attendance,
-                TourCountryAudience = selectedCountry.Audience,
-                TourCountryNewFans = selectedCountry.NewFans,
-                TourCountryRevenue = selectedCountry.Revenue,
+                TourCountryAudience = SaveNLoadFixesWideNumericInterop.GetTourCountryAudience(
+                    tour,
+                    countryOrdinal,
+                    selectedCountry),
+                TourCountryNewFans = SaveNLoadFixesWideNumericInterop.GetTourCountryFans(
+                    tour,
+                    countryOrdinal,
+                    selectedCountry),
+                TourCountryRevenue = SaveNLoadFixesWideNumericInterop.GetTourCountryRevenue(
+                    tour,
+                    countryOrdinal,
+                    selectedCountry),
                 TourCountryDiscount = selectedCountry.Discount
             };
         }
@@ -7255,9 +7323,9 @@ namespace IMDataCore
             AppendIntProperty(builder, CoreConstants.JsonFieldQuality, payload.Quality, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldFanSatisfaction, payload.FanSatisfaction, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldFanBuzz, payload.FanBuzz, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldNewFans, payload.NewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldNewHardcoreFans, payload.NewHardcoreFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldNewCasualFans, payload.NewCasualFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldNewFans, payload.NewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldNewHardcoreFans, payload.NewHardcoreFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldNewCasualFans, payload.NewCasualFans, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldSingleQuantity, payload.SingleQuantity, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldSingleProductionCost, payload.SingleProductionCost, ref isFirstProperty);
             AppendFloatProperty(builder, CoreConstants.JsonFieldSingleMarketingResult, payload.SingleMarketingResult, ref isFirstProperty);
@@ -7466,7 +7534,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastIdList, payload.ShowCastIdList ?? string.Empty, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestAudience, payload.ShowLatestAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestRevenue, payload.ShowLatestRevenue, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestBuzz, payload.ShowLatestBuzz, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowRelaunchCount, payload.ShowRelaunchCount, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldShowWasRelaunched, payload.ShowWasRelaunched, ref isFirstProperty);
@@ -7499,7 +7567,7 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldShowCastIdList, payload.ShowCastIdList ?? string.Empty, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestAudience, payload.ShowLatestAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestRevenue, payload.ShowLatestRevenue, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestBuzz, payload.ShowLatestBuzz, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -7537,9 +7605,9 @@ namespace IMDataCore
             AppendLongProperty(builder, CoreConstants.JsonFieldShowPreviousProfit, payload.ShowPreviousProfit, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestProfit, payload.ShowLatestProfit, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldShowProfitDelta, payload.ShowProfitDelta, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowPreviousNewFans, payload.ShowPreviousNewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldShowNewFansDelta, payload.ShowNewFansDelta, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldShowPreviousNewFans, payload.ShowPreviousNewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldShowLatestNewFans, payload.ShowLatestNewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldShowNewFansDelta, payload.ShowNewFansDelta, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowPreviousBuzz, payload.ShowPreviousBuzz, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowLatestBuzz, payload.ShowLatestBuzz, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldShowBuzzDelta, payload.ShowBuzzDelta, ref isFirstProperty);
@@ -8151,11 +8219,11 @@ namespace IMDataCore
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalAudience, payload.TourTotalAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalRevenue, payload.TourTotalRevenue, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalNewFans, payload.TourTotalNewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourProductionCost, payload.TourProductionCost, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourExpectedRevenue, payload.TourExpectedRevenue, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourSaving, payload.TourSaving, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourProductionCost, payload.TourProductionCost, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourExpectedRevenue, payload.TourExpectedRevenue, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourSaving, payload.TourSaving, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourStaminaCost, payload.TourStaminaCost, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourProfit, payload.TourProfit, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourProfit, payload.TourProfit, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourStartDate, payload.TourStartDate ?? string.Empty, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourFinishDate, payload.TourFinishDate ?? string.Empty, ref isFirstProperty);
 
@@ -8184,9 +8252,9 @@ namespace IMDataCore
             AppendStringProperty(builder, CoreConstants.JsonFieldTourCountryCode, payload.TourCountryCode ?? string.Empty, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryLevel, payload.TourCountryLevel, ref isFirstProperty);
             AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryAttendance, payload.TourCountryAttendance, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryAudience, payload.TourCountryAudience, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryNewFans, payload.TourCountryNewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourCountryRevenue, payload.TourCountryRevenue, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourCountryAudience, payload.TourCountryAudience, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourCountryNewFans, payload.TourCountryNewFans, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourCountryRevenue, payload.TourCountryRevenue, ref isFirstProperty);
             AppendBooleanProperty(builder, CoreConstants.JsonFieldTourCountryDiscount, payload.TourCountryDiscount, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -8213,9 +8281,9 @@ namespace IMDataCore
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalAudience, payload.TourTotalAudience, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalRevenue, payload.TourTotalRevenue, ref isFirstProperty);
             AppendLongProperty(builder, CoreConstants.JsonFieldTourTotalNewFans, payload.TourTotalNewFans, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourProductionCost, payload.TourProductionCost, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourExpectedRevenue, payload.TourExpectedRevenue, ref isFirstProperty);
-            AppendIntProperty(builder, CoreConstants.JsonFieldTourSaving, payload.TourSaving, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourProductionCost, payload.TourProductionCost, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourExpectedRevenue, payload.TourExpectedRevenue, ref isFirstProperty);
+            AppendLongProperty(builder, CoreConstants.JsonFieldTourSaving, payload.TourSaving, ref isFirstProperty);
             AppendStringProperty(builder, CoreConstants.JsonFieldTourFinishDate, payload.TourFinishDate ?? string.Empty, ref isFirstProperty);
 
             builder.Append(CoreConstants.JsonObjectEndCharacter);
@@ -9177,9 +9245,9 @@ namespace IMDataCore
         public int Quality;
         public int FanSatisfaction;
         public int FanBuzz;
-        public int NewFans;
-        public int NewHardcoreFans;
-        public int NewCasualFans;
+        public long NewFans;
+        public long NewHardcoreFans;
+        public long NewCasualFans;
         public int SingleQuantity;
         public long SingleProductionCost;
         public float SingleMarketingResult;
@@ -9335,7 +9403,7 @@ namespace IMDataCore
         public string ShowCastIdList = string.Empty;
         public long ShowLatestAudience;
         public long ShowLatestRevenue;
-        public int ShowLatestNewFans;
+        public long ShowLatestNewFans;
         public int ShowLatestBuzz;
         public int ShowRelaunchCount;
         public bool ShowWasRelaunched;
@@ -9358,7 +9426,7 @@ namespace IMDataCore
         public string ShowCastIdList = string.Empty;
         public long ShowLatestAudience;
         public long ShowLatestRevenue;
-        public int ShowLatestNewFans;
+        public long ShowLatestNewFans;
         public int ShowLatestBuzz;
     }
 
@@ -9386,9 +9454,9 @@ namespace IMDataCore
         public long ShowPreviousProfit;
         public long ShowLatestProfit;
         public long ShowProfitDelta;
-        public int ShowPreviousNewFans;
-        public int ShowLatestNewFans;
-        public int ShowNewFansDelta;
+        public long ShowPreviousNewFans;
+        public long ShowLatestNewFans;
+        public long ShowNewFansDelta;
         public int ShowPreviousBuzz;
         public int ShowLatestBuzz;
         public int ShowBuzzDelta;
@@ -9769,11 +9837,11 @@ namespace IMDataCore
         public long TourTotalAudience;
         public long TourTotalRevenue;
         public long TourTotalNewFans;
-        public int TourProductionCost;
-        public int TourExpectedRevenue;
-        public int TourSaving;
+        public long TourProductionCost;
+        public long TourExpectedRevenue;
+        public long TourSaving;
         public int TourStaminaCost;
-        public int TourProfit;
+        public long TourProfit;
         public string TourStartDate = string.Empty;
         public string TourFinishDate = string.Empty;
     }
@@ -9792,9 +9860,9 @@ namespace IMDataCore
         public string TourCountryCode = string.Empty;
         public int TourCountryLevel;
         public int TourCountryAttendance;
-        public int TourCountryAudience;
-        public int TourCountryNewFans;
-        public int TourCountryRevenue;
+        public long TourCountryAudience;
+        public long TourCountryNewFans;
+        public long TourCountryRevenue;
         public bool TourCountryDiscount;
     }
 
@@ -9811,9 +9879,9 @@ namespace IMDataCore
         public long TourTotalAudience;
         public long TourTotalRevenue;
         public long TourTotalNewFans;
-        public int TourProductionCost;
-        public int TourExpectedRevenue;
-        public int TourSaving;
+        public long TourProductionCost;
+        public long TourExpectedRevenue;
+        public long TourSaving;
         public string TourFinishDate = string.Empty;
     }
 
@@ -9946,7 +10014,7 @@ namespace IMDataCore
         public bool loan_active_before;
         public bool loan_active_after;
         public long loan_amount;
-        public int loan_payment_per_week;
+        public long loan_payment_per_week;
         public int loan_interest_rate;
         public string loan_start_date = string.Empty;
         public string loan_end_date = string.Empty;
@@ -9958,7 +10026,7 @@ namespace IMDataCore
         public int loan_days_to_develop;
         public int loan_count_active;
         public int loan_count_total;
-        public int loan_total_payment_per_week;
+        public long loan_total_payment_per_week;
         public long loan_total_debt;
         public long money_before;
         public long money_after;
@@ -10074,7 +10142,7 @@ namespace IMDataCore
         public long fans_delta;
         public int active_idol_count_before;
         public int active_idol_count_after;
-        public int per_idol_earnings;
+        public long per_idol_earnings;
         public float stamina_cost;
         public int spa_heal;
         public int spa_cost;
@@ -10130,10 +10198,10 @@ namespace IMDataCore
         public string schedule_fan_type = string.Empty;
         public int attendance;
         public long revenue;
-        public int subscribers_delta;
+        public long subscribers_delta;
         public long subscribers_total;
         public int avg_attendance_7d;
-        public int avg_revenue_7d;
+        public long avg_revenue_7d;
         public string weekly_schedule_summary = string.Empty;
         public long total_money_before;
         public long total_money_after;
@@ -10171,8 +10239,8 @@ namespace IMDataCore
         public int dish_id = CoreConstants.InvalidIdValue;
         public string dish_type = string.Empty;
         public string dish_title = string.Empty;
-        public int profit;
-        public int new_fans;
+        public long profit;
+        public long new_fans;
         public string fan_type = string.Empty;
         public int staffed_idol_count;
         public string staffed_idol_id_list = string.Empty;
@@ -10200,7 +10268,7 @@ namespace IMDataCore
         public bool can_fire_before;
         public bool can_fire_severance_before;
         public int fire_points_cost;
-        public int severance_cost;
+        public long severance_cost;
         public long scandal_points_before;
         public long scandal_points_after;
         public long money_before;
@@ -10625,12 +10693,12 @@ namespace IMDataCore
         public long fans_before;
         public long fans_after;
         public long fans_delta;
-        public int fame_before;
-        public int fame_after;
-        public int fame_delta;
-        public int buzz_before;
-        public int buzz_after;
-        public int buzz_delta;
+        public long fame_before;
+        public long fame_after;
+        public long fame_delta;
+        public long buzz_before;
+        public long buzz_after;
+        public long buzz_delta;
         public string event_date = string.Empty;
     }
 
@@ -10682,12 +10750,12 @@ namespace IMDataCore
         public long fans_before;
         public long fans_after;
         public long fans_delta;
-        public int fame_before;
-        public int fame_after;
-        public int fame_delta;
-        public int buzz_before;
-        public int buzz_after;
-        public int buzz_delta;
+        public long fame_before;
+        public long fame_after;
+        public long fame_delta;
+        public long buzz_before;
+        public long buzz_after;
+        public long buzz_delta;
         public string event_date = string.Empty;
     }
 
@@ -10727,8 +10795,8 @@ namespace IMDataCore
         public long money_after;
         public long money_delta;
         public long fans_total;
-        public int fame_points;
-        public int buzz_points;
+        public long fame_points;
+        public long buzz_points;
         public string event_date = string.Empty;
     }
 
@@ -10742,14 +10810,14 @@ namespace IMDataCore
         public long money_after;
         public long money_delta;
         public long expected_daily_profit;
-        public int buzz_before;
-        public int buzz_after;
-        public int buzz_delta;
-        public int expected_daily_buzz_gain;
-        public int fame_before;
-        public int fame_after;
-        public int fame_delta;
-        public int expected_daily_fame_gain;
+        public long buzz_before;
+        public long buzz_after;
+        public long buzz_delta;
+        public long expected_daily_buzz_gain;
+        public long fame_before;
+        public long fame_after;
+        public long fame_delta;
+        public long expected_daily_fame_gain;
         public long fans_before;
         public long fans_after;
         public long fans_delta;
@@ -11067,7 +11135,7 @@ namespace IMDataCore
         internal int LoanDaysToDevelop;
         internal long Money;
         internal long TotalDebt;
-        internal int TotalPaymentPerWeek;
+        internal long TotalPaymentPerWeek;
         internal int ActiveLoanCount;
         internal int TotalLoanCount;
         internal bool LoanContained;
@@ -11220,7 +11288,7 @@ namespace IMDataCore
         internal bool CanFireBefore;
         internal bool CanFireSeveranceBefore;
         internal int FirePointsCostBefore;
-        internal int SeveranceCostBefore;
+        internal long SeveranceCostBefore;
         internal long ScandalPointsBefore;
         internal long MoneyBefore;
         internal string RoomType = string.Empty;
@@ -11603,8 +11671,8 @@ namespace IMDataCore
     {
         internal long MoneyBefore;
         internal long FansBefore;
-        internal int FameBefore;
-        internal int BuzzBefore;
+        internal long FameBefore;
+        internal long BuzzBefore;
         internal int ActiveEventCountBefore;
     }
 
@@ -11622,8 +11690,8 @@ namespace IMDataCore
         internal long EstimatedLiabilityBefore;
         internal long MoneyBefore;
         internal long FansBefore;
-        internal int FameBefore;
-        internal int BuzzBefore;
+        internal long FameBefore;
+        internal long BuzzBefore;
     }
 
     /// <summary>
@@ -11720,8 +11788,8 @@ namespace IMDataCore
     {
         internal long MoneyBefore;
         internal long FansBefore;
-        internal int FameBefore;
-        internal int BuzzBefore;
+        internal long FameBefore;
+        internal long BuzzBefore;
         internal int FameLevelBefore;
         internal float FameProgressBefore;
     }

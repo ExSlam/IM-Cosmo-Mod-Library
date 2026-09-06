@@ -47,7 +47,10 @@ save. At that boundary Graduation Details records the vanilla relative path, rea
 time, playtime, and in-game date. Loading requires that complete tuple to select the matching
 supplemental checkpoint; sequence numbers order history but never decide which save is loaded.
 New Save carries the active branch into the new exact vanilla slot; Overwrite Save updates the
-checkpoint for the selected existing slot.
+checkpoint for the selected existing slot. When vanilla deletes a manual-save slot or story
+playthrough, Graduation Details archives the matching standalone mirror as `.OLD`, `.OLD2`, and
+so on instead of leaving stale state behind for a future slot reuse. The archive step never
+touches the vanilla save file and never participates in SNLF/SWOF transport locking.
 
 ## Legacy migration
 
@@ -58,11 +61,19 @@ read-only for that physical save path, so the original data cannot be overwritte
 retains one `.graduationdetails.bak` recovery generation and can restore from it when the primary
 sidecar cannot be activated.
 
-When IM Data Core is enabled, ready, and writable, Graduation Details stores its detailed archival snapshot
+With the current IM Data Core 3.4.33 sidecar-v6 / journal-v3 consumer contract, Graduation
+Details binds only to the `com.cosmo.imdatacore` assembly and uses `IMDataCoreInteropApi` with
+its own assembly supplied explicitly for namespace registration and custom-state access. When
+IM Data Core is ready and writable, Graduation Details stores its detailed archival snapshot
 inside IMDC's checkpointed custom state and leaves its standalone sidecar untouched. If IMDC is
-not present, too old for the optional interop API, persistence-blocked for the active save, or has
-not yet taken ownership of Graduation Details state, standalone persistence remains available. Once delegated state exists, a failed or
-invalid IMDC update fails closed rather than creating a divergent standalone history.
+absent, does not expose the complete current owner-safe interop contract, is persistence-blocked
+for the active save, or has not yet taken ownership of Graduation Details state, standalone
+persistence remains available. Once delegated state exists, a failed or invalid IMDC update
+fails closed rather than creating a divergent standalone history.
+
+Graduation Details does not call Save n Load Fixes or Save Write Ordering Fix directly. Those
+mods coordinate the physical vanilla-save transport below IM Data Core; Graduation Details owns
+only its domain state and its optional standalone mirror.
 
 ## Build
 

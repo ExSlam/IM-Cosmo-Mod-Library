@@ -23,8 +23,8 @@ namespace IdolCareerDiary
     {
         internal const string HarmonyId = "com.cosmo.idolcareerdiary";
         internal const string HarmonyIdImDataCore = "com.cosmo.imdatacore";
-        internal const string MinimumImDataCoreDisplayVersion = "3.4.5";
-        internal const string MinimumImDataCoreAssemblyVersionText = "3.4.5.0";
+        internal const string MinimumImDataCoreDisplayVersion = "3.4.33";
+        internal const string MinimumImDataCoreAssemblyVersionText = "3.4.33.0";
         internal static readonly Version MinimumImDataCoreAssemblyVersion = new Version(MinimumImDataCoreAssemblyVersionText);
         internal const string HarmonyIdImUiFramework = "com.cosmo.imuiframework";
         internal const string HarmonyIdGraduationRebalances = "com.cosmo.graduationrebalances";
@@ -39,6 +39,9 @@ namespace IdolCareerDiary
         internal const string CoreNamespace = "com.cosmo.idol_career_diary";
         internal const string CoreSelectedEventKeyPrefix = "profile_last_selected_event_";
         internal const string CoreSelectedEventJsonField = "event_id";
+        internal const string CoreBirthdayCapabilityToken = "idol_career_diary_birthday_events";
+        internal const int CoreBirthdayCapabilityRevision = 1;
+        internal const string CoreBirthdayIdempotencyKeyPrefix = "idol_birthday_";
         internal const int CoreRegistrationRetrySeconds = 5;
         internal const int DependencyLogRetrySeconds = 15;
         internal const string ConfigFileName = "IdolCareerDiary.config.ini";
@@ -862,8 +865,10 @@ namespace IdolCareerDiary
     
         
         internal const string IdImDataCoreImDataCoreApi = "IMDataCore.IMDataCoreApi";
+        internal const string IdImDataCoreInteropApi = "IMDataCore.IMDataCoreInteropApi";
         internal const string IdImDataCoreImDataCoreSession = "IMDataCore.IMDataCoreSession";
         internal const string IdImDataCoreImDataCoreEvent = "IMDataCore.IMDataCoreEvent";
+        internal const string IdImDataCoreCapabilityRevision = "IMDataCore.IMDataCoreCapabilityRevision";
         internal static string TextNamespaceIsEmpty { get { return ModLocalization.Get("TextNamespaceIsEmpty", "Namespace is empty."); } }
         internal static string TextImDataCoreReturnedAnEmptySession { get { return ModLocalization.Get("TextImDataCoreReturnedAnEmptySession", "IM Data Core returned an empty session."); } }
         internal static string TextImDataCoreSessionIsUnavailable { get { return ModLocalization.Get("TextImDataCoreSessionIsUnavailable", "IM Data Core session is unavailable."); } }
@@ -876,11 +881,13 @@ namespace IdolCareerDiary
         internal const string MemberNameTryRegisterNamespace = "TryRegisterNamespace";
         internal const string MemberNameTryGetCustomJson = "TryGetCustomJson";
         internal const string MemberNameTrySetCustomJson = "TrySetCustomJson";
-        internal const string MemberNameTryAppendCustomEvent = "TryAppendCustomEvent";
+        internal const string MemberNameTryAppendCustomEventOnce = "TryAppendCustomEventOnce";
+        internal const string MemberNameTryDeclareNamespaceCapabilities = "TryDeclareNamespaceCapabilities";
         internal const string MemberNameTryReadRecentEventsForIdol = "TryReadRecentEventsForIdol";
         internal const string MemberNameTryReadEventsForIdolPage = "TryReadEventsForIdolPage";
         internal static string TextImDataCoreApiMethodSignatureMismatch { get { return ModLocalization.Get("TextImDataCoreApiMethodSignatureMismatch", "IM Data Core API method signature mismatch."); } }
-        internal static string TextImDataCoreAppendCustomEventMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreAppendCustomEventMethodIsUnavailable", "IM Data Core append-custom-event method is unavailable."); } }
+        internal static string TextImDataCoreAppendCustomEventMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreAppendCustomEventMethodIsUnavailable", "IM Data Core append-once custom-event method is unavailable."); } }
+        internal static string TextImDataCoreCapabilityDeclarationFailedPrefix { get { return ModLocalization.Get("TextImDataCoreCapabilityDeclarationFailedPrefix", "IM Data Core capability declaration failed: "); } }
         internal static string TextBirthdayEventAppendFailedPrefix { get { return ModLocalization.Get("TextBirthdayEventAppendFailedPrefix", "Failed to append birthday event: "); } }
         internal const string MemberNameEventId = "EventId";
         internal const string MemberNameGameDateKey = "GameDateKey";
@@ -892,6 +899,9 @@ namespace IdolCareerDiary
         internal const string MemberNameSourcePatch = "SourcePatch";
         internal const string MemberNamePayloadJson = "PayloadJson";
         internal const string MemberNameNamespaceId = "NamespaceId";
+        internal const string MemberNameIdempotencyKey = "IdempotencyKey";
+        internal const string MemberNameParticipantSchemaVersion = "ParticipantSchemaVersion";
+        internal const string MemberNameParticipantKnownness = "ParticipantKnownness";
         internal static string TextImDataCoreEventPropertySignatureMismatch { get { return ModLocalization.Get("TextImDataCoreEventPropertySignatureMismatch", "IM Data Core event property signature mismatch."); } }
         internal static string TextImDataCoreBridgeMethodIsUnavailable { get { return ModLocalization.Get("TextImDataCoreBridgeMethodIsUnavailable", "IM Data Core bridge method is unavailable."); } }
         internal const string IdImUiFrameworkImUiKit = "IMUiFramework.IMUiKit";
@@ -2162,8 +2172,10 @@ namespace IdolCareerDiary
         internal const string MemberNameLoadSenbatsu = "LoadSenbatsu";
 
         // Literal constants used for numeric cleanup.
-        internal const int ImDataCoreCustomJsonMethodParameterCount = 4;
-        internal const int ImDataCoreAppendCustomEventMethodParameterCount = 8;
+        internal const int ImDataCoreInteropRegisterNamespaceMethodParameterCount = 4;
+        internal const int ImDataCoreInteropCustomJsonMethodParameterCount = 5;
+        internal const int ImDataCoreInteropAppendCustomEventOnceMethodParameterCount = 10;
+        internal const int ImDataCoreInteropDeclareCapabilitiesMethodParameterCount = 5;
         internal const int ImDataCoreRecentEventsMethodParameterCount = 4;
         internal const int ImDataCorePagedEventsMethodParameterCount = 6;
         internal const int ShowCastSummaryMaxNames = 4;
@@ -2277,6 +2289,19 @@ namespace IdolCareerDiary
     }
 
     /// <summary>
+    /// Local copy of IM Data Core participant certainty. Integer values mirror the
+    /// public v6 contract so the reflection bridge does not require a compile-time
+    /// IMDataCore assembly reference.
+    /// </summary>
+    public enum IMDataCoreParticipantKnownness
+    {
+        NotApplicable = 0,
+        Exact = 1,
+        Unknown = 2,
+        Malformed = 3
+    }
+
+    /// <summary>
     /// Local event DTO mapped from IM Data Core reflected event objects.
     /// </summary>
     public sealed class IMDataCoreEvent
@@ -2291,6 +2316,9 @@ namespace IdolCareerDiary
         public string SourcePatch { get; internal set; }
         public string PayloadJson { get; internal set; }
         public string NamespaceId { get; internal set; }
+        public string IdempotencyKey { get; internal set; }
+        public int ParticipantSchemaVersion { get; internal set; }
+        public IMDataCoreParticipantKnownness ParticipantKnownness { get; internal set; }
     }
 
     /// <summary>
@@ -2300,24 +2328,31 @@ namespace IdolCareerDiary
     {
         private const string AssemblyNameImDataCore = C.HarmonyIdImDataCore;
         private const string TypeNameApi = C.IdImDataCoreImDataCoreApi;
-        private const string TypeNameApiAlias = C.IdImDataCoreImDataCoreApi;
+        private const string TypeNameInteropApi = C.IdImDataCoreInteropApi;
         private const string TypeNameSession = C.IdImDataCoreImDataCoreSession;
         private const string TypeNameEvent = C.IdImDataCoreImDataCoreEvent;
+        private const string TypeNameCapabilityRevision = C.IdImDataCoreCapabilityRevision;
         private const int ResolveRetrySeconds = C.CoreRegistrationRetrySeconds;
 
         private static readonly object Sync = new object();
         private static DateTime nextResolveAttemptUtc = DateTime.MinValue;
         private static string lastResolveError = string.Empty;
+        private static bool bridgeReady;
+
+        private static readonly Assembly ConsumerAssembly = typeof(IMDataCoreApi).Assembly;
 
         private static Type apiType;
+        private static Type interopApiType;
         private static Type sessionType;
         private static Type eventType;
+        private static Type capabilityRevisionType;
 
         private static MethodInfo methodIsReady;
         private static MethodInfo methodTryRegisterNamespace;
         private static MethodInfo methodTryGetCustomJson;
         private static MethodInfo methodTrySetCustomJson;
-        private static MethodInfo methodTryAppendCustomEvent;
+        private static MethodInfo methodTryAppendCustomEventOnce;
+        private static MethodInfo methodTryDeclareNamespaceCapabilities;
         private static MethodInfo methodTryReadRecentEventsForIdol;
         private static MethodInfo methodTryReadEventsForIdolPage;
 
@@ -2331,6 +2366,9 @@ namespace IdolCareerDiary
         private static PropertyInfo propertySourcePatch;
         private static PropertyInfo propertyPayloadJson;
         private static PropertyInfo propertyNamespaceId;
+        private static PropertyInfo propertyIdempotencyKey;
+        private static PropertyInfo propertyParticipantSchemaVersion;
+        private static PropertyInfo propertyParticipantKnownness;
 
         internal static bool TryResolveDependency(out string errorMessage)
         {
@@ -2370,7 +2408,7 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            object[] args = new object[] { namespaceIdentifier, null, string.Empty };
+            object[] args = new object[] { namespaceIdentifier, ConsumerAssembly, null, string.Empty };
             object invokeResult;
             if (!TryInvokeBool(methodTryRegisterNamespace, args, out invokeResult, out errorMessage))
             {
@@ -2380,18 +2418,18 @@ namespace IdolCareerDiary
             bool success = invokeResult is bool && (bool)invokeResult;
             if (!success)
             {
-                errorMessage = CoalesceOutString(args, C.TimelineActionButtonsPerRow, errorMessage);
+                errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, errorMessage);
                 return false;
             }
 
-            if (args[C.LastFromCount] == null)
+            if (args[2] == null)
             {
                 errorMessage = C.TextImDataCoreReturnedAnEmptySession;
                 return false;
             }
 
-            session = new IMDataCoreSession(args[C.LastFromCount]);
-            errorMessage = CoalesceOutString(args, C.TimelineActionButtonsPerRow, string.Empty);
+            session = new IMDataCoreSession(args[2]);
+            errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, string.Empty);
             return true;
         }
 
@@ -2411,7 +2449,7 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            object[] args = new object[] { session.RawSession, dataKey, null, string.Empty };
+            object[] args = new object[] { session.RawSession, ConsumerAssembly, dataKey, null, string.Empty };
             object invokeResult;
             if (!TryInvokeBool(methodTryGetCustomJson, args, out invokeResult, out errorMessage))
             {
@@ -2419,14 +2457,14 @@ namespace IdolCareerDiary
             }
 
             bool success = invokeResult is bool && (bool)invokeResult;
-            jsonValue = args[C.TimelineActionButtonsPerRow] as string ?? string.Empty;
+            jsonValue = args[3] as string ?? string.Empty;
             if (!success)
             {
-                errorMessage = CoalesceOutString(args, C.TimelineFilterButtonsPerRow, errorMessage);
+                errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, errorMessage);
                 return false;
             }
 
-            errorMessage = CoalesceOutString(args, C.TimelineFilterButtonsPerRow, string.Empty);
+            errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, string.Empty);
             return true;
         }
 
@@ -2445,7 +2483,7 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            object[] args = new object[] { session.RawSession, dataKey, jsonValue, string.Empty };
+            object[] args = new object[] { session.RawSession, ConsumerAssembly, dataKey, jsonValue, string.Empty };
             object invokeResult;
             if (!TryInvokeBool(methodTrySetCustomJson, args, out invokeResult, out errorMessage))
             {
@@ -2455,16 +2493,17 @@ namespace IdolCareerDiary
             bool success = invokeResult is bool && (bool)invokeResult;
             if (!success)
             {
-                errorMessage = CoalesceOutString(args, C.TimelineFilterButtonsPerRow, errorMessage);
+                errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, errorMessage);
                 return false;
             }
 
-            errorMessage = CoalesceOutString(args, C.TimelineFilterButtonsPerRow, string.Empty);
+            errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, string.Empty);
             return true;
         }
 
-        internal static bool TryAppendCustomEvent(
+        internal static bool TryAppendCustomEventOnce(
             IMDataCoreSession session,
+            string idempotencyKey,
             int idolId,
             string entityKind,
             string entityId,
@@ -2486,7 +2525,7 @@ namespace IdolCareerDiary
                 return false;
             }
 
-            if (methodTryAppendCustomEvent == null)
+            if (methodTryAppendCustomEventOnce == null)
             {
                 errorMessage = C.TextImDataCoreAppendCustomEventMethodIsUnavailable;
                 return false;
@@ -2495,6 +2534,8 @@ namespace IdolCareerDiary
             object[] args = new object[]
             {
                 session.RawSession,
+                ConsumerAssembly,
+                idempotencyKey ?? string.Empty,
                 idolId,
                 entityKind ?? string.Empty,
                 entityId ?? string.Empty,
@@ -2505,7 +2546,7 @@ namespace IdolCareerDiary
             };
 
             object invokeResult;
-            if (!TryInvokeBool(methodTryAppendCustomEvent, args, out invokeResult, out errorMessage))
+            if (!TryInvokeBool(methodTryAppendCustomEventOnce, args, out invokeResult, out errorMessage))
             {
                 return false;
             }
@@ -2517,6 +2558,67 @@ namespace IdolCareerDiary
                 return false;
             }
 
+            errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, string.Empty);
+            return true;
+        }
+
+        internal static bool TryDeclareNamespaceCapabilities(
+            IMDataCoreSession session,
+            out string capabilitySetId,
+            out string errorMessage)
+        {
+            capabilitySetId = string.Empty;
+            errorMessage = string.Empty;
+            if (session == null || session.RawSession == null)
+            {
+                errorMessage = C.TextImDataCoreSessionIsUnavailable;
+                return false;
+            }
+            if (!TryEnsureBridgeReady(out errorMessage))
+            {
+                return false;
+            }
+            if (methodTryDeclareNamespaceCapabilities == null || capabilityRevisionType == null)
+            {
+                errorMessage = C.TextImDataCoreApiMethodSignatureMismatch;
+                return false;
+            }
+
+            object capability;
+            try
+            {
+                capability = Activator.CreateInstance(
+                    capabilityRevisionType,
+                    new object[] { C.CoreBirthdayCapabilityToken, C.CoreBirthdayCapabilityRevision });
+            }
+            catch (Exception exception)
+            {
+                errorMessage = exception.GetBaseException().Message;
+                return false;
+            }
+
+            Array capabilities = Array.CreateInstance(capabilityRevisionType, C.LastFromCount);
+            capabilities.SetValue(capability, C.ZeroIndex);
+            object[] args = new object[]
+            {
+                session.RawSession,
+                ConsumerAssembly,
+                capabilities,
+                string.Empty,
+                string.Empty
+            };
+            object invokeResult;
+            if (!TryInvokeBool(methodTryDeclareNamespaceCapabilities, args, out invokeResult, out errorMessage))
+            {
+                return false;
+            }
+            bool success = invokeResult is bool && (bool)invokeResult;
+            capabilitySetId = args[3] as string ?? string.Empty;
+            if (!success)
+            {
+                errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, errorMessage);
+                return false;
+            }
             errorMessage = CoalesceOutString(args, args.Length - C.LastFromCount, string.Empty);
             return true;
         }
@@ -2627,7 +2729,7 @@ namespace IdolCareerDiary
         {
             lock (Sync)
             {
-                if (apiType != null && methodIsReady != null)
+                if (bridgeReady)
                 {
                     errorMessage = string.Empty;
                     return true;
@@ -2704,24 +2806,23 @@ namespace IdolCareerDiary
             }
 
             apiType = targetAssembly.GetType(TypeNameApi, false);
-            if (apiType == null)
-            {
-                apiType = targetAssembly.GetType(TypeNameApiAlias, false);
-            }
+            interopApiType = targetAssembly.GetType(TypeNameInteropApi, false);
             sessionType = targetAssembly.GetType(TypeNameSession, false);
             eventType = targetAssembly.GetType(TypeNameEvent, false);
+            capabilityRevisionType = targetAssembly.GetType(TypeNameCapabilityRevision, false);
 
-            if (apiType == null || sessionType == null || eventType == null)
+            if (apiType == null || interopApiType == null || sessionType == null || eventType == null || capabilityRevisionType == null)
             {
                 errorMessage = C.TextImDataCoreApiTypesWereNotFoundInAssembly;
                 return false;
             }
 
             methodIsReady = FindMethod(apiType, C.MemberNameIsReady, C.MinId);
-            methodTryRegisterNamespace = FindMethod(apiType, C.MemberNameTryRegisterNamespace, C.TimelineFilterButtonsPerRow);
-            methodTryGetCustomJson = FindMethod(apiType, C.MemberNameTryGetCustomJson, C.ImDataCoreCustomJsonMethodParameterCount);
-            methodTrySetCustomJson = FindMethod(apiType, C.MemberNameTrySetCustomJson, C.ImDataCoreCustomJsonMethodParameterCount);
-            methodTryAppendCustomEvent = FindMethod(apiType, C.MemberNameTryAppendCustomEvent, C.ImDataCoreAppendCustomEventMethodParameterCount);
+            methodTryRegisterNamespace = FindMethod(interopApiType, C.MemberNameTryRegisterNamespace, C.ImDataCoreInteropRegisterNamespaceMethodParameterCount);
+            methodTryGetCustomJson = FindMethod(interopApiType, C.MemberNameTryGetCustomJson, C.ImDataCoreInteropCustomJsonMethodParameterCount);
+            methodTrySetCustomJson = FindMethod(interopApiType, C.MemberNameTrySetCustomJson, C.ImDataCoreInteropCustomJsonMethodParameterCount);
+            methodTryAppendCustomEventOnce = FindMethod(interopApiType, C.MemberNameTryAppendCustomEventOnce, C.ImDataCoreInteropAppendCustomEventOnceMethodParameterCount);
+            methodTryDeclareNamespaceCapabilities = FindMethod(interopApiType, C.MemberNameTryDeclareNamespaceCapabilities, C.ImDataCoreInteropDeclareCapabilitiesMethodParameterCount);
             methodTryReadRecentEventsForIdol = FindMethod(apiType, C.MemberNameTryReadRecentEventsForIdol, C.ImDataCoreRecentEventsMethodParameterCount);
             methodTryReadEventsForIdolPage = FindMethod(apiType, C.MemberNameTryReadEventsForIdolPage, C.ImDataCorePagedEventsMethodParameterCount);
 
@@ -2729,6 +2830,8 @@ namespace IdolCareerDiary
                 methodTryRegisterNamespace == null ||
                 methodTryGetCustomJson == null ||
                 methodTrySetCustomJson == null ||
+                methodTryAppendCustomEventOnce == null ||
+                methodTryDeclareNamespaceCapabilities == null ||
                 methodTryReadRecentEventsForIdol == null ||
                 methodTryReadEventsForIdolPage == null)
             {
@@ -2746,6 +2849,9 @@ namespace IdolCareerDiary
             propertySourcePatch = eventType.GetProperty(C.MemberNameSourcePatch, BindingFlags.Public | BindingFlags.Instance);
             propertyPayloadJson = eventType.GetProperty(C.MemberNamePayloadJson, BindingFlags.Public | BindingFlags.Instance);
             propertyNamespaceId = eventType.GetProperty(C.MemberNameNamespaceId, BindingFlags.Public | BindingFlags.Instance);
+            propertyIdempotencyKey = eventType.GetProperty(C.MemberNameIdempotencyKey, BindingFlags.Public | BindingFlags.Instance);
+            propertyParticipantSchemaVersion = eventType.GetProperty(C.MemberNameParticipantSchemaVersion, BindingFlags.Public | BindingFlags.Instance);
+            propertyParticipantKnownness = eventType.GetProperty(C.MemberNameParticipantKnownness, BindingFlags.Public | BindingFlags.Instance);
 
             if (propertyEventId == null ||
                 propertyGameDateKey == null ||
@@ -2755,12 +2861,17 @@ namespace IdolCareerDiary
                 propertyEntityId == null ||
                 propertyEventType == null ||
                 propertySourcePatch == null ||
-                propertyPayloadJson == null)
+                propertyPayloadJson == null ||
+                propertyNamespaceId == null ||
+                propertyIdempotencyKey == null ||
+                propertyParticipantSchemaVersion == null ||
+                propertyParticipantKnownness == null)
             {
                 errorMessage = C.TextImDataCoreEventPropertySignatureMismatch;
                 return false;
             }
 
+            bridgeReady = true;
             return true;
         }
 
@@ -2882,6 +2993,9 @@ namespace IdolCareerDiary
             mapped.SourcePatch = ReadString(rawEvent, propertySourcePatch);
             mapped.PayloadJson = ReadString(rawEvent, propertyPayloadJson);
             mapped.NamespaceId = ReadString(rawEvent, propertyNamespaceId);
+            mapped.IdempotencyKey = ReadString(rawEvent, propertyIdempotencyKey);
+            mapped.ParticipantSchemaVersion = ReadInt(rawEvent, propertyParticipantSchemaVersion);
+            mapped.ParticipantKnownness = ReadParticipantKnownness(rawEvent, propertyParticipantKnownness);
             return mapped;
         }
 
@@ -2966,6 +3080,40 @@ namespace IdolCareerDiary
             catch
             {
                 return C.InvalidId;
+            }
+        }
+
+        private static IMDataCoreParticipantKnownness ReadParticipantKnownness(object source, PropertyInfo property)
+        {
+            if (source == null || property == null)
+            {
+                return IMDataCoreParticipantKnownness.NotApplicable;
+            }
+            try
+            {
+                object value = property.GetValue(source, null);
+                if (value == null)
+                {
+                    return IMDataCoreParticipantKnownness.NotApplicable;
+                }
+                string name = value.ToString() ?? string.Empty;
+                if (string.Equals(name, "Exact", StringComparison.Ordinal))
+                {
+                    return IMDataCoreParticipantKnownness.Exact;
+                }
+                if (string.Equals(name, "Unknown", StringComparison.Ordinal))
+                {
+                    return IMDataCoreParticipantKnownness.Unknown;
+                }
+                if (string.Equals(name, "Malformed", StringComparison.Ordinal))
+                {
+                    return IMDataCoreParticipantKnownness.Malformed;
+                }
+                return IMDataCoreParticipantKnownness.NotApplicable;
+            }
+            catch
+            {
+                return IMDataCoreParticipantKnownness.NotApplicable;
             }
         }
 
@@ -3564,8 +3712,10 @@ namespace IdolCareerDiary
             payload[C.KeyIdolAge].AsInt = Mathf.Max(C.ZeroIndex, girl.GetAge());
             payload[C.KeyIdolBirthdayDate] = staticVars.dateTime.ToString(C.DateFormatRoundTrip, CultureInfo.InvariantCulture);
 
-            if (!IMDataCoreApi.TryAppendCustomEvent(
+            string idempotencyKey = BuildBirthdayIdempotencyKey(girl.id, staticVars.dateTime);
+            if (!IMDataCoreApi.TryAppendCustomEventOnce(
                 coreSession,
+                idempotencyKey,
                 girl.id,
                 C.KindIdol,
                 girl.id.ToString(CultureInfo.InvariantCulture),
@@ -3579,6 +3729,13 @@ namespace IdolCareerDiary
                     Log.Warn(C.TextBirthdayEventAppendFailedPrefix + error);
                 }
             }
+        }
+
+        private static string BuildBirthdayIdempotencyKey(int idolId, DateTime gameDate)
+        {
+            return C.CoreBirthdayIdempotencyKeyPrefix +
+                idolId.ToString(CultureInfo.InvariantCulture) + "_" +
+                gameDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -3618,6 +3775,14 @@ namespace IdolCareerDiary
                 if (!IMDataCoreApi.TryRegisterNamespace(C.CoreNamespace, out coreSession, out error))
                 {
                     Log.Warn(C.TextCoreNamespaceRegistrationFailedPrefix + error);
+                    return false;
+                }
+
+                string capabilitySetId;
+                if (!IMDataCoreApi.TryDeclareNamespaceCapabilities(coreSession, out capabilitySetId, out error))
+                {
+                    Log.Warn(C.TextImDataCoreCapabilityDeclarationFailedPrefix + error);
+                    coreSession = null;
                     return false;
                 }
 
@@ -16915,6 +17080,13 @@ namespace IdolCareerDiary
             if (!IsSocialRelationshipEventType(ev != null ? ev.EventType : string.Empty))
             {
                 return true;
+            }
+
+            if (ev != null &&
+                (ev.ParticipantKnownness == IMDataCoreParticipantKnownness.Unknown ||
+                 ev.ParticipantKnownness == IMDataCoreParticipantKnownness.Malformed))
+            {
+                return false;
             }
 
             if (idol != null && idol.id == participantId)

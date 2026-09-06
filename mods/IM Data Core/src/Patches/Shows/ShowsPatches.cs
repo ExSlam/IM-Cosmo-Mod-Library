@@ -211,6 +211,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix()
         {
             ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceShowRevenue);

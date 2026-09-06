@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
@@ -337,6 +338,172 @@ namespace GraduationDetails
                 calledMethod.ReturnType == typeof(SaveManager.SavedData) &&
                 parameters.Length == 1 &&
                 parameters[0].ParameterType == typeof(string);
+        }
+    }
+
+    internal sealed class GraduationDetailsDeletedSaveArchiveState
+    {
+        internal string VanillaDirectoryPath = "";
+    }
+
+    internal static class GraduationDetailsDeletedSaveArchiveBinding
+    {
+        internal static GraduationDetailsDeletedSaveArchiveState Capture(
+            string vanillaDirectoryPath)
+        {
+            if (string.IsNullOrWhiteSpace(vanillaDirectoryPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                return new GraduationDetailsDeletedSaveArchiveState
+                {
+                    VanillaDirectoryPath = Path.GetFullPath(vanillaDirectoryPath)
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static void ArchiveAfterSuccessfulDelete(
+            GraduationDetailsDeletedSaveArchiveState state)
+        {
+            if (state == null ||
+                string.IsNullOrEmpty(state.VanillaDirectoryPath) ||
+                Directory.Exists(state.VanillaDirectoryPath))
+            {
+                return;
+            }
+
+            GraduationDetailsPersistenceController.OnVanillaSaveDirectoryDeleted(
+                state.VanillaDirectoryPath);
+        }
+    }
+
+    /// <summary>
+    /// Archives the standalone Graduation Details mirror after vanilla removes a
+    /// freeplay/manual save directory. IMDC/SNLF/SWOF continue to own vanilla
+    /// transport coordination; this patch never acquires their locks or touches
+    /// the vanilla save file.
+    /// </summary>
+    [HarmonyPatch(typeof(Popup_Save), "Delete")]
+    internal static class Popup_Save_Delete_GraduationDetailsArchive_Patch
+    {
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.cosmo.imdatacore")]
+        private static void Prefix(
+            Popup_Save __instance,
+            out GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            __state = null;
+            try
+            {
+                if (__instance == null || __instance.SaveFile_ID == 0)
+                {
+                    return;
+                }
+
+                __state = GraduationDetailsDeletedSaveArchiveBinding.Capture(
+                    Path.Combine(
+                        UnityEngine.Application.persistentDataPath,
+                        "data",
+                        "manual_saves",
+                        __instance.SaveFile_ID.ToString()));
+            }
+            catch
+            {
+                __state = null;
+            }
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter("com.cosmo.imdatacore")]
+        private static Exception Finalizer(
+            Exception __exception,
+            GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            GraduationDetailsDeletedSaveArchiveBinding
+                .ArchiveAfterSuccessfulDelete(__state);
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class Popup_Load_Story_Delete_Save_GraduationDetailsArchive_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            return VanillaSavedDataWrite_GraduationDetailsSaveScope_Patch
+                .RequireMethod(
+                    typeof(Popup_Load_Story),
+                    "Delete_Save",
+                    new Type[] { typeof(Popup_Load_Story.save_info) });
+        }
+
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.cosmo.imdatacore")]
+        private static void Prefix(
+            Popup_Load_Story.save_info Save,
+            out GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            __state = Save == null
+                ? null
+                : GraduationDetailsDeletedSaveArchiveBinding.Capture(
+                    Save.GetDirectory());
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter("com.cosmo.imdatacore")]
+        private static Exception Finalizer(
+            Exception __exception,
+            GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            GraduationDetailsDeletedSaveArchiveBinding
+                .ArchiveAfterSuccessfulDelete(__state);
+            return __exception;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class Popup_Load_Story_Delete_Playthrough_GraduationDetailsArchive_Patch
+    {
+        private static MethodBase TargetMethod()
+        {
+            return VanillaSavedDataWrite_GraduationDetailsSaveScope_Patch
+                .RequireMethod(
+                    typeof(Popup_Load_Story),
+                    "Delete_Playthrough",
+                    new Type[] { typeof(Popup_Load_Story.playthrough_info) });
+        }
+
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.cosmo.imdatacore")]
+        private static void Prefix(
+            Popup_Load_Story.playthrough_info Playthrough,
+            out GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            __state = Playthrough == null
+                ? null
+                : GraduationDetailsDeletedSaveArchiveBinding.Capture(
+                    Playthrough.Dir);
+        }
+
+        [HarmonyFinalizer]
+        [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter("com.cosmo.imdatacore")]
+        private static Exception Finalizer(
+            Exception __exception,
+            GraduationDetailsDeletedSaveArchiveState __state)
+        {
+            GraduationDetailsDeletedSaveArchiveBinding
+                .ArchiveAfterSuccessfulDelete(__state);
+            return __exception;
         }
     }
 

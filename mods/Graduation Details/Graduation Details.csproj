@@ -3,7 +3,7 @@
     <ModName>Graduation Details</ModName>
     <RootNamespace>GraduationDetails</RootNamespace>
     <AssemblyName>com.cosmo.graduationdetails</AssemblyName>
-    <Version>1.1.4</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

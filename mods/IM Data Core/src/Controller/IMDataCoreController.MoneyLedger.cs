@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -22,6 +22,12 @@ namespace IMDataCore
         internal const string AssemblyCSharpName = "Assembly-CSharp";
         internal const string HarmonyAssemblyPrefix = "0Harmony";
         internal const string DataCoreAssemblyName = "com.cosmo.imdatacore";
+        // Save n Load Fixes' wide-numeric layer replaces selected vanilla economy methods
+        // but is not itself the semantic owner of those transactions. Treat its continuation
+        // frames as transparent compatibility infrastructure so source attribution follows
+        // the vanilla operation (or an upstream third-party caller) instead of SNLF.
+        internal const string SaveNLoadFixesAssemblyName = "com.cosmo.savenloadfixes";
+        internal const string SaveNLoadFixesContinuationType = "SaveNLoadFixes.Repairs.WideNumericContinuation";
         internal const string MethodOnNewWeek = "OnNewWeek";
         internal const string MethodOnNewDay = "OnNewDay";
         internal const string MethodAdd = "Add";
@@ -202,7 +208,7 @@ namespace IMDataCore
         public string theater_audience_type = string.Empty;
         public int theater_attendance;
         public int theater_subscription_price;
-        public int theater_subscriber_delta;
+        public long theater_subscriber_delta;
         public long theater_subscriber_total;
         public int cafe_id = CoreConstants.InvalidIdValue;
         public string cafe_title = string.Empty;
@@ -213,7 +219,7 @@ namespace IMDataCore
         public List<string> cafe_staff_names = new List<string>();
         public List<int> cafe_working_idol_ids = new List<int>();
         public bool cafe_working_idol_references_known;
-        public int cafe_new_fans;
+        public long cafe_new_fans;
         public string cafe_appeal_type = string.Empty;
         public int concert_id = CoreConstants.InvalidIdValue;
         public string concert_title = string.Empty;
@@ -315,7 +321,7 @@ namespace IMDataCore
         public string TheaterAudienceType { get; internal set; }
         public int TheaterAttendance { get; internal set; }
         public int TheaterSubscriptionPrice { get; internal set; }
-        public int TheaterSubscriberDelta { get; internal set; }
+        public long TheaterSubscriberDelta { get; internal set; }
         public long TheaterSubscriberTotal { get; internal set; }
         public int CafeId { get; internal set; }
         public string CafeTitle { get; internal set; }
@@ -326,7 +332,7 @@ namespace IMDataCore
         public List<string> CafeStaffNames { get; internal set; }
         public List<int> CafeWorkingIdolIds { get; internal set; }
         public bool CafeWorkingIdolReferencesKnown { get; internal set; }
-        public int CafeNewFans { get; internal set; }
+        public long CafeNewFans { get; internal set; }
         public string CafeAppealType { get; internal set; }
         public int ConcertId { get; internal set; }
         public string ConcertTitle { get; internal set; }
@@ -704,6 +710,17 @@ namespace IMDataCore
                 string assemblyName = declaringType.Assembly.GetName().Name ?? string.Empty;
                 string typeName = declaringType.Name ?? string.Empty;
                 string methodName = method.Name ?? string.Empty;
+
+                // SNLF's wide-numeric continuation methods are drop-in implementations of
+                // vanilla economy entry points. Resolve the known replacements back to their
+                // vanilla provenance before the generic infrastructure skip below. This keeps
+                // weekly payroll decomposable into idol/staff/rent/loan allocations instead of
+                // presenting the whole debit as an SNLF mod adjustment.
+                if (TryClassifyTransparentCompatibilityFrame(snapshot, assemblyName, declaringType, methodName))
+                {
+                    return;
+                }
+
                 if (IsInfrastructureFrame(assemblyName, typeName, methodName))
                 {
                     continue;
@@ -734,6 +751,7 @@ namespace IMDataCore
         private static bool IsInfrastructureFrame(string assemblyName, string typeName, string methodName)
         {
             if (string.Equals(assemblyName, MoneyLedgerConstants.DataCoreAssemblyName, StringComparison.Ordinal)
+                || string.Equals(assemblyName, MoneyLedgerConstants.SaveNLoadFixesAssemblyName, StringComparison.Ordinal)
                 || assemblyName.StartsWith(MoneyLedgerConstants.HarmonyAssemblyPrefix, StringComparison.Ordinal))
             {
                 return true;
@@ -743,6 +761,156 @@ namespace IMDataCore
                 && (MethodNameMatches(methodName, MoneyLedgerConstants.HarmonyTargetMethodName)
                     || MethodNameMatches(methodName, MoneyLedgerConstants.MethodAdd)
                     || MethodNameMatches(methodName, MoneyLedgerConstants.MethodAddMoney));
+        }
+
+        private static bool TryClassifyTransparentCompatibilityFrame(
+            MoneyMutationSnapshot snapshot,
+            string assemblyName,
+            Type declaringType,
+            string methodName)
+        {
+            if (!string.Equals(assemblyName, MoneyLedgerConstants.SaveNLoadFixesAssemblyName, StringComparison.Ordinal)
+                || declaringType == null)
+            {
+                return false;
+            }
+
+            string fullTypeName = declaringType.FullName ?? declaringType.Name ?? string.Empty;
+            if (string.Equals(
+                fullTypeName,
+                MoneyLedgerConstants.SaveNLoadFixesContinuationType,
+                StringComparison.Ordinal))
+            {
+                if (TryClassifySaveNLoadFixesContinuationMethod(snapshot, methodName))
+                {
+                    return true;
+                }
+            }
+
+            // Release JITs are free to inline the small continuation methods. Keep the
+            // Harmony patch class itself as a second semantic witness so optimized builds
+            // still recover the same vanilla owner and weekly allocation behavior.
+            switch (declaringType.Name ?? string.Empty)
+            {
+                case "WideNumeric_ResourcesOnNewWeek_Patch":
+                    return ClassifyVanillaWeeklyExpense(snapshot);
+
+                case "WideNumeric_ResourcesOnNewDay_Patch":
+                    return ClassifyVanillaDailyContractIncome(snapshot);
+
+                case "WideNumeric_ActivityPerformanceCounter_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(Activities), "Performance", MoneyLedgerConstants.CategoryActivities, MoneyLedgerConstants.DetailPerformance);
+
+                case "WideNumeric_StaffFireSeverance_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(staff._staff), MoneyLedgerDetailConstants.SourceMethodStaffFireSeverance, MoneyLedgerConstants.CategoryStaffing, MoneyLedgerConstants.DetailStaffSeverance);
+
+                case "WideNumeric_StaffFireDialoguePayment_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(Staff_Fire), "DoComplete", MoneyLedgerConstants.CategoryStaffing, MoneyLedgerConstants.DetailStaffSeverance);
+
+                case "WideNumeric_CafeRenderRooms_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(Cafes), "RenderRooms", MoneyLedgerConstants.CategoryCafes, MoneyLedgerConstants.DetailCafe);
+
+                case "WideNumeric_CafeRender_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(Cafes), MoneyLedgerDetailConstants.SourceMethodCafeRender, MoneyLedgerConstants.CategoryCafes, MoneyLedgerConstants.DetailCafe);
+
+                case "WideNumeric_ResearchBuyPoints_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(Research.category), "Buy_Points", MoneyLedgerConstants.CategoryResearch, MoneyLedgerConstants.DetailResearch);
+
+                case "WideNumeric_VnResource_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(vn_actions), "DoResource", MoneyLedgerConstants.CategoryStory, MoneyLedgerConstants.DetailStory);
+
+                case "WideNumeric_TourFinish_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(SEvent_Tour), "FinishTour", MoneyLedgerConstants.CategoryTours, MoneyLedgerConstants.DetailTour);
+
+                case "WideNumeric_SingleCreditMoney_Patch":
+                    return ClassifyVanillaSource(snapshot, typeof(singles), MoneyLedgerConstants.MethodAddMoney, MoneyLedgerConstants.CategorySingles, MoneyLedgerConstants.DetailSingleRelease);
+
+                default:
+                    // Unknown SNLF frames remain transparent via IsInfrastructureFrame. This
+                    // is deliberate: SNLF repairs vanilla numeric execution and should not
+                    // become the ledger owner merely because future repaired paths traverse it.
+                    return false;
+            }
+        }
+
+        private static bool TryClassifySaveNLoadFixesContinuationMethod(
+            MoneyMutationSnapshot snapshot,
+            string methodName)
+        {
+            switch (methodName)
+            {
+                case "ResourcesOnNewWeek":
+                    return ClassifyVanillaWeeklyExpense(snapshot);
+
+                case "ResourcesOnNewDay":
+                    return ClassifyVanillaDailyContractIncome(snapshot);
+
+                case "PerformActivityWide":
+                    return ClassifyVanillaSource(snapshot, typeof(Activities), "Performance", MoneyLedgerConstants.CategoryActivities, MoneyLedgerConstants.DetailPerformance);
+
+                case "FireStaffWithSeverance":
+                    return ClassifyVanillaSource(snapshot, typeof(staff._staff), MoneyLedgerDetailConstants.SourceMethodStaffFireSeverance, MoneyLedgerConstants.CategoryStaffing, MoneyLedgerConstants.DetailStaffSeverance);
+
+                case "CompleteStaffFireDialoguePayment":
+                    return ClassifyVanillaSource(snapshot, typeof(Staff_Fire), "DoComplete", MoneyLedgerConstants.CategoryStaffing, MoneyLedgerConstants.DetailStaffSeverance);
+
+                case "RenderCafeRooms":
+                    return ClassifyVanillaSource(snapshot, typeof(Cafes), "RenderRooms", MoneyLedgerConstants.CategoryCafes, MoneyLedgerConstants.DetailCafe);
+
+                case "CompleteCafeRender":
+                    return ClassifyVanillaSource(snapshot, typeof(Cafes), MoneyLedgerDetailConstants.SourceMethodCafeRender, MoneyLedgerConstants.CategoryCafes, MoneyLedgerConstants.DetailCafe);
+
+                case "BuyResearchPoints":
+                    return ClassifyVanillaSource(snapshot, typeof(Research.category), "Buy_Points", MoneyLedgerConstants.CategoryResearch, MoneyLedgerConstants.DetailResearch);
+
+                case "DoWideVnResource":
+                    return ClassifyVanillaSource(snapshot, typeof(vn_actions), "DoResource", MoneyLedgerConstants.CategoryStory, MoneyLedgerConstants.DetailStory);
+
+                case "FinishTour":
+                    return ClassifyVanillaSource(snapshot, typeof(SEvent_Tour), "FinishTour", MoneyLedgerConstants.CategoryTours, MoneyLedgerConstants.DetailTour);
+
+                case "CreditSingleMoney":
+                    return ClassifyVanillaSource(snapshot, typeof(singles), MoneyLedgerConstants.MethodAddMoney, MoneyLedgerConstants.CategorySingles, MoneyLedgerConstants.DetailSingleRelease);
+
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ClassifyVanillaWeeklyExpense(MoneyMutationSnapshot snapshot)
+        {
+            SetVanillaSourceIdentity(snapshot, typeof(resources), MoneyLedgerConstants.MethodOnNewWeek);
+            snapshot.IsWeeklyExpense = true;
+            return true;
+        }
+
+        private static bool ClassifyVanillaDailyContractIncome(MoneyMutationSnapshot snapshot)
+        {
+            SetVanillaSourceIdentity(snapshot, typeof(resources), MoneyLedgerConstants.MethodOnNewDay);
+            snapshot.IsDailyContractIncome = true;
+            return SetCategory(snapshot, MoneyLedgerConstants.CategoryContracts, MoneyLedgerConstants.DetailBusinessContracts);
+        }
+
+        private static bool ClassifyVanillaSource(
+            MoneyMutationSnapshot snapshot,
+            Type declaringType,
+            string methodName,
+            string categoryCode,
+            string detailCode)
+        {
+            SetVanillaSourceIdentity(snapshot, declaringType, methodName);
+            return SetCategory(snapshot, categoryCode, detailCode);
+        }
+
+        private static void SetVanillaSourceIdentity(MoneyMutationSnapshot snapshot, Type declaringType, string methodName)
+        {
+            snapshot.SourceAssembly = MoneyLedgerConstants.AssemblyCSharpName;
+            snapshot.SourceType = declaringType != null
+                ? declaringType.FullName ?? declaringType.Name ?? MoneyLedgerConstants.UnknownSource
+                : MoneyLedgerConstants.UnknownSource;
+            snapshot.SourceMethod = string.IsNullOrEmpty(methodName)
+                ? MoneyLedgerConstants.UnknownSource
+                : methodName;
         }
 
         private static bool TryClassifyVanillaFrame(MoneyMutationSnapshot snapshot, Type declaringType, string methodName)
@@ -822,6 +990,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(resources __instance, resources.type _type, out MoneyMutationSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateMoneyMutationSnapshot(__instance, _type);

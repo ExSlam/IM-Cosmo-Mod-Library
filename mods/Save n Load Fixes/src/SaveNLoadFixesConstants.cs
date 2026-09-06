@@ -13,7 +13,7 @@ namespace SaveNLoadFixes
         internal const string DataSaverLoadMethodName = "loadData";
         internal const int LoadWaitTimeoutMilliseconds = -1;
 
-        internal const int TransportApiVersion = 1;
+        internal const int TransportApiVersion = 2;
         internal const string TransportNotActiveMessage =
             "Save n Load Fixes ordered transport is not authoritative because one or more required caller-level patches are unhealthy.";
     }

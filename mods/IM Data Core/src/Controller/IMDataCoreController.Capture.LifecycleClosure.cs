@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -59,9 +59,9 @@ namespace IMDataCore
 
             snapshot.DisplayTaskBefore = tasks.Story_Data.ch4_display_task;
             snapshot.DeadlineBefore = tasks.Story_Data.ch4_deadline ?? string.Empty;
-            snapshot.ScandalPointsBefore = tasks.Story_Data.ch4_scandal_points;
+            snapshot.ScandalPointsBefore = SaveNLoadFixesWideNumericInterop.GetStoryCh4ScandalPoints();
             snapshot.ChartUnlockedBefore = tasks.Story_Data.ch4_chart_unlocked;
-            snapshot.FansNeededBefore = tasks.Story_Data.ch4_fans_needed;
+            snapshot.FansNeededBefore = SaveNLoadFixesWideNumericInterop.GetStoryCh4FansNeeded();
             return snapshot;
         }
 
@@ -74,12 +74,14 @@ namespace IMDataCore
                 return;
             }
 
+            long scandalPointsAfter = SaveNLoadFixesWideNumericInterop.GetStoryCh4ScandalPoints();
+            long fansNeededAfter = SaveNLoadFixesWideNumericInterop.GetStoryCh4FansNeeded();
             bool changed =
                 snapshot.DisplayTaskBefore != tasks.Story_Data.ch4_display_task ||
                 !string.Equals(snapshot.DeadlineBefore ?? string.Empty, tasks.Story_Data.ch4_deadline ?? string.Empty, StringComparison.Ordinal) ||
-                snapshot.ScandalPointsBefore != tasks.Story_Data.ch4_scandal_points ||
+                snapshot.ScandalPointsBefore != scandalPointsAfter ||
                 snapshot.ChartUnlockedBefore != tasks.Story_Data.ch4_chart_unlocked ||
-                snapshot.FansNeededBefore != tasks.Story_Data.ch4_fans_needed;
+                snapshot.FansNeededBefore != fansNeededAfter;
             if (!changed)
             {
                 return;
@@ -93,11 +95,11 @@ namespace IMDataCore
                 deadline_before = snapshot.DeadlineBefore ?? string.Empty,
                 deadline_after = tasks.Story_Data.ch4_deadline ?? string.Empty,
                 scandal_points_before = snapshot.ScandalPointsBefore,
-                scandal_points_after = tasks.Story_Data.ch4_scandal_points,
+                scandal_points_after = scandalPointsAfter,
                 chart_unlocked_before = snapshot.ChartUnlockedBefore,
                 chart_unlocked_after = tasks.Story_Data.ch4_chart_unlocked,
                 fans_needed_before = snapshot.FansNeededBefore,
-                fans_needed_after = tasks.Story_Data.ch4_fans_needed,
+                fans_needed_after = fansNeededAfter,
                 activation_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
 
@@ -235,9 +237,9 @@ namespace IMDataCore
         internal string ObjectiveCode = string.Empty;
         internal bool DisplayTaskBefore;
         internal string DeadlineBefore = string.Empty;
-        internal int ScandalPointsBefore;
+        internal long ScandalPointsBefore;
         internal bool ChartUnlockedBefore;
-        internal int FansNeededBefore;
+        internal long FansNeededBefore;
     }
 
     [Serializable]
@@ -248,12 +250,12 @@ namespace IMDataCore
         public bool display_task_after;
         public string deadline_before = string.Empty;
         public string deadline_after = string.Empty;
-        public int scandal_points_before;
-        public int scandal_points_after;
+        public long scandal_points_before;
+        public long scandal_points_after;
         public bool chart_unlocked_before;
         public bool chart_unlocked_after;
-        public int fans_needed_before;
-        public int fans_needed_after;
+        public long fans_needed_before;
+        public long fans_needed_after;
         public string activation_date = string.Empty;
     }
 

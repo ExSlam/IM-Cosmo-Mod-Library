@@ -5,14 +5,14 @@ Monthly Ledger adds an Action Hub button that opens a queued, game-style popup c
 ## Dependencies
 
 - Mod Buttons
-- IM Data Core 3.4.5 or newer
+- IM Data Core 3.4.33 or newer with the current sidecar-v6/journal-v3 money-history contract
 - IM UI Framework 2.1.0 or newer
 
 ## Current behavior
 
 Month navigation uses the same scene-derived previous/next controls as the Singles chart/Graduation Calendar, with a red per-instance theme. The ledger uses the scene-native Producer Contracts/Salaries/Loans list-scroll pattern: a separate vertical `Slider` with a fixed circular handle and thin track, not `ScrollRect.verticalScrollbar`.
 
-The visible transaction list is capped at 10,000 rows for UI safety. Income, expense, net, and transaction-count totals come from IM Data Core's uncapped monthly aggregate, so large months retain complete totals even when the detail list is truncated. Search filters only the displayed transaction records and does not change summary totals.
+Monthly Ledger exhaustively pages IM Data Core's money history by EventId until the selected month is complete, including dense months with more than 10,000 transactions. It independently asks IM Data Core for the uncapped aggregate and refuses to present the month if paged row count/income/expense disagree with that aggregate. Structured v6 coverage is shown explicitly: fully covered empty months are known-empty, while partial/gapped months are labeled incomplete instead of being mistaken for complete history. Search filters only the displayed transaction records and does not change summary totals. Coverage uncertainty alone is quiet once exhaustive pages agree with IM Data Core aggregates; prominent warnings are reserved for known partial/gapped/pre-coverage months. External adjustments are attributed to their recorded source assembly/call when available instead of being presented as one opaque bucket.
 
 The UI uses Idol Manager's selected game font, the game's small rounded-corner shader treatment, a MUIP search input with game-font text, and vanilla-style collapse indicators for income/expense categories. The current unfinished month is never shown, and the first selectable month is the first complete calendar month after exact capture began.
 

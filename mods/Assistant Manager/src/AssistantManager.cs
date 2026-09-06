@@ -967,10 +967,13 @@ namespace AssitantManagerMod
     {
         private const string AssemblyName = "com.cosmo.imdatacore";
         private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
+        private const string InteropApiTypeName = "IMDataCore.IMDataCoreInteropApi";
         private const string SessionTypeName = "IMDataCore.IMDataCoreSession";
 
         private static readonly object Sync = new object();
+        private static readonly Assembly ConsumerAssembly = typeof(AssistantManagerDataCoreApi).Assembly;
         private static Type apiType;
+        private static Type interopApiType;
         private static Type sessionType;
         private static MethodInfo isReadyMethod;
         private static MethodInfo registerNamespaceMethod;
@@ -995,38 +998,52 @@ namespace AssitantManagerMod
                     return false;
                 }
 
-                object[] args = new object[] { "com.cosmo.assistantmanager", null, string.Empty };
+                object[] args = new object[] { "com.cosmo.assistantmanager", ConsumerAssembly, null, string.Empty };
                 object invocationResult;
                 if (!TryInvoke(registerNamespaceMethod, args, out invocationResult) ||
-                    !(invocationResult is bool) || !(bool)invocationResult || args[1] == null)
+                    !(invocationResult is bool) || !(bool)invocationResult || args[2] == null)
                 {
                     return false;
                 }
 
-                session = new AssistantManagerDataCoreSession(args[1]);
+                session = new AssistantManagerDataCoreSession(args[2]);
                 result = session;
                 return true;
             }
         }
 
-        internal static bool TryGetCustomJson(AssistantManagerDataCoreSession activeSession, string key, out string json)
+        internal static bool TryGetCustomJson(
+            AssistantManagerDataCoreSession activeSession,
+            string key,
+            out string json,
+            out string errorMessage)
         {
             json = string.Empty;
-            if (activeSession == null || activeSession.RawSession == null || !TryEnsureReady())
+            errorMessage = string.Empty;
+            if (activeSession == null || activeSession.RawSession == null)
             {
+                errorMessage = "The IM Data Core session is unavailable.";
+                return false;
+            }
+            if (!TryEnsureReady())
+            {
+                errorMessage = "IM Data Core is not ready.";
                 return false;
             }
 
-            object[] args = new object[] { activeSession.RawSession, key, null, string.Empty };
+            object[] args = new object[] { activeSession.RawSession, ConsumerAssembly, key, null, string.Empty };
             object invocationResult;
             if (!TryInvoke(getCustomJsonMethod, args, out invocationResult) ||
-                !(invocationResult is bool) || !(bool)invocationResult)
+                !(invocationResult is bool))
             {
+                errorMessage = "IM Data Core custom-state read invocation failed.";
                 return false;
             }
 
-            json = args[2] as string ?? string.Empty;
-            return true;
+            bool found = (bool)invocationResult;
+            json = args[3] as string ?? string.Empty;
+            errorMessage = args[4] as string ?? string.Empty;
+            return found;
         }
 
         internal static bool TrySetCustomJson(AssistantManagerDataCoreSession activeSession, string key, string json)
@@ -1036,7 +1053,7 @@ namespace AssitantManagerMod
                 return false;
             }
 
-            object[] args = new object[] { activeSession.RawSession, key, json ?? "{}", string.Empty };
+            object[] args = new object[] { activeSession.RawSession, ConsumerAssembly, key, json ?? "{}", string.Empty };
             object invocationResult;
             return TryInvoke(setCustomJsonMethod, args, out invocationResult) &&
                    invocationResult is bool &&
@@ -1047,7 +1064,7 @@ namespace AssitantManagerMod
         {
             lock (Sync)
             {
-                if (apiType == null || isReadyMethod == null || registerNamespaceMethod == null ||
+                if (apiType == null || interopApiType == null || isReadyMethod == null || registerNamespaceMethod == null ||
                     getCustomJsonMethod == null || setCustomJsonMethod == null)
                 {
                     if (DateTime.UtcNow < nextResolveAttemptUtc || !TryResolve())
@@ -1090,17 +1107,18 @@ namespace AssitantManagerMod
             }
 
             Type resolvedApiType = coreAssembly.GetType(ApiTypeName, false);
+            Type resolvedInteropApiType = coreAssembly.GetType(InteropApiTypeName, false);
             Type resolvedSessionType = coreAssembly.GetType(SessionTypeName, false);
-            if (resolvedApiType == null || resolvedSessionType == null)
+            if (resolvedApiType == null || resolvedInteropApiType == null || resolvedSessionType == null)
             {
                 nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
                 return false;
             }
 
             MethodInfo resolvedIsReady = FindStaticMethod(resolvedApiType, "IsReady", 0);
-            MethodInfo resolvedRegister = FindStaticMethod(resolvedApiType, "TryRegisterNamespace", 3);
-            MethodInfo resolvedGet = FindStaticMethod(resolvedApiType, "TryGetCustomJson", 4);
-            MethodInfo resolvedSet = FindStaticMethod(resolvedApiType, "TrySetCustomJson", 4);
+            MethodInfo resolvedRegister = FindStaticMethod(resolvedInteropApiType, "TryRegisterNamespace", 4);
+            MethodInfo resolvedGet = FindStaticMethod(resolvedInteropApiType, "TryGetCustomJson", 5);
+            MethodInfo resolvedSet = FindStaticMethod(resolvedInteropApiType, "TrySetCustomJson", 5);
             if (resolvedIsReady == null || resolvedRegister == null || resolvedGet == null || resolvedSet == null)
             {
                 nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
@@ -1108,6 +1126,7 @@ namespace AssitantManagerMod
             }
 
             apiType = resolvedApiType;
+            interopApiType = resolvedInteropApiType;
             sessionType = resolvedSessionType;
             isReadyMethod = resolvedIsReady;
             registerNamespaceMethod = resolvedRegister;
@@ -1197,7 +1216,19 @@ namespace AssitantManagerMod
             }
 
             string json;
-            bool foundState = AssistantManagerDataCoreApi.TryGetCustomJson(session, StateKey, out json);
+            string readError;
+            bool foundState = AssistantManagerDataCoreApi.TryGetCustomJson(
+                session,
+                StateKey,
+                out json,
+                out readError);
+            if (!foundState && !string.IsNullOrEmpty(readError))
+            {
+                // A failed read is not proof of empty state. Keep the existing in-memory
+                // branch intact and leave restoreRequested set so a later frame can retry.
+                return;
+            }
+
             applyingRestore = true;
             try
             {

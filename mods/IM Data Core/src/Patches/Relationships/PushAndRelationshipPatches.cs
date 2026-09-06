@@ -423,6 +423,7 @@ namespace IMDataCore
         /// Captures pre-mutation relationship points for one idol/type tuple.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(Relationships_Player._type Type, data_girls.girls Girl, out int __state)
         {
             __state = IMDataCoreController.Instance.CreatePlayerRelationshipPointsSnapshot(Type, Girl);

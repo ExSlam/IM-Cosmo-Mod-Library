@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -215,6 +215,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix()
         {
             ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceSingleRelease);

@@ -11,10 +11,13 @@ using System.Threading;
 namespace IMDataCore
 {
     /// <summary>
-    /// Computes a stable content identity for one vanilla SavedData graph. The
-    /// fingerprint is based on Unity's compact JSON representation, which provides
-    /// a deterministic semantic identity across the save and later load boundary.
-    /// A detached snapshot may register the fingerprint of the JSON that created it
+    /// Computes a stable content identity for one vanilla SavedData graph. Saves
+    /// use Unity's compact JSON representation. When authoritative SNLF is present,
+    /// IMDC registers that exact save-side SHA-256 with SNLF so its validated repair
+    /// envelope can carry the witness through vanilla FixSaveFile's startup rewrite.
+    /// Loads prefer that persisted witness and only fall back to local serialization
+    /// for legacy/non-SNLF paths. A detached snapshot may register the fingerprint
+    /// of the JSON that created it
     /// so checkpoint construction never performs a redundant full serialization.
     /// </summary>
     internal static class VanillaSavedDataFingerprint
@@ -35,15 +38,38 @@ namespace IMDataCore
 
         internal static bool TryComputeForSavedData(
             SaveManager.SavedData savedData,
+            bool loadBoundary,
             out string fingerprint,
+            out bool allowLegacyTransportCheckpointRecovery,
             out string errorMessage)
         {
             fingerprint = string.Empty;
+            allowLegacyTransportCheckpointRecovery = false;
             errorMessage = string.Empty;
             if (savedData == null)
             {
                 errorMessage = "Vanilla SavedData is null.";
                 return false;
+            }
+
+            if (loadBoundary)
+            {
+                string transportFingerprint;
+                bool legacyEnvelopeWithoutFingerprint;
+                if (OrderedTransportProviderInterop
+                        .TryGetLoadedSavedDataCheckpointIdentity(
+                            savedData,
+                            out transportFingerprint,
+                            out legacyEnvelopeWithoutFingerprint))
+                {
+                    if (IsValid(transportFingerprint))
+                    {
+                        fingerprint = transportFingerprint;
+                        return true;
+                    }
+                    allowLegacyTransportCheckpointRecovery =
+                        legacyEnvelopeWithoutFingerprint;
+                }
             }
 
             lock (CacheLock)
@@ -55,6 +81,13 @@ namespace IMDataCore
                 {
                     fingerprint = cached.Value;
                     FrozenFingerprintCache.Remove(savedData);
+                    if (!loadBoundary)
+                    {
+                        OrderedTransportProviderInterop
+                            .TryRegisterSavedDataContentFingerprint(
+                                savedData,
+                                fingerprint);
+                    }
                     return true;
                 }
             }
@@ -63,6 +96,13 @@ namespace IMDataCore
             {
                 string json = UnityEngine.JsonUtility.ToJson(savedData, false);
                 fingerprint = ComputeForJson(json);
+                if (!loadBoundary)
+                {
+                    OrderedTransportProviderInterop
+                        .TryRegisterSavedDataContentFingerprint(
+                            savedData,
+                            fingerprint);
+                }
                 return true;
             }
             catch (Exception exception)
@@ -195,10 +235,12 @@ namespace IMDataCore
         internal long PlaytimeSeconds;
         internal string GameDateTime = string.Empty;
         internal string ContentFingerprint = string.Empty;
+        internal bool AllowLegacyTransportCheckpointRecovery;
 
         internal static bool TryCreate(
             SaveManager.SavedData savedData,
             string relativeSavePath,
+            bool loadBoundary,
             out VanillaSaveStamp stamp,
             out string errorMessage)
         {
@@ -218,9 +260,12 @@ namespace IMDataCore
             }
 
             string contentFingerprint;
+            bool allowLegacyTransportCheckpointRecovery;
             if (!VanillaSavedDataFingerprint.TryComputeForSavedData(
                     savedData,
+                    loadBoundary,
                     out contentFingerprint,
+                    out allowLegacyTransportCheckpointRecovery,
                     out errorMessage))
             {
                 return false;
@@ -232,7 +277,9 @@ namespace IMDataCore
                 LastSave = savedData.staticVars__PlayerData.LastSave ?? string.Empty,
                 PlaytimeSeconds = savedData.staticVars__PlayerData.Playtime_Seconds,
                 GameDateTime = savedData.staticVars__dateTime ?? string.Empty,
-                ContentFingerprint = contentFingerprint
+                ContentFingerprint = contentFingerprint,
+                AllowLegacyTransportCheckpointRecovery =
+                    allowLegacyTransportCheckpointRecovery
             };
             return true;
         }
@@ -3760,7 +3807,28 @@ namespace IMDataCore
                             out matchingCheckpoint) ||
                         matchingCheckpoint == null)
                     {
-                        return true;
+                        if (!stamp.AllowLegacyTransportCheckpointRecovery ||
+                            !TryFindUniqueLegacyTransportCheckpointLocked(
+                                stamp,
+                                out matchingCheckpoint))
+                        {
+                            return true;
+                        }
+
+                        // This escape hatch is intentionally limited to a validated
+                        // pre-bridge SNLF envelope that has no stored IMDC witness. All
+                        // scalar checkpoint fields still have to match, and ambiguity
+                        // fails closed. Once selected, replace
+                        // the reconstructed hash with the exact durable checkpoint hash
+                        // so every downstream checkpoint lookup remains exact.
+                        stamp.ContentFingerprint =
+                            matchingCheckpoint.ContentFingerprint;
+                        stamp.AllowLegacyTransportCheckpointRecovery = false;
+                        CoreLog.Warn(
+                            "IM Data Core recovered a legacy pre-fingerprint SNLF " +
+                            "checkpoint from one unique scalar identity. The next " +
+                            "vanilla save will persist the exact IMDC fingerprint " +
+                            "inside SNLF's repair envelope.");
                     }
 
                     DateTime checkpointGameDate;
@@ -3800,6 +3868,54 @@ namespace IMDataCore
                     return false;
                 }
             }
+        }
+
+        private bool TryFindUniqueLegacyTransportCheckpointLocked(
+            VanillaSaveStamp stamp,
+            out LightweightCheckpointRecord matchingCheckpoint)
+        {
+            matchingCheckpoint = null;
+            if (stamp == null)
+            {
+                return false;
+            }
+
+            string normalizedRelativePath =
+                VanillaSaveStamp.NormalizeRelativePath(stamp.RelativeSavePath);
+            for (int index = 0; index < durableCheckpoints.Count; index++)
+            {
+                LightweightCheckpointRecord candidate = durableCheckpoints[index];
+                if (candidate == null ||
+                    !string.Equals(
+                        VanillaSaveStamp.NormalizeRelativePath(
+                            candidate.RelativeSavePath),
+                        normalizedRelativePath,
+                        CorePaths.PathComparison) ||
+                    !string.Equals(
+                        candidate.LastSave,
+                        stamp.LastSave,
+                        StringComparison.Ordinal) ||
+                    candidate.PlaytimeSeconds != stamp.PlaytimeSeconds ||
+                    !string.Equals(
+                        candidate.GameDateTime,
+                        stamp.GameDateTime,
+                        StringComparison.Ordinal) ||
+                    !VanillaSavedDataFingerprint.IsValid(
+                        candidate.ContentFingerprint))
+                {
+                    continue;
+                }
+
+                if (matchingCheckpoint != null)
+                {
+                    // Same-second/same-scalar branches are precisely why the content
+                    // fingerprint exists. Never guess when more than one candidate
+                    // survived the old rewrite boundary.
+                    return false;
+                }
+                matchingCheckpoint = candidate;
+            }
+            return matchingCheckpoint != null;
         }
 
         /// <summary>

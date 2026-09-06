@@ -373,24 +373,9 @@ namespace IMDataCore
                 return;
             }
 
-            long totalAudience = CoreConstants.ZeroLongValue;
-            long totalRevenue = CoreConstants.ZeroLongValue;
-            long totalNewFans = CoreConstants.ZeroLongValue;
-            if (tour.SelectedCountries != null)
-            {
-                for (int countryIndex = CoreConstants.ZeroBasedListStartIndex; countryIndex < tour.SelectedCountries.Count; countryIndex++)
-                {
-                    SEvent_Tour.tour.selectedCountry country = tour.SelectedCountries[countryIndex];
-                    if (country == null)
-                    {
-                        continue;
-                    }
-
-                    totalAudience += country.Audience;
-                    totalRevenue += country.Revenue;
-                    totalNewFans += country.NewFans;
-                }
-            }
+            long totalAudience = SaveNLoadFixesWideNumericInterop.GetTourTotalAudience(tour);
+            long totalRevenue = SaveNLoadFixesWideNumericInterop.GetTourRevenue(tour);
+            long totalNewFans = SaveNLoadFixesWideNumericInterop.GetTourTotalCountryFans(tour);
 
             TourStatusPayload payload = new TourStatusPayload
             {
@@ -401,9 +386,9 @@ namespace IMDataCore
                 TourTotalAudience = totalAudience,
                 TourTotalRevenue = totalRevenue,
                 TourTotalNewFans = totalNewFans,
-                TourProductionCost = tour.ProductionCost,
-                TourExpectedRevenue = tour.ExpectedRevenue,
-                TourSaving = tour.Saving,
+                TourProductionCost = SaveNLoadFixesWideNumericInterop.GetTourProductionCost(tour),
+                TourExpectedRevenue = SaveNLoadFixesWideNumericInterop.GetTourExpectedRevenue(tour),
+                TourSaving = SaveNLoadFixesWideNumericInterop.GetTourSaving(tour),
                 TourFinishDate = CoreDateTimeUtility.ToRoundTripString(tour.FinishDate)
             };
 
@@ -724,7 +709,7 @@ namespace IMDataCore
             {
                 Money = resources.Money(),
                 TotalDebt = loans.GetTotalDebt(),
-                TotalPaymentPerWeek = loans.GetTotalPaymentPerWeek(),
+                TotalPaymentPerWeek = SaveNLoadFixesWideNumericInterop.GetTotalLoanPayment(),
                 ActiveLoanCount = CountActiveLoans(),
                 TotalLoanCount = loans.Loans != null ? loans.Loans.Count : CoreConstants.ZeroBasedListStartIndex
             };
@@ -1227,7 +1212,7 @@ namespace IMDataCore
 
             long moneyAfter = resources.Money();
             long totalDebtAfter = loans.GetTotalDebt();
-            int totalPaymentAfter = loans.GetTotalPaymentPerWeek();
+            long totalPaymentAfter = SaveNLoadFixesWideNumericInterop.GetTotalLoanPayment();
             int activeLoanCountAfter = CountActiveLoans();
             int totalLoanCountAfter = loans.Loans != null ? loans.Loans.Count : CoreConstants.ZeroBasedListStartIndex;
             bool loanContainedAfter = loans.Loans != null && loans.Loans.Contains(loan);
@@ -1243,7 +1228,7 @@ namespace IMDataCore
                 loan_active_before = snapshotBefore != null && snapshotBefore.LoanActive,
                 loan_active_after = loan.Active,
                 loan_amount = loan.Amount,
-                loan_payment_per_week = loan.PaymentPerWeek,
+                loan_payment_per_week = SaveNLoadFixesWideNumericInterop.GetLoanPayment(loan),
                 loan_interest_rate = loan.InterestRate,
                 loan_start_date = loan.StartDate == DateTime.MinValue ? string.Empty : CoreDateTimeUtility.ToRoundTripString(loan.StartDate),
                 loan_end_date = loan.EndDate == default(DateTime) ? string.Empty : CoreDateTimeUtility.ToRoundTripString(loan.EndDate),
@@ -1496,9 +1481,9 @@ namespace IMDataCore
                 fans_delta = resources.GetFansTotal(null) - fallbackSnapshot.FansBefore,
                 active_idol_count_before = fallbackSnapshot.ActiveIdolCountBefore,
                 active_idol_count_after = activeIdolCountAfter,
-                per_idol_earnings = activeIdolCountAfter > CoreConstants.ZeroBasedListStartIndex
-                    ? Mathf.RoundToInt((float)moneyDelta / activeIdolCountAfter)
-                    : CoreConstants.ZeroBasedListStartIndex,
+                per_idol_earnings = SaveNLoadFixesWideNumericInterop.GetActivityPerformanceIdolShare(
+                    moneyDelta,
+                    activeIdolCountAfter),
                 stamina_cost = activitiesSystem != null ? activitiesSystem.GetStaminaCost() : CoreConstants.ZeroBasedListStartIndex,
                 activity_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
@@ -1819,10 +1804,13 @@ namespace IMDataCore
                         : CoreConstants.StatusCodeUnknown,
                     attendance = latestStat.Attendance,
                     revenue = latestStat.Revenue,
-                    subscribers_delta = latestStat.Subscribers,
+                    subscribers_delta = SaveNLoadFixesWideNumericInterop.GetTheaterStatSubscribers(
+                        theater,
+                        theater.Stats.Count - CoreConstants.LastElementOffsetFromCount,
+                        latestStat),
                     subscribers_total = theater.GetSubscribers(),
                     avg_attendance_7d = theater.GetAvgAttendance(),
-                    avg_revenue_7d = theater.GetAvgRevenue(),
+                    avg_revenue_7d = SaveNLoadFixesWideNumericInterop.GetTheaterAverageRevenue(theater),
                     weekly_schedule_summary = BuildTheaterScheduleSummary(theater),
                     total_money_before = snapshotBefore.MoneyBefore,
                     total_money_after = moneyAfter,
@@ -2058,7 +2046,8 @@ namespace IMDataCore
                 return;
             }
 
-            Cafes._cafe._stat latestStat = cafe.Stats[cafe.Stats.Count - CoreConstants.LastElementOffsetFromCount];
+            int latestStatOrdinal = cafe.Stats.Count - CoreConstants.LastElementOffsetFromCount;
+            Cafes._cafe._stat latestStat = cafe.Stats[latestStatOrdinal];
             if (latestStat == null)
             {
                 return;
@@ -2082,8 +2071,8 @@ namespace IMDataCore
                     ? CoreEnumNameMapping.ToCafeDishTypeCode(dish.Type)
                     : CoreConstants.StatusCodeUnknown,
                 dish_title = dish != null ? (dish.Title ?? string.Empty) : string.Empty,
-                profit = latestStat.Profit,
-                new_fans = latestStat.New_Fans,
+                profit = SaveNLoadFixesWideNumericInterop.GetCafeStatProfit(cafe, latestStatOrdinal, latestStat),
+                new_fans = SaveNLoadFixesWideNumericInterop.GetCafeStatNewFans(cafe, latestStatOrdinal, latestStat),
                 fan_type = CoreEnumNameMapping.ToFanTypeCode(latestStat.Fan_Type),
                 staffed_idol_count = latestStat.Girls != null ? latestStat.Girls.Count : CoreConstants.ZeroBasedListStartIndex,
                 staffed_idol_id_list = latestStat.Girls != null
@@ -2269,7 +2258,7 @@ namespace IMDataCore
             snapshot.CanFireBefore = staffer.CanFire();
             snapshot.CanFireSeveranceBefore = staffer.CanFire_Severance();
             snapshot.FirePointsCostBefore = staffer.PointsToFire();
-            snapshot.SeveranceCostBefore = staffer.Severance();
+            snapshot.SeveranceCostBefore = SaveNLoadFixesWideNumericInterop.GetStaffSeverance(staffer);
             snapshot.HireDate = staffer.HireDate == default(DateTime)
                 ? string.Empty
                 : CoreDateTimeUtility.ToRoundTripString(staffer.HireDate);
@@ -4969,8 +4958,8 @@ namespace IMDataCore
             {
                 MoneyBefore = resources.Money(),
                 FansBefore = resources.GetFansTotal(null),
-                FameBefore = (int)resources.Get(resources.type.fame, true),
-                BuzzBefore = (int)resources.Get(resources.type.buzz, true),
+                FameBefore = resources.Get(resources.type.fame, true),
+                BuzzBefore = resources.Get(resources.type.buzz, true),
                 ActiveEventCountBefore = manager != null && manager.activeEvents != null
                     ? manager.activeEvents.Count
                     : CoreConstants.ZeroBasedListStartIndex
@@ -5008,13 +4997,13 @@ namespace IMDataCore
 
             long moneyBefore = snapshotBefore != null ? snapshotBefore.MoneyBefore : resources.Money();
             long fansBefore = snapshotBefore != null ? snapshotBefore.FansBefore : resources.GetFansTotal(null);
-            int fameBefore = snapshotBefore != null ? snapshotBefore.FameBefore : (int)resources.Get(resources.type.fame, true);
-            int buzzBefore = snapshotBefore != null ? snapshotBefore.BuzzBefore : (int)resources.Get(resources.type.buzz, true);
+            long fameBefore = snapshotBefore != null ? snapshotBefore.FameBefore : resources.Get(resources.type.fame, true);
+            long buzzBefore = snapshotBefore != null ? snapshotBefore.BuzzBefore : resources.Get(resources.type.buzz, true);
 
             long moneyAfter = resources.Money();
             long fansAfter = resources.GetFansTotal(null);
-            int fameAfter = (int)resources.Get(resources.type.fame, true);
-            int buzzAfter = (int)resources.Get(resources.type.buzz, true);
+            long fameAfter = resources.Get(resources.type.fame, true);
+            long buzzAfter = resources.Get(resources.type.buzz, true);
 
             RandomEventStartedEventPayload payload = new RandomEventStartedEventPayload
             {
@@ -5080,8 +5069,8 @@ namespace IMDataCore
                 ActiveEventBefore = manager != null ? manager.GetActiveEvent() : null,
                 MoneyBefore = resources.Money(),
                 FansBefore = resources.GetFansTotal(null),
-                FameBefore = (int)resources.Get(resources.type.fame, true),
-                BuzzBefore = (int)resources.Get(resources.type.buzz, true)
+                FameBefore = resources.Get(resources.type.fame, true),
+                BuzzBefore = resources.Get(resources.type.buzz, true)
             };
 
             if (snapshot.ActiveEventBefore == null)
@@ -5129,8 +5118,8 @@ namespace IMDataCore
 
             long moneyAfter = resources.Money();
             long fansAfter = resources.GetFansTotal(null);
-            int fameAfter = (int)resources.Get(resources.type.fame, true);
-            int buzzAfter = (int)resources.Get(resources.type.buzz, true);
+            long fameAfter = resources.Get(resources.type.fame, true);
+            long buzzAfter = resources.Get(resources.type.buzz, true);
 
             RandomEventConcludedEventPayload payload = new RandomEventConcludedEventPayload
             {
@@ -5778,8 +5767,8 @@ namespace IMDataCore
             {
                 MoneyBefore = resources.Money(),
                 FansBefore = resources.GetFansTotal(null),
-                FameBefore = (int)resources.Get(resources.type.fame, true),
-                BuzzBefore = (int)resources.Get(resources.type.buzz, true),
+                FameBefore = resources.Get(resources.type.fame, true),
+                BuzzBefore = resources.Get(resources.type.buzz, true),
                 FameLevelBefore = resources.GetFameLevel(),
                 FameProgressBefore = resources.GetFameProgress()
             };
@@ -5803,8 +5792,8 @@ namespace IMDataCore
                 money_after = moneyAfter,
                 money_delta = moneyAfter - snapshotBefore.MoneyBefore,
                 fans_total = resources.GetFansTotal(null),
-                fame_points = (int)resources.Get(resources.type.fame, true),
-                buzz_points = (int)resources.Get(resources.type.buzz, true),
+                fame_points = resources.Get(resources.type.fame, true),
+                buzz_points = resources.Get(resources.type.buzz, true),
                 event_date = CoreDateTimeUtility.ToRoundTripString(staticVars.dateTime)
             };
 
@@ -5842,23 +5831,23 @@ namespace IMDataCore
 
             long moneyAfter = resources.Money();
             long fansAfter = resources.GetFansTotal(null);
-            int fameAfter = (int)resources.Get(resources.type.fame, true);
-            int buzzAfter = (int)resources.Get(resources.type.buzz, true);
+            long fameAfter = resources.Get(resources.type.fame, true);
+            long buzzAfter = resources.Get(resources.type.buzz, true);
 
             EconomyDailyTickEventPayload payload = new EconomyDailyTickEventPayload
             {
                 money_before = snapshotBefore.MoneyBefore,
                 money_after = moneyAfter,
                 money_delta = moneyAfter - snapshotBefore.MoneyBefore,
-                expected_daily_profit = resourceSystem.Money_DailyProfit(),
+                expected_daily_profit = SaveNLoadFixesWideNumericInterop.GetDailyBusinessProfit(resourceSystem),
                 buzz_before = snapshotBefore.BuzzBefore,
                 buzz_after = buzzAfter,
                 buzz_delta = buzzAfter - snapshotBefore.BuzzBefore,
-                expected_daily_buzz_gain = resourceSystem.Buzz_Daily() - resourceSystem.GetDailyBuzzReduction(),
+                expected_daily_buzz_gain = SaveNLoadFixesWideNumericInterop.GetDailyBusinessBuzz(resourceSystem) - (long)resourceSystem.GetDailyBuzzReduction(),
                 fame_before = snapshotBefore.FameBefore,
                 fame_after = fameAfter,
                 fame_delta = fameAfter - snapshotBefore.FameBefore,
-                expected_daily_fame_gain = resourceSystem.Fame_Daily(),
+                expected_daily_fame_gain = SaveNLoadFixesWideNumericInterop.GetDailyBusinessFame(resourceSystem),
                 fans_before = snapshotBefore.FansBefore,
                 fans_after = fansAfter,
                 fans_delta = fansAfter - snapshotBefore.FansBefore,

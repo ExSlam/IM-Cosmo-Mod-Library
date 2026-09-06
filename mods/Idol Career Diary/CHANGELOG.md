@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+- Updated the IM Data Core dependency contract to 3.4.33 v6 APIs.
+- Moved namespace registration, custom JSON reads/writes, and custom-event writes to reflection-safe `IMDataCoreInteropApi` calls with Idol Career Diary's own assembly as the owner witness.
+- Birthday events now use deterministic `TryAppendCustomEventOnce` keys, preventing duplicate rows from repeated hooks on the same in-game birthday.
+- Declares the `idol_career_diary_birthday_events` revision-1 namespace capability at session bootstrap.
+- Maps v6 `IdempotencyKey`, `ParticipantSchemaVersion`, and `ParticipantKnownness`; unknown/malformed shared participant metadata is not used to guess social participants.
+- Keeps timeline queries read-only on the normal IM Data Core query surface and retains zero direct SNLF/SWOF or physical-save transport ownership.
+
 ## 1.2.4
 
 - Career-window timeline filtering now excludes events before an idol's hiring date and after a completed graduation while retaining the graduation day itself.

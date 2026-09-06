@@ -742,7 +742,7 @@ namespace IMDataCore
                 ShowCastIdList = BuildDelimitedIdentifierList(castIdolIdentifiers),
                 ShowLatestAudience = ResolveLatestLongMetric(show.audience),
                 ShowLatestRevenue = ResolveLatestLongMetric(show.revenue),
-                ShowLatestNewFans = ResolveLatestIntMetric(show.fans),
+                ShowLatestNewFans = ResolveLatestLongMetric(SaveNLoadFixesWideNumericInterop.GetShowFans(show)),
                 ShowLatestBuzz = ResolveLatestIntMetric(show.buzz)
             };
 
@@ -790,8 +790,9 @@ namespace IMDataCore
             int showEpisodeBudget = show.GetBudget();
             long previousProfit = previousRevenue - showEpisodeBudget;
             long latestProfit = latestRevenue - showEpisodeBudget;
-            int previousNewFans = ResolvePreviousIntMetric(show.fans);
-            int latestNewFans = ResolveLatestIntMetric(show.fans);
+            List<long> exactShowFans = SaveNLoadFixesWideNumericInterop.GetShowFans(show);
+            long previousNewFans = ResolvePreviousLongMetric(exactShowFans);
+            long latestNewFans = ResolveLatestLongMetric(exactShowFans);
             int previousBuzz = ResolvePreviousIntMetric(show.buzz);
             int latestBuzz = ResolveLatestIntMetric(show.buzz);
             float previousFatigue = ResolvePreviousFloatMetric(show.fatigue);

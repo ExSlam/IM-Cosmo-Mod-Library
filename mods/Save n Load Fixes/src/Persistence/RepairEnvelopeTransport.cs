@@ -18,8 +18,16 @@ namespace SaveNLoadFixes.Persistence
     internal static class RepairEnvelopeTransport
     {
         private static readonly object RegistrySync = new object();
+        private sealed class RegisteredContentFingerprint
+        {
+            internal string Value = string.Empty;
+        }
+
         private static readonly ConditionalWeakTable<SaveManager.SavedData, RepairEnvelopeLoadState>
             LoadStates = new ConditionalWeakTable<SaveManager.SavedData, RepairEnvelopeLoadState>();
+        private static readonly ConditionalWeakTable<SaveManager.SavedData, RegisteredContentFingerprint>
+            RegisteredContentFingerprints =
+                new ConditionalWeakTable<SaveManager.SavedData, RegisteredContentFingerprint>();
 
         private static long frozenCheckpointCount;
         private static long envelopeReadCount;
@@ -36,6 +44,83 @@ namespace SaveNLoadFixes.Persistence
         internal static long InvalidEnvelopeReadCount { get { return Interlocked.Read(ref invalidEnvelopeReadCount); } }
         internal static long FreezeFailureCount { get { return Interlocked.Read(ref freezeFailureCount); } }
         internal static string LastDiagnostic { get { lock (RegistrySync) { return lastDiagnostic; } } }
+
+        /// <summary>
+        /// Registers IM Data Core's exact save-side content fingerprint against the
+        /// SavedData instance that SNLF is about to freeze. The registration is weak
+        /// and one-shot: TryFreezeSavedDataPayload consumes it into the repair envelope.
+        /// </summary>
+        internal static bool TryRegisterSavedDataContentFingerprint(
+            SaveManager.SavedData savedData,
+            string fingerprint,
+            out string error)
+        {
+            error = string.Empty;
+            if (savedData == null)
+            {
+                error = "SavedData is null.";
+                return false;
+            }
+            if (!RepairEnvelopeContentFingerprint.IsValid(fingerprint))
+            {
+                error = "The supplied content fingerprint is not a canonical SHA-256 witness.";
+                return false;
+            }
+
+            lock (RegistrySync)
+            {
+                RegisteredContentFingerprints.Remove(savedData);
+                RegisteredContentFingerprints.Add(
+                    savedData,
+                    new RegisteredContentFingerprint { Value = fingerprint });
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the checkpoint witness carried by the validated SNLF envelope. A
+        /// legacy flag is also returned for a validated pre-bridge envelope that has
+        /// no IMDC witness yet. IMDC may use that flag for one conservative, unique-
+        /// candidate migration without weakening ordinary exact matching afterward.
+        /// </summary>
+        internal static bool TryGetLoadedSavedDataCheckpointIdentity(
+            SaveManager.SavedData savedData,
+            out string fingerprint,
+            out bool legacyEnvelopeWithoutFingerprint,
+            out string error)
+        {
+            fingerprint = string.Empty;
+            legacyEnvelopeWithoutFingerprint = false;
+            error = string.Empty;
+            if (savedData == null)
+            {
+                error = "SavedData is null.";
+                return false;
+            }
+
+            lock (RegistrySync)
+            {
+                RepairEnvelopeLoadState state;
+                if (!LoadStates.TryGetValue(savedData, out state) ||
+                    state == null || !state.Present || !state.Valid ||
+                    state.Envelope == null)
+                {
+                    error =
+                        "SavedData does not have a validated SNLF repair-envelope load state.";
+                    return false;
+                }
+
+                string stored = state.Envelope.imdc_content_fingerprint ?? string.Empty;
+                if (RepairEnvelopeContentFingerprint.IsValid(stored))
+                {
+                    fingerprint = stored;
+                    return true;
+                }
+
+                legacyEnvelopeWithoutFingerprint = string.IsNullOrEmpty(stored);
+                return true;
+            }
+        }
 
         internal static bool TryFreezeSavedDataPayload(
             SaveManager.SavedData dataToSave,
@@ -59,6 +144,20 @@ namespace SaveNLoadFixes.Persistence
                 Interlocked.Increment(ref freezeFailureCount);
                 SetDiagnostic("Repair envelope capture failed: " + error);
                 return false;
+            }
+
+            lock (RegistrySync)
+            {
+                RegisteredContentFingerprint registered;
+                if (RegisteredContentFingerprints.TryGetValue(
+                        dataToSave,
+                        out registered) &&
+                    registered != null &&
+                    RepairEnvelopeContentFingerprint.IsValid(registered.Value))
+                {
+                    envelope.imdc_content_fingerprint = registered.Value;
+                }
+                RegisteredContentFingerprints.Remove(dataToSave);
             }
 
             string vanillaJson;

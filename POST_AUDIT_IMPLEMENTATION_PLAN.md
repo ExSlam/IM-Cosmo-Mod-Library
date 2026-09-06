@@ -747,6 +747,8 @@ Do not implement split findings' current continuation half in IMDC.
 
 ## IMDC Wave 3 - payload/timing/reference semantics (#41-#55)
 
+**Implementation checkpoint:** Wave 3 Task 1, payload/timing #41-#47, is complete in IMDataCore 3.4.31; Wave 3 Task 2, historical references/lifetime #48-#52, is complete in 3.4.32; and Wave 3 Task 3, namespace bootstrap/order/reentrancy #53-#55, is complete in 3.4.33. Wave 3 is complete. The next planned phase is Wave 4 public query product #61-#68.
+
 Apply the closed Area #9/#13/#14 contracts:
 
 - payload/timing #41-#47;
@@ -756,6 +758,14 @@ Apply the closed Area #9/#13/#14 contracts:
 Run legacy/current schema fixtures after every payload change so #57 is not regressed.
 
 ## IMDC Wave 4 - public query product (#61-#68)
+
+**Implementation checkpoint:** Wave 4 Task 1, structured coverage/knownness **#61-#65**, is **FINAL-STATIC in IMDataCore 3.4.33**. Its source/deterministic implementation and dormant v6/v3 acceptance contracts are closed while the production storage gate intentionally remains sidecar v5 / journal v2. Real compilation plus Idol Manager/Unity #120-#127 execution is tracked separately in `mods/IM Data Core/docs/IMDC_WAVE4_V6V3_CUTOVER_VALIDATION_GATE.md`; the trusted legacy-unbound namespace owner authorization channel is tracked in `mods/IM Data Core/docs/IMDC_LEGACY_NAMESPACE_AUTHORIZATION_FOLLOWUP.md`. Neither follow-up redefines the remaining Wave 4 query-product tasks #66-#68.
+
+**Implementation checkpoint:** Wave 4 Task 2, public current-generation resolver **#66**, is **FINAL-STATIC in IMDataCore 3.4.33**. The resolver surface was staged early in Wave 1 Task 6; Task 2 revalidates it against the finalized selected-branch v6 identity model, preserves live-v5 fail-closed behavior for opaque generations/candidate persistence, deduplicates redundant exact-alias evidence by canonical target, and rejects cross-kind candidate leakage. The next planned query-product task is **Wave 4 Task 3 / #67**, followed by **Task 4 / #68**.
+
+**Implementation checkpoint:** Wave 4 Task 3, canonical career-wide durable-history paginator **#67**, is **FINAL-STATIC in IMDataCore 3.4.33**. `TryReadHistoryPage(...)` now exposes the selected branch's canonical physical `activeEvents` stream through the preferred, reflection-friendly, and uppercase facades; pages by stable EventId/shared sequence; preserves one-row-per-occurrence shared/global/namespaced semantics; and fails closed on discarded-branch cursors. The existing idol paginator remains the participant-expanded compatibility view. No storage-generation change is required. Task 3 remains closed.
+
+**Implementation checkpoint:** Wave 4 Task 4, cursor-complete money-detail paginator **#68**, is **FINAL-STATIC in IMDataCore 3.4.33**. `TryReadMoneyTransactionsPage(...)` preserves the existing half-open game-date bucket semantics while adding exact active-branch EventId/shared-sequence continuation inside dense days; discarded-branch, changed-range, and namespaced-lookalike cursors fail closed; aggregate totals remain unchanged and uncapped. No storage-generation change is required. **Wave 4 public query product #61-#68 is FINAL-STATIC complete. The next planned phase is Wave 5 full 1-154 regression closure.**
 
 After storage and identity are stable:
 
@@ -767,6 +777,8 @@ After storage and identity are stable:
 - old money coverage method retained only as conservative compatibility convenience.
 
 ## IMDC Wave 5 - full 1-154 regression closure
+
+**Implementation checkpoint:** Wave 5 Task 1, full #1-#154 static regression closure, is **FINAL-STATIC in IMDataCore 3.4.33**. A machine-readable registry maps every audit regression number to executable source/model evidence, and dedicated aggregate oracles now implement #147-#154. Native v6/v3 compile/runtime execution remains owned by `mods/IM Data Core/docs/IMDC_WAVE4_V6V3_CUTOVER_VALIDATION_GATE.md`; production remains sidecar v5 / journal v2 until that gate passes.
 
 Run the full existing suite against:
 
@@ -785,6 +797,12 @@ Run the full existing suite against:
 ---
 
 # 9. IMDataCore and SNLF transport cooperation
+
+**Implementation checkpoint:** Wave 5 Task 2, ordered transport cooperation, is **FINAL-STATIC in IMDataCore 3.4.33**. IMDataCore now discovers the effective provider by reflection, preferring authoritative + healthy `SaveNLoadFixes.SaveTransportApi`, falling back to healthy `SaveWriteOrderingFix.SaveWriteOrderingApi`, and otherwise retaining its standalone detached-save/deletion safety path. Save-boundary optimization and directory deletion share one provider decision, so deletion acquires at most one effective-owner lease. The live sidecar v5 / journal v2 gate is unchanged.
+
+**Implementation checkpoint:** Wave 5 Task 3, v6/v3 static release preflight, is **FINAL-STATIC in IMDataCore 3.4.33**. Canonical identity and structured coverage now share one atomic 6/3 activation predicate; physical initialization rejects split 6/2 or 5/3 configurations. Static migration/API/regression/nonduplication prerequisites are machine-checked. Live activation remains sidecar v5 / journal v2 until the separate compile/Unity cutover gate passes.
+
+**Implementation checkpoint:** Wave 5 Task 4, companion transport reference validation, is **FINAL-STATIC in IMDataCore 3.4.33**. The reflection contract has been checked against supplied SNLF/SWOF source and Release DLLs; direct SNLF requires API version >= 1 plus exact owner identity, while current SWOF effective-health trust requires a recognized SWOF/delegated-SNLF owner. Legacy SWOF fallback and the live sidecar v5 / journal v2 gate remain unchanged.
 
 Current IMDataCore 3.4.7 looks specifically for `SaveWriteOrderingFix.SaveWriteOrderingApi` and uses SWOF's health/exclusive-directory API when present. Update this in the IMDataCore implementation wave without changing defect counts.
 

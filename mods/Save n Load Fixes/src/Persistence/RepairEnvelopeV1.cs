@@ -12,6 +12,38 @@ namespace SaveNLoadFixes.Persistence
         internal const int FormatVersion = 1;
     }
 
+    /// <summary>
+    /// Optional cross-mod checkpoint witness carried by the SNLF envelope. IM Data
+    /// Core computes this value from the pre-write vanilla SavedData graph. SNLF
+    /// preserves it through vanilla FixSaveFile's SimpleJSON scalar rewrite so IMDC
+    /// can select the exact same sidecar checkpoint after restart.
+    /// </summary>
+    internal static class RepairEnvelopeContentFingerprint
+    {
+        internal const string Prefix = "sha256:";
+
+        internal static bool IsValid(string value)
+        {
+            if (string.IsNullOrEmpty(value) ||
+                value.Length != Prefix.Length + 64 ||
+                !value.StartsWith(Prefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            for (int index = Prefix.Length; index < value.Length; index++)
+            {
+                char character = value[index];
+                if (!((character >= '0' && character <= '9') ||
+                      (character >= 'a' && character <= 'f')))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
     [Serializable]
     internal sealed class RepairEnvelopeV1
     {
@@ -20,6 +52,12 @@ namespace SaveNLoadFixes.Persistence
         public string checkpoint_id = string.Empty;
         public string mod_version = string.Empty;
         public string game_date = string.Empty;
+
+        // Optional. Empty means this envelope predates the IMDC/SNLF checkpoint
+        // bridge. Keeping it on the repair envelope, rather than vanilla SavedData,
+        // lets FixSaveFile rewrite the file without destroying IMDC checkpoint identity.
+        public string imdc_content_fingerprint = string.Empty;
+
         public RepairEnvelopeRecordsV1 records = new RepairEnvelopeRecordsV1();
     }
 

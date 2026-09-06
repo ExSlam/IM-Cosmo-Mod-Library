@@ -4,20 +4,26 @@
 
 ## Dependencies
 
-- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.7` or higher
+- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.33` or higher, with the v6 consumer interop contract
 - `IM UI Framework` (`com.cosmo.imuiframework`) version `2.0.3` or higher
 
 This mod does not ship a separate persistence backend. It reads timeline events and supplemental state through IM Data Core and renders UI with IM UI Framework.
 
 ## Current data contract
 
-Idol Career Diary uses IM Data Core's public API only. Current timeline data uses the canonical `single_released`, `show_episode_released`, `contract_cancelled`, and `idol_status_changed` event names, while readers for older aliases remain so imported or third-party events can still be displayed.
+Idol Career Diary uses IM Data Core's read-only query API plus the reflection-safe `IMDataCoreInteropApi` for owner-authenticated namespace state and custom-event writes. Current timeline data uses the canonical `single_released`, `show_episode_released`, `contract_cancelled`, and `idol_status_changed` event names, while readers for older aliases remain so imported or third-party events can still be displayed.
 
 Timeline source rows are career-windowed before aggregation/deduplication: events before the idol's hiring date and events after an actually completed graduation are excluded from that idol's diary. The graduation day itself remains included.
 
 IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Graduation** using vanilla's resolved `Graduation_Trivia_Text`, preserving JSON-only graduation-trivia additions without a hard dependency on the mod that supplied them. Election rankings use IM Data Core's persisted `election_number`, not event identity, and concert details retain the captured ordered setlist/talk-break snapshot.
 
 The last-selected diary entry is supplemental state stored through IM Data Core. It is immediately visible in the active session and becomes durable at the next vanilla save boundary.
+
+### IM Data Core v6 integration
+
+Idol Career Diary authenticates its namespace as `com.cosmo.idolcareerdiary` by passing its own assembly to `IMDataCoreInteropApi`. Reflection is never used against owner-sensitive methods on the normal `IMDataCoreApi`. The diary declares revision 1 of the `idol_career_diary_birthday_events` namespace capability and records birthdays with deterministic append-once keys so repeated hooks/load paths cannot create duplicate birthday rows on the active branch.
+
+The v6 event DTO fields `IdempotencyKey`, `ParticipantSchemaVersion`, and `ParticipantKnownness` are mapped into the diary read model. Unknown or malformed shared-participant metadata is not used to guess social participants. Read-only timeline paging remains on IM Data Core's normal query surface. Idol Career Diary does not call SNLF or SWOF directly and never writes the physical vanilla save.
 
 ## Player-facing behavior
 
@@ -101,7 +107,7 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 
 ## Installation
 
-1. Install `IM Data Core` 3.4.7 or newer.
+1. Install `IM Data Core` 3.4.33 or newer with the v6 consumer interop contract.
 2. Install `IM UI Framework` 2.0.3 or newer.
 3. Install `Idol Career Diary`.
 4. Launch the game and open an idol profile to verify the diary UI appears.

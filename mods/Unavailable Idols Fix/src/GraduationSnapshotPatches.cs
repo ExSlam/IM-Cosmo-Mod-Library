@@ -328,13 +328,17 @@ namespace UnavailableIdolsFix
     internal static class IMDataCoreSnapshotBridge
     {
         private const string HarmonyId = "com.cosmo.imdatacore";
+        private const string AssemblyName = "com.cosmo.imdatacore";
         private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
+        private const string InteropApiTypeName = "IMDataCore.IMDataCoreInteropApi";
         private const string NamespaceIdentifier = "com.cosmo.unavailableidolsfix";
+
+        private static readonly Assembly ConsumerAssembly = typeof(IMDataCoreSnapshotBridge).Assembly;
+        private static MethodInfo isReadyMethod;
         private static MethodInfo registerMethod;
-        private static MethodInfo appendMethod;
+        private static MethodInfo appendOnceMethod;
         private static object session;
-        private static bool resolved;
-        private static bool registrationAttempted;
+        private static DateTime nextResolveAttemptUtc = DateTime.MinValue;
         private static bool loggedFailure;
 
         internal static void TryAppend(data_girls.girls girl, string payload)
@@ -354,6 +358,8 @@ namespace UnavailableIdolsFix
                 object[] args =
                 {
                     session,
+                    ConsumerAssembly,
+                    BuildIdempotencyKey(girl),
                     girl.id,
                     "idol",
                     girl.id.ToString(CultureInfo.InvariantCulture),
@@ -362,10 +368,10 @@ namespace UnavailableIdolsFix
                     "data_girls.girls.Graduate.prefix",
                     string.Empty
                 };
-                object result = appendMethod.Invoke(null, args);
+                object result = appendOnceMethod.Invoke(null, args);
                 if (!(result is bool) || !(bool)result)
                 {
-                    LogFailure(args[7] as string);
+                    LogFailure(args[9] as string);
                 }
             }
             catch (Exception exception)
@@ -374,62 +380,106 @@ namespace UnavailableIdolsFix
             }
         }
 
+        private static string BuildIdempotencyKey(data_girls.girls girl)
+        {
+            DateTime occurrenceDate = girl != null && girl.Graduation_Date > DateTime.MinValue
+                ? girl.Graduation_Date
+                : staticVars.dateTime;
+            return "graduating_idol_final_snapshot_"
+                + (girl == null ? "unknown" : girl.id.ToString(CultureInfo.InvariantCulture))
+                + "_"
+                + occurrenceDate.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        }
+
         private static bool EnsureSession()
         {
             if (session != null)
             {
                 return true;
             }
-            if (registrationAttempted)
-            {
-                return false;
-            }
-            registrationAttempted = true;
 
-            if (!Resolve())
+            if (!TryEnsureReady())
             {
                 return false;
             }
 
-            object[] args = { NamespaceIdentifier, null, string.Empty };
+            object[] args = { NamespaceIdentifier, ConsumerAssembly, null, string.Empty };
             object result = registerMethod.Invoke(null, args);
-            if (result is bool && (bool)result && args[1] != null)
+            if (result is bool && (bool)result && args[2] != null)
             {
-                session = args[1];
+                session = args[2];
                 return true;
             }
 
-            LogFailure(args[2] as string);
+            LogFailure(args[3] as string);
             return false;
+        }
+
+        private static bool TryEnsureReady()
+        {
+            if (isReadyMethod == null || registerMethod == null || appendOnceMethod == null)
+            {
+                if (DateTime.UtcNow < nextResolveAttemptUtc || !Resolve())
+                {
+                    return false;
+                }
+            }
+
+            object result = isReadyMethod.Invoke(null, null);
+            return result is bool && (bool)result;
         }
 
         private static bool Resolve()
         {
-            if (resolved)
+            Assembly coreAssembly = null;
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < loadedAssemblies.Length; i++)
             {
-                return registerMethod != null && appendMethod != null;
-            }
-            resolved = true;
-
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                Type apiType = assembly.GetType(ApiTypeName, false);
-                if (apiType == null)
+                Assembly assembly = loadedAssemblies[i];
+                if (assembly != null && assembly.GetName() != null
+                    && string.Equals(assembly.GetName().Name, AssemblyName, StringComparison.OrdinalIgnoreCase))
                 {
-                    continue;
+                    coreAssembly = assembly;
+                    break;
                 }
-
-                registerMethod = FindMethod(apiType, "TryRegisterNamespace", 3);
-                appendMethod = FindMethod(apiType, "TryAppendCustomEvent", 8);
-                break;
             }
 
-            if (registerMethod == null || appendMethod == null)
+            if (coreAssembly == null)
             {
-                LogFailure("IM Data Core API methods were not found.");
+                try
+                {
+                    coreAssembly = Assembly.Load(AssemblyName);
+                }
+                catch
+                {
+                    nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                    return false;
+                }
+            }
+
+            Type apiType = coreAssembly.GetType(ApiTypeName, false);
+            Type interopApiType = coreAssembly.GetType(InteropApiTypeName, false);
+            if (apiType == null || interopApiType == null)
+            {
+                nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                LogFailure("IM Data Core v6 API types were not found.");
                 return false;
             }
 
+            MethodInfo resolvedIsReady = FindMethod(apiType, "IsReady", 0);
+            MethodInfo resolvedRegister = FindMethod(interopApiType, "TryRegisterNamespace", 4);
+            MethodInfo resolvedAppendOnce = FindMethod(interopApiType, "TryAppendCustomEventOnce", 10);
+            if (resolvedIsReady == null || resolvedRegister == null || resolvedAppendOnce == null)
+            {
+                nextResolveAttemptUtc = DateTime.UtcNow.AddSeconds(5d);
+                LogFailure("IM Data Core v6 owner-safe snapshot API methods were not found.");
+                return false;
+            }
+
+            isReadyMethod = resolvedIsReady;
+            registerMethod = resolvedRegister;
+            appendOnceMethod = resolvedAppendOnce;
+            nextResolveAttemptUtc = DateTime.MinValue;
             return true;
         }
 

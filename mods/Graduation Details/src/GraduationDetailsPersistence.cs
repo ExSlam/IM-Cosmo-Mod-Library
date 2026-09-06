@@ -340,6 +340,98 @@ namespace GraduationDetails
             return true;
         }
 
+        internal static bool TryResolveMirroredDirectoryForVanillaDirectory(
+            string vanillaDirectoryPath,
+            out string detailsDirectoryPath)
+        {
+            return TryResolveMirroredDirectoryForVanillaDirectory(
+                Application.persistentDataPath,
+                vanillaDirectoryPath,
+                out detailsDirectoryPath);
+        }
+
+        internal static bool TryResolveMirroredDirectoryForVanillaDirectory(
+            string persistentDataRoot,
+            string vanillaDirectoryPath,
+            out string detailsDirectoryPath)
+        {
+            detailsDirectoryPath = "";
+            if (string.IsNullOrWhiteSpace(vanillaDirectoryPath) ||
+                HasNavigationPathSegment(vanillaDirectoryPath))
+            {
+                return false;
+            }
+
+            string normalizedPersistentRoot;
+            if (!TryNormalizeDirectoryPath(
+                    persistentDataRoot,
+                    out normalizedPersistentRoot))
+            {
+                return false;
+            }
+
+            string dataRoot = GetVanillaDataRootDirectory(normalizedPersistentRoot);
+            string detailsRoot = GetRootDirectory(normalizedPersistentRoot);
+            string normalizedVanillaDirectory;
+            if (string.IsNullOrEmpty(dataRoot) ||
+                string.IsNullOrEmpty(detailsRoot) ||
+                !TryNormalizeDirectoryPath(
+                    vanillaDirectoryPath,
+                    out normalizedVanillaDirectory) ||
+                !IsStrictlyContainedPath(dataRoot, normalizedVanillaDirectory))
+            {
+                return false;
+            }
+
+            string relativePath = normalizedVanillaDirectory.Substring(
+                BuildDirectoryPrefix(dataRoot).Length);
+            if (!AreRelativePathSegmentsSafe(relativePath))
+            {
+                return false;
+            }
+
+            string[] segments = SplitRelativePath(relativePath);
+            if (!IsSupportedVanillaSaveDirectorySegments(segments))
+            {
+                return false;
+            }
+
+            return GraduationDetailsPersistenceIO.TryGetContainedPath(
+                detailsRoot,
+                relativePath,
+                true,
+                out detailsDirectoryPath);
+        }
+
+        internal static bool IsSameOrContainedPath(
+            string directoryPath,
+            string candidatePath)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath) ||
+                string.IsNullOrWhiteSpace(candidatePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string normalizedDirectory = TrimTrailingDirectorySeparators(
+                    Path.GetFullPath(directoryPath));
+                string normalizedCandidate = Path.GetFullPath(candidatePath);
+                return string.Equals(
+                        normalizedDirectory,
+                        normalizedCandidate,
+                        GraduationDetailsPathSemantics.Comparison) ||
+                    normalizedCandidate.StartsWith(
+                        BuildDirectoryPrefix(normalizedDirectory),
+                        GraduationDetailsPathSemantics.Comparison);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         internal static GraduationDetailsSaveScope CreateTransientScope()
         {
             return new GraduationDetailsSaveScope
@@ -477,6 +569,45 @@ namespace GraduationDetails
             return segments.Length == 4 &&
                 IsStoryChapterFolderName(segments[2]) &&
                 IsSaveJsonFileName(fileName);
+        }
+
+        private static bool IsSupportedVanillaSaveDirectorySegments(
+            string[] segments)
+        {
+            if (segments == null)
+            {
+                return false;
+            }
+
+            if (segments.Length == 2 &&
+                string.Equals(
+                    segments[0],
+                    ManualSavesFolderName,
+                    GraduationDetailsPathSemantics.Comparison))
+            {
+                return IsOpaquePathSegment(segments[1]);
+            }
+
+            if (segments.Length == 2 &&
+                string.Equals(
+                    segments[0],
+                    StoryModeFolderName,
+                    GraduationDetailsPathSemantics.Comparison))
+            {
+                return IsOpaquePathSegment(segments[1]);
+            }
+
+            return segments.Length == 4 &&
+                string.Equals(
+                    segments[0],
+                    StoryModeFolderName,
+                    GraduationDetailsPathSemantics.Comparison) &&
+                IsOpaquePathSegment(segments[1]) &&
+                string.Equals(
+                    segments[2],
+                    ManualSavesFolderName,
+                    GraduationDetailsPathSemantics.Comparison) &&
+                IsOpaquePathSegment(segments[3]);
         }
 
         private static bool IsDirectSaveFileName(string fileName)
@@ -889,6 +1020,7 @@ namespace GraduationDetails
     /// </summary>
     internal static class GraduationDetailsImDataCoreBridge
     {
+        private const string ExpectedAssemblyName = "com.cosmo.imdatacore";
         private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
         private const string InteropApiTypeName = "IMDataCore.IMDataCoreInteropApi";
         private const string NamespaceIdentifier = "graduation_details";
@@ -897,10 +1029,10 @@ namespace GraduationDetails
         private const int ExpectedFormatVersion = 1;
 
         private static readonly object BridgeLock = new object();
+        private static Assembly imDataCoreAssembly;
         private static Type apiType;
         private static Type interopApiType;
         private static object session;
-        private static bool lookupAttempted;
         private static bool delegatedStateObserved;
 
         internal static bool HasDelegatedState
@@ -1076,55 +1208,110 @@ namespace GraduationDetails
         {
             available = false;
             errorMessage = "";
-            if (!lookupAttempted || apiType == null || interopApiType == null)
+            if (imDataCoreAssembly == null || apiType == null || interopApiType == null)
             {
-                lookupAttempted = true;
+                imDataCoreAssembly = null;
+                apiType = null;
+                interopApiType = null;
+
                 foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    if (apiType == null)
+                    AssemblyName assemblyName;
+                    try
                     {
-                        apiType = assembly.GetType(ApiTypeName, false);
+                        assemblyName = assembly == null ? null : assembly.GetName();
                     }
-                    if (interopApiType == null)
+                    catch
                     {
-                        interopApiType = assembly.GetType(InteropApiTypeName, false);
+                        continue;
                     }
-                    if (apiType != null && interopApiType != null)
+
+                    if (assemblyName != null &&
+                        string.Equals(
+                            assemblyName.Name,
+                            ExpectedAssemblyName,
+                            StringComparison.OrdinalIgnoreCase))
                     {
+                        imDataCoreAssembly = assembly;
                         break;
                     }
                 }
+
+                if (imDataCoreAssembly == null)
+                {
+                    try
+                    {
+                        imDataCoreAssembly = Assembly.Load(ExpectedAssemblyName);
+                    }
+                    catch
+                    {
+                        // IMDC is genuinely absent. Standalone persistence remains valid.
+                        return true;
+                    }
+                }
+
+                apiType = imDataCoreAssembly.GetType(ApiTypeName, false);
+                interopApiType = imDataCoreAssembly.GetType(InteropApiTypeName, false);
             }
-            if (apiType == null || interopApiType == null)
+
+            if (apiType == null ||
+                interopApiType == null ||
+                apiType.Assembly != imDataCoreAssembly ||
+                interopApiType.Assembly != imDataCoreAssembly)
             {
-                // Older IMDC builds do not expose the reflection-safe owner-aware
-                // facade. Treat them as unavailable and keep standalone persistence.
+                // An older/incompatible IMDC build is not a delegated persistence
+                // provider. Treat it as unavailable and keep the standalone path.
                 return true;
             }
 
             try
             {
-                MethodInfo isReadyMethod = apiType.GetMethod(
+                MethodInfo isReadyMethod = FindStaticMethod(
+                    apiType,
                     "IsReady",
-                    BindingFlags.Public | BindingFlags.Static);
-                if (isReadyMethod == null || !(bool)isReadyMethod.Invoke(null, null))
+                    0);
+                MethodInfo registerMethod = FindStaticMethod(
+                    interopApiType,
+                    "TryRegisterNamespace",
+                    4);
+                MethodInfo getMethod = FindStaticMethod(
+                    interopApiType,
+                    "TryGetCustomJson",
+                    5);
+                MethodInfo setMethod = FindStaticMethod(
+                    interopApiType,
+                    "TrySetCustomJson",
+                    5);
+                MethodInfo diagnosticsMethod = FindStaticMethod(
+                    apiType,
+                    "TryGetPersistenceDiagnostics",
+                    2);
+
+                if (isReadyMethod == null ||
+                    registerMethod == null ||
+                    getMethod == null ||
+                    setMethod == null ||
+                    diagnosticsMethod == null ||
+                    isReadyMethod.ReturnType != typeof(bool))
+                {
+                    // Current Graduation Details requires the owner-safe v6 consumer
+                    // contract as one unit. Partial/older surfaces fall back rather
+                    // than being mistaken for a writable delegated provider.
+                    return true;
+                }
+
+                object readyResult = isReadyMethod.Invoke(null, null);
+                if (!(readyResult is bool) || !(bool)readyResult)
                 {
                     return true;
                 }
+
                 available = true;
                 if (session != null)
                 {
                     return true;
                 }
 
-                MethodInfo registerMethod = interopApiType.GetMethod(
-                    "TryRegisterNamespace",
-                    BindingFlags.Public | BindingFlags.Static);
-                if (registerMethod == null)
-                {
-                    errorMessage = "IM Data Core does not expose namespace registration.";
-                    return false;
-                }
                 object[] arguments = new object[]
                 {
                     NamespaceIdentifier,
@@ -1132,7 +1319,9 @@ namespace GraduationDetails
                     null,
                     ""
                 };
-                bool registered = (bool)registerMethod.Invoke(null, arguments);
+                object registerResult = registerMethod.Invoke(null, arguments);
+                bool registered =
+                    registerResult is bool && (bool)registerResult;
                 if (!registered || arguments[2] == null)
                 {
                     errorMessage = arguments[3] as string ??
@@ -1158,9 +1347,10 @@ namespace GraduationDetails
             errorMessage = "";
             try
             {
-                MethodInfo method = apiType.GetMethod(
+                MethodInfo method = FindStaticMethod(
+                    apiType,
                     "TryGetPersistenceDiagnostics",
-                    BindingFlags.Public | BindingFlags.Static);
+                    2);
                 if (method == null)
                 {
                     errorMessage =
@@ -1224,9 +1414,10 @@ namespace GraduationDetails
             errorMessage = "";
             try
             {
-                MethodInfo method = interopApiType.GetMethod(
+                MethodInfo method = FindStaticMethod(
+                    interopApiType,
                     "TrySetCustomJson",
-                    BindingFlags.Public | BindingFlags.Static);
+                    5);
                 if (method == null)
                 {
                     errorMessage = "IM Data Core does not expose custom JSON writes.";
@@ -1270,9 +1461,10 @@ namespace GraduationDetails
             errorMessage = "";
             try
             {
-                MethodInfo method = interopApiType.GetMethod(
+                MethodInfo method = FindStaticMethod(
+                    interopApiType,
                     "TryGetCustomJson",
-                    BindingFlags.Public | BindingFlags.Static);
+                    5);
                 if (method == null)
                 {
                     errorMessage = "IM Data Core does not expose custom JSON reads.";
@@ -1307,6 +1499,32 @@ namespace GraduationDetails
                     UnwrapReflectionException(exception).Message;
                 return false;
             }
+        }
+
+        private static MethodInfo FindStaticMethod(
+            Type type,
+            string methodName,
+            int parameterCount)
+        {
+            if (type == null || string.IsNullOrEmpty(methodName))
+            {
+                return null;
+            }
+
+            foreach (MethodInfo method in type.GetMethods(
+                BindingFlags.Public | BindingFlags.Static))
+            {
+                if (string.Equals(
+                        method.Name,
+                        methodName,
+                        StringComparison.Ordinal) &&
+                    method.GetParameters().Length == parameterCount)
+                {
+                    return method;
+                }
+            }
+
+            return null;
         }
 
         private static Exception UnwrapReflectionException(Exception exception)
@@ -1926,6 +2144,80 @@ namespace GraduationDetails
             }
         }
 
+        internal static void OnVanillaSaveDirectoryDeleted(
+            string vanillaDirectoryPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(vanillaDirectoryPath) ||
+                    Directory.Exists(vanillaDirectoryPath))
+                {
+                    return;
+                }
+
+                string detailsDirectoryPath;
+                if (!GraduationDetailsPaths.TryResolveMirroredDirectoryForVanillaDirectory(
+                        vanillaDirectoryPath,
+                        out detailsDirectoryPath))
+                {
+                    WarnSafely(
+                        "Could not resolve the deleted vanilla save directory for " +
+                        "Graduation Details archival.");
+                    return;
+                }
+
+                lock (PersistenceLock)
+                {
+                    EnsureInitializedLocked();
+                    bool activeScopeWasDeleted =
+                        activeScope != null &&
+                        !activeScope.IsTransient &&
+                        GraduationDetailsPaths.IsSameOrContainedPath(
+                            vanillaDirectoryPath,
+                            activeScope.SaveFilePath);
+
+                    if (activeScopeWasDeleted)
+                    {
+                        StageReferencedActivePortraitsToWorkingLocked();
+                    }
+
+                    string archivedDirectoryPath;
+                    string errorMessage;
+                    if (!TryArchiveStandaloneDirectoryLocked(
+                            detailsDirectoryPath,
+                            out archivedDirectoryPath,
+                            out errorMessage))
+                    {
+                        WarnSafely(
+                            "Could not archive Graduation Details persistence for the " +
+                            "deleted save: " + errorMessage);
+                        return;
+                    }
+
+                    if (!string.IsNullOrEmpty(archivedDirectoryPath))
+                    {
+                        InfoSafely(
+                            "Preserved deleted-save standalone persistence at: " +
+                            archivedDirectoryPath);
+                    }
+
+                    if (activeScopeWasDeleted)
+                    {
+                        storageEngine.DetachDeletedScope(activeScope);
+                        activeScope = GraduationDetailsPaths.CreateTransientScope();
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // Vanilla deletion has already succeeded. Supplemental archival may
+                // never turn that successful action into a game error.
+                WarnSafely(
+                    "Deleted-save archival failed without affecting vanilla: " +
+                    exception.Message);
+            }
+        }
+
         internal static void OnNewGameStarting()
         {
             try
@@ -2355,6 +2647,136 @@ namespace GraduationDetails
             }
         }
 
+        private static void StageReferencedActivePortraitsToWorkingLocked()
+        {
+            if (storageEngine == null ||
+                activeScope == null ||
+                activeScope.IsTransient)
+            {
+                return;
+            }
+
+            foreach (GraduationSnapshot snapshot in storageEngine.GetSnapshots())
+            {
+                string fileName = snapshot == null ? "" : snapshot.PortraitFile;
+                if (!GraduationDetailsPaths.IsSafePortraitFileName(fileName))
+                {
+                    continue;
+                }
+
+                string workingPath;
+                if (TryGetWorkingPortraitPathLocked(
+                        fileName,
+                        false,
+                        out workingPath) &&
+                    File.Exists(workingPath))
+                {
+                    continue;
+                }
+
+                string activePath;
+                string stagedPath;
+                if (!TryGetActivePortraitPathLocked(
+                        fileName,
+                        false,
+                        out activePath) ||
+                    !File.Exists(activePath) ||
+                    !TryGetWorkingPortraitPathLocked(
+                        fileName,
+                        true,
+                        out stagedPath))
+                {
+                    continue;
+                }
+
+                TryCopyPortraitAtomically(
+                    workingPortraitDirectory,
+                    activePath,
+                    stagedPath);
+            }
+        }
+
+        private static bool TryArchiveStandaloneDirectoryLocked(
+            string sourceDirectoryPath,
+            out string archivedDirectoryPath,
+            out string errorMessage)
+        {
+            archivedDirectoryPath = "";
+            errorMessage = "";
+            if (string.IsNullOrWhiteSpace(sourceDirectoryPath))
+            {
+                errorMessage = "The Graduation Details archive source is missing.";
+                return false;
+            }
+
+            string detailsRoot = GraduationDetailsPaths.GetRootDirectory();
+            string validatedSource;
+            if (string.IsNullOrEmpty(detailsRoot) ||
+                !GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                    detailsRoot,
+                    sourceDirectoryPath,
+                    false,
+                    out validatedSource))
+            {
+                errorMessage = "The Graduation Details archive source failed containment validation.";
+                return false;
+            }
+
+            if (!Directory.Exists(validatedSource))
+            {
+                return true;
+            }
+
+            if ((File.GetAttributes(validatedSource) &
+                    FileAttributes.ReparsePoint) != 0 ||
+                ContainsReparsePointBelow(validatedSource))
+            {
+                errorMessage = "The Graduation Details archive source contains a reparse point.";
+                return false;
+            }
+
+            string parentDirectory = Path.GetDirectoryName(validatedSource);
+            string sourceName = Path.GetFileName(validatedSource);
+            if (string.IsNullOrEmpty(parentDirectory) ||
+                string.IsNullOrEmpty(sourceName))
+            {
+                errorMessage = "The Graduation Details archive source has no safe parent.";
+                return false;
+            }
+
+            for (int index = 1; index <= 10000; index++)
+            {
+                string suffix = index == 1
+                    ? ".OLD"
+                    : ".OLD" + index.ToString(CultureInfo.InvariantCulture);
+                string candidate = Path.Combine(
+                    parentDirectory,
+                    sourceName + suffix);
+                string validatedCandidate;
+                if (!GraduationDetailsPersistenceIO.TryValidatePathUnderRoot(
+                        detailsRoot,
+                        candidate,
+                        true,
+                        out validatedCandidate))
+                {
+                    errorMessage = "A Graduation Details archive destination failed containment validation.";
+                    return false;
+                }
+                if (Directory.Exists(validatedCandidate) ||
+                    File.Exists(validatedCandidate))
+                {
+                    continue;
+                }
+
+                Directory.Move(validatedSource, validatedCandidate);
+                archivedDirectoryPath = validatedCandidate;
+                return true;
+            }
+
+            errorMessage = "Graduation Details could not allocate a unique OLD archive directory.";
+            return false;
+        }
+
         private static bool SamePath(string first, string second)
         {
             if (string.IsNullOrEmpty(first) || string.IsNullOrEmpty(second))
@@ -2371,6 +2793,21 @@ namespace GraduationDetails
             catch
             {
                 return false;
+            }
+        }
+
+        private static void InfoSafely(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return;
+            }
+            try
+            {
+                Debug.Log("[Graduation Details] " + message);
+            }
+            catch
+            {
             }
         }
 
@@ -3143,6 +3580,40 @@ namespace GraduationDetails
             }
             return "The retained Graduation Details backup could not be activated: " +
                 (backupError ?? "unknown error") + ".";
+        }
+
+        internal void DetachDeletedScope(GraduationDetailsSaveScope scope)
+        {
+            if (scope == null || scope.IsTransient)
+            {
+                return;
+            }
+
+            lock (stateLock)
+            {
+                string relativeSavePath = GraduationDetailsPaths.NormalizeRelativePath(
+                    scope.RelativeSavePath);
+                activeCheckpoints.RemoveAll(
+                    checkpoint => checkpoint != null &&
+                        string.Equals(
+                            GraduationDetailsPaths.NormalizeRelativePath(
+                                checkpoint.RelativeSavePath),
+                            relativeSavePath,
+                            GraduationDetailsPathSemantics.Comparison));
+                durableCheckpoints.RemoveAll(
+                    checkpoint => checkpoint != null &&
+                        string.Equals(
+                            GraduationDetailsPaths.NormalizeRelativePath(
+                                checkpoint.RelativeSavePath),
+                            relativeSavePath,
+                            GraduationDetailsPathSemantics.Comparison));
+
+                if (IsPersistenceBlockedForScopeLocked(scope))
+                {
+                    ClearPersistenceBlockLocked();
+                }
+                recoveredFromBackupSidecarPath = "";
+            }
         }
 
         internal bool TryActivateCheckpoint(

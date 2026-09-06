@@ -25,6 +25,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(string str, out SummerGamesObjectiveSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateSummerGamesObjectiveSnapshot(str);

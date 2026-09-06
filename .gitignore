@@ -56,3 +56,31 @@ mods/Save n Load Fixes.zip
 mods/Save Write Ordering Fix.zip
 mods/Save Write Ordering Fix/tests/Test-TransportCoexistenceSourceQualification.py
 mods/Save Write Ordering Fix/tests/Test-VersionSync.py
+mods/Assistant Manager/tests/Test-ReadFailurePreservesState.py
+mods/Assistant Manager/tests/Test-V6BridgeReadinessContract.py
+mods/Assistant Manager/tests/Test-V6InteropOwnerAuthentication.py
+mods/Assistant Manager/tests/Test-VersionAndTransportAgnostic.py
+mods/Graduation Details/tests/Test-DelegatedNoDualWrite.py
+mods/Graduation Details/tests/Test-DeleteArchiveSlotReuse.py
+mods/Graduation Details/tests/Test-FailClosedSupplementalState.py
+mods/Graduation Details/tests/Test-SaveBoundaryMatrix.py
+mods/Graduation Details/tests/Test-SaveLoadTransportOrdering.py
+mods/Graduation Details/tests/Test-StandaloneFallbackMatrix.py
+mods/Graduation Details/tests/Test-Step5PackageStatus.py
+mods/Graduation Details/tests/Test-V6InteropOwnerAndAssemblyContract.py
+mods/Graduation Details/tests/Test-VersionAndTransportAgnostic.py
+mods/Unavailable Idols Fix/tests/Test-FinalSnapshotAppendOnce.py
+mods/Unavailable Idols Fix/tests/Test-V6InteropOwnerAuthentication.py
+mods/Unavailable Idols Fix/tests/Test-VersionAndTransportAgnostic.py
+mods/Idol Career Diary/docs/IMDATACORE_V6_INTEGRATION.md
+mods/Monthly Ledger/tests/Test-AggregateParityFailClosed.py
+mods/Monthly Ledger/tests/Test-CoverageClassificationModel.py
+mods/Monthly Ledger/tests/Test-CurrentIMDataCoreMoneySurface.py
+mods/Monthly Ledger/tests/Test-ExactWholeYenFormatting.py
+mods/Monthly Ledger/tests/Test-ExhaustiveMoneyPaging.py
+mods/Monthly Ledger/tests/Test-Hotfix031CoverageDoesNotHideRows.py
+mods/Monthly Ledger/tests/Test-Hotfix032CoverageAndExternalAttribution.py
+mods/Monthly Ledger/tests/Test-Step4PackageStatus.py
+mods/Monthly Ledger/tests/Test-V6StructuredCoverageSource.py
+mods/Monthly Ledger/tests/Test-VersionAndTransportAgnostic.py
+mods/IM Data Core/docs/IMDC_CONSUMER_UPGRADE_STEP1_INTEROP_EVENT_APPEND.md

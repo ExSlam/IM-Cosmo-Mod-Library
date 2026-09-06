@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using SaveNLoadFixes.Persistence;
 using SaveNLoadFixes.Transport;
 
 namespace SaveNLoadFixes
@@ -74,6 +75,54 @@ namespace SaveNLoadFixes
                     snapshot.GlobalDataWrite.Healthy &&
                     snapshot.GlobalDataRead.Healthy;
             }
+        }
+
+        /// <summary>
+        /// Associates IM Data Core's exact pre-write SavedData fingerprint with the
+        /// next SNLF freeze of this object. The witness is stored inside SNLF's repair
+        /// envelope and therefore survives vanilla FixSaveFile's startup rewrite.
+        /// </summary>
+        public static bool TryRegisterSavedDataContentFingerprint(
+            SaveManager.SavedData savedData,
+            string fingerprint,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!RequireAuthoritativeProvider(out errorMessage))
+            {
+                return false;
+            }
+
+            return RepairEnvelopeTransport.TryRegisterSavedDataContentFingerprint(
+                savedData,
+                fingerprint,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Reads the IMDC checkpoint witness from the validated repair envelope bound
+        /// to this loaded SavedData object. The legacy flag is true only for a
+        /// validated older envelope that predates this fingerprint bridge.
+        /// </summary>
+        public static bool TryGetLoadedSavedDataCheckpointIdentity(
+            SaveManager.SavedData savedData,
+            out string fingerprint,
+            out bool legacyEnvelopeWithoutFingerprint,
+            out string errorMessage)
+        {
+            fingerprint = string.Empty;
+            legacyEnvelopeWithoutFingerprint = false;
+            errorMessage = string.Empty;
+            if (!RequireAuthoritativeProvider(out errorMessage))
+            {
+                return false;
+            }
+
+            return RepairEnvelopeTransport.TryGetLoadedSavedDataCheckpointIdentity(
+                savedData,
+                out fingerprint,
+                out legacyEnvelopeWithoutFingerprint,
+                out errorMessage);
         }
 
         public static bool TryGetDiagnostics(

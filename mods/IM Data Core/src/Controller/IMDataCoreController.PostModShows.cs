@@ -293,8 +293,9 @@ namespace IMDataCore
             long latestAudience = ResolveLatestLongMetric(show.audience);
             long previousRevenue = ResolvePreviousLongMetric(show.revenue);
             long latestRevenue = ResolveLatestLongMetric(show.revenue);
-            int previousFans = ResolvePreviousIntMetric(show.fans);
-            int latestFans = ResolveLatestIntMetric(show.fans);
+            List<long> exactShowFans = SaveNLoadFixesWideNumericInterop.GetShowFans(show);
+            long previousFans = ResolvePreviousLongMetric(exactShowFans);
+            long latestFans = ResolveLatestLongMetric(exactShowFans);
             int previousBuzz = ResolvePreviousIntMetric(show.buzz);
             int latestBuzz = ResolveLatestIntMetric(show.buzz);
             float previousFatigue = ResolvePreviousFloatMetric(show.fatigue);

@@ -2,6 +2,7 @@ extern alias UiFrameworkReference;
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using HarmonyLib;
 using IMDataCore;
 using ModLocalizationSystem;
@@ -90,6 +91,11 @@ namespace MonthlyLedger
         internal const string CategoryEvents = "events";
         internal const string CategoryStory = "story";
         internal const string CategoryExternalAdjustments = "external_adjustments";
+        // Monthly Ledger-only presentation categories derived from IMDataCore source attribution.
+        // The durable IMDataCore category remains external_adjustments; these labels only make
+        // the UI explain whether that adjustment came from another mod or vanilla Controls.
+        internal const string CategoryModAdjustments = "mod_adjustments";
+        internal const string CategoryManualSystemAdjustments = "manual_system_adjustments";
         internal const string CategoryOther = "other";
 
         internal const string DetailBusinessContracts = "business_contracts";
@@ -131,7 +137,9 @@ namespace MonthlyLedger
         internal const string FallbackRent = "Rent";
         internal const string FallbackEvents = "Events";
         internal const string FallbackStory = "Story";
-        internal const string FallbackExternalAdjustments = "External adjustments";
+        internal const string FallbackExternalAdjustments = "Unattributed adjustments";
+        internal const string FallbackModAdjustments = "Mod adjustments";
+        internal const string FallbackManualSystemAdjustments = "Manual / system adjustments";
 
         internal const string KeyTitle = "ui.title";
         internal const string KeyIncome = "ui.income";
@@ -142,10 +150,15 @@ namespace MonthlyLedger
         internal const string KeyNoSearchResults = "state.no_search_results";
         internal const string KeyNoCompleteMonth = "state.no_complete_month";
         internal const string KeyNoTransactions = "state.no_transactions";
-        internal const string KeyTruncated = "state.truncated";
         internal const string KeyLoadFailed = "state.load_failed";
         internal const string KeyDependencyError = "state.dependency_error";
         internal const string KeyCoverageFailed = "state.coverage_failed";
+        internal const string KeyCoveragePartial = "state.coverage_partial";
+        internal const string KeyCoverageGap = "state.coverage_gap";
+        internal const string KeyCoveragePreStart = "state.coverage_pre_start";
+        internal const string KeyCoverageUnknown = "state.coverage_unknown";
+        internal const string KeyCoverageNotApplicable = "state.coverage_not_applicable";
+        internal const string KeyIntegrityMismatch = "state.integrity_mismatch";
 
         internal const string VanillaContractsKey = "TIP__CONTRACTS";
         internal const string VanillaSinglesKey = "SINGLES";
@@ -185,20 +198,25 @@ namespace MonthlyLedger
         internal const string FallbackNoSearchResults = "No transactions match this search.";
         internal const string FallbackNoCompleteMonth = "No fully recorded completed month is available yet.";
         internal const string FallbackNoTransactions = "No transactions were recorded for this month.";
-        internal const string FallbackTruncated = "This month contains more records than can be displayed. The list is truncated, but the totals include the full month.";
         internal const string FallbackLoadFailed = "Monthly ledger data could not be loaded: {0}";
         internal const string FallbackDependencyError = "Monthly Ledger requires an active, compatible installation of {0}.";
-        internal const string FallbackCoverageFailed = "Exact monthly ledger coverage has not started for this save.";
+        internal const string FallbackCoverageFailed = "Exact monthly ledger coverage is unavailable for this save.";
+        internal const string FallbackCoveragePartial = "IM Data Core has only partial money-history coverage for this month. Recorded rows and exact totals for those rows are shown, but the month may be incomplete.";
+        internal const string FallbackCoverageGap = "IM Data Core reports a money-history coverage gap in this month. Recorded rows and exact totals for those rows are shown, but the month is incomplete.";
+        internal const string FallbackCoveragePreStart = "This month predates provable IM Data Core money-history coverage. Any recorded rows are shown, but the month may be incomplete.";
+        internal const string FallbackCoverageUnknown = "Recorded transactions are internally consistent, but IM Data Core did not provide a completeness certificate for this month.";
+        internal const string FallbackCoverageNotApplicable = "Recorded transactions are internally consistent; coverage certification is not applicable for this month.";
+        internal const string FallbackIntegrityMismatch = "Monthly Ledger detected a mismatch between exhaustive transaction pages and IM Data Core's aggregate totals. The month was not displayed.";
         internal const string FallbackOther = "Other";
-        internal const string DataCoreDependencyDisplayName = "IM Data Core 3.4.5+";
-        internal const string MinimumDataCoreAssemblyVersionText = "3.4.5.0";
+        internal const string DataCoreDependencyDisplayName = "IM Data Core 3.4.33 v6+";
+        internal const string MinimumDataCoreAssemblyVersionText = "3.4.33.0";
 
         internal const int PopupTypeValue = 997;
         internal const int FirstDayOfMonth = 1;
-        internal const int FullMonthOffsetAfterCoverage = 1;
         internal const int PreviousMonthOffset = -1;
         internal const int NextMonthOffset = 1;
-        internal const int MaximumTransactionCount = 10000;
+        internal const int MoneyTransactionPageSize = 10000;
+        internal const long FirstMoneyTransactionCursor = 0L;
         internal const int ZeroIndex = 0;
         internal const int TitleFontSize = 22;
         internal const int SummaryLabelFontSize = 16;
@@ -271,7 +289,8 @@ namespace MonthlyLedger
         {
             CategoryContracts, CategorySingles, CategoryShows, CategoryCafes, CategoryTheaters, CategoryConcerts, CategoryTours, CategoryElections,
             CategoryActivities, CategoryAgency, CategoryAuditions, CategoryResearch, CategoryStaffing, CategoryIdolSalaries, CategoryStaffSalaries,
-            CategoryRent, CategoryLoans, CategoryEvents, CategoryStory, CategoryExternalAdjustments, CategoryOther
+            CategoryRent, CategoryLoans, CategoryEvents, CategoryStory, CategoryModAdjustments, CategoryManualSystemAdjustments,
+            CategoryExternalAdjustments, CategoryOther
         };
 
         internal static readonly Version MinimumDataCoreAssemblyVersion = new Version(MinimumDataCoreAssemblyVersionText);
@@ -288,8 +307,13 @@ namespace MonthlyLedger
         internal static string NoSearchResults { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoSearchResults, MonthlyLedgerConstants.FallbackNoSearchResults); } }
         internal static string NoCompleteMonth { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoCompleteMonth, MonthlyLedgerConstants.FallbackNoCompleteMonth); } }
         internal static string NoTransactions { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyNoTransactions, MonthlyLedgerConstants.FallbackNoTransactions); } }
-        internal static string Truncated { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyTruncated, MonthlyLedgerConstants.FallbackTruncated); } }
         internal static string CoverageFailed { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoverageFailed, MonthlyLedgerConstants.FallbackCoverageFailed); } }
+        internal static string CoveragePartial { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoveragePartial, MonthlyLedgerConstants.FallbackCoveragePartial); } }
+        internal static string CoverageGap { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoverageGap, MonthlyLedgerConstants.FallbackCoverageGap); } }
+        internal static string CoveragePreStart { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoveragePreStart, MonthlyLedgerConstants.FallbackCoveragePreStart); } }
+        internal static string CoverageUnknown { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoverageUnknown, MonthlyLedgerConstants.FallbackCoverageUnknown); } }
+        internal static string CoverageNotApplicable { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyCoverageNotApplicable, MonthlyLedgerConstants.FallbackCoverageNotApplicable); } }
+        internal static string IntegrityMismatch { get { return ModLocalization.Get(MonthlyLedgerConstants.KeyIntegrityMismatch, MonthlyLedgerConstants.FallbackIntegrityMismatch); } }
 
         internal static string LoadFailed(string error)
         {
@@ -361,6 +385,8 @@ namespace MonthlyLedger
                 case MonthlyLedgerConstants.CategoryEvents: vanillaKey = MonthlyLedgerConstants.VanillaEventsKey; fallback = MonthlyLedgerConstants.FallbackEvents; break;
                 case MonthlyLedgerConstants.CategoryStory: vanillaKey = MonthlyLedgerConstants.VanillaStoryKey; fallback = MonthlyLedgerConstants.FallbackStory; break;
                 case MonthlyLedgerConstants.CategoryExternalAdjustments: fallback = MonthlyLedgerConstants.FallbackExternalAdjustments; break;
+                case MonthlyLedgerConstants.CategoryModAdjustments: fallback = MonthlyLedgerConstants.FallbackModAdjustments; break;
+                case MonthlyLedgerConstants.CategoryManualSystemAdjustments: fallback = MonthlyLedgerConstants.FallbackManualSystemAdjustments; break;
                 case MonthlyLedgerConstants.CategoryOther: vanillaKey = MonthlyLedgerConstants.VanillaOtherKey; break;
             }
         }
@@ -405,6 +431,37 @@ namespace MonthlyLedger
         }
     }
 
+    internal static class MonthlyLedgerMoneyFormatting
+    {
+        internal static string FormatMoney(long value)
+        {
+            bool negative = value < MonthlyLedgerConstants.ZeroMoney;
+            ulong magnitude = negative
+                ? (ulong)(-(value + 1L)) + 1UL
+                : (ulong)value;
+            string digits = magnitude.ToString("#,0", CultureInfo.InvariantCulture);
+            return (negative ? MonthlyLedgerConstants.NegativePrefix : string.Empty) + mainScript.yen + digits;
+        }
+
+        internal static string FormatSignedMoney(long value)
+        {
+            string formatted = FormatMoney(value);
+            return value > MonthlyLedgerConstants.ZeroMoney
+                ? MonthlyLedgerConstants.PositivePrefix + formatted
+                : formatted;
+        }
+    }
+
+    internal enum LedgerMonthCoverageState
+    {
+        Complete = 0,
+        Partial = 1,
+        Gap = 2,
+        PreCoverage = 3,
+        Unknown = 4,
+        NotApplicable = 5
+    }
+
     public static class MonthlyLedgerActions
     {
         public static void OpenLedger()
@@ -426,9 +483,100 @@ namespace MonthlyLedger
     internal sealed class LedgerCategoryGroup
     {
         internal string CategoryCode = string.Empty;
+        internal string GroupKey = string.Empty;
+        internal string DisplayLabel = string.Empty;
         internal bool IsIncome;
         internal long Total;
         internal readonly List<IMDataCoreMoneyTransaction> Records = new List<IMDataCoreMoneyTransaction>();
+    }
+
+    internal static class MonthlyLedgerTransactionAttribution
+    {
+        internal const string VanillaAssemblyName = "Assembly-CSharp";
+        internal const string UnknownSourceValue = "unknown";
+        internal const string CategoryLabelSeparator = " — ";
+
+        internal static bool IsExternalAdjustment(IMDataCoreMoneyTransaction transaction)
+        {
+            return transaction != null && string.Equals(
+                transaction.CategoryCode,
+                MonthlyLedgerConstants.CategoryExternalAdjustments,
+                StringComparison.Ordinal);
+        }
+
+        internal static bool HasMeaningfulSource(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                && !string.Equals(value.Trim(), UnknownSourceValue, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static bool IsThirdPartyAdjustment(IMDataCoreMoneyTransaction transaction)
+        {
+            return IsExternalAdjustment(transaction)
+                && HasMeaningfulSource(transaction.SourceAssembly)
+                && !string.Equals(transaction.SourceAssembly.Trim(), VanillaAssemblyName, StringComparison.Ordinal);
+        }
+
+        internal static bool IsManualSystemAdjustment(IMDataCoreMoneyTransaction transaction)
+        {
+            return IsExternalAdjustment(transaction)
+                && HasMeaningfulSource(transaction.SourceAssembly)
+                && string.Equals(transaction.SourceAssembly.Trim(), VanillaAssemblyName, StringComparison.Ordinal);
+        }
+
+        internal static string GetDisplayCategoryCode(IMDataCoreMoneyTransaction transaction)
+        {
+            if (!IsExternalAdjustment(transaction))
+            {
+                return transaction == null || string.IsNullOrEmpty(transaction.CategoryCode)
+                    ? MonthlyLedgerConstants.CategoryOther
+                    : transaction.CategoryCode;
+            }
+
+            if (IsThirdPartyAdjustment(transaction))
+            {
+                return MonthlyLedgerConstants.CategoryModAdjustments;
+            }
+            if (IsManualSystemAdjustment(transaction))
+            {
+                return MonthlyLedgerConstants.CategoryManualSystemAdjustments;
+            }
+            return MonthlyLedgerConstants.CategoryExternalAdjustments;
+        }
+
+        internal static string GetGroupKey(IMDataCoreMoneyTransaction transaction)
+        {
+            string categoryCode = GetDisplayCategoryCode(transaction);
+            if (string.Equals(categoryCode, MonthlyLedgerConstants.CategoryModAdjustments, StringComparison.Ordinal)
+                && HasMeaningfulSource(transaction.SourceAssembly))
+            {
+                return categoryCode + MonthlyLedgerConstants.CategorySignSeparator + transaction.SourceAssembly.Trim();
+            }
+            return categoryCode;
+        }
+
+        internal static string GetCategoryLabel(IMDataCoreMoneyTransaction transaction)
+        {
+            string categoryCode = GetDisplayCategoryCode(transaction);
+            string label = MonthlyLedgerText.Category(categoryCode);
+            if (string.Equals(categoryCode, MonthlyLedgerConstants.CategoryModAdjustments, StringComparison.Ordinal)
+                && HasMeaningfulSource(transaction.SourceAssembly))
+            {
+                return label + CategoryLabelSeparator + transaction.SourceAssembly.Trim();
+            }
+            return label;
+        }
+
+        internal static string GetSourceCall(IMDataCoreMoneyTransaction transaction)
+        {
+            if (transaction == null) return string.Empty;
+            bool hasType = HasMeaningfulSource(transaction.SourceType);
+            bool hasMethod = HasMeaningfulSource(transaction.SourceMethod);
+            if (hasType && hasMethod) return transaction.SourceType.Trim() + "." + transaction.SourceMethod.Trim();
+            if (hasType) return transaction.SourceType.Trim();
+            if (hasMethod) return transaction.SourceMethod.Trim();
+            return string.Empty;
+        }
     }
 
     internal static class MonthlyLedgerRuntime
@@ -445,7 +593,9 @@ namespace MonthlyLedger
         private static readonly HashSet<string> CollapsedCategoryKeys = new HashSet<string>(StringComparer.Ordinal);
         private static GameObject vanillaGroupCollapseTemplate;
         private static List<IMDataCoreMoneyTransaction> currentTransactions = new List<IMDataCoreMoneyTransaction>();
-        private static bool currentWasTruncated;
+        private static IMDataCoreHistoryCoverage currentMoneyCoverage;
+        private static IMDataCoreBackendCoverage currentBackendCoverage;
+        private static LedgerMonthCoverageState currentCoverageState = LedgerMonthCoverageState.Unknown;
         private static string searchQuery = string.Empty;
         private static Transform resultsRoot;
 
@@ -585,18 +735,60 @@ namespace MonthlyLedger
                 return;
             }
 
-            DateTime coverageStart;
             string errorMessage;
-            if (!TryLoadCoverageStart(out coverageStart, out errorMessage))
+            IMDataCoreHistoryCoverage coverage;
+            if (!IMDataCoreApi.TryGetMoneyHistoryCoverage(out coverage, out errorMessage))
             {
-                RenderState(string.IsNullOrEmpty(errorMessage) ? MonthlyLedgerText.CoverageFailed : MonthlyLedgerText.LoadFailed(errorMessage));
-                return;
+                Debug.LogWarning(
+                    MonthlyLedgerConstants.LogPrefix +
+                    "Structured money-history coverage could not be read; recorded rows will still be queried: " +
+                    (errorMessage ?? string.Empty));
+                coverage = null;
+            }
+            currentMoneyCoverage = coverage;
+
+            IMDataCoreBackendCoverage backendCoverage;
+            if (!IMDataCoreApi.TryGetBackendCoverageOrigin(out backendCoverage, out errorMessage))
+            {
+                Debug.LogWarning(
+                    MonthlyLedgerConstants.LogPrefix +
+                    "Backend coverage origin could not be read; recorded rows will still be queried: " +
+                    (errorMessage ?? string.Empty));
+                backendCoverage = null;
+            }
+            currentBackendCoverage = backendCoverage;
+
+            DateTime currentMonth = new DateTime(
+                staticVars.dateTime.Year,
+                staticVars.dateTime.Month,
+                MonthlyLedgerConstants.FirstDayOfMonth);
+            latestMonth = currentMonth.AddMonths(MonthlyLedgerConstants.PreviousMonthOffset);
+
+            DateTime coverageStart;
+            if (TryFindEarliestActiveCoverageDate(coverage, out coverageStart))
+            {
+                earliestMonth = new DateTime(
+                    coverageStart.Year,
+                    coverageStart.Month,
+                    MonthlyLedgerConstants.FirstDayOfMonth);
+            }
+            else if (backendCoverage != null && backendCoverage.FirstBoundary != null)
+            {
+                DateTime backendStart = backendCoverage.FirstBoundary.GameDateTime;
+                earliestMonth = new DateTime(
+                    backendStart.Year,
+                    backendStart.Month,
+                    MonthlyLedgerConstants.FirstDayOfMonth);
+            }
+            else
+            {
+                DateTime careerStart = staticVars.StartDate;
+                earliestMonth = new DateTime(
+                    careerStart.Year,
+                    careerStart.Month,
+                    MonthlyLedgerConstants.FirstDayOfMonth);
             }
 
-            DateTime coverageMonth = new DateTime(coverageStart.Year, coverageStart.Month, MonthlyLedgerConstants.FirstDayOfMonth);
-            earliestMonth = coverageMonth.AddMonths(MonthlyLedgerConstants.FullMonthOffsetAfterCoverage);
-            DateTime currentMonth = new DateTime(staticVars.dateTime.Year, staticVars.dateTime.Month, MonthlyLedgerConstants.FirstDayOfMonth);
-            latestMonth = currentMonth.AddMonths(MonthlyLedgerConstants.PreviousMonthOffset);
             if (earliestMonth > latestMonth)
             {
                 RenderState(MonthlyLedgerText.NoCompleteMonth);
@@ -618,9 +810,282 @@ namespace MonthlyLedger
             return installedVersion != null && installedVersion >= MonthlyLedgerConstants.MinimumDataCoreAssemblyVersion;
         }
 
-        private static bool TryLoadCoverageStart(out DateTime coverageStart, out string errorMessage)
+        private static bool TryFindEarliestActiveCoverageDate(
+            IMDataCoreHistoryCoverage coverage,
+            out DateTime coverageStart)
         {
-            return IMDataCoreApi.TryGetMoneyLedgerCoverageStart(out coverageStart, out errorMessage);
+            coverageStart = DateTime.MaxValue;
+            if (coverage == null || coverage.Intervals == null)
+            {
+                return false;
+            }
+
+            bool found = false;
+            for (int index = MonthlyLedgerConstants.ZeroIndex; index < coverage.Intervals.Count; index++)
+            {
+                IMDataCoreCoverageInterval interval = coverage.Intervals[index];
+                if (interval == null ||
+                    interval.State != IMDataCoreCoverageIntervalState.Active ||
+                    interval.StartBoundary == null)
+                {
+                    continue;
+                }
+                if (!found || interval.StartBoundary.GameDateTime < coverageStart)
+                {
+                    coverageStart = interval.StartBoundary.GameDateTime;
+                    found = true;
+                }
+            }
+            return found;
+        }
+
+        private static bool TryAssessSelectedMonthCoverage(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out LedgerMonthCoverageState state,
+            out string errorMessage)
+        {
+            state = LedgerMonthCoverageState.Unknown;
+            errorMessage = string.Empty;
+            IMDataCoreHistoryCoverage coverage = currentMoneyCoverage;
+            if (coverage == null)
+            {
+                errorMessage = MonthlyLedgerConstants.FallbackCoverageFailed;
+                return false;
+            }
+            if (coverage.Knownness == IMDataCoreHistoryKnownness.Unknown)
+            {
+                state = LedgerMonthCoverageState.Unknown;
+                return true;
+            }
+            if (coverage.Knownness == IMDataCoreHistoryKnownness.NotApplicable)
+            {
+                state = LedgerMonthCoverageState.NotApplicable;
+                return true;
+            }
+            if (coverage.Intervals == null || coverage.Intervals.Count == MonthlyLedgerConstants.ZeroIndex)
+            {
+                state = LedgerMonthCoverageState.Unknown;
+                return true;
+            }
+
+            DateTime earliestActiveStart = DateTime.MaxValue;
+            bool sawActive = false;
+            bool overlapsActive = false;
+            bool overlapsGap = false;
+            IMDataCoreCoverageInterval containingActiveInterval = null;
+
+            for (int index = MonthlyLedgerConstants.ZeroIndex; index < coverage.Intervals.Count; index++)
+            {
+                IMDataCoreCoverageInterval interval = coverage.Intervals[index];
+                if (interval == null || interval.StartBoundary == null)
+                {
+                    errorMessage = "IM Data Core returned an invalid money-history coverage interval.";
+                    return false;
+                }
+
+                DateTime intervalStart = interval.StartBoundary.GameDateTime;
+                DateTime intervalEnd = interval.EndBoundary != null
+                    ? interval.EndBoundary.GameDateTime
+                    : DateTime.MaxValue;
+                bool overlaps = intervalStart < endExclusive && intervalEnd > startInclusive;
+
+                if (interval.State == IMDataCoreCoverageIntervalState.Active)
+                {
+                    sawActive = true;
+                    if (intervalStart < earliestActiveStart)
+                    {
+                        earliestActiveStart = intervalStart;
+                    }
+                    overlapsActive |= overlaps;
+
+                    bool startsSafelyBeforeMonth = intervalStart < startInclusive ||
+                        IsExactCareerStartBoundary(interval, startInclusive);
+                    bool coversThroughMonthEnd = interval.EndBoundary == null ||
+                        intervalEnd >= endExclusive;
+                    if (startsSafelyBeforeMonth && coversThroughMonthEnd)
+                    {
+                        containingActiveInterval = interval;
+                    }
+                }
+                else if (interval.State == IMDataCoreCoverageIntervalState.Gap)
+                {
+                    overlapsGap |= overlaps;
+                }
+                else
+                {
+                    errorMessage = "IM Data Core returned an unsupported money-history coverage interval state.";
+                    return false;
+                }
+            }
+
+            if (containingActiveInterval != null)
+            {
+                IMDataCoreHistoryBoundary assessmentEnd = containingActiveInterval.EndBoundary;
+                if (assessmentEnd == null)
+                {
+                    assessmentEnd = new IMDataCoreHistoryBoundary(
+                        long.MaxValue,
+                        endExclusive,
+                        string.Empty);
+                }
+
+                IMDataCoreCoverageAssessment assessment;
+                if (!IMDataCoreApi.TryAssessMoneyHistoryRange(
+                        containingActiveInterval.StartBoundary,
+                        assessmentEnd,
+                        out assessment,
+                        out errorMessage))
+                {
+                    return false;
+                }
+                if (assessment == null)
+                {
+                    errorMessage = "IM Data Core returned no money-history coverage assessment.";
+                    return false;
+                }
+
+                switch (assessment.Knownness)
+                {
+                    case IMDataCoreHistoryKnownness.Complete:
+                        state = LedgerMonthCoverageState.Complete;
+                        return true;
+                    case IMDataCoreHistoryKnownness.Partial:
+                        state = LedgerMonthCoverageState.Partial;
+                        return true;
+                    case IMDataCoreHistoryKnownness.NotApplicable:
+                        state = LedgerMonthCoverageState.NotApplicable;
+                        return true;
+                    default:
+                        state = LedgerMonthCoverageState.Unknown;
+                        return true;
+                }
+            }
+
+            if (sawActive && endExclusive <= earliestActiveStart)
+            {
+                state = LedgerMonthCoverageState.PreCoverage;
+            }
+            else if (overlapsGap)
+            {
+                state = LedgerMonthCoverageState.Gap;
+            }
+            else if (overlapsActive)
+            {
+                state = LedgerMonthCoverageState.Partial;
+            }
+            else
+            {
+                state = coverage.Knownness == IMDataCoreHistoryKnownness.Partial
+                    ? LedgerMonthCoverageState.Partial
+                    : LedgerMonthCoverageState.Unknown;
+            }
+            return true;
+        }
+
+        private static bool IsExactCareerStartBoundary(
+            IMDataCoreCoverageInterval interval,
+            DateTime requestedStart)
+        {
+            return interval != null &&
+                interval.StartBoundary != null &&
+                interval.StartBoundary.GameDateTime == requestedStart &&
+                currentBackendCoverage != null &&
+                currentBackendCoverage.Knownness == IMDataCoreHistoryKnownness.Complete &&
+                currentBackendCoverage.Origin == IMDataCoreCoverageOrigin.CareerStart &&
+                currentBackendCoverage.FirstBoundary != null &&
+                currentBackendCoverage.FirstBoundary.GameDateTime == requestedStart;
+        }
+
+        private static bool TryReadAllMoneyTransactions(
+            DateTime startInclusive,
+            DateTime endExclusive,
+            out List<IMDataCoreMoneyTransaction> transactions,
+            out long pageIncomeTotal,
+            out long pageExpenseTotal,
+            out string errorMessage)
+        {
+            transactions = new List<IMDataCoreMoneyTransaction>();
+            pageIncomeTotal = MonthlyLedgerConstants.ZeroMoney;
+            pageExpenseTotal = MonthlyLedgerConstants.ZeroMoney;
+            errorMessage = string.Empty;
+
+            long cursor = MonthlyLedgerConstants.FirstMoneyTransactionCursor;
+            while (true)
+            {
+                List<IMDataCoreMoneyTransaction> page;
+                bool hasMore;
+                if (!IMDataCoreApi.TryReadMoneyTransactionsPage(
+                        startInclusive,
+                        endExclusive,
+                        cursor,
+                        MonthlyLedgerConstants.MoneyTransactionPageSize,
+                        out page,
+                        out hasMore,
+                        out errorMessage))
+                {
+                    return false;
+                }
+
+                page = page ?? new List<IMDataCoreMoneyTransaction>();
+                long previousEventId = cursor;
+                try
+                {
+                    checked
+                    {
+                        for (int index = MonthlyLedgerConstants.ZeroIndex; index < page.Count; index++)
+                        {
+                            IMDataCoreMoneyTransaction transaction = page[index];
+                            if (transaction == null || transaction.EventId <= previousEventId)
+                            {
+                                errorMessage = "IM Data Core returned a non-advancing money-transaction page.";
+                                return false;
+                            }
+
+                            previousEventId = transaction.EventId;
+                            transactions.Add(transaction);
+                            if (transaction.Amount > MonthlyLedgerConstants.ZeroMoney)
+                            {
+                                pageIncomeTotal += transaction.Amount;
+                            }
+                            else
+                            {
+                                pageExpenseTotal += transaction.Amount;
+                            }
+                        }
+                    }
+                }
+                catch (OverflowException)
+                {
+                    errorMessage = "Monthly Ledger's exact transaction-page total exceeded Int64 range.";
+                    return false;
+                }
+
+                if (!hasMore)
+                {
+                    return true;
+                }
+                if (page.Count == MonthlyLedgerConstants.ZeroIndex || previousEventId <= cursor)
+                {
+                    errorMessage = "IM Data Core reported another money-transaction page without advancing the EventId cursor.";
+                    return false;
+                }
+                cursor = previousEventId;
+            }
+        }
+
+        private static bool TotalsMatchExhaustivePages(
+            List<IMDataCoreMoneyTransaction> transactions,
+            long pageIncomeTotal,
+            long pageExpenseTotal,
+            long aggregateIncomeTotal,
+            long aggregateExpenseTotal,
+            int aggregateTransactionCount)
+        {
+            return transactions != null &&
+                aggregateTransactionCount == transactions.Count &&
+                aggregateIncomeTotal == pageIncomeTotal &&
+                aggregateExpenseTotal == pageExpenseTotal;
         }
 
         private static void RenderSelectedMonth()
@@ -628,26 +1093,42 @@ namespace MonthlyLedger
             IMUiKit.ClearChildren(scaffold.ContentRoot);
             CreateNavigationRow();
 
-            List<IMDataCoreMoneyTransaction> transactions;
-            bool wasTruncated;
             string errorMessage;
             DateTime endExclusive = selectedMonth.AddMonths(MonthlyLedgerConstants.NextMonthOffset);
-            if (!IMDataCoreApi.TryReadMoneyTransactions(
-                selectedMonth,
-                endExclusive,
-                MonthlyLedgerConstants.MaximumTransactionCount,
-                out transactions,
-                out wasTruncated,
-                out errorMessage))
+            LedgerMonthCoverageState coverageState;
+            if (!TryAssessSelectedMonthCoverage(
+                    selectedMonth,
+                    endExclusive,
+                    out coverageState,
+                    out errorMessage))
+            {
+                Debug.LogWarning(
+                    MonthlyLedgerConstants.LogPrefix +
+                    "The selected month's coverage could not be assessed; exact recorded rows will still be queried: " +
+                    (errorMessage ?? string.Empty));
+                coverageState = LedgerMonthCoverageState.Unknown;
+            }
+            currentCoverageState = coverageState;
+
+            // Coverage is completeness metadata, not permission to inspect durable rows.
+            // Unknown/partial/pre-coverage states must never hide exact transactions that
+            // IMDataCore can still read for the selected calendar month.  The warning below
+            // tells the user whether the observed rows are provably complete.
+            List<IMDataCoreMoneyTransaction> transactions;
+            long pageIncomeTotal;
+            long pageExpenseTotal;
+            if (!TryReadAllMoneyTransactions(
+                    selectedMonth,
+                    endExclusive,
+                    out transactions,
+                    out pageIncomeTotal,
+                    out pageExpenseTotal,
+                    out errorMessage))
             {
                 CreateStateText(MonthlyLedgerText.LoadFailed(errorMessage));
                 FinishRender();
                 return;
             }
-
-            currentTransactions = transactions ?? new List<IMDataCoreMoneyTransaction>();
-            currentWasTruncated = wasTruncated;
-            CreateSearchBar();
 
             long incomeTotal;
             long expenseTotal;
@@ -664,8 +1145,26 @@ namespace MonthlyLedger
                 FinishRender();
                 return;
             }
-            currentWasTruncated = currentWasTruncated ||
-                transactionCount > currentTransactions.Count;
+            if (!TotalsMatchExhaustivePages(
+                    transactions,
+                    pageIncomeTotal,
+                    pageExpenseTotal,
+                    incomeTotal,
+                    expenseTotal,
+                    transactionCount))
+            {
+                Debug.LogError(
+                    MonthlyLedgerConstants.LogPrefix +
+                    "Money-history integrity mismatch for " + selectedMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture) +
+                    ": pages=" + transactions.Count + "/" + pageIncomeTotal + "/" + pageExpenseTotal +
+                    ", aggregate=" + transactionCount + "/" + incomeTotal + "/" + expenseTotal + ".");
+                CreateStateText(MonthlyLedgerText.IntegrityMismatch);
+                FinishRender();
+                return;
+            }
+
+            currentTransactions = transactions;
+            CreateSearchBar();
             CreateSummaryRow(incomeTotal, expenseTotal, incomeTotal + expenseTotal);
 
             GameObject body = IMUiKit.CreateVerticalLayoutContainer(
@@ -796,7 +1295,23 @@ namespace MonthlyLedger
         {
             if (resultsRoot == null) return;
             IMUiKit.ClearChildren(resultsRoot);
-            if (currentWasTruncated) CreateWarningText(resultsRoot, MonthlyLedgerText.Truncated);
+            if (currentCoverageState == LedgerMonthCoverageState.Gap)
+            {
+                CreateWarningText(resultsRoot, MonthlyLedgerText.CoverageGap);
+            }
+            else if (currentCoverageState == LedgerMonthCoverageState.Partial)
+            {
+                CreateWarningText(resultsRoot, MonthlyLedgerText.CoveragePartial);
+            }
+            else if (currentCoverageState == LedgerMonthCoverageState.PreCoverage)
+            {
+                CreateWarningText(resultsRoot, MonthlyLedgerText.CoveragePreStart);
+            }
+            // Unknown and NotApplicable are metadata-certainty states, not evidence of a
+            // missing transaction. Once exhaustive pages agree exactly with IMDataCore's
+            // independent aggregate, do not paint those states as a red data-loss warning.
+            // Prominent warnings are reserved for states that positively identify incomplete
+            // calendar coverage: Gap, Partial, or PreCoverage.
             if (currentTransactions == null || currentTransactions.Count == 0)
             {
                 CreateStateText(resultsRoot, MonthlyLedgerText.NoTransactions);
@@ -828,14 +1343,16 @@ namespace MonthlyLedger
         private static bool TransactionMatchesSearch(IMDataCoreMoneyTransaction transaction, string query)
         {
             if (string.IsNullOrEmpty(query)) return true;
-            string category = MonthlyLedgerText.Category(transaction.CategoryCode ?? string.Empty);
+            string category = MonthlyLedgerTransactionAttribution.GetCategoryLabel(transaction);
             string detail = MonthlyLedgerDetailText.Format(transaction);
             string amount = FormatSignedMoney(transaction.Amount);
             string date = transaction.GameDateTime ?? string.Empty;
             DateTime parsed;
             if (DateTime.TryParse(transaction.GameDateTime, out parsed)) date += " " + ExtensionMethods.ToString_Loc(parsed, MonthlyLedgerConstants.DateFormatRecord);
             return ContainsIgnoreCase(category, query) || ContainsIgnoreCase(detail, query) || ContainsIgnoreCase(amount, query)
-                || ContainsIgnoreCase(date, query) || ContainsIgnoreCase(transaction.CategoryCode, query) || ContainsIgnoreCase(transaction.DetailCode, query);
+                || ContainsIgnoreCase(date, query) || ContainsIgnoreCase(transaction.CategoryCode, query) || ContainsIgnoreCase(transaction.DetailCode, query)
+                || ContainsIgnoreCase(transaction.SourceAssembly, query) || ContainsIgnoreCase(transaction.SourceType, query)
+                || ContainsIgnoreCase(transaction.SourceMethod, query);
         }
 
         private static bool ContainsIgnoreCase(string value, string query)
@@ -890,12 +1407,20 @@ namespace MonthlyLedger
                 bool isIncome = string.Equals(transaction.SectionCode, MonthlyLedgerConstants.SectionIncome, StringComparison.Ordinal)
                     || (!string.Equals(transaction.SectionCode, MonthlyLedgerConstants.SectionExpense, StringComparison.Ordinal)
                         && transaction.Amount > MonthlyLedgerConstants.ZeroMoney);
-                string categoryCode = string.IsNullOrEmpty(transaction.CategoryCode) ? MonthlyLedgerConstants.CategoryOther : transaction.CategoryCode;
-                string key = (isIncome ? MonthlyLedgerConstants.PositivePrefix : MonthlyLedgerConstants.NegativePrefix) + MonthlyLedgerConstants.CategorySignSeparator + categoryCode;
+                string categoryCode = MonthlyLedgerTransactionAttribution.GetDisplayCategoryCode(transaction);
+                string groupKey = MonthlyLedgerTransactionAttribution.GetGroupKey(transaction);
+                string key = (isIncome ? MonthlyLedgerConstants.PositivePrefix : MonthlyLedgerConstants.NegativePrefix)
+                    + MonthlyLedgerConstants.CategorySignSeparator + groupKey;
                 LedgerCategoryGroup group;
                 if (!byKey.TryGetValue(key, out group))
                 {
-                    group = new LedgerCategoryGroup { CategoryCode = categoryCode, IsIncome = isIncome };
+                    group = new LedgerCategoryGroup
+                    {
+                        CategoryCode = categoryCode,
+                        GroupKey = groupKey,
+                        DisplayLabel = MonthlyLedgerTransactionAttribution.GetCategoryLabel(transaction),
+                        IsIncome = isIncome
+                    };
                     byKey[key] = group;
                 }
 
@@ -913,7 +1438,11 @@ namespace MonthlyLedger
             int leftOrder = CategoryOrder(left.CategoryCode);
             int rightOrder = CategoryOrder(right.CategoryCode);
             int orderComparison = leftOrder.CompareTo(rightOrder);
-            return orderComparison != MonthlyLedgerConstants.ZeroIndex ? orderComparison : string.Compare(left.CategoryCode, right.CategoryCode, StringComparison.Ordinal);
+            if (orderComparison != MonthlyLedgerConstants.ZeroIndex) return orderComparison;
+            int categoryComparison = string.Compare(left.CategoryCode, right.CategoryCode, StringComparison.Ordinal);
+            return categoryComparison != MonthlyLedgerConstants.ZeroIndex
+                ? categoryComparison
+                : string.Compare(left.DisplayLabel, right.DisplayLabel, StringComparison.Ordinal);
         }
 
         private static int CategoryOrder(string categoryCode)
@@ -1035,7 +1564,10 @@ namespace MonthlyLedger
             SetPreferredSize(header, MonthlyLedgerConstants.UnconstrainedSize, MonthlyLedgerConstants.CategoryHeaderHeight);
 
             GameObject collapseIndicator = CreateVanillaCollapseIndicator(header.transform, expanded);
-            TextMeshProUGUI label = IMUiKit.CreateText(header.transform, MonthlyLedgerConstants.LabelObjectName, MonthlyLedgerText.Category(group.CategoryCode), MonthlyLedgerConstants.CategoryFontSize, TextAlignmentOptions.Left, mainScript.black32);
+            string categoryLabel = string.IsNullOrEmpty(group.DisplayLabel)
+                ? MonthlyLedgerText.Category(group.CategoryCode)
+                : group.DisplayLabel;
+            TextMeshProUGUI label = IMUiKit.CreateText(header.transform, MonthlyLedgerConstants.LabelObjectName, categoryLabel, MonthlyLedgerConstants.CategoryFontSize, TextAlignmentOptions.Left, mainScript.black32);
             SetFlexibleWidth(label.gameObject);
             TextMeshProUGUI total = IMUiKit.CreateText(header.transform, MonthlyLedgerConstants.ValueObjectName, FormatSignedMoney(group.Total), MonthlyLedgerConstants.CategoryFontSize, TextAlignmentOptions.Right, group.IsIncome ? mainScript.green32 : mainScript.red32);
             SetPreferredSize(total.gameObject, MonthlyLedgerConstants.RecordAmountWidth, MonthlyLedgerConstants.CategoryHeaderHeight);
@@ -1072,7 +1604,7 @@ namespace MonthlyLedger
         {
             return (group.IsIncome ? MonthlyLedgerConstants.SectionIncome : MonthlyLedgerConstants.SectionExpense)
                 + MonthlyLedgerConstants.CategorySignSeparator
-                + group.CategoryCode;
+                + (string.IsNullOrEmpty(group.GroupKey) ? group.CategoryCode : group.GroupKey);
         }
 
         private static void ToggleCategory(string stateKey, GameObject records, GameObject collapseIndicator)
@@ -1460,8 +1992,7 @@ namespace MonthlyLedger
 
         private static string FormatSignedMoney(long value)
         {
-            string formatted = ExtensionMethods.formatMoney(value, false, false, false);
-            return value > MonthlyLedgerConstants.ZeroMoney ? MonthlyLedgerConstants.PositivePrefix + formatted : formatted;
+            return MonthlyLedgerMoneyFormatting.FormatSignedMoney(value);
         }
 
         private static void SetButtonActive(Button button, bool active)

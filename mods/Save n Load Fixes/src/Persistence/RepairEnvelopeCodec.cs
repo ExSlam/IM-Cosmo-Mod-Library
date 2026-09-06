@@ -441,6 +441,16 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            if (!string.IsNullOrEmpty(envelope.imdc_content_fingerprint) &&
+                !RepairEnvelopeContentFingerprint.IsValid(
+                    envelope.imdc_content_fingerprint))
+            {
+                error =
+                    "Repair envelope imdc_content_fingerprint is not a canonical " +
+                    "lower-case SHA-256 checkpoint witness.";
+                return false;
+            }
+
             if (envelope.records == null ||
                 envelope.records.relationship_dynamics == null)
             {

@@ -90,6 +90,7 @@ namespace IMDataCore
                     if (!VanillaSaveStamp.TryCreate(
                             savedData,
                             targetScope.RelativeSavePath,
+                            false,
                             out stamp,
                             out errorMessage) ||
                         !storageEngine.AddOrReplaceCheckpoint(
@@ -202,6 +203,7 @@ namespace IMDataCore
                 if (!VanillaSaveStamp.TryCreate(
                     loadedSaveData,
                     targetScope.RelativeSavePath,
+                    true,
                     out stamp,
                     out errorMessage))
                 {

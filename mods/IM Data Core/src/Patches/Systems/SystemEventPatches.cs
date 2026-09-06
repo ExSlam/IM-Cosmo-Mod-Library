@@ -92,6 +92,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(out ActivityActionSnapshot __state)
         {
             ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceActivitiesPerformance);
@@ -122,6 +123,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(out ActivityActionSnapshot __state)
         {
             ActivityEarningsSourceContext.Push(CoreConstants.EarningsSourceActivitiesPromotion);
@@ -312,6 +314,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(Cafes._cafe Cafe, out CafeRenderSnapshot __state)
         {
             MoneyLedgerAmbientContext.Begin();
@@ -322,6 +325,7 @@ namespace IMDataCore
 
         [HarmonyPostfix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyAfter("com.cosmo.savenloadfixes")]
         private static void Postfix(agency._room Room, Cafes._cafe Cafe, CafeRenderSnapshot __state)
         {
             IMDataCoreController.Instance.CaptureCafeRenderResult(Room, Cafe, __state);
@@ -383,6 +387,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(staff._staff __instance, out StaffLifecycleSnapshot __state)
         {
             MoneyLedgerAmbientContext.Begin();
@@ -457,6 +462,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(Research.category __instance, out ResearchBuyPointsSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateResearchBuyPointsSnapshot(__instance);
@@ -1325,6 +1331,7 @@ namespace IMDataCore
         /// Captures pre-mutation salary state before raise calculation.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(data_girls.girls __instance, out SalaryChangeSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateSalaryChangeSnapshot(__instance);
@@ -1354,6 +1361,7 @@ namespace IMDataCore
         /// Captures pre-mutation salary state before reduction calculation.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(data_girls.girls __instance, out SalaryChangeSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateSalaryChangeSnapshot(__instance);
@@ -1751,6 +1759,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(out EconomyTickSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateEconomyTickSnapshot();
@@ -1772,6 +1781,7 @@ namespace IMDataCore
     {
         [HarmonyPrefix]
         [HarmonyPriority(Priority.Last)]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(out EconomyTickSnapshot __state)
         {
             __state = IMDataCoreController.Instance.CreateEconomyTickSnapshot();

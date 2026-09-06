@@ -136,7 +136,7 @@ Graduation Details already owns a prefix on `Graduate` that captures fan buckets
 
 IM Data Core currently captures `idol_graduated` in a postfix and its lifecycle payload does not include fan buckets. Detect Harmony owner `com.cosmo.imdatacore` and its public API at runtime without a hard assembly reference.
 
-- Register namespace `com.cosmo.unavailableidolsfix` through `IMDataCoreApi`.
+- Register namespace `com.cosmo.unavailableidolsfix` through `IMDataCoreInteropApi` with Unavailable Idols Fix's own assembly as the explicit owner witness.
 - Append a pre-cleanup custom event such as `graduating_idol_final_snapshot` from the `Graduate` prefix.
 - Store the complete primitive snapshot JSON, including pre-oshihen fan totals and assignment IDs.
 - Flush before destructive cleanup when possible.

@@ -1,3 +1,26 @@
+## 0.3.2
+
+- Reserved prominent coverage warnings for positively incomplete months (gap, partial, or pre-coverage). Unknown/NotApplicable coverage metadata no longer produces a red warning after exhaustive pages match IM Data Core aggregate totals.
+- Replaced the vague external-adjustments presentation with source-aware attribution. Third-party adjustments are grouped as Mod adjustments and split by source assembly; vanilla Controls-origin adjustments are labeled Manual / system adjustments; unattributed records remain explicitly marked as such.
+- External adjustment rows now show the recorded source assembly and source type/method when IM Data Core captured them. Search also matches those source fields.
+
+## 0.3.1
+
+- Fixed the v6 coverage gate incorrectly hiding otherwise readable money transactions when coverage completeness was Unknown, Partial, pre-coverage, or otherwise not provably complete.
+- Structured coverage now controls completeness warnings only; exact recorded rows are still read and displayed.
+- Exhaustive page/aggregate parity remains mandatory before any month is shown.
+- Added fallback navigation bounds from backend/career start when structured money coverage has no active interval.
+
+## 0.3.0
+
+- Updated Monthly Ledger for IM Data Core 3.4.33 sidecar-v6/journal-v3 structured money-history coverage.
+- Replaced the legacy coverage-start marker with structured coverage plus exact range assessment.
+- Replaced the 10,000-row capped read with exhaustive EventId-cursor paging.
+- Cross-checks exhaustive page count/income/expense against IM Data Core's uncapped aggregate and fails closed on mismatch.
+- Distinguishes complete/known-empty months from partial, gapped, pre-coverage, unknown, and unsupported coverage states.
+- Uses an internal exact Int64 whole-yen formatter for every Monthly Ledger money label, including Int64.MinValue, without depending on SNLF formatting patches.
+- Raised the IM Data Core requirement to 3.4.33.
+
 # Changelog
 
 ## 0.2.6

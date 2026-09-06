@@ -184,6 +184,11 @@ namespace MonthlyLedger
         internal const string KeyAccidentCriticalFailures = "detail.label.accident_critical_failures";
         internal const string KeyTrack = "detail.label.track";
         internal const string KeyFinished = "detail.label.finished";
+        internal const string KeySourceAssembly = "detail.label.source_assembly";
+        internal const string KeySourceCall = "detail.label.source_call";
+        internal const string KeyModAdjustment = "detail.external_mod_adjustment";
+        internal const string KeyManualSystemAdjustment = "detail.manual_system_adjustment";
+        internal const string KeyUnattributedAdjustment = "detail.unattributed_adjustment";
 
         internal const string FallbackContractor = "Contractor";
         internal const string FallbackProduct = "Product";
@@ -261,6 +266,11 @@ namespace MonthlyLedger
         internal const string FallbackAccidentCriticalFailures = "Critical failures";
         internal const string FallbackTrack = "Track";
         internal const string FallbackFinished = "Finished";
+        internal const string FallbackSourceAssembly = "Mod / assembly";
+        internal const string FallbackSourceCall = "Source call";
+        internal const string FallbackModAdjustment = "Mod money adjustment";
+        internal const string FallbackManualSystemAdjustment = "Manual / system money adjustment";
+        internal const string FallbackUnattributedAdjustment = "Unattributed money adjustment";
         internal const string FallbackAuto = "Auto";
         internal const string FallbackManzai = "Manzai";
         internal const string FallbackDayOff = "Day off";
@@ -322,6 +332,11 @@ namespace MonthlyLedger
 
         internal static string Format(IMDataCoreMoneyTransaction transaction)
         {
+            if (MonthlyLedgerTransactionAttribution.IsExternalAdjustment(transaction))
+            {
+                return FormatExternalAdjustment(transaction);
+            }
+
             if (!HasStructuredDetails(transaction))
             {
                 return MonthlyLedgerText.Detail(transaction != null ? transaction.DetailCode : string.Empty, transaction != null ? transaction.CategoryCode : string.Empty);
@@ -342,6 +357,40 @@ namespace MonthlyLedger
                 case MonthlyLedgerDetailConstants.KindConcert: return FormatConcert(details);
                 default: return MonthlyLedgerText.Detail(transaction.DetailCode, transaction.CategoryCode);
             }
+        }
+
+        private static string FormatExternalAdjustment(IMDataCoreMoneyTransaction transaction)
+        {
+            List<string> lines = new List<string>();
+            if (MonthlyLedgerTransactionAttribution.IsThirdPartyAdjustment(transaction))
+            {
+                lines.Add(Custom(MonthlyLedgerDetailConstants.KeyModAdjustment, MonthlyLedgerDetailConstants.FallbackModAdjustment));
+            }
+            else if (MonthlyLedgerTransactionAttribution.IsManualSystemAdjustment(transaction))
+            {
+                lines.Add(Custom(MonthlyLedgerDetailConstants.KeyManualSystemAdjustment, MonthlyLedgerDetailConstants.FallbackManualSystemAdjustment));
+            }
+            else
+            {
+                lines.Add(Custom(MonthlyLedgerDetailConstants.KeyUnattributedAdjustment, MonthlyLedgerDetailConstants.FallbackUnattributedAdjustment));
+            }
+
+            if (MonthlyLedgerTransactionAttribution.HasMeaningfulSource(transaction.SourceAssembly))
+            {
+                lines.Add(Field(
+                    Custom(MonthlyLedgerDetailConstants.KeySourceAssembly, MonthlyLedgerDetailConstants.FallbackSourceAssembly),
+                    transaction.SourceAssembly.Trim()));
+            }
+
+            string sourceCall = MonthlyLedgerTransactionAttribution.GetSourceCall(transaction);
+            if (!string.IsNullOrEmpty(sourceCall))
+            {
+                lines.Add(Field(
+                    Custom(MonthlyLedgerDetailConstants.KeySourceCall, MonthlyLedgerDetailConstants.FallbackSourceCall),
+                    sourceCall));
+            }
+
+            return JoinLines(lines);
         }
 
         private static string FormatContract(IMDataCoreMoneyTransactionDetail details)
@@ -780,7 +829,7 @@ namespace MonthlyLedger
 
         private static string Money(long amount)
         {
-            return ExtensionMethods.formatMoney(amount, false, false, false);
+            return MonthlyLedgerMoneyFormatting.FormatMoney(amount);
         }
 
         private static string Number(long value)

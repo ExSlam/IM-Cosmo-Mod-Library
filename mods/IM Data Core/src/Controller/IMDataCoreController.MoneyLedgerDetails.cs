@@ -654,13 +654,20 @@ namespace IMDataCore
             Cafes._cafe._dish dish = cafe.GetCurrentDish();
             string cafeEntityId = IMDataCoreController.Instance.ResolveCafeHistoryEntityId(cafe, null);
             List<int> workingIdolIds = ResolveIdolIdentifiers(cafe.WorkingGirls);
-            int amount = cafe.GetMoneyToAdd();
+
+            // SNLF's cafe repair is intentionally two-legged: vanilla first credits the
+            // Int32 compatibility mirror and SNLF then applies the exact Int64 correction
+            // in its postfix. Keep this allocation tied to the real first mutation so IMDC
+            // does not invent a compensating "other" row, but carry the exact economic
+            // result in the detail payload for consumers.
+            int compatibilityAmount = cafe.GetMoneyToAdd();
+            long exactAmount = SaveNLoadFixesWideNumericInterop.GetCafeMoneyToAdd(cafe);
             capture.Allocations.Add(new MoneyLedgerAllocationSnapshot
             {
-                Amount = amount,
+                Amount = compatibilityAmount,
                 CategoryCode = MoneyLedgerConstants.CategoryCafes,
                 DetailCode = MoneyLedgerConstants.DetailCafe,
-                SectionCode = amount < CoreConstants.ZeroBasedListStartIndex
+                SectionCode = compatibilityAmount < CoreConstants.ZeroBasedListStartIndex
                     ? MoneyLedgerConstants.SectionExpense
                     : MoneyLedgerConstants.SectionIncome,
                 IncludeWhenZero = true,
@@ -681,9 +688,9 @@ namespace IMDataCore
                     cafe_staff_names = ResolveIdolNames(cafe.WorkingGirls),
                     cafe_working_idol_ids = workingIdolIds,
                     cafe_working_idol_references_known = true,
-                    cafe_new_fans = cafe.GetFansToAdd(),
+                    cafe_new_fans = SaveNLoadFixesWideNumericInterop.GetCafeFansToAdd(cafe),
                     cafe_appeal_type = CoreEnumNameMapping.ToFanTypeCode(cafe.GetFanTypeToAdd()),
-                    gross_revenue = amount
+                    gross_revenue = exactAmount
                 }
             });
             return capture;
@@ -793,8 +800,11 @@ namespace IMDataCore
                 {
                     Theaters._theater._stat latestStat = theater.Stats[theater.Stats.Count - MoneyLedgerDetailConstants.LastCollectionIndexOffset];
                     details.theater_subscriber_delta = latestStat != null
-                        ? latestStat.Subscribers
-                        : CoreConstants.ZeroBasedListStartIndex;
+                        ? SaveNLoadFixesWideNumericInterop.GetTheaterStatSubscribers(
+                            theater,
+                            theater.Stats.Count - MoneyLedgerDetailConstants.LastCollectionIndexOffset,
+                            latestStat)
+                        : CoreConstants.ZeroLongValue;
                 }
             }
         }
@@ -961,14 +971,14 @@ namespace IMDataCore
 
             snapshot.Allocations.Add(new MoneyLedgerAllocationSnapshot
             {
-                Amount = -resourceManager.Money_Rent(false),
+                Amount = -SaveNLoadFixesWideNumericInterop.GetTotalRent(resourceManager, false),
                 CategoryCode = MoneyLedgerConstants.CategoryRent,
                 DetailCode = MoneyLedgerConstants.DetailRent,
                 SectionCode = MoneyLedgerConstants.SectionExpense
             });
             snapshot.Allocations.Add(new MoneyLedgerAllocationSnapshot
             {
-                Amount = -loans.GetTotalPaymentPerWeek(),
+                Amount = -SaveNLoadFixesWideNumericInterop.GetTotalLoanPayment(),
                 CategoryCode = MoneyLedgerConstants.CategoryLoans,
                 DetailCode = MoneyLedgerConstants.DetailLoanPayment,
                 SectionCode = MoneyLedgerConstants.SectionExpense
@@ -991,7 +1001,7 @@ namespace IMDataCore
                     continue;
                 }
 
-                long dailyPayment = Mathf.RoundToInt((float)activeContract.Payment_per_week / MoneyLedgerDetailConstants.DaysPerWeek);
+                long dailyPayment = SaveNLoadFixesWideNumericInterop.GetDailyContractAllocation(activeContract.Payment_per_week);
                 MoneyLedgerDetailPayload details = BuildActiveContractDetail(activeContract);
                 snapshot.Allocations.Add(new MoneyLedgerAllocationSnapshot
                 {
@@ -1449,6 +1459,7 @@ namespace IMDataCore
     internal static class singles_AddMoney_IMDataCoreMoneyLedgerDetails_Patch
     {
         [HarmonyPrefix]
+        [HarmonyBefore("com.cosmo.savenloadfixes")]
         private static void Prefix(singles._single single)
         {
             MoneyLedgerAmbientContext.Begin();

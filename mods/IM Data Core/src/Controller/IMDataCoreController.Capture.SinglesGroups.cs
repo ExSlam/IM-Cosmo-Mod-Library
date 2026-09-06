@@ -134,9 +134,9 @@ namespace IMDataCore
                 int quality = ResolveQuality(releasedSingle);
                 int fanSatisfaction = ResolveFanSatisfaction(releasedSingle);
                 int fanBuzz = ResolveFanBuzz(releasedSingle);
-                int newFans = ResolveNewFans(releasedSingle);
-                int newHardcoreFans = ResolveNewHardcoreFans(releasedSingle);
-                int newCasualFans = ResolveNewCasualFans(releasedSingle);
+                long newFans = ResolveNewFans(releasedSingle);
+                long newHardcoreFans = ResolveNewHardcoreFans(releasedSingle);
+                long newCasualFans = ResolveNewCasualFans(releasedSingle);
                 int singleQuantity = ResolveSingleQuantity(releasedSingle);
                 long singleProductionCost = ResolveSingleProductionCost(releasedSingle);
                 float singleMarketingResult = ResolveSingleMarketingResult(releasedSingle);

@@ -22,6 +22,10 @@ namespace IMDataCore
         private const string SavedDataHealthPropertyName = "SavedDataInterceptionHealthy";
         private const string EffectiveHealthPropertyName = "EffectiveTransportHealthy";
         private const string AcquireDirectoryMethodName = "TryAcquireExclusiveDirectoryAccess";
+        private const string RegisterSavedDataFingerprintMethodName =
+            "TryRegisterSavedDataContentFingerprint";
+        private const string LoadedSavedDataCheckpointIdentityMethodName =
+            "TryGetLoadedSavedDataCheckpointIdentity";
         private const int AcquireTimeoutMilliseconds = 30000;
 
         private static readonly object LookupLock = new object();
@@ -32,6 +36,134 @@ namespace IMDataCore
         {
             ProviderBinding provider;
             return TryResolvePreferredProvider(out provider);
+        }
+
+        internal static bool TryRegisterSavedDataContentFingerprint(
+            SaveManager.SavedData savedData,
+            string fingerprint)
+        {
+            if (savedData == null || string.IsNullOrEmpty(fingerprint))
+            {
+                return false;
+            }
+
+            ProviderBinding provider;
+            if (!TryResolvePreferredProvider(out provider) ||
+                provider == null ||
+                provider.RegisterSavedDataFingerprintMethod == null)
+            {
+                return false;
+            }
+
+            int apiVersion;
+            if (!TryReadInt(provider.VersionProperty, out apiVersion) ||
+                apiVersion < 2)
+            {
+                return false;
+            }
+
+            try
+            {
+                object[] arguments = new object[]
+                {
+                    savedData,
+                    fingerprint,
+                    string.Empty
+                };
+                object result = provider.RegisterSavedDataFingerprintMethod.Invoke(
+                    null,
+                    arguments);
+                bool succeeded = result is bool && (bool)result;
+                if (!succeeded)
+                {
+                    string detail = arguments[2] as string ?? string.Empty;
+                    if (!string.IsNullOrEmpty(detail))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not register its save checkpoint " +
+                            "fingerprint with the ordered transport. " + detail);
+                    }
+                }
+                return succeeded;
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not register its save checkpoint fingerprint " +
+                    "with the ordered transport. " + exception.Message);
+                return false;
+            }
+        }
+
+        internal static bool TryGetLoadedSavedDataCheckpointIdentity(
+            SaveManager.SavedData savedData,
+            out string fingerprint,
+            out bool legacyEnvelopeWithoutFingerprint)
+        {
+            fingerprint = string.Empty;
+            legacyEnvelopeWithoutFingerprint = false;
+            if (savedData == null)
+            {
+                return false;
+            }
+
+            ProviderBinding provider;
+            if (!TryResolvePreferredProvider(out provider) ||
+                provider == null ||
+                provider.LoadedSavedDataCheckpointIdentityMethod == null)
+            {
+                return false;
+            }
+
+            int apiVersion;
+            if (!TryReadInt(provider.VersionProperty, out apiVersion) ||
+                apiVersion < 2)
+            {
+                return false;
+            }
+
+            try
+            {
+                object[] arguments = new object[]
+                {
+                    savedData,
+                    string.Empty,
+                    false,
+                    string.Empty
+                };
+                object result = provider.LoadedSavedDataCheckpointIdentityMethod.Invoke(
+                    null,
+                    arguments);
+                bool succeeded = result is bool && (bool)result;
+                fingerprint = arguments[1] as string ?? string.Empty;
+                legacyEnvelopeWithoutFingerprint =
+                    arguments[2] is bool && (bool)arguments[2];
+                if (!succeeded)
+                {
+                    string detail = arguments[3] as string ?? string.Empty;
+                    if (!string.IsNullOrEmpty(detail))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not read SNLF checkpoint identity " +
+                            "for the loaded SavedData; using its local fingerprint fallback. " +
+                            detail);
+                    }
+                    fingerprint = string.Empty;
+                    legacyEnvelopeWithoutFingerprint = false;
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not read SNLF checkpoint identity for the " +
+                    "loaded SavedData; using its local fingerprint fallback. " +
+                    exception.Message);
+                fingerprint = string.Empty;
+                legacyEnvelopeWithoutFingerprint = false;
+                return false;
+            }
         }
 
         internal static bool TryAcquireDirectoryLease(
@@ -272,6 +404,29 @@ namespace IMDataCore
                     typeof(string).MakeByRefType()
                 },
                 null);
+            MethodInfo registerSavedDataFingerprintMethod = apiType.GetMethod(
+                RegisterSavedDataFingerprintMethodName,
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string),
+                    typeof(string).MakeByRefType()
+                },
+                null);
+            MethodInfo loadedSavedDataCheckpointIdentityMethod = apiType.GetMethod(
+                LoadedSavedDataCheckpointIdentityMethodName,
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string).MakeByRefType(),
+                    typeof(bool).MakeByRefType(),
+                    typeof(string).MakeByRefType()
+                },
+                null);
 
             return new ProviderBinding
             {
@@ -283,7 +438,10 @@ namespace IMDataCore
                 EffectiveHealthProperty = GetBooleanProperty(
                     apiType,
                     EffectiveHealthPropertyName),
-                AcquireDirectoryMethod = acquireDirectoryMethod
+                AcquireDirectoryMethod = acquireDirectoryMethod,
+                RegisterSavedDataFingerprintMethod = registerSavedDataFingerprintMethod,
+                LoadedSavedDataCheckpointIdentityMethod =
+                    loadedSavedDataCheckpointIdentityMethod
             };
         }
 
@@ -401,6 +559,8 @@ namespace IMDataCore
             internal PropertyInfo SavedDataHealthProperty;
             internal PropertyInfo EffectiveHealthProperty;
             internal MethodInfo AcquireDirectoryMethod;
+            internal MethodInfo RegisterSavedDataFingerprintMethod;
+            internal MethodInfo LoadedSavedDataCheckpointIdentityMethod;
         }
     }
 }
