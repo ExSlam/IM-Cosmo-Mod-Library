@@ -23,6 +23,7 @@ namespace FasterSkipDialogue
         private static ActiveDialogueController owner;
         private static int runnerGeneration;
         private static bool sceneEnding;
+        private static bool sceneEndStoryMusicStopGuardReleasePending;
 
         private static bool tweenBoostActive;
         private static float tweenScaleBeforeBoost = 1f;
@@ -41,6 +42,7 @@ namespace FasterSkipDialogue
             }
 
             owner = controller;
+            SceneMusicCleanup.Arm(controller);
             sceneEnding = false;
             runnerGeneration++;
             return runnerGeneration;
@@ -129,16 +131,44 @@ namespace FasterSkipDialogue
             // the next dialogue cannot inherit it, but keep the visual boost alive briefly so the
             // closing fades complete quickly too.
             sceneEnding = true;
+            sceneEndStoryMusicStopGuardReleasePending = true;
             ActiveDialogueController.Skip = false;
             EngageTweenBoost();
         }
 
+        /// <summary>
+        /// Vanilla refuses StopStorySong() during the first three seconds after a
+        /// story track starts. Fast skip can legitimately finish an entire VN before
+        /// that guard expires. Once Hide() has declared the real scene boundary,
+        /// release that guard exactly once so MusicManager.Resume() can stop the
+        /// outgoing story/award track instead of leaking it back into gameplay.
+        /// </summary>
+        internal static bool TryConsumeSceneEndStoryMusicStopGuardRelease()
+        {
+            if (!sceneEndStoryMusicStopGuardReleasePending)
+            {
+                return false;
+            }
+
+            sceneEndStoryMusicStopGuardReleasePending = false;
+            return true;
+        }
+
         internal static void ResetForNewDialogue(ActiveDialogueController controller)
         {
+            SceneMusicCleanup.BeginDialogue(controller);
             // Set() is used for a new top-level dialogue. Internal instant_transition does not call
             // Set(), so skip intentionally survives those data-driven cutscene segments. A new Set
             // always owns a fresh skip session, even if a scene change created a new controller.
             ForceCleanup();
+            sceneEndStoryMusicStopGuardReleasePending = false;
+        }
+
+        internal static void ResetForControllerStart()
+        {
+            SceneMusicCleanup.BeginDialogue(null);
+            ForceCleanup();
+            sceneEndStoryMusicStopGuardReleasePending = false;
         }
 
         internal static void ForceCleanup()

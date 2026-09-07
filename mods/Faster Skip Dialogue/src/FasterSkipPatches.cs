@@ -63,9 +63,10 @@ namespace FasterSkipDialogue
     internal static class ActiveDialogueControllerHideFastSkipPatch
     {
         [HarmonyPriority(Priority.First)]
-        private static void Prefix(ActiveDialogueController __instance)
+        private static void Prefix(ActiveDialogueController __instance, MusicManager ___musicManager)
         {
             FasterSkipRuntime.MarkSceneEnding(__instance);
+            SceneMusicCleanup.EndDialogue(__instance, ___musicManager);
         }
     }
 
@@ -104,7 +105,7 @@ namespace FasterSkipDialogue
         [HarmonyPriority(Priority.First)]
         private static void Prefix()
         {
-            FasterSkipRuntime.ForceCleanup();
+            FasterSkipRuntime.ResetForControllerStart();
             ActiveDialogueController.Skip = false;
         }
     }
@@ -152,4 +153,29 @@ namespace FasterSkipDialogue
             FasterSkipRuntime.RestoreProtectedSkipState(__state);
         }
     }
+    /// <summary>
+    /// MusicManager intentionally blocks StopStorySong() for three seconds after a
+    /// story track starts. Fast skip can finish an award/VN scene inside that window,
+    /// causing ActiveDialogueController.Hide()->MusicManager.Resume() to leave the
+    /// story track playing in normal gameplay. Hide() is already our authoritative
+    /// scene boundary, so release the private guard exactly once for the first
+    /// StopStorySong() reached after that boundary and otherwise leave vanilla music
+    /// behavior untouched.
+    /// </summary>
+    [HarmonyPatch(
+        typeof(MusicManager),
+        nameof(MusicManager.StopStorySong),
+        new Type[] { typeof(bool) })]
+    internal static class MusicManagerStopStorySongFastSkipSceneEndPatch
+    {
+        [HarmonyPriority(Priority.First)]
+        private static void Prefix(ref bool ___blockStopping)
+        {
+            if (FasterSkipRuntime.TryConsumeSceneEndStoryMusicStopGuardRelease())
+            {
+                ___blockStopping = false;
+            }
+        }
+    }
+
 }

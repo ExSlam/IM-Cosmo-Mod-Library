@@ -1,5 +1,9 @@
 # Faster Skip Dialogue
 
+Version 1.0.1 stops both story audio players at the end of a skipped scene, kills pending song-transition tweens without running their callbacks, and cancels delayed/custom-WAV starts belonging to that scene. Requests remember their original scene even if another dialogue starts while audio is loading. Vanilla's intentional Phantasm music handoff remains intact.
+
+Validation: `tests/Test-SceneMusicCleanupRuntime.ps1` executes the production cleanup with deterministic audio/tween adapters, including a WAV that finishes loading after the next dialogue begins. Live audio playback still requires an in-game check.
+
 `Faster Skip Dialogue` upgrades Idol Manager's existing VN **Skip** button. It keeps the vanilla control and state indicator, but replaces the slow/seen-only skip coroutine with a fast runner that works through normal dialogue and data-driven mod cutscenes.
 
 The intended behavior is:
@@ -93,6 +97,12 @@ This means:
 The original action still runs in full. Only the transient `Skip = false` side effect is restored afterward.
 
 `vn_actions.DoCustom` is similarly guarded because several vanilla custom cinematics directly set Skip to false. If the custom sequence actually ends the VN by calling `Hide()`, the Hide patch marks the real scene end and the postfix does not re-arm Skip.
+
+### 7. Story-music scene-end guard
+
+Vanilla `MusicManager` refuses to stop a newly started story track for three seconds. A fast-skipped VN, including an idol award-show scene, can legitimately reach `ActiveDialogueController.Hide()` before those three seconds expire. In vanilla that makes `MusicManager.Resume()` call `StopStorySong()` while the guard is still active, so the award/story track leaks into normal gameplay.
+
+Faster Skip now marks the real `Hide()` boundary and releases that private stop guard exactly once for the first `StopStorySong()` reached after the scene end. Ordinary music transitions and non-skipped scenes retain vanilla behavior.
 
 ## Modded dialogue and EroEvents-style cutscenes
 
