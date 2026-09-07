@@ -10,13 +10,20 @@ namespace SaveNLoadFixes.Persistence
         internal const string RootKey = "__cosmo_save_n_load_fixes";
         internal const string FormatName = "cosmo-save-n-load-fixes";
         internal const int FormatVersion = 1;
+
+        // Additive V1 root marker. Zero is intentionally the default so envelopes
+        // written before this marker remain valid legacy input.
+        internal const int IMDataCorePersistenceUnknown = 0;
+        internal const int IMDataCorePersistenceDurable = 1;
+        internal const int IMDataCorePersistenceFailed = 2;
     }
 
     /// <summary>
     /// Optional cross-mod checkpoint witness carried by the SNLF envelope. IM Data
-    /// Core computes this value from the pre-write vanilla SavedData graph. SNLF
-    /// preserves it through vanilla FixSaveFile's SimpleJSON scalar rewrite so IMDC
-    /// can select the exact same sidecar checkpoint after restart.
+    /// Core computes this value from the pre-write vanilla SavedData graph, persists
+    /// the matching sidecar checkpoint, and only then publishes the witness to SNLF.
+    /// SNLF preserves it through vanilla FixSaveFile's SimpleJSON scalar rewrite so
+    /// IMDC can select the exact same durable sidecar checkpoint after restart.
     /// </summary>
     internal static class RepairEnvelopeContentFingerprint
     {
@@ -57,6 +64,13 @@ namespace SaveNLoadFixes.Persistence
         // bridge. Keeping it on the repair envelope, rather than vanilla SavedData,
         // lets FixSaveFile rewrite the file without destroying IMDC checkpoint identity.
         public string imdc_content_fingerprint = string.Empty;
+
+        // 0 = pre-marker / no IMDC companion result, 1 = durable IMDC checkpoint
+        // with a canonical fingerprint, 2 = IMDC participated but its save process
+        // did not reach a durable coordinated completion. This prevents a failed
+        // modern IMDC save from being mistaken for a pre-bridge legacy envelope.
+        public int imdc_persistence_state =
+            RepairEnvelopeConstants.IMDataCorePersistenceUnknown;
 
         public RepairEnvelopeRecordsV1 records = new RepairEnvelopeRecordsV1();
     }

@@ -22,27 +22,57 @@ namespace IMDataCore
             bool isJson,
             bool fullPath)
         {
+            string resolvedVanillaPath = string.Empty;
+            CoreSaveScope targetScope = null;
+            bool saveProgressSucceeded = false;
+            string saveProgressDetail =
+                "IM Data Core persistence did not reach a durable completion boundary.";
+
+            if (savedData == null)
+            {
+                CoreLog.Warn("IM Data Core cannot prepare a null SavedData save boundary.");
+                return;
+            }
+
             try
             {
-                string resolvedVanillaPath;
+                // The companion progress contract is deliberately non-blocking for the
+                // vanilla/SNLF save. A missing IMDC witness still means "no matching
+                // durable sidecar", but it no longer converts an otherwise successful
+                // vanilla save into a transport failure. The save-progress owner keeps
+                // the popup open until IMDC reports this transaction's terminal result.
+                IMDataCoreSaveProgressBridge.BeginPersistence(savedData);
+
                 if (!CorePaths.TryResolveDataSaverPath(
                         dataFileName,
                         isJson,
                         fullPath,
                         out resolvedVanillaPath))
                 {
+                    saveProgressDetail =
+                        "IM Data Core rejected an unsupported vanilla save target.";
                     CoreLog.Warn(
-                        "IM Data Core rejected an unsupported vanilla save target.");
+                        saveProgressDetail + " " +
+                        DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                     return;
                 }
 
-                CoreSaveScope targetScope;
+                // Standalone IMDC has no ordered SavedData writer to report vanilla's
+                // asynchronous completion. Capture the exact target before vanilla
+                // DataSaver starts so its fallback UI can observe the physical commit.
+                IMDataCoreSaveProgressBridge.RegisterVanillaTarget(
+                    savedData,
+                    resolvedVanillaPath);
+
                 if (!CorePaths.TryResolveSaveScope(
                         resolvedVanillaPath,
                         out targetScope))
                 {
+                    saveProgressDetail =
+                        "IM Data Core could not resolve the vanilla save scope.";
                     CoreLog.Warn(
-                        "IM Data Core could not resolve the vanilla save scope.");
+                        saveProgressDetail + " " +
+                        DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                     return;
                 }
 
@@ -57,13 +87,44 @@ namespace IMDataCore
                     CaptureCurrentModSnapshot(true);
                 LightweightCoreStorageEngine engineForWrite;
                 LightweightPersistenceSnapshot persistenceSnapshot;
+                string durableContentFingerprint = string.Empty;
                 string errorMessage;
                 lock (runtimeLock)
                 {
+                    bool recoverableSamePathRebasePrepared = false;
+                    if (storageEngine != null &&
+                        !storageEngine.TryPrepareRecoverableSamePathOverwrite(
+                            targetScope,
+                            out recoverableSamePathRebasePrepared,
+                            out errorMessage))
+                    {
+                        saveProgressDetail =
+                            "IM Data Core could not prepare this protected sidecar " +
+                            "scope for overwrite: " + (errorMessage ?? string.Empty);
+                        CoreLog.Warn(
+                            saveProgressDetail + " " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                        return;
+                    }
+                    if (recoverableSamePathRebasePrepared)
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core is establishing a fresh sidecar branch for " +
+                            "an explicitly overwritten vanilla slot whose prior " +
+                            "checkpoint could not be attached exactly. The previous " +
+                            "sidecar generation will be preserved as the atomic backup. " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                    }
+
                     if (!EnsureInitializedLocked(out errorMessage) ||
                         !FlushLocked(true, out errorMessage))
                     {
-                        CoreLog.Warn(errorMessage);
+                        saveProgressDetail = string.IsNullOrEmpty(errorMessage)
+                            ? "IM Data Core could not flush its pending capture state."
+                            : errorMessage;
+                        CoreLog.Warn(
+                            saveProgressDetail + " " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                         return;
                     }
 
@@ -92,8 +153,23 @@ namespace IMDataCore
                             targetScope.RelativeSavePath,
                             false,
                             out stamp,
-                            out errorMessage) ||
-                        !storageEngine.AddOrReplaceCheckpoint(
+                            out errorMessage))
+                    {
+                        saveProgressDetail =
+                            "IM Data Core could not create its vanilla checkpoint stamp: " +
+                            (errorMessage ?? string.Empty);
+                        CoreLog.Warn(
+                            saveProgressDetail + " " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                        return;
+                    }
+
+                    durableContentFingerprint = stamp.ContentFingerprint;
+                    IMDataCoreSaveProgressBridge.RegisterExpectedVanillaFingerprint(
+                        savedData,
+                        durableContentFingerprint);
+
+                    if (!storageEngine.AddOrReplaceCheckpoint(
                             stamp,
                             captureSequence,
                             enabledMods,
@@ -107,9 +183,12 @@ namespace IMDataCore
                             out persistenceSnapshot,
                             out errorMessage))
                     {
-                        CoreLog.Warn(
+                        saveProgressDetail =
                             "IM Data Core could not prepare its sidecar: " +
-                            errorMessage);
+                            (errorMessage ?? string.Empty);
+                        CoreLog.Warn(
+                            saveProgressDetail + " " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                         return;
                     }
 
@@ -125,9 +204,12 @@ namespace IMDataCore
                         out persistenceSnapshotIsCurrent,
                         out errorMessage))
                 {
-                    CoreLog.Warn(
+                    saveProgressDetail =
                         "IM Data Core could not persist its sidecar: " +
-                        errorMessage);
+                        (errorMessage ?? string.Empty);
+                    CoreLog.Warn(
+                        saveProgressDetail + " " +
+                        DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                     return;
                 }
 
@@ -138,6 +220,42 @@ namespace IMDataCore
                         !engineForWrite.IsPersistenceSnapshotStillCurrent(
                             persistenceSnapshot))
                     {
+                        saveProgressDetail =
+                            "IM Data Core persisted or superseded a sidecar snapshot, " +
+                            "but could not prove this save checkpoint is the current " +
+                            "durable generation.";
+                        CoreLog.Warn(
+                            saveProgressDetail + " Its SNLF witness was not published. " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                        return;
+                    }
+                }
+
+                if (targetScope == null ||
+                    string.IsNullOrEmpty(targetScope.SidecarFilePath) ||
+                    !File.Exists(targetScope.SidecarFilePath))
+                {
+                    saveProgressDetail =
+                        "IM Data Core reported a current persistence snapshot, but the " +
+                        "resolved sidecar file is not materialized.";
+                    CoreLog.Warn(
+                        saveProgressDetail + " Its SNLF witness was not published. " +
+                        DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                    return;
+                }
+
+                lock (runtimeLock)
+                {
+                    if (!ReferenceEquals(storageEngine, engineForWrite) ||
+                        !engineForWrite.IsPersistenceSnapshotStillCurrent(
+                            persistenceSnapshot))
+                    {
+                        saveProgressDetail =
+                            "IM Data Core's durable sidecar generation changed before " +
+                            "save-boundary activation.";
+                        CoreLog.Warn(
+                            saveProgressDetail + " Its SNLF witness was not published. " +
+                            DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
                         return;
                     }
 
@@ -147,14 +265,74 @@ namespace IMDataCore
                     CorePaths.SetActiveSaveFilePathHint(
                         targetScope.SaveFilePath);
                 }
+
+                // The SNLF witness is a durability claim, not a save-attempt claim.
+                // Publish only after TryPersistSnapshot succeeds, the generation remains
+                // current, and the resolved sidecar file is physically present. A
+                // publication failure is reported to the progress UI, but it does not
+                // make SNLF discard an otherwise successful vanilla save.
+                if (!VanillaSavedDataFingerprint.TryPublishDurableCheckpointWitness(
+                        savedData,
+                        durableContentFingerprint))
+                {
+                    saveProgressDetail =
+                        "IM Data Core durably persisted its sidecar but could not " +
+                        "publish the matching SNLF checkpoint witness.";
+                    CoreLog.Warn(
+                        saveProgressDetail + " " +
+                        DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+                    return;
+                }
+
+                saveProgressSucceeded = true;
+                saveProgressDetail = string.Empty;
             }
             catch (Exception exception)
             {
-                CoreLog.Warn(
+                saveProgressDetail =
                     "IM Data Core sidecar preparation failed without blocking vanilla: " +
-                    exception.Message);
+                    exception.Message;
+                CoreLog.Warn(
+                    saveProgressDetail + " " +
+                    DescribeSaveBoundaryPaths(resolvedVanillaPath, targetScope));
+            }
+            finally
+            {
+                try
+                {
+                    IMDataCoreSaveProgressBridge.ReportPersistenceResult(
+                        savedData,
+                        saveProgressSucceeded,
+                        saveProgressDetail);
+                }
+                catch (Exception exception)
+                {
+                    CoreLog.Warn(
+                        "IM Data Core could not report its save-progress result: " +
+                        exception.Message);
+                }
             }
         }
+
+        private static string DescribeSaveBoundaryPaths(
+            string resolvedVanillaPath,
+            CoreSaveScope targetScope)
+        {
+            string vanillaPath = targetScope != null &&
+                !string.IsNullOrEmpty(targetScope.SaveFilePath)
+                    ? targetScope.SaveFilePath
+                    : resolvedVanillaPath;
+            string sidecarPath = targetScope != null
+                ? targetScope.SidecarFilePath
+                : string.Empty;
+
+            return "Vanilla path='" +
+                (string.IsNullOrEmpty(vanillaPath) ? "<unresolved>" : vanillaPath) +
+                "'; sidecar path='" +
+                (string.IsNullOrEmpty(sidecarPath) ? "<unresolved>" : sidecarPath) +
+                "'.";
+        }
+
         /// <summary>
         /// Replaces the supplemental runtime immediately after vanilla assigns
         /// SaveManager.Data and before any LoadEvent subscriber mutates its stamp.

@@ -204,7 +204,7 @@ namespace MonthlyLedger
         internal const string FallbackCoveragePartial = "IM Data Core has only partial money-history coverage for this month. Recorded rows and exact totals for those rows are shown, but the month may be incomplete.";
         internal const string FallbackCoverageGap = "IM Data Core reports a money-history coverage gap in this month. Recorded rows and exact totals for those rows are shown, but the month is incomplete.";
         internal const string FallbackCoveragePreStart = "This month predates provable IM Data Core money-history coverage. Any recorded rows are shown, but the month may be incomplete.";
-        internal const string FallbackCoverageUnknown = "Recorded transactions are internally consistent, but IM Data Core did not provide a completeness certificate for this month.";
+        internal const string FallbackCoverageUnknown = "IM Data Core cannot certify that this month's money history is complete. An empty list here does not prove that no transactions occurred.";
         internal const string FallbackCoverageNotApplicable = "Recorded transactions are internally consistent; coverage certification is not applicable for this month.";
         internal const string FallbackIntegrityMismatch = "Monthly Ledger detected a mismatch between exhaustive transaction pages and IM Data Core's aggregate totals. The month was not displayed.";
         internal const string FallbackOther = "Other";
@@ -1307,11 +1307,15 @@ namespace MonthlyLedger
             {
                 CreateWarningText(resultsRoot, MonthlyLedgerText.CoveragePreStart);
             }
-            // Unknown and NotApplicable are metadata-certainty states, not evidence of a
-            // missing transaction. Once exhaustive pages agree exactly with IMDataCore's
-            // independent aggregate, do not paint those states as a red data-loss warning.
-            // Prominent warnings are reserved for states that positively identify incomplete
-            // calendar coverage: Gap, Partial, or PreCoverage.
+            // Unknown coverage with recorded rows is not itself evidence that a row is
+            // missing. An *empty* unknown month is different: it must not be presented as
+            // proof that nothing happened, because a detached/mismatched IMDC checkpoint
+            // also returns an empty durable history surface. Make that uncertainty visible.
+            if ((currentTransactions == null || currentTransactions.Count == 0) &&
+                currentCoverageState == LedgerMonthCoverageState.Unknown)
+            {
+                CreateWarningText(resultsRoot, MonthlyLedgerText.CoverageUnknown);
+            }
             if (currentTransactions == null || currentTransactions.Count == 0)
             {
                 CreateStateText(resultsRoot, MonthlyLedgerText.NoTransactions);

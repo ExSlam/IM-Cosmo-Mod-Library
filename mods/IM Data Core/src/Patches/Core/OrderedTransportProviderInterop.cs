@@ -13,6 +13,7 @@ namespace IMDataCore
     {
         private const string SnlAssemblyName = "com.cosmo.savenloadfixes";
         private const string SnlApiTypeName = "SaveNLoadFixes.SaveTransportApi";
+        private const string SnlProgressApiTypeName = "SaveNLoadFixes.SaveProgressApi";
         private const string SwofAssemblyName = "com.cosmo.savewriteorderingfix";
         private const string SwofApiTypeName = "SaveWriteOrderingFix.SaveWriteOrderingApi";
 
@@ -22,20 +23,209 @@ namespace IMDataCore
         private const string SavedDataHealthPropertyName = "SavedDataInterceptionHealthy";
         private const string EffectiveHealthPropertyName = "EffectiveTransportHealthy";
         private const string AcquireDirectoryMethodName = "TryAcquireExclusiveDirectoryAccess";
+        private const string RequireSavedDataCheckpointWitnessMethodName =
+            "TryRequireSavedDataCheckpointWitness";
         private const string RegisterSavedDataFingerprintMethodName =
             "TryRegisterSavedDataContentFingerprint";
         private const string LoadedSavedDataCheckpointIdentityMethodName =
             "TryGetLoadedSavedDataCheckpointIdentity";
+        private const string ProgressVersionPropertyName = "Version";
+        private const string ProgressIsCoordinatorActivePropertyName = "IsCoordinatorActive";
+        private const string BeginIMDataCorePersistenceMethodName =
+            "TryBeginIMDataCorePersistence";
+        private const string ReportIMDataCorePersistenceResultMethodName =
+            "TryReportIMDataCorePersistenceResult";
         private const int AcquireTimeoutMilliseconds = 30000;
 
         private static readonly object LookupLock = new object();
         private static ProviderBinding snlBinding;
         private static ProviderBinding swofBinding;
+        private static ProgressBinding snlProgressBinding;
 
         internal static bool IsSavedDataTransportHealthy()
         {
             ProviderBinding provider;
             return TryResolvePreferredProvider(out provider);
+        }
+
+
+        internal static bool IsSnlSaveProgressCoordinatorActive()
+        {
+            ProgressBinding binding = GetSnlProgressBinding();
+            bool active;
+            int version;
+            return binding != null &&
+                TryReadInt(binding.VersionProperty, out version) &&
+                version >= 1 &&
+                TryReadBoolean(binding.IsCoordinatorActiveProperty, out active) &&
+                active;
+        }
+
+        internal static bool TryBeginSnlIMDataCorePersistence(
+            SaveManager.SavedData savedData,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (savedData == null)
+            {
+                errorMessage = "SavedData is null.";
+                return false;
+            }
+
+            ProgressBinding binding = GetSnlProgressBinding();
+            if (binding == null ||
+                binding.BeginIMDataCorePersistenceMethod == null ||
+                !IsSnlSaveProgressCoordinatorActive())
+            {
+                errorMessage = "Save n Load Fixes save-progress coordinator is unavailable.";
+                return false;
+            }
+
+            try
+            {
+                object[] arguments = new object[]
+                {
+                    savedData,
+                    string.Empty
+                };
+                object result = binding.BeginIMDataCorePersistenceMethod.Invoke(
+                    null,
+                    arguments);
+                bool succeeded = result is bool && (bool)result;
+                errorMessage = arguments[1] as string ?? string.Empty;
+                return succeeded;
+            }
+            catch (Exception exception)
+            {
+                errorMessage =
+                    "Save n Load Fixes save-progress begin reporting failed: " +
+                    exception.Message;
+                return false;
+            }
+        }
+
+        internal static bool TryReportSnlIMDataCorePersistenceResult(
+            SaveManager.SavedData savedData,
+            bool succeeded,
+            string detail,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (savedData == null)
+            {
+                errorMessage = "SavedData is null.";
+                return false;
+            }
+
+            ProgressBinding binding = GetSnlProgressBinding();
+            if (binding == null ||
+                binding.ReportIMDataCorePersistenceResultMethod == null ||
+                !IsSnlSaveProgressCoordinatorActive())
+            {
+                errorMessage = "Save n Load Fixes save-progress coordinator is unavailable.";
+                return false;
+            }
+
+            try
+            {
+                object[] arguments = new object[]
+                {
+                    savedData,
+                    succeeded,
+                    detail ?? string.Empty,
+                    string.Empty
+                };
+                object result = binding.ReportIMDataCorePersistenceResultMethod.Invoke(
+                    null,
+                    arguments);
+                bool reported = result is bool && (bool)result;
+                errorMessage = arguments[3] as string ?? string.Empty;
+                return reported;
+            }
+            catch (Exception exception)
+            {
+                errorMessage =
+                    "Save n Load Fixes save-progress completion reporting failed: " +
+                    exception.Message;
+                return false;
+            }
+        }
+
+        internal static bool IsSavedDataCheckpointWitnessBridgeActive()
+        {
+            ProviderBinding provider;
+            int apiVersion;
+            return TryResolvePreferredProvider(out provider) &&
+                provider != null &&
+                provider.RegisterSavedDataFingerprintMethod != null &&
+                TryReadInt(provider.VersionProperty, out apiVersion) &&
+                apiVersion >= 2;
+        }
+
+        internal static bool IsSavedDataCheckpointWitnessRequirementBridgeActive()
+        {
+            ProviderBinding provider;
+            int apiVersion;
+            return TryResolvePreferredProvider(out provider) &&
+                provider != null &&
+                provider.RequireSavedDataCheckpointWitnessMethod != null &&
+                TryReadInt(provider.VersionProperty, out apiVersion) &&
+                apiVersion >= 3;
+        }
+
+        internal static bool TryRequireSavedDataCheckpointWitness(
+            SaveManager.SavedData savedData)
+        {
+            if (savedData == null)
+            {
+                return false;
+            }
+
+            ProviderBinding provider;
+            if (!TryResolvePreferredProvider(out provider) ||
+                provider == null ||
+                provider.RequireSavedDataCheckpointWitnessMethod == null)
+            {
+                return false;
+            }
+
+            int apiVersion;
+            if (!TryReadInt(provider.VersionProperty, out apiVersion) ||
+                apiVersion < 3)
+            {
+                return false;
+            }
+
+            try
+            {
+                object[] arguments = new object[]
+                {
+                    savedData,
+                    string.Empty
+                };
+                object result = provider.RequireSavedDataCheckpointWitnessMethod.Invoke(
+                    null,
+                    arguments);
+                bool succeeded = result is bool && (bool)result;
+                if (!succeeded)
+                {
+                    string detail = arguments[1] as string ?? string.Empty;
+                    if (!string.IsNullOrEmpty(detail))
+                    {
+                        CoreLog.Warn(
+                            "IM Data Core could not require a durable checkpoint " +
+                            "witness from the ordered transport. " + detail);
+                    }
+                }
+                return succeeded;
+            }
+            catch (Exception exception)
+            {
+                CoreLog.Warn(
+                    "IM Data Core could not require a durable checkpoint witness " +
+                    "from the ordered transport. " + exception.Message);
+                return false;
+            }
         }
 
         internal static bool TryRegisterSavedDataContentFingerprint(
@@ -305,6 +495,90 @@ namespace IMDataCore
             return true;
         }
 
+
+        private static ProgressBinding GetSnlProgressBinding()
+        {
+            ProgressBinding binding = snlProgressBinding;
+            if (binding != null)
+            {
+                return binding;
+            }
+
+            lock (LookupLock)
+            {
+                if (snlProgressBinding == null)
+                {
+                    snlProgressBinding = TryCreateProgressBinding();
+                }
+                return snlProgressBinding;
+            }
+        }
+
+        private static ProgressBinding TryCreateProgressBinding()
+        {
+            Assembly assembly = FindLoadedAssembly(SnlAssemblyName);
+            if (assembly == null)
+            {
+                return null;
+            }
+
+            Type apiType = assembly.GetType(SnlProgressApiTypeName, false);
+            if (apiType == null)
+            {
+                return null;
+            }
+
+            PropertyInfo versionProperty = apiType.GetProperty(
+                ProgressVersionPropertyName,
+                BindingFlags.Public | BindingFlags.Static);
+            PropertyInfo activeProperty = GetBooleanProperty(
+                apiType,
+                ProgressIsCoordinatorActivePropertyName);
+            if (versionProperty == null ||
+                versionProperty.PropertyType != typeof(int) ||
+                versionProperty.GetIndexParameters().Length != 0 ||
+                activeProperty == null)
+            {
+                return null;
+            }
+
+            MethodInfo beginMethod = apiType.GetMethod(
+                BeginIMDataCorePersistenceMethodName,
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string).MakeByRefType()
+                },
+                null);
+            MethodInfo reportMethod = apiType.GetMethod(
+                ReportIMDataCorePersistenceResultMethodName,
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(bool),
+                    typeof(string),
+                    typeof(string).MakeByRefType()
+                },
+                null);
+
+            if (beginMethod == null || reportMethod == null)
+            {
+                return null;
+            }
+
+            return new ProgressBinding
+            {
+                VersionProperty = versionProperty,
+                IsCoordinatorActiveProperty = activeProperty,
+                BeginIMDataCorePersistenceMethod = beginMethod,
+                ReportIMDataCorePersistenceResultMethod = reportMethod
+            };
+        }
+
         private static ProviderBinding GetSnlBinding()
         {
             ProviderBinding binding = snlBinding;
@@ -404,6 +678,16 @@ namespace IMDataCore
                     typeof(string).MakeByRefType()
                 },
                 null);
+            MethodInfo requireSavedDataCheckpointWitnessMethod = apiType.GetMethod(
+                RequireSavedDataCheckpointWitnessMethodName,
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new Type[]
+                {
+                    typeof(SaveManager.SavedData),
+                    typeof(string).MakeByRefType()
+                },
+                null);
             MethodInfo registerSavedDataFingerprintMethod = apiType.GetMethod(
                 RegisterSavedDataFingerprintMethodName,
                 BindingFlags.Public | BindingFlags.Static,
@@ -439,6 +723,8 @@ namespace IMDataCore
                     apiType,
                     EffectiveHealthPropertyName),
                 AcquireDirectoryMethod = acquireDirectoryMethod,
+                RequireSavedDataCheckpointWitnessMethod =
+                    requireSavedDataCheckpointWitnessMethod,
                 RegisterSavedDataFingerprintMethod = registerSavedDataFingerprintMethod,
                 LoadedSavedDataCheckpointIdentityMethod =
                     loadedSavedDataCheckpointIdentityMethod
@@ -550,6 +836,15 @@ namespace IMDataCore
             }
         }
 
+
+        private sealed class ProgressBinding
+        {
+            internal PropertyInfo VersionProperty;
+            internal PropertyInfo IsCoordinatorActiveProperty;
+            internal MethodInfo BeginIMDataCorePersistenceMethod;
+            internal MethodInfo ReportIMDataCorePersistenceResultMethod;
+        }
+
         private sealed class ProviderBinding
         {
             internal string DisplayName;
@@ -559,6 +854,7 @@ namespace IMDataCore
             internal PropertyInfo SavedDataHealthProperty;
             internal PropertyInfo EffectiveHealthProperty;
             internal MethodInfo AcquireDirectoryMethod;
+            internal MethodInfo RequireSavedDataCheckpointWitnessMethod;
             internal MethodInfo RegisterSavedDataFingerprintMethod;
             internal MethodInfo LoadedSavedDataCheckpointIdentityMethod;
         }

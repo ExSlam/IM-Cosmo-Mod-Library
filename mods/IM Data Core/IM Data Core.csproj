@@ -3,10 +3,11 @@
     <ModName>IM Data Core</ModName>
     <RootNamespace>IMDataCore</RootNamespace>
     <AssemblyName>com.cosmo.imdatacore</AssemblyName>
-    <Version>3.4.33</Version>
+    <Version>3.4.34</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\**\*.cs" />
+    <Compile Include="..\Shared\SaveNotifications.cs" Link="src\SaveNotifications.cs" />
   </ItemGroup>
 </Project>

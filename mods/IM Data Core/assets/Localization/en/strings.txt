@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=Game saving started
+SAVE_PROGRESS_COMPLETED=Game saving completed.
+SAVE_PROGRESS_FAILED=Game saving failed.
+SAVE_PROGRESS_COMPANION_FAILED=IM Data Core could not save its sidecar.

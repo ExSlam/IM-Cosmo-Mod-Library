@@ -96,16 +96,35 @@ namespace SaveNLoadFixes.Transport
         internal object DeferredDataToSerialize;
         internal bool SerializeOnWriter;
         internal bool IsJson = true;
+        internal long SavedDataAttemptId;
+    }
+
+    internal enum SavedDataWriteAttemptStatus
+    {
+        None = 0,
+        Pending = 1,
+        Succeeded = 2,
+        Failed = 3
     }
 
     internal sealed class SavePathQueue
     {
+        internal string SavedDataTargetPath = string.Empty;
         internal readonly object SyncRoot = new object();
         internal readonly Queue<FrozenSaveWrite> PendingWrites =
             new Queue<FrozenSaveWrite>();
 
         internal bool Draining;
         internal bool ExternalAccessActive;
+
+        // SavedData loads must never silently fall back to stale bytes after the
+        // newest same-path save request failed before queue admission or on disk.
+        // Only the latest attempt matters: an older writer finishing after a newer
+        // request was registered cannot overwrite the newer request's outcome.
+        internal long LastIssuedSavedDataAttemptId;
+        internal long LatestSavedDataAttemptId;
+        internal SavedDataWriteAttemptStatus LatestSavedDataAttemptStatus;
+        internal string LatestSavedDataAttemptError = string.Empty;
     }
 
     internal sealed class SaveDirectoryExclusiveLease : IDisposable
@@ -173,11 +192,26 @@ namespace SaveNLoadFixes.Transport
 
             if (string.IsNullOrEmpty(targetPath))
             {
+                const string unresolvedPathError =
+                    "Repair-dependent SavedData request was not written because its physical path could not be resolved.";
+                SaveProgressCoordinator.ReportSavedDataWriteSetupFailure(
+                    dataToSave,
+                    unresolvedPathError);
                 Debug.LogError(
                     SaveNLoadFixesConstants.LogPrefix +
-                    "Repair-dependent SavedData request was not written because its physical path could not be resolved.");
+                    unresolvedPathError);
                 return;
             }
+
+            SavePathQueue attemptQueue;
+            long savedDataAttemptId = BeginSavedDataWriteAttempt(
+                targetPath,
+                out attemptQueue);
+
+            SaveProgressCoordinator.BindSavedDataWrite(
+                dataToSave,
+                targetPath,
+                savedDataAttemptId);
 
             string payload;
             string checkpointId;
@@ -189,8 +223,14 @@ namespace SaveNLoadFixes.Transport
                     out checkpointId,
                     out error))
             {
-                // Never move repair-envelope capture onto the writer thread. A failed
-                // exact freeze must not produce a vanilla/repair split-brain checkpoint.
+                // The physical file still contains the previous checkpoint. Record
+                // this failed overwrite explicitly so an immediate LoadData call
+                // cannot mistake those stale bytes for the save the player just made.
+                CompleteSavedDataWriteAttempt(
+                    attemptQueue,
+                    savedDataAttemptId,
+                    false,
+                    error);
                 Debug.LogError(
                     SaveNLoadFixesConstants.LogPrefix +
                     "Repair-dependent SavedData request was not written: " +
@@ -203,7 +243,8 @@ namespace SaveNLoadFixes.Transport
                 payload,
                 null,
                 false,
-                true);
+                true,
+                savedDataAttemptId);
         }
 
         internal static void QueueGlobalDataWrite(
@@ -238,6 +279,21 @@ namespace SaveNLoadFixes.Transport
         {
             WaitForReadPath(dataFileName, "SavedData");
             string physicalPath = SavePathResolver.ResolveReadPath(dataFileName);
+
+            string blockedReason;
+            if (TryGetLatestSavedDataReadBlockReason(
+                    physicalPath,
+                    out blockedReason))
+            {
+                Debug.LogError(
+                    SaveNLoadFixesConstants.LogPrefix +
+                    "Blocked a stale SavedData read for " +
+                    physicalPath +
+                    " because the newest same-path save request did not complete successfully. " +
+                    blockedReason);
+                return null;
+            }
+
             return RepairEnvelopeTransport.LoadSavedDataFromPhysicalPath(physicalPath);
         }
 
@@ -562,6 +618,113 @@ namespace SaveNLoadFixes.Transport
             }
         }
 
+        private static long BeginSavedDataWriteAttempt(
+            string targetPath,
+            out SavePathQueue queue)
+        {
+            queue = null;
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                return 0L;
+            }
+
+            lock (RegistrySync)
+            {
+                while (IsPathBlockedByExclusiveDirectoryLocked(targetPath))
+                {
+                    Monitor.Wait(RegistrySync);
+                }
+
+                if (!Queues.TryGetValue(targetPath, out queue))
+                {
+                    queue = new SavePathQueue();
+                    Queues.Add(targetPath, queue);
+                }
+
+                lock (queue.SyncRoot)
+                {
+                    long attemptId = ++queue.LastIssuedSavedDataAttemptId;
+                    queue.SavedDataTargetPath = targetPath;
+                    queue.LatestSavedDataAttemptId = attemptId;
+                    queue.LatestSavedDataAttemptStatus =
+                        SavedDataWriteAttemptStatus.Pending;
+                    queue.LatestSavedDataAttemptError = string.Empty;
+                    Monitor.PulseAll(queue.SyncRoot);
+                    return attemptId;
+                }
+            }
+        }
+
+        private static void CompleteSavedDataWriteAttempt(
+            SavePathQueue queue,
+            long attemptId,
+            bool succeeded,
+            string errorMessage)
+        {
+            if (queue == null || attemptId <= 0L)
+            {
+                return;
+            }
+
+            lock (queue.SyncRoot)
+            {
+                // Read protection concerns only the newest attempt; progress must
+                // receive every completed write, including superseded requests.
+                if (queue.LatestSavedDataAttemptId == attemptId)
+                {
+                    queue.LatestSavedDataAttemptStatus = succeeded
+                        ? SavedDataWriteAttemptStatus.Succeeded
+                        : SavedDataWriteAttemptStatus.Failed;
+                    queue.LatestSavedDataAttemptError = succeeded
+                        ? string.Empty
+                        : (errorMessage ?? string.Empty);
+                    Monitor.PulseAll(queue.SyncRoot);
+                }
+            }
+
+            SaveProgressCoordinator.ReportSavedDataWriteResult(
+                queue.SavedDataTargetPath,
+                attemptId,
+                succeeded,
+                errorMessage);
+        }
+
+        private static bool TryGetLatestSavedDataReadBlockReason(
+            string normalizedPath,
+            out string reason)
+        {
+            reason = string.Empty;
+            SavePathQueue queue = TryGetQueue(normalizedPath);
+            if (queue == null)
+            {
+                return false;
+            }
+
+            lock (queue.SyncRoot)
+            {
+                if (queue.LatestSavedDataAttemptStatus ==
+                    SavedDataWriteAttemptStatus.Pending)
+                {
+                    reason =
+                        "The newest save request is still pending before or inside the ordered writer.";
+                    return true;
+                }
+
+                if (queue.LatestSavedDataAttemptStatus ==
+                    SavedDataWriteAttemptStatus.Failed)
+                {
+                    reason = string.IsNullOrEmpty(
+                            queue.LatestSavedDataAttemptError)
+                        ? "The newest save request failed."
+                        : "The newest save request failed: " +
+                            queue.LatestSavedDataAttemptError;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static void QueueObjectWrite(
             object dataToSave,
             string targetPath,
@@ -592,7 +755,8 @@ namespace SaveNLoadFixes.Transport
                 payload ?? string.Empty,
                 payload == null ? dataToSave : null,
                 payload == null,
-                isJson);
+                isJson,
+                0L);
         }
 
         private static void QueuePreparedWrite(
@@ -600,7 +764,8 @@ namespace SaveNLoadFixes.Transport
             string payload,
             object deferredDataToSerialize,
             bool serializeOnWriter,
-            bool isJson)
+            bool isJson,
+            long savedDataAttemptId)
         {
             SavePathQueue queue;
             bool startDrainer = false;
@@ -627,7 +792,8 @@ namespace SaveNLoadFixes.Transport
                             Payload = payload ?? string.Empty,
                             DeferredDataToSerialize = deferredDataToSerialize,
                             SerializeOnWriter = serializeOnWriter,
-                            IsJson = isJson
+                            IsJson = isJson,
+                            SavedDataAttemptId = savedDataAttemptId
                         });
 
                     if (!queue.Draining &&
@@ -917,7 +1083,16 @@ namespace SaveNLoadFixes.Transport
                     write = queue.PendingWrites.Dequeue();
                 }
 
-                WriteFrozenPayload(write);
+                string writeError;
+                bool writeSucceeded = WriteFrozenPayload(write, out writeError);
+                if (write != null && write.SavedDataAttemptId > 0L)
+                {
+                    CompleteSavedDataWriteAttempt(
+                        queue,
+                        write.SavedDataAttemptId,
+                        writeSucceeded,
+                        writeError);
+                }
 
                 lock (queue.SyncRoot)
                 {
@@ -926,12 +1101,16 @@ namespace SaveNLoadFixes.Transport
             }
         }
 
-        private static void WriteFrozenPayload(FrozenSaveWrite write)
+        private static bool WriteFrozenPayload(
+            FrozenSaveWrite write,
+            out string errorMessage)
         {
+            errorMessage = string.Empty;
             if (write == null ||
                 string.IsNullOrEmpty(write.TargetPath))
             {
-                return;
+                errorMessage = "The ordered write request has no physical target path.";
+                return false;
             }
 
             try
@@ -957,9 +1136,11 @@ namespace SaveNLoadFixes.Transport
 
                 byte[] bytes = Encoding.UTF8.GetBytes(payload ?? string.Empty);
                 File.WriteAllBytes(write.TargetPath, bytes);
+                return true;
             }
             catch (Exception exception)
             {
+                errorMessage = exception.Message;
                 Debug.LogWarning(
                     SaveNLoadFixesConstants.LogPrefix +
                     "Failed to write ordered vanilla data to: " +
@@ -968,6 +1149,7 @@ namespace SaveNLoadFixes.Transport
                     SaveNLoadFixesConstants.LogPrefix +
                     "Error: " +
                     exception.Message);
+                return false;
             }
         }
     }

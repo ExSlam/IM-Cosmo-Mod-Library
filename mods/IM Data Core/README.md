@@ -1,4 +1,6 @@
-# IM Data Core 3.4.33
+# IM Data Core 3.4.34
+
+Version 3.4.34 fixes autosave/manual sidecar failures reporting `A populated event namespace has no durable namespace-owner binding.` Client session tokens survive storage replacement during load/new game; validating those sessions now also restores or verifies their owner binding in the current engine before allowing access. Foreign owners and unadopted legacy namespaces remain protected. `tests/Test-SessionOwnerPersistenceRuntime.ps1` exercises the production validation method with the compiled storage engine, writes both save scopes, and reloads their events and bindings.
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
@@ -476,3 +478,14 @@ The repository's shared `Directory.Build.props` supplies the framework, Harmony,
 ## Portrait identity
 
 Idol lifecycle events preserve the raw idol type, custom-id/addressable identity, and exact body/hair/face/accessory asset IDs. Consumers can use these vanilla-style references without persisting rendered portrait images.
+## Detached same-slot overwrite recovery
+
+If a valid existing sidecar loads but the selected vanilla save has no exact IMDataCore checkpoint, IMDC still detaches fail-closed rather than guessing a branch. A later save to a different slot remains writable as before. With the current recovery path, an explicit overwrite of that same vanilla slot may also establish a fresh native-v6 branch when the block came from this logical checkpoint detachment. The previous primary sidecar and its journal are rotated through the normal atomic `.imdc.bak` generation before replacement. Hard blocks caused by unreadable or unsupported physical storage remain protected and cannot use this recovery path.
+
+When current Save n Load Fixes is the authoritative transport, IMDC reports its save as a companion transaction. It still publishes a checkpoint witness only after the sidecar is durable, but IMDC failure no longer automatically cancels an otherwise successful vanilla/SNLF save. SNLF records that failure explicitly in its repair envelope so the resulting vanilla checkpoint cannot be mistaken for a pre-bridge legacy save during later IMDC attachment.
+
+## Save progress UI
+
+IMDC begins and ends a persistence-progress transaction around each actual vanilla save boundary, including autosaves, manual saves, and chapter saves. Authoritative SNLF owns notifications through its reflection-only `SaveProgressApi`. Otherwise IMDC supplies standalone notifications and observes the exact vanilla target until the asynchronous DataSaver worker has changed it and produced the matching complete SavedData fingerprint.
+
+The messages are `Game saving started` and `Game saving completed.` If the vanilla save succeeds but the sidecar fails, completion is accompanied by a separate red sidecar-failure notification. An unconfirmed vanilla write times out after 120 seconds with `Game saving failed.` Notifications use the game's prefab and history, remain visible during forced pauses, and do not depend on the Other notification filter. Transactions are tracked independently; completion runs on the main thread and leaves vanilla popup closure unchanged.

@@ -12,13 +12,13 @@ namespace IMDataCore
 {
     /// <summary>
     /// Computes a stable content identity for one vanilla SavedData graph. Saves
-    /// use Unity's compact JSON representation. When authoritative SNLF is present,
-    /// IMDC registers that exact save-side SHA-256 with SNLF so its validated repair
-    /// envelope can carry the witness through vanilla FixSaveFile's startup rewrite.
-    /// Loads prefer that persisted witness and only fall back to local serialization
-    /// for legacy/non-SNLF paths. A detached snapshot may register the fingerprint
-    /// of the JSON that created it
-    /// so checkpoint construction never performs a redundant full serialization.
+    /// use Unity's compact JSON representation, but fingerprint calculation is kept
+    /// separate from transport publication: a save-side witness is published to SNLF
+    /// only after IMDC has durably persisted the sidecar snapshot containing that
+    /// checkpoint. Loads prefer the persisted witness and only fall back to local
+    /// serialization for legacy/non-SNLF paths. A detached snapshot may cache the
+    /// fingerprint of the JSON that created it so checkpoint construction never
+    /// performs a redundant full serialization.
     /// </summary>
     internal static class VanillaSavedDataFingerprint
     {
@@ -81,13 +81,6 @@ namespace IMDataCore
                 {
                     fingerprint = cached.Value;
                     FrozenFingerprintCache.Remove(savedData);
-                    if (!loadBoundary)
-                    {
-                        OrderedTransportProviderInterop
-                            .TryRegisterSavedDataContentFingerprint(
-                                savedData,
-                                fingerprint);
-                    }
                     return true;
                 }
             }
@@ -96,13 +89,6 @@ namespace IMDataCore
             {
                 string json = UnityEngine.JsonUtility.ToJson(savedData, false);
                 fingerprint = ComputeForJson(json);
-                if (!loadBoundary)
-                {
-                    OrderedTransportProviderInterop
-                        .TryRegisterSavedDataContentFingerprint(
-                            savedData,
-                            fingerprint);
-                }
                 return true;
             }
             catch (Exception exception)
@@ -180,6 +166,35 @@ namespace IMDataCore
                     savedData,
                     new CachedFingerprint { Value = fingerprint });
             }
+        }
+
+        /// <summary>
+        /// Publishes an already-computed checkpoint witness to the effective ordered
+        /// transport. Callers must invoke this only after the sidecar snapshot that
+        /// contains the checkpoint has been durably committed. Absence of a companion
+        /// witness bridge is valid for standalone IMDC.
+        /// </summary>
+        internal static bool TryPublishDurableCheckpointWitness(
+            SaveManager.SavedData savedData,
+            string fingerprint)
+        {
+            if (savedData == null || !IsValid(fingerprint))
+            {
+                return false;
+            }
+
+            if (!OrderedTransportProviderInterop
+                    .IsSavedDataCheckpointWitnessBridgeActive())
+            {
+                // Standalone IMDC and SWOF-only transport have no SNLF envelope
+                // witness to publish. The sidecar remains fully valid on its own.
+                return true;
+            }
+
+            return OrderedTransportProviderInterop
+                .TryRegisterSavedDataContentFingerprint(
+                    savedData,
+                    fingerprint);
         }
 
         internal static bool IsValid(string fingerprint)
@@ -886,6 +901,7 @@ namespace IMDataCore
         private string currentRelativeSavePath = string.Empty;
         private string blockedPersistencePath = string.Empty;
         private string blockedPersistenceReason = string.Empty;
+        private bool blockedPersistenceCanRebaseOnExplicitSave;
         private long lastIssuedSequence;
         private long nextPersistenceGeneration;
         private long lastCommittedPersistenceGeneration;
@@ -2400,6 +2416,13 @@ namespace IMDataCore
                         errorMessage =
                             "An existing IM Data Core sidecar was preserved instead of " +
                             "being replaced with empty state.";
+
+                        // ResetStateLocked() cleared the physical-format provenance.
+                        // This exact path is about to be write-protected, but the
+                        // engine contract still permits a later New Save/Overwrite to
+                        // a different vanilla path. Seed native-v6 provenance for that
+                        // future detached branch before blocking the current path.
+                        InitializeNativeV6ProvenanceLocked();
                         BlockPersistenceForCurrentScopeLocked(errorMessage);
                         return false;
                     }
@@ -2430,10 +2453,101 @@ namespace IMDataCore
                 ResetStateLocked();
                 currentSidecarPath = sidecarPath ?? string.Empty;
                 currentRelativeSavePath = relativePath ?? string.Empty;
+
+                // This scope is read-only, but saving the detached empty branch to
+                // a different vanilla path remains supported. ResetStateLocked()
+                // clears migrationProvenance, so restore the required native-v6
+                // document provenance before exposing that retargetable state.
+                InitializeNativeV6ProvenanceLocked();
                 blockedPersistencePath = currentSidecarPath;
                 blockedPersistenceReason = string.IsNullOrEmpty(reason)
                     ? "The existing IM Data Core sidecar is protected from overwrite."
                     : reason;
+                // This block means the physical document was readable, but the
+                // loaded vanilla checkpoint could not be attached exactly. A later
+                // explicit overwrite of this same vanilla slot is allowed to start
+                // a fresh branch. The ordinary atomic writer will rotate the old
+                // primary/journal into the .imdc.bak generation first.
+                blockedPersistenceCanRebaseOnExplicitSave = true;
+            }
+        }
+
+        /// <summary>
+        /// Converts a recoverable detached/read-only scope into a fresh writable
+        /// branch only when the player is explicitly saving the same vanilla path.
+        /// Hard blocks created for unreadable or unsupported physical generations
+        /// remain fail-closed. No disk bytes are changed here; the later atomic full
+        /// snapshot preserves the old primary as .imdc.bak before replacement.
+        /// </summary>
+        internal bool TryPrepareRecoverableSamePathOverwrite(
+            CoreSaveScope saveScope,
+            out bool rebasePrepared,
+            out string errorMessage)
+        {
+            rebasePrepared = false;
+            errorMessage = string.Empty;
+            if (saveScope == null || saveScope.IsTransient)
+            {
+                return true;
+            }
+
+            lock (storageLock)
+            {
+                try
+                {
+                    ThrowIfDisposed();
+                    if (string.IsNullOrEmpty(blockedPersistencePath))
+                    {
+                        return true;
+                    }
+
+                    string candidatePath;
+                    if (!CorePaths.TryValidateContainedMutationPath(
+                            saveScope.SidecarFilePath ?? string.Empty,
+                            false,
+                            out candidatePath,
+                            out errorMessage))
+                    {
+                        return false;
+                    }
+
+                    if (!string.Equals(
+                            Path.GetFullPath(candidatePath),
+                            Path.GetFullPath(blockedPersistencePath),
+                            CorePaths.PathComparison))
+                    {
+                        // A different save path is already allowed by the existing
+                        // detached-branch contract. Leave the old block in place.
+                        return true;
+                    }
+
+                    if (!blockedPersistenceCanRebaseOnExplicitSave)
+                    {
+                        errorMessage = blockedPersistenceReason;
+                        return false;
+                    }
+
+                    currentSidecarPath = candidatePath;
+                    currentRelativeSavePath =
+                        VanillaSaveStamp.NormalizeRelativePath(
+                            saveScope.RelativeSavePath);
+                    blockedPersistencePath = string.Empty;
+                    blockedPersistenceReason = string.Empty;
+                    blockedPersistenceCanRebaseOnExplicitSave = false;
+                    recoveredFromBackup = false;
+                    recoveredBackupJournalPath = string.Empty;
+                    loadedExistingSidecarDocument = false;
+                    InitializeNativeV6ProvenanceLocked();
+                    rebasePrepared = true;
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    errorMessage =
+                        "Preparing the detached IMDC branch for same-path overwrite failed: " +
+                        exception.Message;
+                    return false;
+                }
             }
         }
 
@@ -2507,6 +2621,7 @@ namespace IMDataCore
                     {
                         blockedPersistencePath = string.Empty;
                         blockedPersistenceReason = string.Empty;
+                        blockedPersistenceCanRebaseOnExplicitSave = false;
                     }
 
                     if (detachedCurrentScope)
@@ -2515,6 +2630,7 @@ namespace IMDataCore
                         currentRelativeSavePath = string.Empty;
                         blockedPersistencePath = string.Empty;
                         blockedPersistenceReason = string.Empty;
+                        blockedPersistenceCanRebaseOnExplicitSave = false;
                         recoveredFromBackup = false;
                         loadedExistingSidecarDocument = false;
                         lastPersistenceMode = "archived_detached";
@@ -4694,6 +4810,7 @@ namespace IMDataCore
                         currentRelativeSavePath = snapshot.RelativeSavePath;
                         blockedPersistencePath = string.Empty;
                         blockedPersistenceReason = string.Empty;
+                        blockedPersistenceCanRebaseOnExplicitSave = false;
                         recoveredFromBackup = false;
                         recoveredBackupJournalPath = string.Empty;
                         if (!snapshot.IsIncremental)
@@ -8692,6 +8809,7 @@ namespace IMDataCore
                 string.IsNullOrEmpty(reason)
                     ? "The existing IM Data Core sidecar is protected from overwrite."
                     : reason;
+            blockedPersistenceCanRebaseOnExplicitSave = false;
         }
 
         private bool IsPersistenceBlockedForPathLocked(string path)
@@ -8754,6 +8872,7 @@ namespace IMDataCore
             currentRelativeSavePath = string.Empty;
             blockedPersistencePath = string.Empty;
             blockedPersistenceReason = string.Empty;
+            blockedPersistenceCanRebaseOnExplicitSave = false;
             latestCommittedPersistenceGenerationByPath.Clear();
             committedPathStates.Clear();
             nextPersistenceGeneration = 0L;

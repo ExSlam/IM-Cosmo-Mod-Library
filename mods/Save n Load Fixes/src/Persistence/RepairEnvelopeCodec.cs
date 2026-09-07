@@ -451,6 +451,36 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            if (envelope.imdc_persistence_state <
+                    RepairEnvelopeConstants.IMDataCorePersistenceUnknown ||
+                envelope.imdc_persistence_state >
+                    RepairEnvelopeConstants.IMDataCorePersistenceFailed)
+            {
+                error = "Repair envelope imdc_persistence_state is not recognized.";
+                return false;
+            }
+
+            if (envelope.imdc_persistence_state ==
+                    RepairEnvelopeConstants.IMDataCorePersistenceDurable &&
+                !RepairEnvelopeContentFingerprint.IsValid(
+                    envelope.imdc_content_fingerprint))
+            {
+                error =
+                    "Repair envelope claims durable IM Data Core persistence without " +
+                    "a canonical checkpoint witness.";
+                return false;
+            }
+
+            if (envelope.imdc_persistence_state ==
+                    RepairEnvelopeConstants.IMDataCorePersistenceFailed &&
+                !string.IsNullOrEmpty(envelope.imdc_content_fingerprint))
+            {
+                error =
+                    "Repair envelope claims failed IM Data Core persistence while " +
+                    "also carrying a checkpoint witness.";
+                return false;
+            }
+
             if (envelope.records == null ||
                 envelope.records.relationship_dynamics == null)
             {

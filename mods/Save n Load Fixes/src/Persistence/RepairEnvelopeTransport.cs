@@ -20,6 +20,9 @@ namespace SaveNLoadFixes.Persistence
         private static readonly object RegistrySync = new object();
         private sealed class RegisteredContentFingerprint
         {
+            internal bool WitnessRequired;
+            internal bool IMDataCoreAttempted;
+            internal bool IMDataCoreFailed;
             internal string Value = string.Empty;
         }
 
@@ -47,8 +50,10 @@ namespace SaveNLoadFixes.Persistence
 
         /// <summary>
         /// Registers IM Data Core's exact save-side content fingerprint against the
-        /// SavedData instance that SNLF is about to freeze. The registration is weak
-        /// and one-shot: TryFreezeSavedDataPayload consumes it into the repair envelope.
+        /// SavedData instance that SNLF is about to freeze. IMDC publishes only after
+        /// its matching sidecar checkpoint is durable. The registration is weak and
+        /// one-shot: the next freeze attempt consumes it before repair capture starts,
+        /// so a failed freeze cannot leak a stale witness into a later save request.
         /// </summary>
         internal static bool TryRegisterSavedDataContentFingerprint(
             SaveManager.SavedData savedData,
@@ -69,12 +74,135 @@ namespace SaveNLoadFixes.Persistence
 
             lock (RegistrySync)
             {
+                RegisteredContentFingerprint existing;
+                bool witnessRequired = RegisteredContentFingerprints.TryGetValue(
+                        savedData,
+                        out existing) &&
+                    existing != null &&
+                    existing.WitnessRequired;
                 RegisteredContentFingerprints.Remove(savedData);
                 RegisteredContentFingerprints.Add(
                     savedData,
-                    new RegisteredContentFingerprint { Value = fingerprint });
+                    new RegisteredContentFingerprint
+                    {
+                        WitnessRequired = witnessRequired,
+                        IMDataCoreAttempted = true,
+                        IMDataCoreFailed = false,
+                        Value = fingerprint
+                    });
             }
             return true;
+        }
+
+        /// <summary>
+        /// Marks this exact SavedData instance as requiring a durable IM Data Core
+        /// checkpoint before SNLF may serialize the matching vanilla save. IMDC
+        /// registers this before its save-boundary work begins and replaces the
+        /// empty requirement with the exact fingerprint only after the sidecar is
+        /// durably committed. If IMDC fails or returns early, SNLF fails the vanilla
+        /// save closed instead of creating a vanilla/sidecar split-brain checkpoint.
+        /// </summary>
+        internal static bool TryRequireSavedDataContentFingerprint(
+            SaveManager.SavedData savedData,
+            out string error)
+        {
+            error = string.Empty;
+            if (savedData == null)
+            {
+                error = "SavedData is null.";
+                return false;
+            }
+
+            lock (RegistrySync)
+            {
+                RegisteredContentFingerprint existing;
+                bool hasExisting = RegisteredContentFingerprints.TryGetValue(
+                        savedData,
+                        out existing) &&
+                    existing != null;
+                string value = hasExisting
+                    ? existing.Value ?? string.Empty
+                    : string.Empty;
+                bool attempted = hasExisting && existing.IMDataCoreAttempted;
+                bool failed = hasExisting && existing.IMDataCoreFailed;
+                RegisteredContentFingerprints.Remove(savedData);
+                RegisteredContentFingerprints.Add(
+                    savedData,
+                    new RegisteredContentFingerprint
+                    {
+                        WitnessRequired = true,
+                        IMDataCoreAttempted = attempted,
+                        IMDataCoreFailed = failed,
+                        Value = value
+                    });
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Records whether IM Data Core participated in this exact SavedData save and
+        /// whether its coordinated save process reached durable completion. Failure is
+        /// carried into the SNLF envelope as an explicit marker rather than being
+        /// confused with a pre-bridge legacy envelope that simply has no fingerprint.
+        /// </summary>
+        internal static void ReportIMDataCorePersistenceOutcome(
+            SaveManager.SavedData savedData,
+            bool succeeded)
+        {
+            if (savedData == null)
+            {
+                return;
+            }
+
+            lock (RegistrySync)
+            {
+                RegisteredContentFingerprint existing;
+                bool hasExisting = RegisteredContentFingerprints.TryGetValue(
+                        savedData,
+                        out existing) &&
+                    existing != null;
+                bool witnessRequired = hasExisting && existing.WitnessRequired;
+                string value = hasExisting
+                    ? existing.Value ?? string.Empty
+                    : string.Empty;
+
+                if (!succeeded)
+                {
+                    // A failed terminal outcome must never leave a previously
+                    // registered witness attached to this save attempt.
+                    value = string.Empty;
+                }
+
+                RegisteredContentFingerprints.Remove(savedData);
+                RegisteredContentFingerprints.Add(
+                    savedData,
+                    new RegisteredContentFingerprint
+                    {
+                        WitnessRequired = witnessRequired,
+                        IMDataCoreAttempted = true,
+                        IMDataCoreFailed = !succeeded,
+                        Value = value
+                    });
+            }
+        }
+
+        private static RegisteredContentFingerprint TakeRegisteredContentFingerprint(
+            SaveManager.SavedData savedData)
+        {
+            if (savedData == null)
+            {
+                return null;
+            }
+
+            lock (RegistrySync)
+            {
+                RegisteredContentFingerprint registered;
+                RegisteredContentFingerprints.TryGetValue(
+                    savedData,
+                    out registered);
+                RegisteredContentFingerprints.Remove(savedData);
+                return registered;
+            }
         }
 
         /// <summary>
@@ -117,7 +245,19 @@ namespace SaveNLoadFixes.Persistence
                     return true;
                 }
 
-                legacyEnvelopeWithoutFingerprint = string.IsNullOrEmpty(stored);
+                if (state.Envelope.imdc_persistence_state ==
+                    RepairEnvelopeConstants.IMDataCorePersistenceFailed)
+                {
+                    // Modern save with an explicitly failed IMDC companion. It is not
+                    // eligible for the one-time legacy unique-candidate adoption path.
+                    legacyEnvelopeWithoutFingerprint = false;
+                    return true;
+                }
+
+                legacyEnvelopeWithoutFingerprint =
+                    string.IsNullOrEmpty(stored) &&
+                    state.Envelope.imdc_persistence_state ==
+                        RepairEnvelopeConstants.IMDataCorePersistenceUnknown;
                 return true;
             }
         }
@@ -133,6 +273,24 @@ namespace SaveNLoadFixes.Persistence
             checkpointId = string.Empty;
             error = string.Empty;
 
+            // Take the one-shot IMDC witness before any part of this freeze attempt
+            // can fail. Once IMDC has published a witness it refers to a sidecar already
+            // on disk; if SNLF does not produce the matching vanilla save, carrying that
+            // witness into a later request would be incorrect.
+            RegisteredContentFingerprint registeredContentFingerprint =
+                TakeRegisteredContentFingerprint(dataToSave);
+
+            if (registeredContentFingerprint != null &&
+                registeredContentFingerprint.WitnessRequired &&
+                !RepairEnvelopeContentFingerprint.IsValid(
+                    registeredContentFingerprint.Value))
+            {
+                return FreezeFailed(
+                    "IM Data Core required a durable checkpoint witness for this " +
+                    "SavedData save, but no matching durable fingerprint was published.",
+                    out error);
+            }
+
             if (!isJson)
             {
                 return FreezeFailed("Repair-dependent SavedData writes must use JSON.", out error);
@@ -146,18 +304,23 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
-            lock (RegistrySync)
+            if (registeredContentFingerprint != null &&
+                RepairEnvelopeContentFingerprint.IsValid(
+                    registeredContentFingerprint.Value))
             {
-                RegisteredContentFingerprint registered;
-                if (RegisteredContentFingerprints.TryGetValue(
-                        dataToSave,
-                        out registered) &&
-                    registered != null &&
-                    RepairEnvelopeContentFingerprint.IsValid(registered.Value))
-                {
-                    envelope.imdc_content_fingerprint = registered.Value;
-                }
-                RegisteredContentFingerprints.Remove(dataToSave);
+                envelope.imdc_content_fingerprint =
+                    registeredContentFingerprint.Value;
+                envelope.imdc_persistence_state =
+                    RepairEnvelopeConstants.IMDataCorePersistenceDurable;
+            }
+            else if (registeredContentFingerprint != null &&
+                registeredContentFingerprint.IMDataCoreAttempted)
+            {
+                // The IMDC companion participated but no valid durable witness exists.
+                // Persist that fact so a later load does not interpret this as a
+                // pre-bridge legacy envelope and adopt an unrelated old checkpoint.
+                envelope.imdc_persistence_state =
+                    RepairEnvelopeConstants.IMDataCorePersistenceFailed;
             }
 
             string vanillaJson;

@@ -1,5 +1,7 @@
 # Save n Load Fixes
 
+Version 0.54.1 fixes save notifications for autosaves, manual saves, and chapter/story-slot writes. Each actual write gets independent start/completion tracking, including concurrent saves whose per-path attempt IDs coincide. `tests/Test-SaveProgressRuntime.ps1` runs the production coordinator and writer completion callback against overlapping writes, failures, and worker-thread completion.
+
 **Runtime compatibility hotfix:** SNLF must load ordinary vanilla saves and older SNLF saves without requiring prior SNLF metadata. The current Task-6 hotfix removes A33's `System.Numerics` runtime dependency after Unity/Mono was observed throwing from the patched idol salary/UI path even though vanilla `SaveManager.LoadData` had succeeded. SNLF now keeps its exact wide arithmetic self-contained. No vanilla idol migration or guessed recovery path is involved.
 
 ## Version 0.54.0
@@ -340,3 +342,16 @@ With the supplied decompile available, run all `tests/Test-*Source.py` files wit
 The normal repository build requires the private game/Harmony/Unity reference DLLs and a
 .NET/MSBuild toolchain. This development stream is intentionally source/static validated in the
 current environment.
+
+## Failed-overwrite stale-load guard
+
+The ordered SavedData transport now records the outcome of the newest same-path save request from caller-thread repair-envelope freeze through the physical writer. If that newest request fails before queue admission or fails while writing the file, a subsequent SavedData read in the same process returns no save instead of silently loading the older bytes still present on disk. A later successful save to the path clears the failed-attempt state. This prevents a rapid overwrite-then-load sequence from pairing an old vanilla checkpoint with a newer supplemental sidecar.
+## IMDataCore coordinated checkpoint outcome
+
+Transport API v3 retains the older hard-witness requirement call for compatibility, but current IM Data Core no longer uses that call as the normal save contract. IMDC still publishes the exact SHA-256 witness only after its sidecar generation is durable. If IMDC participates but fails before that boundary, SNLF may still complete the vanilla save and records `imdc_persistence_state = 2` with no witness. A later load treats that as an explicitly failed modern IMDC companion, not as a pre-bridge legacy envelope eligible for unique-candidate sidecar adoption. A successful companion records `imdc_persistence_state = 1` together with the canonical witness; old/no-companion envelopes remain state `0`. The failed-overwrite stale-read guard remains a second safety layer for failures of SNLF's own physical vanilla write.
+
+## Save progress notifications
+
+When SNLF owns the ordered `SavedData` transport, every actual write emits `Game saving started`. `Game saving completed.` follows only after the writer succeeds and participating IM Data Core persistence reaches a terminal result. A failed sidecar gets a separate red notification; a failed vanilla write emits `Game saving failed.` The game's notification prefab/history is used directly so forced pauses, the Other category filter, and a busy gameplay notification queue cannot hide save status. Start and completion are displayed on separate frames, and each path/attempt is tracked independently.
+
+Completion notifications are marshalled through a `mainScript.Update` postfix so worker-thread transport results never call Unity notification UI directly. SNLF does not intercept or defer `PopupManager.Close` for this notification-based UX.

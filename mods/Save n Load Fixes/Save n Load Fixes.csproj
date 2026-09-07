@@ -3,12 +3,14 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>0.54.0</Version>
+    <Version>0.54.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\SaveNLoadFixesConstants.cs" />
     <Compile Include="src\SaveNLoadFixesDiagnostics.cs" />
+    <Compile Include="src\SaveProgressApi.cs" />
+    <Compile Include="..\Shared\SaveNotifications.cs" Link="src\SaveNotifications.cs" />
     <Compile Include="src\Persistence\RepairEnvelopeV1.cs" />
     <Compile Include="src\Persistence\RepairEnvelopeCodec.cs" />
     <Compile Include="src\Persistence\RepairEnvelopeTransport.cs" />
@@ -121,6 +123,8 @@
     <Compile Include="src\Repairs\WideNumericContinuationPatches.cs" />
     <Compile Include="src\Transport\TransportPatchHealth.cs" />
     <Compile Include="src\Transport\OrderedSaveTransport.cs" />
+    <Compile Include="src\Transport\SaveProgressCoordinator.cs" />
+    <Compile Include="src\Transport\SaveProgressPatches.cs" />
     <Compile Include="src\Transport\StartupSaveFileMigration.cs" />
     <Compile Include="src\Transport\SaveTransportPatches.cs" />
     <Compile Include="src\Transport\SaveTransportApi.cs" />

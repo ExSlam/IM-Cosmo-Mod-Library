@@ -3401,6 +3401,26 @@ namespace IMDataCore
                 return false;
             }
 
+            // Session tokens survive new-game/load engine replacement. Registration
+            // alone therefore cannot guarantee that the CURRENT sidecar contains
+            // the owner binding required by v6. Revalidate the durable owner before
+            // any session read/write; this also rejects a different owner or an
+            // unadopted legacy namespace in the newly loaded document.
+            if (!EnsureInitializedLocked(out errorMessage))
+            {
+                return false;
+            }
+            if (storageEngine.SupportsStructuredCoverageModel &&
+                !storageEngine.TryEnsureNamespaceOwnerBinding(
+                    registrationFromMap.NamespaceIdentifier,
+                    registrationFromMap.StableOwnerId,
+                    registrationFromMap.OwnerSchemaVersion,
+                    registrationFromMap.CallingAssemblyIdentity,
+                    out errorMessage))
+            {
+                return false;
+            }
+
             registration = registrationFromMap;
             return true;
         }

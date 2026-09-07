@@ -49,3 +49,7 @@ dotnet build "mods/Monthly Ledger/Monthly Ledger.csproj" -c Release
 ```
 
 Release history belongs in [`CHANGELOG.md`](CHANGELOG.md).
+
+## Empty-month certainty
+
+An empty transaction list is only presented as a plain empty month when IM Data Core can provide meaningful coverage state. If coverage is unknown and the exact row query returns zero rows, Monthly Ledger now shows an explicit warning that the empty list is not proof that no transactions occurred. This makes detached or checkpoint-mismatched IMDataCore history visible instead of masquerading as a legitimately empty month.

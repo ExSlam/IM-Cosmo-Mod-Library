@@ -78,8 +78,31 @@ namespace SaveNLoadFixes
         }
 
         /// <summary>
-        /// Associates IM Data Core's exact pre-write SavedData fingerprint with the
-        /// next SNLF freeze of this object. The witness is stored inside SNLF's repair
+        /// Requires the next SNLF freeze of this exact SavedData instance to carry
+        /// an IM Data Core durable checkpoint witness. IMDC calls this before its
+        /// save-boundary work begins. If that work does not later publish the exact
+        /// fingerprint, SNLF refuses to write a vanilla checkpoint that IMDC cannot
+        /// match durably.
+        /// </summary>
+        public static bool TryRequireSavedDataCheckpointWitness(
+            SaveManager.SavedData savedData,
+            out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (!RequireAuthoritativeProvider(out errorMessage))
+            {
+                return false;
+            }
+
+            return RepairEnvelopeTransport.TryRequireSavedDataContentFingerprint(
+                savedData,
+                out errorMessage);
+        }
+
+        /// <summary>
+        /// Associates IM Data Core's exact SavedData fingerprint with the next SNLF
+        /// freeze of this object. IMDC calls this only after its matching checkpoint
+        /// has been durably persisted. The witness is stored inside SNLF's repair
         /// envelope and therefore survives vanilla FixSaveFile's startup rewrite.
         /// </summary>
         public static bool TryRegisterSavedDataContentFingerprint(
