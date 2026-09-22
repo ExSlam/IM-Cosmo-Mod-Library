@@ -1,6 +1,11 @@
-# IM Data Core v5 sidecar schema
+# IM Data Core v5 sidecar schema (historical, unsupported)
+
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
 
 This document describes the private sidecar representation written and accepted by IMDC 3.4.24. Consumer mods should use `IMDataCoreApi` instead of depending on these field names.
+
+**IMDC 3.4.34 does not support loading or migrating this format.** This file is retained only as historical schema documentation. The supported runtime generation is sidecar v6 + journal v3.
 
 Current persistence versions:
 

@@ -1,5 +1,16 @@
 # IM Data Core 3.4.33 patch summary
 
+## Current implementation and qualification (2026-09-09)
+
+The active loader accepts only native sidecar v6 / journal v3. It rejects older and newer unsupported generations without conversion or backup downgrade. Unknown forward-envelope versions are protected before parsing schema-dependent fields.
+
+Current evidence is recorded in [V6V3_QUALIFICATION_STATUS.md](docs/V6V3_QUALIFICATION_STATUS.md). Native Unity tests pass selected persistence, consumer, Save As and normal Save & Quit/restart cases, including SNLF/SWOF combinations. Native testing also found and fixed omitted GD record lists and IMDC random-event effect arrays. The complete 23-regression gate, visual UI checks and interruption/stress cases remain open.
+
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
+
+Historical task entries below intentionally retain the storage version that was live at that task checkpoint; they do not override the current v6/v3-only support policy.
+
 ## 3.4.33 Wave 3 Task 3 - namespace bootstrap and reentrancy hardening
 
 1. **Registration ordering:** consumer code calls `TryRegisterNamespace(...)` directly at a safe gameplay point; `IsReady()` is observational rather than a prerequisite, so consumer/IMDC Harmony postfix order cannot permanently suppress registration.

@@ -1,12 +1,26 @@
 # IM Data Core 3.4.34
 
+## Current implementation and qualification (2026-09-21)
+
+The [automated native qualification runner](qualification/README.md) covers storage, crash/restart, repair ownership, public queries and actual Save & Quit paths. See its [evidence and remaining scope](docs/V6V3_AUTOMATED_QUALIFICATION_2026_09_21.md). No visual verification is required for these persistence tests.
+
+The active loader accepts only native sidecar v6 / journal v3. It rejects older and newer unsupported generations without conversion or backup downgrade. Unknown forward-envelope versions are protected before parsing schema-dependent fields.
+
+Current evidence is recorded in [V6V3_QUALIFICATION_STATUS.md](docs/V6V3_QUALIFICATION_STATUS.md). Native Unity tests pass selected persistence, consumer, Save As and normal Save & Quit/restart cases, including SNLF/SWOF combinations. Native testing also found and fixed omitted GD record lists and IMDC random-event effect arrays. The complete 23-regression gate, visual UI checks and interruption/stress cases remain open.
+
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
+
 Version 3.4.34 fixes autosave/manual sidecar failures reporting `A populated event namespace has no durable namespace-owner binding.` Client session tokens survive storage replacement during load/new game; validating those sessions now also restores or verifies their owner binding in the current engine before allowing access. Foreign owners and unadopted legacy namespaces remain protected. `tests/Test-SessionOwnerPersistenceRuntime.ps1` exercises the production validation method with the compiled storage engine, writes both save scopes, and reloads their events and bindings.
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-IMDC 3.4.33 writes sidecar format 5 and transactional journal format 2. Runtime IMDC still accepts exactly sidecar format 5. The cumulative Wave-0 storage foundation is complete in staged form, all five Wave-1 family-specific durable-identity contracts are implemented, and the shared Area-#12 D06-D10 compatibility layer is now staged as well. Business contracts use opaque `g:` generations, cliques use opaque `q:` generations, bullying intervals use opaque `b:` episode generations parented to the clique generation, generated non-custom tasks use opaque `t:` occurrence generations, and room-work SSK/tour targets use the existing durable room generation plus distinct `ssk:<ID>` / `tour:<ID>` owner namespaces. Exact legacy-unbound checkpoints deterministically derive forward generations from the selected checkpoint stamp plus serialized locator/witness and migration salt, while checkpoint-owned legacy candidate metadata preserves `Exact` / `Ambiguous` / `Unresolved` quality without rewriting old event rows. The normal runtime v6/v3 cutover remains intentionally disabled, so the four opaque-generation families and durable candidate multimap are not advertised as restart-stable until v6 is live; the existing room/theater/cafe generations and SSK/tour room-work identity remain safe on v5.
+**Current persistence generation:** IMDC 3.4.34 runs **sidecar v6 / journal v3** as one atomic live generation. **There is no supported backwards-compatibility path for IMDC storage generations.** Sidecar v1-v5 and journal v1-v2 are unsupported inputs and are not release-qualified for migration into v6/v3. They must fail closed without conversion or overwrite. Earlier v5/v2 and migration statements below are historical implementation notes only. Finding #56 is therefore intentionally retired from the current release obligation rather than treated as an unfinished migration feature. See [`docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md`](docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md).
+The remaining audit regressions that require live restart/F9/Save-As/compaction/fault evidence are planned in [`docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md`](docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md).
 
-IMDC 3.4.33 uses SHA-256 content-fingerprinted exact-save checkpoints, keeps the enabled-mod inventory and durable agency-room generation map, anchors newly adopted vanilla careers before any explicit IMDC-only flush, and preserves deleted-save sidecars under `OLD` archive directories. Append-only generations use the SHA-256-bound transactional journal and periodically compact into the atomic v5 snapshot.
+At the IMDC 3.4.33 checkpoint, IMDC wrote sidecar format 5 and transactional journal format 2, and that runtime accepted exactly sidecar format 5. The cumulative Wave-0 storage foundation is complete in staged form, all five Wave-1 family-specific durable-identity contracts are implemented, and the shared Area-#12 D06-D10 compatibility layer is now staged as well. Business contracts use opaque `g:` generations, cliques use opaque `q:` generations, bullying intervals use opaque `b:` episode generations parented to the clique generation, generated non-custom tasks use opaque `t:` occurrence generations, and room-work SSK/tour targets use the existing durable room generation plus distinct `ssk:<ID>` / `tour:<ID>` owner namespaces. Exact legacy-unbound checkpoints deterministically derive forward generations from the selected checkpoint stamp plus serialized locator/witness and migration salt, while checkpoint-owned legacy candidate metadata preserves `Exact` / `Ambiguous` / `Unresolved` quality without rewriting old event rows. At that historical checkpoint, the normal runtime v6/v3 cutover remained intentionally disabled, so the four opaque-generation families and durable candidate multimap are not advertised as restart-stable until v6 is live; the existing room/theater/cafe generations and SSK/tour room-work identity remain safe on v5.
+
+At the IMDC 3.4.33 checkpoint, IMDC used SHA-256 content-fingerprinted exact-save checkpoints, kept the enabled-mod inventory and durable agency-room generation map, anchored newly adopted vanilla careers before any explicit IMDC-only flush, and preserved deleted-save sidecars under `OLD` archive directories. Append-only generations used the SHA-256-bound transactional journal and periodically compacted into the atomic v5 snapshot.
 
 ### Wave 3 Task 3: namespace bootstrap, cancellation proof, and reentrancy hardening
 
@@ -16,7 +30,7 @@ Business-contract cancellation now snapshots exact collection membership and imm
 
 The audited ambient capture bridges are now nesting-safe. Activity-income attribution, concert-crisis choice context, scandal parameter mutation suppression, blackmail trigger results, and money-ledger attribution use thread-local frame/depth semantics with owning Harmony finalizers restoring the previous outer frame. Money frames are installed before detail construction so exceptions cannot pop an unrelated outer operation, while transient show-profit attribution remains scoped to the exact resource mutation it decorates.
 
-Live persistence remains sidecar v5 / journal v2 and the Event Catalog remains 173 queryable built-in event types across 41 domains. See [`docs/IMDC_WAVE3_TASK3.md`](docs/IMDC_WAVE3_TASK3.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2; the Event Catalog contained 173 queryable built-in event types across 41 domains. See [`docs/IMDC_WAVE3_TASK3.md`](docs/IMDC_WAVE3_TASK3.md).
 
 ### Wave 3 Task 2: historical references and lifetime semantics
 
@@ -24,7 +38,7 @@ Version 3.4.32 implements findings #48 through #52 without changing IMDataCore c
 
 Natural loan expiry now emits `loan_matured` from the authoritative weekly transition only when the exact loan was active and overdue before processing, becomes inactive afterward, and remains in the loan collection. The processing date is preserved separately from the contractual end date. Election-release cancellation also snapshots its linked election before the UI path clears the parent `ReleaseSingle` pointer, then transfers that observed identity and knownness into `single_cancelled` through exact-reference, nesting-safe transient context.
 
-Live persistence remains sidecar v5 / journal v2; the previously staged v6/v3 formats remain disabled. See [`docs/IMDC_WAVE3_TASK2.md`](docs/IMDC_WAVE3_TASK2.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2 and the staged v6/v3 formats were still disabled. See [`docs/IMDC_WAVE3_TASK2.md`](docs/IMDC_WAVE3_TASK2.md).
 
 ### Wave 3 Task 1: payload and timing semantics
 
@@ -32,7 +46,7 @@ Version 3.4.31 implements findings #41 through #47 without changing IMDataCore c
 
 Idol departures and status transitions now carry controlled provenance from source-proven callers, with `unknown` used instead of inference when a caller is not recognized. Generated-task payloads expose structured single/show constraint IDs and titles rather than requiring consumers to parse localized descriptions. Blackmail history now uses a history-only `bm:<guid>` occurrence across enqueue, trigger, and dequeue, names queue checkpoints according to when they are observed, and records the trigger's influence reward as planned rather than falsely claiming it has already been applied.
 
-Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE3_TASK1.md`](docs/IMDC_WAVE3_TASK1.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE3_TASK1.md`](docs/IMDC_WAVE3_TASK1.md).
 
 ### Wave 2 Task 7: lifecycle and history closure
 
@@ -42,7 +56,7 @@ Training and treatment now have explicit `room_work_assigned` history, while dir
 
 Nested Harmony capture now uses a semantic capture scope for the audited prerequisite chains. Child rows are held without sequence numbers until the outer prerequisite event has been enqueued, fixing loan-added/initialized, show-released/episode, room-built/facility-created, contract-accepted/activated, and recursive-clique ordering without globally sorting unrelated history. Group creation/disbanding is stored once as a shared row with participant indexing instead of physically fanning out one duplicate row per member. Single chart resolution is also split from release history into `single_chart_result`, so a chart backfill can never manufacture a second `single_released` occurrence.
 
-Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK7.md`](docs/IMDC_WAVE2_TASK7.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK7.md`](docs/IMDC_WAVE2_TASK7.md).
 
 ### Wave 2 Task 6: split event and relationship history
 
@@ -52,7 +66,7 @@ Random-event runs now carry history-only `re:<guid>` occurrence IDs. Business-co
 
 Template events now carry history-only `te:<guid>` presentation/conclusion correlation. The popup/button seams passively preserve the exact reply variants vanilla rendered, selected part/value context, actors, and semantic variables without calling the random `GetReplies()` selector again. `Date_Popup.OnClick_ForceBreakup()` also emits one semantic `player_forced_breakup` row around the observed before/after state. Its capture brackets Save n Load Fixes when installed but performs no breakup repair itself.
 
-Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK6.md`](docs/IMDC_WAVE2_TASK6.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK6.md`](docs/IMDC_WAVE2_TASK6.md).
 
 ### Wave 2 Task 5: tasks, substories, and scene completion history
 
@@ -62,7 +76,7 @@ Reversible chapter-3 objectives now emit `task_unfulfilled` only for a proven `F
 
 Scene-type substories now carry an explicit history-only `ss:<guid>` occurrence ID from queue insertion through room-scene completion. IMDC binds the exact queued object at the vanilla `Scenes.Set(...)` presentation seam, snapshots the active room scene before `agency._room.SubstoryFinish()` clears it, and emits one correlated `substory_completed` terminal. After load/F9 clears transient maps, correlation can recover from the newest still-open occurrence on the selected active history branch. This is history correlation only: IMDC does not restore `room.substoryScene`, and Save n Load Fixes remains the live current-state continuity owner where installed. A separate scene-presentation history event remains reserved for later finding #43 rather than being invented early here.
 
-Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK5.md`](docs/IMDC_WAVE2_TASK5.md).
+At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK5.md`](docs/IMDC_WAVE2_TASK5.md).
 
 ### Wave 2 Task 4: show episodes, cancellation intent, and award speeches
 
@@ -70,7 +84,7 @@ Version 3.4.27 completes the plan's shows/singles/awards group (#5, #21, #22, #2
 
 Deferred show cancellation now has explicit lifecycle history. `_show.Cancel()` emits `show_cancellation_scheduled` only for a real `ToCancel: false -> true` transition that leaves the show non-canceled, while immediate or eventually-consumed cancellation remains the existing terminal `show_cancelled` row. `_show.DontCancel()` emits `show_cancellation_withdrawn` only for a real `true -> false` transition. IMDC does not project a cancellation date from vanilla's buggy helper.
 
-Award dialogue now emits one `award_speech_delivered` row per live speech object. IMDC marks only the actual `awards_solo_thanks` / `awards_group_thanks` dialogue execution, passively observes the game's `GetThanks()` result, and weakly deduplicates later getter evaluations. It never calls `GetThanks()` or `mainScript.chance(...)` to manufacture history. When Save n Load Fixes is present, its `her_choice` cache remains the current-state consistency owner and IMDC simply records that authoritative returned category. Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK4.md`](docs/IMDC_WAVE2_TASK4.md).
+Award dialogue now emits one `award_speech_delivered` row per live speech object. IMDC marks only the actual `awards_solo_thanks` / `awards_group_thanks` dialogue execution, passively observes the game's `GetThanks()` result, and weakly deduplicates later getter evaluations. It never calls `GetThanks()` or `mainScript.chance(...)` to manufacture history. When Save n Load Fixes is present, its `her_choice` cache remains the current-state consistency owner and IMDC simply records that authoritative returned category. At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK4.md`](docs/IMDC_WAVE2_TASK4.md).
 
 
 ### Wave 2 Task 2: business proposals and developing-loan terminals
@@ -79,11 +93,11 @@ Version 3.4.25 implements the plan's business/loan/contracts group (#15, #16, #2
 
 For continuing accepted proposals, the terminal proposal row also carries the exact `EntityId` chosen by the existing contract-acceptance history path, so the transient offer occurrence can be joined to the resulting durable contract stream without changing contract identity semantics. Declines retain the full pre-decline snapshot and never fabricate a contract reference. Proposal occurrence bookkeeping is process-local observation state and is cleared on the existing load/F9 runtime reset.
 
-Developing room loans now receive a distinct `loan_cancelled` terminal event from `agency._room.CancelJob()`, but only when IMDC proves the exact loan reference was contained in `loans.Loans` before the call and absent afterward. The row uses the same vanilla loan ID and records collection membership before/after. Ordinary payoff remains `loan_paid_off`: payoff requires active-before -> inactive-after and leaves the loan object in the collection, so cancellation and settlement cannot collapse into one lifecycle meaning. Live persistence remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK2.md`](docs/IMDC_WAVE2_TASK2.md).
+Developing room loans now receive a distinct `loan_cancelled` terminal event from `agency._room.CancelJob()`, but only when IMDC proves the exact loan reference was contained in `loans.Loans` before the call and absent afterward. The row uses the same vanilla loan ID and records collection membership before/after. Ordinary payoff remains `loan_paid_off`: payoff requires active-before -> inactive-after and leaves the loan object in the collection, so cancellation and settlement cannot collapse into one lifecycle meaning. At this historical task checkpoint, live persistence remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK2.md`](docs/IMDC_WAVE2_TASK2.md).
 
 ### Wave 2 Task 1: people, auditions, hire, and date history
 
-Version 3.4.26 continues Wave 2 with the groups/social/rivals group (#20, #24, #25). `clique_created` now records the authoritative first-member birth without inventing a join; `player_bullying_intervention` preserves partial/full stop semantics under the existing bullying identity; and monthly rival capture emits sparse per-group creation/retirement rows from exact before/after object-reference diffs while retaining one aggregate market row. Live persistence remains sidecar v5 / journal v2.
+Version 3.4.26 continues Wave 2 with the groups/social/rivals group (#20, #24, #25). `clique_created` now records the authoritative first-member birth without inventing a join; `player_bullying_intervention` preserves partial/full stop semantics under the existing bullying identity; and monthly rival capture emits sparse per-group creation/retirement rows from exact before/after object-reference diffs while retaining one aggregate market row. At this historical task checkpoint, live persistence remained sidecar v5 / journal v2.
 
 Version 3.4.24 starts Wave 2 with the plan's people/auditions/hire/date group (#14, #17-#19). Audition history now uses one runtime `a:<guid>` occurrence ID across `audition_started`, `audition_candidates_generated`, audition cost, and `audition_completed`. Candidate summaries receive deterministic occurrence-local `:candidate:<ordinal>` IDs, preserve generated profile/rarity, and the terminal snapshot records which candidates were actually hired versus rejected. The start payload keeps its pre-generation count explicitly as `candidate_count_at_start`; the authoritative generated slate size lives on the post-`GenerateGirls` event.
 
@@ -91,15 +105,15 @@ Version 3.4.24 starts Wave 2 with the plan's people/auditions/hire/date group (#
 
 Generic dates now produce correlated `player_generic_date_presented` and `player_generic_date_completed` rows under one `d:<guid>` occurrence. Location and mask state are captured only after `Dating.GenerateGenericDate(...)` owns them; the completed row is emitted from the `vn_actions.Do` Postfix only after the exact `dating/add_points` action has committed. The older `player_date_interaction` remains the attempt/route-decision view. `Date_Flirt.DoFlirt(...)` now emits `player_flirt_outcome` from the already-applied `DatingData.Previous_Attempt`, preserving per-occurrence semantic results without logging dialogue wording or invoking the RNG-producing `GetOutcome()` helper.
 
-These are historical ledger additions only. They do not duplicate audition/date/idol current-state persistence in the sidecar, and live storage remains sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK1.md`](docs/IMDC_WAVE2_TASK1.md).
+These are historical ledger additions only. They do not duplicate audition/date/idol current-state persistence in the sidecar; at this historical task checkpoint, live storage remained sidecar v5 / journal v2. See [`docs/IMDC_WAVE2_TASK1.md`](docs/IMDC_WAVE2_TASK1.md).
 
 ### Shared identity compatibility and #66 resolver
 
 Version 3.4.24 completes the shared Area-#12 D06-D10 compatibility layer around the five family contracts. Every staged v6 checkpoint now carries explicit `IdentityCandidates` beside `IdentityBindings`. Candidate state is branch-owned: exact checkpoint selection clears the current compatibility view before native rebind or legacy adoption, so F9 cannot inherit generations from a discarded branch.
 
-A migrated legacy-unbound checkpoint derives forward `g:` / `q:` / `b:` / `t:` IDs deterministically from the exact vanilla checkpoint stamp, family serialized ordinal/parent/child locator, structural SHA-256 witness, and migration salt `imdc.identity.adoption.v1`. This creates no synthetic acceptance, clique birth, bullying start, or task birth. Legacy rows remain under their original `EntityId`; candidate metadata is a multimap and never a global rewrite dictionary.
+Current v6 checkpoints derive/rebind canonical `g:` / `q:` / `b:` / `t:` identities only from native-v6 checkpoint state and source-proven locators/witnesses. Pre-v6 IMDC identity state is not adopted or converted into current bindings.
 
-The read-only #66 resolver is available through `IMDataCoreApi`, `IMDataCoreInteropApi`, and `IMDataCoreAPI`. `TryResolveCurrentIdentity` uses documented stable locator descriptors rather than CLR object references. `TryResolveLegacyIdentityCandidates` returns the complete candidate set plus `Unresolved`, `Ambiguous`, or `Exact`; `CanonicalEntityId` is populated only for a proven exact result. On the live v5 runtime the resolver exposes only identities whose durable ingredients already survive v5, such as room/theater/cafe and SSK/tour room-work. The four opaque generation families and durable candidate lookup remain unresolved until the v6 checkpoint generation is active. See [`docs/IMDC_WAVE1_TASK6.md`](docs/IMDC_WAVE1_TASK6.md).
+The read-only #66 resolver is available through `IMDataCoreApi`, `IMDataCoreInteropApi`, and `IMDataCoreAPI`. `TryResolveCurrentIdentity` uses documented stable locator descriptors rather than CLR object references. `TryResolveLegacyIdentityCandidates` returns the complete candidate set plus `Unresolved`, `Ambiguous`, or `Exact`; `CanonicalEntityId` is populated only for a proven exact result. On the historical live-v5 runtime, the resolver exposed only identities whose durable ingredients already survived v5, such as room/theater/cafe and SSK/tour room-work. The four opaque generation families and durable candidate lookup remain unresolved until the v6 checkpoint generation is active. See [`docs/IMDC_WAVE1_TASK6.md`](docs/IMDC_WAVE1_TASK6.md).
 
 ### Generated non-custom task birth and staged occurrence identity
 
@@ -107,7 +121,7 @@ Wave 1 Identity 4 coordinates the generated-task identity repair with finding #2
 
 Custom/scripted task IDs retain their existing definition-stream semantics. For generated tasks, the historical `type|goal|girl` fallback is only a legacy candidate because different occurrences can reuse it even when their randomized genre/lyrics/medium/skill constraints differ. Exact staged-v6 checkpoints bind the live task by serialized `tasks__TaskData` ordinal plus SHA-256 over every field vanilla saves. Rebinding after `tasks.LoadFunction` requires ordinal, witness, and reconstructed-row equality. The witness validates a row but never allocates identity: a later generated occurrence may reproduce the exact same full `TaskData` row and still receives a new `t:` generation.
 
-Version 3.4.24 keeps live persistence at sidecar v5 / journal v2. Finding #27's real generated-task birth row is safe to emit now using the existing coarse v5 `EntityId`; canonical `t:` emission stays gated until v6 can persist and rebind the occurrence generation. Legacy/adopted tasks already present at a migration boundary do not receive a synthetic birth row. See [`docs/IMDC_WAVE1_TASK4.md`](docs/IMDC_WAVE1_TASK4.md).
+At the Version 3.4.24 checkpoint, live persistence remained sidecar v5 / journal v2. Finding #27's real generated-task birth row is safe to emit now using the existing coarse v5 `EntityId`; canonical `t:` emission stays gated until v6 can persist and rebind the occurrence generation. Unsupported pre-v6 task history is not imported into the current v6 identity model. See [`docs/IMDC_WAVE1_TASK4.md`](docs/IMDC_WAVE1_TASK4.md).
 
 
 ### Wave 5 Task 6: current v6/v3 combined correctness audit
@@ -123,9 +137,9 @@ The reflection-only ordered transport bridge is validated against the supplied S
 IMDataCore 3.4.33 now has one atomic source-level activation predicate for the
 staged sidecar-v6/journal-v3 generation. Canonical identity and structured coverage
 cannot become live from a sidecar-only edit, and physical initialization rejects
-split 6/2 or 5/3 configurations. Static migration, API, regression-registry,
+split 6/2 or 5/3 configurations. Static unsupported-generation, API, regression-registry,
 transport, and current-state nonduplication prerequisites are verified, while the
-real compile/Unity cutover gate remains open. Production still writes sidecar v5 /
+real compile/Unity cutover gate remained open at that checkpoint. Production at the Task 3 checkpoint still wrote sidecar v5 /
 journal v2. See
 [`docs/IMDC_WAVE5_TASK3_V6V3_STATIC_PREFLIGHT.md`](docs/IMDC_WAVE5_TASK3_V6V3_STATIC_PREFLIGHT.md).
 
@@ -195,23 +209,23 @@ This split is safe on the live v5 format because v5 already checkpoints the room
 
 The sidecar-v6 logical model now carries a document-level `NamespaceOwnerBindings` provenance collection for namespaced custom state and custom history. Ownership is deliberately **not** checkpoint state: exact F9/Save-As branch selection may rewind custom rows, but it must not erase the durable owner lineage that controls who can reclaim that namespace after restart.
 
-Each namespace uses an immutable revision chain. Native v6 ownership begins at revision 1, a legitimate binary upgrade/reinstall appends a later revision under the same stable assembly lineage while rotating the strong MVID/location/SHA-256 witness, and v5 migration creates only a revision-1 `legacy_unbound` record with unknown owner. Ordinary first registration cannot turn that unknown record into a known owner; migration adoption is a separate explicit authorization path. `EnabledMods` remains diagnostic inventory and is never used as namespace authority. See [`docs/NAMESPACE_OWNER_PROVENANCE.md`](docs/NAMESPACE_OWNER_PROVENANCE.md).
+Each namespace uses an immutable revision chain. Native v6 ownership begins at revision 1, a legitimate binary upgrade/reinstall appends a later revision under the same stable assembly lineage while rotating the strong MVID/location/SHA-256 witness, and current native-v6 ownership starts from native owner provenance. Historical v5 `legacy_unbound` / migration-adoption mechanics are not a supported release input path and are retained only as development history where still present in source. `EnabledMods` remains diagnostic inventory and is never used as namespace authority. See [`docs/NAMESPACE_OWNER_PROVENANCE.md`](docs/NAMESPACE_OWNER_PROVENANCE.md).
 
-The live v5/v2 writer does not serialize this collection yet, so IMDC 3.4.24 does not claim durable owner enforcement in normal runtime activation before a later deliberate v6/v3 runtime cutover. Same-process registration still uses the existing strong assembly identity.
+Current v6/v3 runtime serializes this collection and uses it as the durable cross-restart namespace authority.
 
 ### Staged coverage and capability knownness
 
 The sidecar-v6 logical model now also requires `CoverageModelVersion`, an immutable `CoverageCapabilitySets` catalog, and sequence-owned `CoverageTransitions`. Capability-set identity is derived from canonical semantic `{Token, Revision}` content rather than package version or the sidecar format. Namespace descriptors are additionally bound to the durable #60 owner lineage.
 
-Coverage transitions consume the same monotonic sequence space as events and custom mutations. `CareerStart` represents native new-career observation, while loaded-career boundaries use exact checkpoint anchors for `LateAdoption`, `LegacyResume`, and namespace process gaps. Missing coverage remains unknown rather than complete-empty, positive legacy rows remain evidence of themselves, and v1-v5 migration creates no fake historical frontier. Capability descriptors and owner provenance do not rewind; coverage transitions do.
+Coverage transitions consume the same monotonic sequence space as events and custom mutations. `CareerStart` represents native new-career observation, while loaded-career boundaries use exact checkpoint anchors for `LateAdoption` and namespace process gaps. `LegacyResume` is not part of the supported current storage path because pre-v6 IMDC storage is not migrated. Missing coverage remains unknown rather than complete-empty. Unsupported pre-v6 IMDC storage is not imported as evidence and creates no coverage frontier. Capability descriptors and owner provenance do not rewind; coverage transitions do.
 
 The staged journal-v3 path now publishes `COVERAGE_CAPABILITY_SET`, `NAMESPACE_OWNER_BINDING`, `COVERAGE_TRANSITION`, and `HISTORICAL_BASELINE_ASSERTION` additions in the same committed count envelope. Task 9 completes the final frozen v3 semantic row codec and adds the bounded `group_target_audience_origin` baseline carrier. Baseline assertions rewind with branch state; capability descriptors and owner provenance do not. The structured public coverage/knownness APIs remain later Wave-4 work. See [`docs/V6_COVERAGE_SCHEMA.md`](docs/V6_COVERAGE_SCHEMA.md) and [`docs/V6_HISTORICAL_BASELINE_SCHEMA.md`](docs/V6_HISTORICAL_BASELINE_SCHEMA.md).
 
-### Staged migration provenance and downgrade protection
+### Native-v6 provenance and unsupported-generation protection
 
-Sidecar-v6 logical documents now require non-rewinding `MigrationProvenance`. Native generations identify themselves as `native_v6`; v1-v5 conversions identify themselves as `legacy_migration` and retain the validated source sidecar version, a normalized source-document SHA-256, the source sequence high watermark, the v6/v3 target generation, and a deterministic save-scope-bound conversion ID. Reopening a committed migrated document therefore has an explicit destination identity and cannot be mistaken for a new native career or silently rerun legacy conversion semantics. Migrated coverage may begin only with a later exact `LegacyResume` boundary, never a fabricated `CareerStart` or `LateAdoption`. See [`docs/V6_MIGRATION_PROVENANCE_SCHEMA.md`](docs/V6_MIGRATION_PROVENANCE_SCHEMA.md).
+Sidecar-v6 documents retain document-level provenance for the native v6 generation and fail-closed downgrade/unsupported-generation protection. The current release does **not** support importing v1-v5 sidecars or v1-v2 journals into v6/v3. Historical `legacy_migration` structures may remain in source/tests as development artifacts, but they are not part of the supported storage contract and must not be used as a release-qualification path. See [`docs/V6_MIGRATION_PROVENANCE_SCHEMA.md`](docs/V6_MIGRATION_PROVENANCE_SCHEMA.md).
 
-The live v5 reader also distinguishes unsupported authoritative generations from ordinary corruption. An unsupported primary sidecar, or an unsupported journal whose SHA-256 affinity matches the candidate compact base, makes that save scope write-protected and blocks fallback to an older `.imdc.bak` generation. This prevents backup recovery from becoming an accidental downgrade writer. Finding #58 remains intact: an unsupported journal bound to a different base hash is still classified as a stale suffix and may be ignored while the healthy candidate base is considered.
+The current v6/v3 reader distinguishes unsupported authoritative generations from ordinary corruption. An unsupported primary sidecar, or an unsupported journal whose SHA-256 affinity matches the candidate compact base, makes that save scope write-protected and blocks fallback to an older `.imdc.bak` generation. This prevents backup recovery from becoming an accidental downgrade writer. Finding #58 remains intact: an unsupported journal bound to a different base hash is classified as a stale suffix rather than a migration candidate.
 
 ## Save ownership
 
@@ -348,7 +362,7 @@ Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-sub
 
 IMDC 3.4.25 reads only sidecar format 5 and replays only transactional journal format 2 for the matching compact-base generation. Journal headers are decoded through a version-agnostic affinity envelope first: an unsupported IMDC journal bound to a different compact-base SHA-256 is treated as a stale generation suffix, while an unsupported journal whose hash matches the candidate base fails closed and write-protects that save scope because it may contain authoritative committed state. An unsupported primary sidecar likewise blocks backup fallback, preventing an older runtime from healing newer/unknown semantics backward. Older lightweight sidecars are not migrated by the normal runtime.
 
-The staged v6 event codec carries `ParticipantSchemaVersion`. Repository history places the released canonical shared-envelope participant contract in sidecar format v2, so migrated v2-v5 shared candidates remain strict. A bounded v1 archival/synthetic shared candidate may derive only a redundant participant count from an authoritative stored ID list; if the stored row still cannot prove participant identity, the occurrence remains durable with `ParticipantKnownness = Unknown` and is not projected onto guessed idols. Current contradictory list/count/pair metadata remains malformed and quarantined.
+The v6 event codec carries `ParticipantSchemaVersion` for current-format schema evolution. Pre-v6 sidecars are unsupported storage inputs and are not imported or normalized into current v6 rows. Current contradictory list/count/pair metadata remains malformed and quarantined.
 
 Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
 

@@ -6384,7 +6384,6 @@ namespace IMDataCore
             errorMessage = string.Empty;
             try
             {
-                bool loadedLegacyGenerationForV6 = false;
                 if (DurableV6RuntimeEnabled)
                 {
                     byte[] baseBytes = File.ReadAllBytes(path);
@@ -6414,46 +6413,7 @@ namespace IMDataCore
 
                     persistenceInfo.BaseFileBytes = baseBytes.LongLength;
                     persistenceInfo.BaseFileHash = ComputeSha256Hex(baseBytes);
-                    if (physicalFormatVersion >= 1 &&
-                        physicalFormatVersion <
-                            LightweightIdentityBindingSchema.SidecarFormatVersion)
-                    {
-                        byte[] legacyJournalBytes;
-                        string selectedLegacyJournalPath;
-                        if (!TrySelectLegacyJournalForMigrationLocked(
-                                path,
-                                preferredJournalPath,
-                                persistenceInfo.BaseFileHash,
-                                persistenceInfo,
-                                out legacyJournalBytes,
-                                out selectedLegacyJournalPath,
-                                out errorMessage))
-                        {
-                            return false;
-                        }
-
-                        LightweightLegacyGenerationMigration.Result migrationResult;
-                        if (!LightweightLegacyGenerationMigration.TryMaterializeForV6(
-                                baseBytes,
-                                legacyJournalBytes,
-                                expectedRelativeSavePath,
-                                out migrationResult,
-                                out errorMessage))
-                        {
-                            return false;
-                        }
-                        document = migrationResult.Document;
-                        persistenceInfo.JournalEntryCount =
-                            migrationResult.ReplayedJournalEntryCount;
-                        persistenceInfo.ForceFullSnapshot = true;
-                        if (migrationResult.JournalHeaderMatched)
-                        {
-                            persistenceInfo.ReplayedJournalPath =
-                                selectedLegacyJournalPath;
-                        }
-                        loadedLegacyGenerationForV6 = true;
-                    }
-                    else if (physicalFormatVersion ==
+                    if (physicalFormatVersion ==
                         LightweightIdentityBindingSchema.SidecarFormatVersion)
                     {
                         using (StringReader reader = new StringReader(baseJson))
@@ -6526,8 +6486,7 @@ namespace IMDataCore
                 int baseForwardExtensionCount =
                     document.ForwardExtensions.Count;
 
-                if (!loadedLegacyGenerationForV6 &&
-                    !TryReplayJournalLocked(
+                if (!TryReplayJournalLocked(
                         path,
                         preferredJournalPath,
                         persistenceInfo.BaseFileHash,
@@ -6539,8 +6498,7 @@ namespace IMDataCore
                     return false;
                 }
 
-                if (!loadedLegacyGenerationForV6 &&
-                    persistenceInfo.JournalEntryCount > 0 &&
+                if (persistenceInfo.JournalEntryCount > 0 &&
                     !TryValidateDocumentSuffixLocked(
                         document,
                         baseEventCount,
@@ -6572,6 +6530,13 @@ namespace IMDataCore
                     return false;
                 }
                 return true;
+            }
+            catch (LightweightUnsupportedForwardSchemaException exception)
+            {
+                persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
+                errorMessage = exception.Message;
+                document = null;
+                return false;
             }
             catch (LightweightUnsupportedForwardExtensionException exception)
             {
@@ -6620,167 +6585,11 @@ namespace IMDataCore
         }
 
         /// <summary>
-        /// Selects only a v2 journal positively bound to a legacy compact base.
+        /// Replays only a supported journal positively bound to the selected base.
         /// Preferred recovery journals are considered before the base sibling,
         /// matching the native replay crash-recovery order. Stale or first-header
-        /// torn candidates never become authoritative migration input.
+        /// torn candidates never become authoritative replay input.
         /// </summary>
-        private bool TrySelectLegacyJournalForMigrationLocked(
-            string basePath,
-            string preferredJournalPath,
-            string baseFileHash,
-            LightweightLoadedPersistenceInfo persistenceInfo,
-            out byte[] selectedJournalBytes,
-            out string selectedJournalPath,
-            out string errorMessage)
-        {
-            selectedJournalBytes = null;
-            selectedJournalPath = string.Empty;
-            errorMessage = string.Empty;
-            string defaultJournalPath = basePath + ".imdc.journal";
-
-            if (!string.IsNullOrEmpty(preferredJournalPath) &&
-                !string.Equals(
-                    preferredJournalPath,
-                    defaultJournalPath,
-                    CorePaths.PathComparison) &&
-                File.Exists(preferredJournalPath))
-            {
-                LightweightJournalReplayStatus preferredStatus;
-                if (!TrySelectLegacyJournalCandidateLocked(
-                        preferredJournalPath,
-                        baseFileHash,
-                        persistenceInfo,
-                        out preferredStatus,
-                        out selectedJournalBytes,
-                        out selectedJournalPath,
-                        out errorMessage))
-                {
-                    return false;
-                }
-                if (preferredStatus ==
-                    LightweightJournalReplayStatus.HeaderMatched)
-                {
-                    return true;
-                }
-                ResetJournalReplayDiagnostics(persistenceInfo);
-            }
-
-            LightweightJournalReplayStatus defaultStatus;
-            if (!TrySelectLegacyJournalCandidateLocked(
-                    defaultJournalPath,
-                    baseFileHash,
-                    persistenceInfo,
-                    out defaultStatus,
-                    out selectedJournalBytes,
-                    out selectedJournalPath,
-                    out errorMessage))
-            {
-                return false;
-            }
-            if (defaultStatus == LightweightJournalReplayStatus.HeaderMismatch ||
-                defaultStatus == LightweightJournalReplayStatus.TornBeforeHeader)
-            {
-                persistenceInfo.ForceFullSnapshot = true;
-            }
-            return true;
-        }
-
-        private bool TrySelectLegacyJournalCandidateLocked(
-            string journalPath,
-            string baseFileHash,
-            LightweightLoadedPersistenceInfo persistenceInfo,
-            out LightweightJournalReplayStatus replayStatus,
-            out byte[] selectedJournalBytes,
-            out string selectedJournalPath,
-            out string errorMessage)
-        {
-            replayStatus = LightweightJournalReplayStatus.Missing;
-            selectedJournalBytes = null;
-            selectedJournalPath = string.Empty;
-            errorMessage = string.Empty;
-            string normalizedJournalPath;
-            if (!CorePaths.TryValidateContainedMutationPath(
-                    journalPath,
-                    false,
-                    out normalizedJournalPath,
-                    out errorMessage))
-            {
-                return false;
-            }
-            if (!File.Exists(normalizedJournalPath))
-            {
-                return true;
-            }
-
-            byte[] journalBytes = File.ReadAllBytes(normalizedJournalPath);
-            persistenceInfo.JournalBytes = journalBytes.LongLength;
-            if (journalBytes.Length == 0)
-            {
-                replayStatus = LightweightJournalReplayStatus.TornBeforeHeader;
-                persistenceInfo.ForceFullSnapshot = true;
-                return true;
-            }
-
-            string journalText = DecodeUtf8Bytes(journalBytes);
-            bool endsWithNewline =
-                journalText.EndsWith("\n", StringComparison.Ordinal);
-            using (StringReader reader = new StringReader(journalText))
-            {
-                string headerLine = reader.ReadLine();
-                LightweightJournalHeaderAffinityDecision affinityDecision;
-                LightweightJournalHeaderEnvelope headerEnvelope;
-                string headerError;
-                if (!LightweightSidecarJson.TryClassifyJournalHeaderForCandidate(
-                        headerLine,
-                        baseFileHash,
-                        2,
-                        out affinityDecision,
-                        out headerEnvelope,
-                        out headerError))
-                {
-                    if (!endsWithNewline && reader.Peek() < 0)
-                    {
-                        replayStatus =
-                            LightweightJournalReplayStatus.TornBeforeHeader;
-                        persistenceInfo.ForceFullSnapshot = true;
-                        return true;
-                    }
-                    errorMessage =
-                        "The legacy IMDC journal header is invalid: " +
-                        headerError;
-                    return false;
-                }
-
-                if (affinityDecision ==
-                    LightweightJournalHeaderAffinityDecision.HeaderMismatch)
-                {
-                    replayStatus =
-                        LightweightJournalReplayStatus.HeaderMismatch;
-                    return true;
-                }
-
-                replayStatus = LightweightJournalReplayStatus.HeaderMatched;
-                if (affinityDecision ==
-                    LightweightJournalHeaderAffinityDecision.HeaderMatchedUnsupported)
-                {
-                    persistenceInfo.WriteProtectedByUnsupportedGeneration = true;
-                    persistenceInfo.UnsupportedJournalFormatVersion =
-                        headerEnvelope.FormatVersion;
-                    errorMessage =
-                        "The journal bound to the legacy IMDC base uses unsupported format " +
-                        headerEnvelope.FormatVersion.ToString(
-                            CultureInfo.InvariantCulture) +
-                        ".";
-                    return false;
-                }
-
-                selectedJournalBytes = journalBytes;
-                selectedJournalPath = normalizedJournalPath;
-                return true;
-            }
-        }
-
         private bool TryReplayJournalLocked(
             string basePath,
             string preferredJournalPath,

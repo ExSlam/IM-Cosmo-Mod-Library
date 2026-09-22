@@ -2,6 +2,8 @@
 
 `Idol Career Diary` adds a profile-integrated timeline view that turns IM Data Core events into readable career history.
 
+The current Release build and compiled API resolver pass against IMDataCore 3.4.34 (sidecar v6 / journal v3). Native Unity testing also passes Diary's birthday append-once method and mapped history reader before and after a real Save As/restart. See [current compatibility evidence and remaining qualification](../IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md).
+
 ## Dependencies
 
 - `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.33` or higher, with the v6 consumer interop contract
@@ -21,7 +23,7 @@ The last-selected diary entry is supplemental state stored through IM Data Core.
 
 ### IM Data Core v6 integration
 
-Idol Career Diary authenticates its namespace as `com.cosmo.idolcareerdiary` by passing its own assembly to `IMDataCoreInteropApi`. Reflection is never used against owner-sensitive methods on the normal `IMDataCoreApi`. The diary declares revision 1 of the `idol_career_diary_birthday_events` namespace capability and records birthdays with deterministic append-once keys so repeated hooks/load paths cannot create duplicate birthday rows on the active branch.
+Idol Career Diary authenticates its namespace as `com.cosmo.idol_career_diary` by passing its own assembly (`com.cosmo.idolcareerdiary`) to `IMDataCoreInteropApi`. Reflection is never used against owner-sensitive methods on the normal `IMDataCoreApi`. The diary declares revision 1 of the `idol_career_diary_birthday_events` namespace capability and records birthdays with deterministic append-once keys so repeated hooks/load paths cannot create duplicate birthday rows on the active branch.
 
 The v6 event DTO fields `IdempotencyKey`, `ParticipantSchemaVersion`, and `ParticipantKnownness` are mapped into the diary read model. Unknown or malformed shared-participant metadata is not used to guess social participants. Read-only timeline paging remains on IM Data Core's normal query surface. Idol Career Diary does not call SNLF or SWOF directly and never writes the physical vanilla save.
 

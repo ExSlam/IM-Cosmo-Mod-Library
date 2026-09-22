@@ -1,6 +1,13 @@
-# IM Data Core 3.4.24 validation notes
+# IM Data Core 3.4.24 validation notes (historical)
+
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
 
 This revision was statically checked against the supplied Cosmo Mod Library source and the supplied decompiled Idol Manager source. No Unity/.NET compiler or game runtime was available in the analysis environment, so these notes intentionally distinguish static verification from runtime testing.
+
+## Current 3.4.34 compatibility disposition
+
+The migration checks below document an abandoned development path. IMDC 3.4.34 supports only sidecar v6 + journal v3. v1-v5 sidecars and v1-v2 journals are not supported for migration into the current format and are not release-qualification fixtures.
 
 ## Wave 0 task 1 migration checks
 

@@ -2,6 +2,8 @@
 
 Monthly Ledger adds an Action Hub button that opens a queued, game-style popup containing exact cash records for completed calendar months.
 
+The current Release build and native Unity storage checks pass against IMDataCore 3.4.34 (sidecar v6 / journal v3), including all 10,005 same-day transactions and exact 64-bit values after process restart. Ledger's own reader also returns a real captured 5,000,000,123 transaction before and after a real Save As/restart. See [current compatibility evidence and remaining qualification](../IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md).
+
 ## Dependencies
 
 - Mod Buttons

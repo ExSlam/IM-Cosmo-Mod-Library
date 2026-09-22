@@ -6991,7 +6991,8 @@ namespace IMDataCore
     internal static class CoreJsonUtility
     {
         /// <summary>
-        /// Serializes arbitrary payload objects with Unity JsonUtility for additive domains.
+        /// Serializes additive-domain payloads, using an explicit codec where
+        /// Unity cannot preserve the payload's nested fields.
         /// </summary>
         internal static string SerializeObjectPayload(object payload)
         {
@@ -7002,6 +7003,8 @@ namespace IMDataCore
 
             try
             {
+                RandomEventConcludedEventPayload concluded = payload as RandomEventConcludedEventPayload;
+                if (concluded != null) return SerializeRandomEventConcludedPayload(concluded);
                 return JsonUtility.ToJson(payload, CoreConstants.PrettyPrintJsonPayload);
             }
             catch
@@ -7010,6 +7013,73 @@ namespace IMDataCore
             }
         }
 
+        // Unity 2019 omits this dynamically loaded DTO's nested effect array.
+        // Keep its event schema explicit, including every scalar and array entry.
+        private static string SerializeRandomEventConcludedPayload(RandomEventConcludedEventPayload payload)
+        {
+            StringBuilder builder = new StringBuilder(CoreConstants.JsonBuilderDefaultCapacity);
+            builder.Append('{');
+            bool first = true;
+            AppendStringProperty(builder, "random_event_id", payload.random_event_id, ref first);
+            AppendStringProperty(builder, "random_event_occurrence_id", payload.random_event_occurrence_id, ref first);
+            AppendStringProperty(builder, "random_event_title", payload.random_event_title, ref first);
+            AppendStringProperty(builder, "random_event_state_before", payload.random_event_state_before, ref first);
+            AppendStringProperty(builder, "random_event_state_after", payload.random_event_state_after, ref first);
+            AppendStringProperty(builder, "terminal_path", payload.terminal_path, ref first);
+            AppendStringProperty(builder, "selected_contract_instance_id", payload.selected_contract_instance_id, ref first);
+            AppendStringProperty(builder, "selected_contract_type", payload.selected_contract_type, ref first);
+            AppendStringProperty(builder, "selected_contract_agent_name", payload.selected_contract_agent_name, ref first);
+            AppendStringProperty(builder, "selected_contract_product_name", payload.selected_contract_product_name, ref first);
+            AppendStringProperty(builder, "selected_contract_end_date", payload.selected_contract_end_date, ref first);
+            AppendStringProperty(builder, "reply_text", payload.reply_text, ref first);
+            AppendStringProperty(builder, "reply_description", payload.reply_description, ref first);
+            AppendStringProperty(builder, "reply_effect_summary", payload.reply_effect_summary, ref first);
+            AppendStringProperty(builder, "random_event_actor_id_list", payload.random_event_actor_id_list, ref first);
+            AppendStringProperty(builder, "actors_summary", payload.actors_summary, ref first);
+            AppendStringProperty(builder, "event_date", payload.event_date, ref first);
+            AppendBooleanProperty(builder, "reply_effects_applied", payload.reply_effects_applied, ref first);
+            AppendBooleanProperty(builder, "resource_delta_known", payload.resource_delta_known, ref first);
+            AppendBooleanProperty(builder, "selected_contract_present", payload.selected_contract_present, ref first);
+            AppendIntProperty(builder, "selected_contract_target_idol_id", payload.selected_contract_target_idol_id, ref first);
+            AppendIntProperty(builder, "reply_index", payload.reply_index, ref first);
+            AppendIntProperty(builder, "reply_effect_count", payload.reply_effect_count, ref first);
+            AppendLongProperty(builder, "estimated_liability", payload.estimated_liability, ref first);
+            AppendLongProperty(builder, "money_before", payload.money_before, ref first);
+            AppendLongProperty(builder, "money_after", payload.money_after, ref first);
+            AppendLongProperty(builder, "money_delta", payload.money_delta, ref first);
+            AppendLongProperty(builder, "fans_before", payload.fans_before, ref first);
+            AppendLongProperty(builder, "fans_after", payload.fans_after, ref first);
+            AppendLongProperty(builder, "fans_delta", payload.fans_delta, ref first);
+            AppendLongProperty(builder, "fame_before", payload.fame_before, ref first);
+            AppendLongProperty(builder, "fame_after", payload.fame_after, ref first);
+            AppendLongProperty(builder, "fame_delta", payload.fame_delta, ref first);
+            AppendLongProperty(builder, "buzz_before", payload.buzz_before, ref first);
+            AppendLongProperty(builder, "buzz_after", payload.buzz_after, ref first);
+            AppendLongProperty(builder, "buzz_delta", payload.buzz_delta, ref first);
+            StringBuilder effects = new StringBuilder();
+            if (payload.reply_effect_entries == null) effects.Append("null");
+            else
+            {
+                effects.Append('[');
+                for (int index = 0; index < payload.reply_effect_entries.Length; index++)
+                {
+                    if (index != 0) effects.Append(',');
+                    RandomEventReplyEffectEntry entry = payload.reply_effect_entries[index];
+                    if (entry == null) { effects.Append("null"); continue; }
+                    effects.Append('{');
+                    bool firstEffect = true;
+                    AppendStringProperty(effects, "target", entry.target, ref firstEffect);
+                    AppendStringProperty(effects, "parameter", entry.parameter, ref firstEffect);
+                    AppendStringProperty(effects, "formula", entry.formula, ref firstEffect);
+                    AppendStringProperty(effects, "special", entry.special, ref firstEffect);
+                    effects.Append('}');
+                }
+                effects.Append(']');
+            }
+            AppendRawJsonProperty(builder, CoreConstants.JsonFieldReplyEffectEntries, effects.ToString(), ref first);
+            builder.Append('}');
+            return builder.ToString();
+        }
         /// <summary>
         /// Serializes a single-lifecycle payload into compact JSON.
         /// </summary>

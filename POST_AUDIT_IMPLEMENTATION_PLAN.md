@@ -1,5 +1,14 @@
 # Post-Audit Implementation and Regression Plan
 
+> **Automated testing follow-up (2026-09-21):** native storage, crash/restart, repair ownership, public-read and Save & Quit suites now have an [automated runner and evidence record](mods/IM%20Data%20Core/docs/V6V3_AUTOMATED_QUALIFICATION_2026_09_21.md). These persistence tests require no visual verification. The record distinguishes passing bounded fixtures from the still-open full audit matrix.
+
+> **Implementation follow-up (2026-09-09):** the v6/v3 loader enforces the no-migration policy and protects unsupported forward-envelope schemas from backup downgrade. Actual Unity tests also found and fixed omitted collections in Graduation Details persistence and IMDC random-event payloads. Native consumer/save/load evidence and remaining qualification work are tracked in [`V6V3_QUALIFICATION_STATUS.md`](mods/IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md). Frozen audit counts remain unchanged. Historical task checkpoints below are not current release-status assertions.
+
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
+
+**Current product-scope override (2026-09-07):** frozen audit finding #56 is intentionally retired from the release obligation. IMDataCore will support only sidecar v6 / journal v3 and will not ship v1-v5/v1-v2 migration. Historical ledger counts remain frozen for audit traceability, but the active release scope is **58 numbered IMDataCore obligations + 5 durable-identity contracts**.
+
 Source basis: reconciled `README_IMDataCore_Persistence_Audit.md`, Cosmo Mod Library commit `98e8e56c86513c2ec3f05b1f9b5be7d7cd2f7312`, supplied decompiled Idol Manager source, and current Save Write Ordering Fix 1.3.0 source.
 
 This document is an **implementation plan**, not a new source-audit pass. Source-proven defects and contracts remain exactly as counted in the audit. New architecture choices below are labeled as planning decisions and do not create new findings unless later source/runtime evidence proves a new defect.
@@ -78,7 +87,7 @@ It must:
 
 ### D3. IMDataCore
 
-Implement the reconciled 59 numbered backend/history obligations plus the five durable-identity repair contracts. The only planned forward persistence generation remains:
+Implement the 58 active numbered backend/history obligations plus the five durable-identity repair contracts. Frozen finding #56 is retained as historical audit evidence but deliberately retired from the current product scope by the no-backwards-compatibility policy. The only planned forward persistence generation remains:
 
 - **sidecar v6**;
 - **journal v3**.
@@ -667,7 +676,7 @@ Do first because later identity/coverage/public API work depends on it.
 
 Includes:
 
-- #56 frozen legacy codecs + bounded v1-v5 -> v6 migration;
+- #56 unsupported-generation handling: current v6/v3 accepts no pre-v6 storage and fails closed without conversion or overwrite;
 - Area #12 v6 checkpoint identity-binding schema;
 - journal v3 row/transaction shape;
 - #58 minimal version-agnostic journal header/base-hash affinity;
@@ -678,7 +687,7 @@ Includes:
 - #63 `HistoricalBaselineAssertions` branch carrier + public quality;
 - migration provenance and fail-closed downgrade behavior.
 
-Exit gate: regressions #48-#50, #57-#65, #72-#90, #91-#127, #140-#154 that are storage/migration-sensitive have an executable or deterministic fixture path.
+Exit gate: regressions #48-#50, #57-#65, #72-#90, #91-#127, #140-#154 that are storage-generation/unsupported-format-sensitive have an executable or deterministic fixture path.
 
 ## IMDC Wave 1 - five durable-identity contracts
 
@@ -725,8 +734,8 @@ Implement Area #12 D06-D10 as one layer:
 
 - `IdentityBindingsVersion` / completeness marker;
 - native v6 complete binding snapshots;
-- v5 migrated checkpoints explicitly legacy-unbound;
-- deterministic migration-boundary adopted IDs;
+- native v6 checkpoints carry complete/explicit binding knownness;
+- unsupported pre-v6 checkpoints are never adopted or converted;
 - candidate multimap with `Exact/Ambiguous/Unresolved` quality;
 - branch-safe F9 rebinding;
 - public resolver required by #66.
@@ -783,8 +792,8 @@ After storage and identity are stable:
 Run the full existing suite against:
 
 - native v6 career;
-- migrated v5 + v2 journal;
-- selected older legacy codecs;
+- unsupported v1-v5 sidecar / v1-v2 journal rejection fixtures;
+- native v6/v3 restart/rewind/compaction/Save-As fixtures;
 - restart;
 - F9 branch rewind;
 - compaction;
@@ -877,7 +886,7 @@ A runtime save is allowed to fail softly only when continuing would not create a
 - unknown pre-fix repair state -> deterministic audited compatibility fallback or explicit unknown;
 - malformed SNLF envelope -> do not reinterpret as exact empty state;
 - failed exact repair-envelope freeze -> do not enqueue a mismatched vanilla save;
-- failed IMDC migration -> preserve source bytes and remain fail closed;
+- unsupported pre-v6 IMDC storage -> preserve source bytes, perform no conversion, and remain fail closed;
 - failed transport interception health -> expose diagnostics and keep conservative fallback behavior.
 
 ---
@@ -969,9 +978,9 @@ Requires:
 
 Requires:
 
-- migration tooling first;
+- sidecar v6 / journal v3 as the only supported storage generation;
 - five identity contracts implemented;
-- no v5 source overwrite on failed migration;
+- unsupported v1-v5/v1-v2 storage rejected without conversion or overwrite;
 - public coverage/identity/history/money APIs complete;
 - full 1-154 acceptance coverage;
 - Save n Load Fixes current-state nonduplication checks passing.

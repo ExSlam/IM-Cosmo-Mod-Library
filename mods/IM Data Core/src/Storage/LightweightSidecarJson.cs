@@ -2550,6 +2550,11 @@ namespace IMDataCore
                     "The logical sidecar is not IM Data Core sidecar format 6.");
             }
 
+            // Inspect the envelope before fields whose shape may change in a future
+            // schema. An unsupported envelope is authoritative, not corrupt data.
+            int forwardSchemaVersion = RequireInt32(root, "ForwardCompatibilitySchemaVersion");
+            LightweightForwardCompatibilitySchema.ValidateSchemaVersion(forwardSchemaVersion);
+
             string relativeSavePath = RequireString(root, "RelativeSavePath");
             LightweightSidecarDocument document = new LightweightSidecarDocument
             {
@@ -2557,9 +2562,7 @@ namespace IMDataCore
                 FormatVersion = formatVersion,
                 RelativeSavePath = relativeSavePath,
                 LastIssuedSequence = RequireInt64(root, "LastIssuedSequence"),
-                ForwardCompatibilitySchemaVersion = RequireInt32(
-                    root,
-                    "ForwardCompatibilitySchemaVersion"),
+                ForwardCompatibilitySchemaVersion = forwardSchemaVersion,
                 ForwardExtensions = ReadV6ForwardExtensions(
                     RequireArray(root, "ForwardExtensions")),
                 MigrationProvenance = ReadV6MigrationProvenance(

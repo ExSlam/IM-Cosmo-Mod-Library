@@ -1,9 +1,12 @@
 # IM Data Core - Start Here (Beginner-Friendly)
 
-This guide explains exactly how to use IM Data Core 3.4.24 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
+
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
+
+This guide explains exactly how to use IM Data Core 3.4.34 from another Idol Manager mod, even if you are new to Harmony and mod persistence. Public JSON arguments must be valid JSON documents; IMDC normalizes them before they enter history.
 
 IM Data Core stores each sidecar under a mirrored representation of its exact
-vanilla save path. This development build accepts sidecar format 5 only. For
+vanilla save path. The runtime accepts sidecar v6 and journal v3 only. For
 path mapping, checkpoint identity, deleted-save archival, and journal details,
 see [`STORAGE_LAYOUT.md`](STORAGE_LAYOUT.md).
 
@@ -64,8 +67,8 @@ internal static class DataCoreBridge
 Why one shared session:
 
 - Registration is namespace-scoped and assembly-bound.
-- In live 3.4.24 v5/v2 persistence, this authorization is still process-local. The staged sidecar-v6 model adds durable document-level owner provenance, but it is intentionally not the normal runtime authority until a later deliberate v6/v3 runtime cutover.
-- Do not treat checkpoint `EnabledMods` or being first to register after restart as proof of historical namespace ownership. Migrated v1-v5 namespaces remain explicitly legacy-unbound until a separate adoption policy authorizes a durable owner.
+- Sidecar v6 persists document-level namespace-owner provenance. Session validation verifies or rebinds that ownership when loading another save or starting a new career.
+- Checkpoint `EnabledMods` and registration order do not establish ownership. Unsupported v1-v5 storage is rejected; it creates no namespace adoption opportunity.
 - Reusing one session avoids duplicate registration logic.
 
 ## Step 3: Register directly at a safe gameplay point
@@ -107,7 +110,7 @@ Important:
 
 ## Optional: resolve current durable history identity
 
-Version 3.4.24 exposes a read-only #66 resolver for generation-scoped identities. It accepts stable locator descriptors, not game CLR object references.
+Version 3.4.34 exposes a read-only #66 resolver for generation-scoped identities. It accepts stable locator descriptors, not game CLR object references.
 
 ```csharp
 IMDataCoreIdentityResolution identity;
@@ -123,7 +126,7 @@ if (IMDataCoreApi.TryResolveCurrentIdentity(
 }
 ```
 
-Supported locator shapes are documented in `IMDC_WAVE1_TASK6.md`. Legacy coarse keys use `TryResolveLegacyIdentityCandidates`; always inspect `Quality` and the full `CanonicalEntityIds` list. `Ambiguous` is a successful compatibility answer, not an error to be guessed away. On live v5, opaque contract/clique/bullying/task generations and the durable candidate multimap remain `Unresolved` until v6 persistence can preserve them across restart.
+Supported locator shapes are documented in `IMDC_WAVE1_TASK6.md`. Legacy coarse keys use `TryResolveLegacyIdentityCandidates`; always inspect `Quality` and the full `CanonicalEntityIds` list. `Ambiguous` is a successful compatibility answer, not an error to be guessed away. Current v6 checkpoints persist and rebind contract/clique/bullying/task generations. Missing or ambiguous evidence remains unresolved; no pre-v6 storage is imported.
 
 ## Step 4: Save custom JSON
 

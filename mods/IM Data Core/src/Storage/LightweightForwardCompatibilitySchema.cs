@@ -49,12 +49,7 @@ namespace IMDataCore
             {
                 throw new ArgumentNullException("document");
             }
-            if (document.ForwardCompatibilitySchemaVersion !=
-                CompatibilitySchemaVersion)
-            {
-                throw new FormatException(
-                    "The sidecar-v6 forward-compatibility schema version is unsupported.");
-            }
+            ValidateSchemaVersion(document.ForwardCompatibilitySchemaVersion);
             if (document.ForwardExtensions == null)
             {
                 throw new FormatException(
@@ -80,6 +75,14 @@ namespace IMDataCore
                         record.ExtensionId,
                         record.ExtensionSchemaVersion);
                 }
+            }
+        }
+
+        internal static void ValidateSchemaVersion(int schemaVersion)
+        {
+            if (schemaVersion != CompatibilitySchemaVersion)
+            {
+                throw new LightweightUnsupportedForwardSchemaException(schemaVersion);
             }
         }
 
@@ -146,6 +149,21 @@ namespace IMDataCore
                 }
             }
             return hasNamespaceSeparator;
+        }
+    }
+
+    /// <summary>
+    /// Unsupported envelope semantics must never enter ordinary backup recovery.
+    /// </summary>
+    internal sealed class LightweightUnsupportedForwardSchemaException : FormatException
+    {
+        internal readonly int UnsupportedSchemaVersion;
+
+        internal LightweightUnsupportedForwardSchemaException(int schemaVersion)
+            : base("The sidecar-v6 forward-compatibility schema version " +
+                schemaVersion.ToString(CultureInfo.InvariantCulture) + " is unsupported.")
+        {
+            UnsupportedSchemaVersion = schemaVersion;
         }
     }
 
