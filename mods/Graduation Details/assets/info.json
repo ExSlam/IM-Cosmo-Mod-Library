@@ -2,7 +2,7 @@
   "Title": "Graduation Details",
   "Description": "Adds a graduated idol details popup with exact-save supplemental persistence and current IM Data Core 3.4.33 v6/v3 delegation when available.",
   "Author": "Cosmo",
-  "Version": "1.2.0",
+  "Version": "1.2.1",
   "Tags": ["ui", "gameplay"],
   "HarmonyID": "com.cosmo.graduationdetails"
 }

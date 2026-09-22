@@ -2,6 +2,8 @@
 
 `Graduation Details` adds a graduated idol details popup with earnings, singles, and marriage info.
 
+The current 1.2.1 Release build, compiled API binding and native Unity persistence checks pass against IMDataCore 3.4.34 (sidecar v6 / journal v3). Nonempty records survive actual Save & Quit/restart and standalone persistence after the codec repair described below. See [current compatibility evidence and remaining qualification](../IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md).
+
 ## Player-facing behavior
 
 - Adds a dedicated graduated-idol details view.
@@ -15,7 +17,9 @@
 
 ## Save data
 
-Graduation Details mirrors each supported vanilla save below a sibling directory in the game's
+Version 1.2.1 uses an explicit JSON codec for both IMDC snapshots and standalone sidecars. Live Unity testing showed that the previous `JsonUtility` path could omit record collections while writing a valid-looking header. The new codec preserves nested records and exact 64-bit values, and rejects header-only or incomplete documents. Fields already omitted from an older file cannot be recovered from that file; no existing file is automatically converted or repaired.
+
+When using standalone persistence, Graduation Details mirrors each supported vanilla save below a sibling directory in the game's
 persistent data folder:
 
 `C:\Users\<user>\AppData\LocalLow\Glitch Pitch\Idol Manager\GraduationDetails`
@@ -61,7 +65,7 @@ read-only for that physical save path, so the original data cannot be overwritte
 retains one `.graduationdetails.bak` recovery generation and can restore from it when the primary
 sidecar cannot be activated.
 
-With the current IM Data Core 3.4.33 sidecar-v6 / journal-v3 consumer contract, Graduation
+With the IM Data Core 3.4.33-or-later sidecar-v6 / journal-v3 consumer contract, Graduation
 Details binds only to the `com.cosmo.imdatacore` assembly and uses `IMDataCoreInteropApi` with
 its own assembly supplied explicitly for namespace registration and custom-state access. When
 IM Data Core is ready and writable, Graduation Details stores its detailed archival snapshot

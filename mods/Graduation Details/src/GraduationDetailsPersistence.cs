@@ -1094,7 +1094,7 @@ namespace GraduationDetails
                 GraduationDetailsImDataCoreDocument document;
                 try
                 {
-                    document = JsonUtility.FromJson<GraduationDetailsImDataCoreDocument>(json);
+                    document = GraduationDetailsJson.Deserialize<GraduationDetailsImDataCoreDocument>(json);
                 }
                 catch (Exception exception)
                 {
@@ -1197,7 +1197,7 @@ namespace GraduationDetails
                         Snapshots = engine.GetSnapshots(),
                         EnabledMods = GraduationDetailsEnabledMods.Capture()
                     };
-                string json = JsonUtility.ToJson(document, false);
+                string json = GraduationDetailsJson.Serialize(document);
                 return TrySetJsonLocked(DataKey, json, out errorMessage);
             }
         }
@@ -3536,7 +3536,7 @@ namespace GraduationDetails
             try
             {
                 string json = File.ReadAllText(path);
-                document = JsonUtility.FromJson<GraduationDetailsSidecarDocument>(json);
+                document = GraduationDetailsJson.Deserialize<GraduationDetailsSidecarDocument>(json);
                 return TryValidateDocument(document, scope, out errorMessage);
             }
             catch (Exception exception)
@@ -3979,7 +3979,7 @@ namespace GraduationDetails
 
                     GraduationDetailsSidecarDocument document =
                         BuildDocumentLocked(validatedScope.RelativeSavePath);
-                    string json = JsonUtility.ToJson(document, false);
+                    string json = GraduationDetailsJson.Serialize(document);
                     bool preserveExistingBackup =
                         SamePath(
                             recoveredFromBackupSidecarPath,

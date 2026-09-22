@@ -3,7 +3,7 @@
     <ModName>Graduation Details</ModName>
     <RootNamespace>GraduationDetails</RootNamespace>
     <AssemblyName>com.cosmo.graduationdetails</AssemblyName>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,5 +11,6 @@
     <Compile Include="src\GraduationDetailsLifecyclePatches.cs" />
     <Compile Include="src\GraduationDetailsPersistence.cs" />
     <Compile Include="src\GraduationDetailsPersistenceIO.cs" />
+    <Compile Include="src\GraduationDetailsJson.cs" />
   </ItemGroup>
 </Project>
