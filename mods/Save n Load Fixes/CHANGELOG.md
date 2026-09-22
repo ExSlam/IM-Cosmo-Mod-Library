@@ -1,3 +1,14 @@
+## 5.5.1 - Audition portrait hardening and version correction
+
+- Corrects the previous `0.55.1` label to `5.5.1`. Minor and patch components are decimal digits (0-9), carrying to the next component when incremented past 9; the major component can grow beyond 9.
+
+- Adds the same vanilla-visual-preserving audition portrait queue/retry/replacement safety used by the patched Targeted Auditions source.
+- Dynamically checks Harmony ownership of `Audition_Closed_Card.Set`.
+- If `com.tel.customauditions` owns the Targeted Auditions portrait-hardening patch, this SNLF repair stands down.
+- If Targeted Auditions is absent, SNLF limits full-portrait loading to five concurrent requests, retries a failed candidate's own portrait once, and replaces a persistently unrenderable candidate with a fully generated vanilla idol.
+- Never substitutes another candidate's sprite and never switches to the cropped middle portrait.
+- Excludes `Auditions.type.custom` so scripted/story auditions are untouched.
+
 ## 0.55.0 - Save completion barrier and participating mod storage
 
 - Wait for outstanding SNLF writes and registered sidecar attempts before in-game Save and Exit or Return to Main Menu. Keep Unity's update loop running until every attempt is terminal, including failed/cancelled attempts.

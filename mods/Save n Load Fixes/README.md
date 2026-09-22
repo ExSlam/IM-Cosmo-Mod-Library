@@ -1,6 +1,8 @@
 # Save n Load Fixes
 
-## Version 0.55.0
+## Version 5.5.1
+
+Release versions use decimal carry: minor and patch components range from 0 to 9, while the major component can grow beyond 9. For example, `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The previous `0.55.1` release label is corrected to `5.5.1`. Historical release labels below remain as originally recorded.
 
 Save and Exit now waits for SNLF's pending writes and registered mod save attempts
 to **finish**, whether they succeed, fault or cancel. Return to Main Menu uses the
@@ -93,7 +95,7 @@ persistence audit.
 
 This is a cumulative development build through **A33.6: wide numeric continuity and overflow repair**, over Sprint 1D Task 50 / A23 and all earlier repair/transport work. All six A33 implementation segments compile, pass their decompiled-source and implementation contracts, and pass the isolated arithmetic/envelope/Harmony runtime harnesses. The live Unity overwrite-save, Save As, autosave, F9, restart, repeated-load, and mod-combination matrix remains a separate release qualification gate.
 
-Implemented cumulatively through 0.55.0:
+Implemented cumulatively through 5.5.1:
 
 - **A33.1-A33.6 wide numeric continuity and overflow repair:** checked add/subtract/negate/multiply, exact rational/decimal midpoint-to-even rounding, exact `Int64` aggregation, and explicit narrow-ABI compatibility conversions now cover the audited resource, rent, business, loan, salary, fan engine, single, show, tour, theater, café, concert, SSK, research, story, VN, statistics, and UI paths. Multi-step mutations are preflighted transactionally, including mod-expanded theater prices. SNLF persists exact tour/single/show/theater/Stats/story/loan/café shadows as canonical decimal strings in `wide_numeric_state_version = 2`, accepts version 1 with an honest legacy fallback for its newly added chapter-four scandal baseline, validates identity/count/mirror witnesses before restore, and follows draft tours by object identity across ID assignment. Exact scandal totals and chapter-three/four targets flow through gameplay and display consumers; bounded vanilla ABI endpoints clamp only at the compatibility edge. Persistent counters and allocators fail closed at exhaustion instead of wrapping. Both frozen Harmony manifests are recomposition-idempotent, health-gated, and part of the checkpoint veto.
 

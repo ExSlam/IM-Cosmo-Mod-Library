@@ -1,15 +1,23 @@
-Save n Load Fixes
+Save n Load Fixes repairs save/load bugs and related gameplay problems in Idol Manager. It helps your agency keep its progress, relationships, schedules and financial records when you save and return to the game.
 
-Development build. Cumulative through Sprint 1D Task 48 / v0.50.0.
-
-Implemented foundations include A20 deterministic legacy idol-profile migration, A21 deterministic legacy aggregate-fan migration, ordered SavedData/GlobalData transport, checkpoint safety,
-selective LoadEpoch stale-carrier invalidation, the completed low-risk/no-storage repair wave,
-and Wave-3 repair-envelope continuity through N01 relationship Dynamic, N05 show FanAppeal,
-N07 Activities.Chain, N08 Event_Overlord.Latest_Event, N09 paused-training girl rebinding,
-N10 exact paused-business remaining minutes, N11 tutorial activity baselines, A02 sparse private project progress counters, A15 bounded recent-activity recency continuity, and A16 PreviousNewSubstory spacing-anchor continuity.
-
-The SNLF V1 repair envelope is active and frozen together with the same caller-thread SavedData
-checkpoint. Older V1 sections remain backward-compatible through section-level version markers.
-
-This development package is source/static validated. No live Unity/game runtime claim is made by
-the bundled reports.
+[olist]
+[*][b]Saving and loading:[/b] Prevents overlapping saves from finishing in the wrong order and loading from reading an unfinished save.
+[*][b]Save and Exit:[/b] Waits for SNLF and participating mods to finish their save attempts before exiting or returning to the main menu, including attempts that fail.
+[*][b]Save notifications:[/b] Shows when saving starts, finishes or fails.
+[*][b]Money and large totals:[/b] Fixes calculations and displays that could turn large amounts into incorrect or negative numbers, including salaries, loans, business income, theater revenue and fan totals.
+[*][b]Training and business:[/b] Preserves training progress, paused idols, remaining job time and business proposals selected by events.
+[*][b]Singles, shows, concerts, tours and elections:[/b] Restores missing project progress information and fixes scheduling and completion-date errors.
+[*][b]Fans and target audiences:[/b] Preserves show fan appeal, single comparisons and group audience settings after loading.
+[*][b]Idol relationships:[/b] Preserves relationship behavior across saves and properly clears both idols' relationship state when you force them to break up.
+[*][b]Graduation:[/b] Fixes graduation-date changes that were not being applied and restores pending successor introductions after loading.
+[*][b]Activities and idol pushes:[/b] Preserves queued activities and recent activity history, and resets push duration when you change the selected idol.
+[*][b]Story events and agency scenes:[/b] Preserves event timing, queued dialogue setup and pending scenes, and fixes events that remained active after ending.
+[*][b]Awards:[/b] Preserves pending nominations and fixes inconsistent nominated singles and award-speech choices.
+[*][b]Tutorials:[/b] Restores missing tutorial progress and delayed steps, and clears effects left behind by finished or skipped tutorials.
+[*][b]SNS:[/b] Preserves saved messages and their replies after loading.
+[*][b]Audition portraits:[/b] Retries portraits that fail to load and replaces candidates whose portraits still cannot be displayed.
+[*][b]Modded idol and staff portraits:[/b] Preserves original portrait choices when a portrait pack is temporarily unavailable.
+[*][b]Older saves:[/b] Keeps reconstructed idol ages, fan distribution, relationships and rival groups consistent across repeated loads.
+[*][b]Reloading during play:[/b] Stops delayed actions from a previous load from affecting your current game.
+[*][b]Settings and other gameplay fixes:[/b] Fixes saved settings not applying at startup, along with issues involving birthday checks, bankruptcy warnings, risky marketing and graduation records.
+[/olist]
