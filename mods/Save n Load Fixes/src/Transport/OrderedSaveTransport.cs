@@ -181,6 +181,18 @@ namespace SaveNLoadFixes.Transport
         private static readonly List<string> ExclusiveDirectories =
             new List<string>();
 
+        internal static bool HasAnyPendingWrites()
+        {
+            lock (RegistrySync)
+            {
+                foreach (SavePathQueue queue in Queues.Values)
+                    lock (queue.SyncRoot)
+                        if (queue.Draining || queue.PendingWrites.Count != 0 ||
+                            queue.LatestSavedDataAttemptStatus == SavedDataWriteAttemptStatus.Pending) return true;
+                return false;
+            }
+        }
+
         internal static void QueueSavedDataWrite(
             SaveManager.SavedData dataToSave,
             string dataFileName,
@@ -208,43 +220,52 @@ namespace SaveNLoadFixes.Transport
                 targetPath,
                 out attemptQueue);
 
-            SaveProgressCoordinator.BindSavedDataWrite(
-                dataToSave,
-                targetPath,
-                savedDataAttemptId);
-
-            string payload;
-            string checkpointId;
-            string error;
-            if (!RepairEnvelopeTransport.TryFreezeSavedDataPayload(
-                    dataToSave,
-                    isJson,
-                    out payload,
-                    out checkpointId,
-                    out error))
+            try
             {
-                // The physical file still contains the previous checkpoint. Record
-                // this failed overwrite explicitly so an immediate LoadData call
-                // cannot mistake those stale bytes for the save the player just made.
-                CompleteSavedDataWriteAttempt(
-                    attemptQueue,
-                    savedDataAttemptId,
-                    false,
-                    error);
-                Debug.LogError(
-                    SaveNLoadFixesConstants.LogPrefix +
-                    "Repair-dependent SavedData request was not written: " +
-                    (error ?? string.Empty));
-                return;
-            }
+                SaveProgressCoordinator.BindSavedDataWrite(
+                    dataToSave,
+                    targetPath,
+                    savedDataAttemptId);
 
-            QueuePreparedWrite(
-                targetPath,
-                payload,
-                null,
-                false,
-                true,
-                savedDataAttemptId);
+                SaveParticipationApi.Dispatch(targetPath);
+
+                string payload;
+                string checkpointId;
+                string error;
+                if (!RepairEnvelopeTransport.TryFreezeSavedDataPayload(
+                        dataToSave,
+                        isJson,
+                        out payload,
+                        out checkpointId,
+                        out error))
+                {
+                    // Record this failed overwrite so immediate loads cannot
+                    // mistake old bytes for the save the player just requested.
+                    CompleteSavedDataWriteAttempt(
+                        attemptQueue,
+                        savedDataAttemptId,
+                        false,
+                        error);
+                    Debug.LogError(
+                        SaveNLoadFixesConstants.LogPrefix +
+                        "Repair-dependent SavedData request was not written: " +
+                        (error ?? string.Empty));
+                    return;
+                }
+
+                QueuePreparedWrite(
+                    targetPath,
+                    payload,
+                    null,
+                    false,
+                    true,
+                    savedDataAttemptId);
+            }
+            catch (Exception exception)
+            {
+                CompleteSavedDataWriteAttempt(attemptQueue, savedDataAttemptId, false, exception.ToString());
+                SaveShutdownCoordinator.ReportFailure("SavedData setup failed: " + exception);
+            }
         }
 
         internal static void QueueGlobalDataWrite(
@@ -1054,7 +1075,24 @@ namespace SaveNLoadFixes.Transport
 
             thread.IsBackground = false;
             thread.Name = "Idol Manager SNLF ordered save writer";
-            thread.Start();
+            try { thread.Start(); }
+            catch (Exception exception)
+            {
+                // A writer that could not start is a completed failed attempt,
+                // not an eternally draining queue that strands Save and Exit.
+                lock (queue.SyncRoot)
+                {
+                    while (queue.PendingWrites.Count != 0)
+                    {
+                        FrozenSaveWrite failed = queue.PendingWrites.Dequeue();
+                        if (failed.SavedDataAttemptId > 0)
+                            CompleteSavedDataWriteAttempt(queue, failed.SavedDataAttemptId, false, exception.Message);
+                    }
+                    queue.Draining = false;
+                    Monitor.PulseAll(queue.SyncRoot);
+                }
+                SaveShutdownCoordinator.ReportFailure("Could not start save writer: " + exception);
+            }
         }
 
         private static void DrainQueue(SavePathQueue queue)

@@ -81,3 +81,5 @@ mods/IM Data Core/docs/V6V3_AUTOMATED_QUALIFICATION_2026_09_21.md
 mods/IM Data Core/docs/V6V3_QUALIFICATION_STATUS.md
 mods/IM Data Core/docs/V6V3_UNITY_QUALIFICATION_2026_09_09.md
 mods/IM Data Core/docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md
+mods/IM Data Core/qualification/Test-SnlfCompletion.ps1
+mods/IM Data Core/qualification/UnityStorageQualification.Snlf.cs

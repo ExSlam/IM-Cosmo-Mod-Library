@@ -72,6 +72,7 @@ namespace SaveNLoadFixes.Safety
         {
             if (loadedData != null)
             {
+                SaveNLoadFixes.Persistence.ModDataStorage.MarkAdopted(loadedData);
                 Advance("SaveManager.LoadData successful target adoption");
                 Interlocked.Increment(ref successfulCareerLoadCount);
             }

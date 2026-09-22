@@ -738,7 +738,7 @@ namespace SaveNLoadFixes.Persistence
             return fields;
         }
 
-        private static void AppendJsonString(StringBuilder builder, string value)
+        internal static void AppendJsonString(StringBuilder builder, string value)
         {
             if (value == null)
             {
@@ -2163,7 +2163,7 @@ namespace SaveNLoadFixes.Persistence
             return false;
         }
 
-        private enum FiniteJsonKind
+        internal enum FiniteJsonKind
         {
             Object,
             Array,
@@ -2173,7 +2173,7 @@ namespace SaveNLoadFixes.Persistence
             Null
         }
 
-        private sealed class FiniteJsonValue
+        internal sealed class FiniteJsonValue
         {
             internal FiniteJsonKind Kind;
             internal Dictionary<string, FiniteJsonValue> ObjectValues;
@@ -2182,7 +2182,7 @@ namespace SaveNLoadFixes.Persistence
             internal bool Boolean;
         }
 
-        private sealed class FiniteJsonParser
+        internal sealed class FiniteJsonParser
         {
             private const int MaxDepth = 64;
             private const int MaxNodeCount = 2000000;

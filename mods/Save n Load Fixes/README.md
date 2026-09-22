@@ -1,5 +1,20 @@
 # Save n Load Fixes
 
+## Version 0.55.0
+
+Save and Exit now waits for SNLF's pending writes and registered mod save attempts
+to **finish**, whether they succeed, fault or cancel. Return to Main Menu uses the
+same barrier. Unity's update loop remains alive for callbacks/coroutines; a timeout
+does not count as completion. Mods must track their asynchronous work through
+`SaveParticipationApi`; SNLF cannot discover arbitrary detached mod threads.
+
+`ModDataApi` provides isolated, owner-namespaced payloads in the same physical save.
+The mod owns its schema compatibility and migration policy independently of its
+DLL version. Absent, incompatible and future-format payloads are preserved without
+being restored into vanilla state. `EroEventsDataCodec` supplies opt-in exact
+Int32/Int64 payload conversion. See [the integration contract](docs/MOD_PERSISTENCE_API.md)
+and [native completion qualification](docs/SHUTDOWN_QUALIFICATION_2026_09_22.md).
+
 Version 0.54.1 fixes save notifications for autosaves, manual saves, and chapter/story-slot writes. Each actual write gets independent start/completion tracking, including concurrent saves whose per-path attempt IDs coincide. `tests/Test-SaveProgressRuntime.ps1` runs the production coordinator and writer completion callback against overlapping writes, failures, and worker-thread completion.
 
 **Runtime compatibility hotfix:** SNLF must load ordinary vanilla saves and older SNLF saves without requiring prior SNLF metadata. The current Task-6 hotfix removes A33's `System.Numerics` runtime dependency after Unity/Mono was observed throwing from the patched idol salary/UI path even though vanilla `SaveManager.LoadData` had succeeded. SNLF now keeps its exact wide arithmetic self-contained. No vanilla idol migration or guessed recovery path is involved.
@@ -78,7 +93,7 @@ persistence audit.
 
 This is a cumulative development build through **A33.6: wide numeric continuity and overflow repair**, over Sprint 1D Task 50 / A23 and all earlier repair/transport work. All six A33 implementation segments compile, pass their decompiled-source and implementation contracts, and pass the isolated arithmetic/envelope/Harmony runtime harnesses. The live Unity overwrite-save, Save As, autosave, F9, restart, repeated-load, and mod-combination matrix remains a separate release qualification gate.
 
-Implemented cumulatively through 0.54.0:
+Implemented cumulatively through 0.55.0:
 
 - **A33.1-A33.6 wide numeric continuity and overflow repair:** checked add/subtract/negate/multiply, exact rational/decimal midpoint-to-even rounding, exact `Int64` aggregation, and explicit narrow-ABI compatibility conversions now cover the audited resource, rent, business, loan, salary, fan engine, single, show, tour, theater, café, concert, SSK, research, story, VN, statistics, and UI paths. Multi-step mutations are preflighted transactionally, including mod-expanded theater prices. SNLF persists exact tour/single/show/theater/Stats/story/loan/café shadows as canonical decimal strings in `wide_numeric_state_version = 2`, accepts version 1 with an honest legacy fallback for its newly added chapter-four scandal baseline, validates identity/count/mirror witnesses before restore, and follows draft tours by object identity across ID assignment. Exact scandal totals and chapter-three/four targets flow through gameplay and display consumers; bounded vanilla ABI endpoints clamp only at the compatibility edge. Persistent counters and allocators fail closed at exhaustion instead of wrapping. Both frozen Harmony manifests are recomposition-idempotent, health-gated, and part of the checkpoint veto.
 

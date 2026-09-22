@@ -1,3 +1,11 @@
+## 0.55.0 - Save completion barrier and participating mod storage
+
+- Wait for outstanding SNLF writes and registered sidecar attempts before in-game Save and Exit or Return to Main Menu. Keep Unity's update loop running until every attempt is terminal, including failed/cancelled attempts.
+- Add task-based sidecar writer registration and explicit completion tickets for existing mod hooks. Subscriber exceptions are isolated; a duplicate ticket completion cannot release another attempt.
+- Add versioned, namespaced mod payload storage outside the repair root and vanilla DTO. Owning mods accept/reject/migrate their schemas; missing mods, incompatible records and future containers retain their opaque data.
+- Add opt-in EroEvents integer payload codecs with exact Int32-to-Int64 widening and checked, all-or-nothing Int64-to-Int32 reads.
+- Add native Unity tests for delayed physical writes, main-thread sidecar completion, failures, cancellation, compatible updates, absent owners, future formats, physical restart and numeric boundaries. No installed mod deployment or user save migration.
+
 ## 0.54.0 - A33.2-A33.6 wide numeric continuity completion
 
 - Runtime hotfix 3: completed the money-display integrity audit. The weekly theater hover now includes current streaming income normalized by the game's four-weeks-per-month convention; full-width money formatting is exact across `Int64.MinValue`; salary/earnings UI no longer uses float or abbreviated money; new-single production cost no longer round-trips through `Single`; and staff severance now widens before the 48-week product across affordability, debit, context-menu, tooltip, and firing-dialogue paths.

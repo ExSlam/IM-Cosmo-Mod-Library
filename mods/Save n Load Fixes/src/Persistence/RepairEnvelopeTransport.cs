@@ -346,6 +346,7 @@ namespace SaveNLoadFixes.Persistence
                 return false;
             }
 
+            payload = ModDataStorage.Inject(dataToSave, payload);
             checkpointId = envelope.checkpoint_id;
             Interlocked.Increment(ref frozenCheckpointCount);
             SetDiagnostic("Frozen one SavedData request with SNLF checkpoint " + checkpointId + ".");
@@ -399,10 +400,18 @@ namespace SaveNLoadFixes.Persistence
             }
 
             string vanillaJson;
+            ModDataContainer modData;
+            string modDataError;
+            string withoutModData;
+            if (!ModDataStorage.TryExtract(fullJson, out withoutModData, out modData, out modDataError))
+            {
+                Debug.LogError(SaveNLoadFixesConstants.LogPrefix + modDataError);
+                return null;
+            }
             RepairEnvelopeLoadState state;
             string fatalError;
             if (!RepairEnvelopeCodec.TryExtractAndStrip(
-                    fullJson,
+                    withoutModData,
                     out vanillaJson,
                     out state,
                     out fatalError))
@@ -431,6 +440,7 @@ namespace SaveNLoadFixes.Persistence
             }
 
             state.PhysicalPath = physicalPath;
+            ModDataStorage.Associate(loaded, modData);
 
             lock (RegistrySync)
             {

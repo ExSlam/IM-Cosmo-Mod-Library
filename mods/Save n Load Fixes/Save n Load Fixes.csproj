@@ -3,10 +3,16 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>0.54.1</Version>
+    <Version>0.55.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="src\SaveParticipationApi.cs" />
+    <Compile Include="src\ModDataApi.cs" />
+    <Compile Include="src\EroEventsDataCodec.cs" />
+    <Compile Include="src\Persistence\ModDataStorage.cs" />
+    <Compile Include="src\Persistence\ModDataLoadPatches.cs" />
+    <Compile Include="src\Transport\SaveShutdownCoordinator.cs" />
     <Compile Include="src\SaveNLoadFixesConstants.cs" />
     <Compile Include="src\SaveNLoadFixesDiagnostics.cs" />
     <Compile Include="src\SaveProgressApi.cs" />

@@ -32,7 +32,7 @@ namespace SaveNLoadFixes.Safety
         [HarmonyPostfix]
         private static void Postfix(ref bool __result)
         {
-            if (__result && CheckpointGate.HasActiveBlockers)
+            if (__result && (CheckpointGate.HasActiveBlockers || Transport.SaveShutdownCoordinator.IsWaiting))
             {
                 __result = false;
             }
@@ -53,6 +53,7 @@ namespace SaveNLoadFixes.Safety
         [HarmonyPrefix]
         private static bool Prefix(bool autoSave)
         {
+            if (Transport.SaveShutdownCoordinator.BlockNewSave) return false;
             if (autoSave)
             {
                 return true;
@@ -108,6 +109,7 @@ namespace SaveNLoadFixes.Safety
         [HarmonyPrefix]
         private static bool Prefix()
         {
+            if (Transport.SaveShutdownCoordinator.IsWaiting) return false;
             string reason;
             if (CheckpointGate.ShouldAllowInGameLoad(out reason))
             {

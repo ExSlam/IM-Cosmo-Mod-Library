@@ -10,6 +10,7 @@ namespace SaveNLoadFixes.Transport
         [HarmonyPriority(Priority.Last)]
         private static void Postfix()
         {
+            SaveShutdownCoordinator.EnsurePump();
             SaveProgressCoordinator.PumpNotifications();
         }
     }
