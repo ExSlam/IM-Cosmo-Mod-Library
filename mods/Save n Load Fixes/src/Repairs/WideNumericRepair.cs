@@ -240,6 +240,28 @@ namespace SaveNLoadFixes.Repairs
             }
         }
 
+        internal static long TruncateSingleProduct(
+            long value,
+            string context,
+            params float[] coefficients)
+        {
+            try
+            {
+                long result = WideNumericMath.TruncateSingleProduct(value, coefficients);
+                Interlocked.Increment(ref checkedOperationCount);
+                return result;
+            }
+            catch (OverflowException exception)
+            {
+                throw CreateOverflowException(
+                    context,
+                    "exact Single-coefficient truncation",
+                    value,
+                    coefficients == null ? 0L : coefficients.Length,
+                    exception);
+            }
+        }
+
         internal static long FloorSingleProduct(
             long value,
             string context,

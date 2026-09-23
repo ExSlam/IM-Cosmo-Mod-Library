@@ -1,3 +1,15 @@
+# Changelog
+
+## Rivals Reborn wide-numeric compatibility and documentation consolidation
+
+- Added optional reflection-only Rivals Reborn wide-numeric interop with no `rivalsreborn.dll` reference and no RR persistence ownership.
+- Added exact truncate-toward-zero `Single` product arithmetic and exact weighted-product comparison for RR formulas that operate on widened Int64 fan/sales/salary values.
+- Repaired RR fan growth, accusation growth, rival sales, idol/demographic fan allocation, former-idol founding, poach target/buyout/salary paths, yearly shakeout ordering, award score input, wide fan formatting, founder eligibility, player-to-rival Fame derivation, and dating cover-up fan consumption.
+- Preserved RR RNG/settings and final remainder semantics; bounded or intrinsically floating-point RR paths remain RR-owned.
+- Added frozen RR arithmetic regression oracles at the `2^24` boundary, `Int32.MaxValue`, above `2^32`, `2^53`, overflow, and exact shakeout comparisons. Live compiled/Unity RR integration qualification remains a separate release gate.
+- Consolidated durable SNLF purpose, contracts, compatibility notes, API rules, patch inventory, and validation status into `README.md`; removed historical sprint/task reports, A33 planning notes, one-off shutdown qualification markdown, and staged RR notes from the source bundle.
+- Corrected the unreleased RR bridge to compile against Idol Manager's Unity API by using `Mathf.Log(value, 10f)` instead of unavailable `Mathf.Log10`, and kept RR yearly-shakeout SNS posting reflection-only through `RivalsReborn.News.PostSNS` rather than introducing a direct RR symbol reference.
+
 ## 5.5.1 - Audition portrait hardening and version correction
 
 - Corrects the previous `0.55.1` label to `5.5.1`. Minor and patch components are decimal digits (0-9), carrying to the next component when incremented past 9; the major component can grow beyond 9.

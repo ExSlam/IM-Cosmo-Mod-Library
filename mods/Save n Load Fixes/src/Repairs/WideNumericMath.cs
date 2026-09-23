@@ -680,6 +680,93 @@ namespace SaveNLoadFixes.Repairs
             return DivideRoundToEven(numerator, denominator);
         }
 
+        /// <summary>
+        /// Applies the exact IEEE-754 value of every supplied Single and truncates the
+        /// final rational result toward zero, matching a C# floating-point-to-Int64 cast
+        /// without first narrowing the Int64 operand to Single.
+        /// </summary>
+        internal static long TruncateSingleProduct(long value, params float[] coefficients)
+        {
+            ExactInteger numerator = ExactInteger.FromInt64(value);
+            ExactInteger denominator = ExactInteger.One;
+            ApplySingleCoefficients(coefficients, ref numerator, ref denominator);
+
+            ExactInteger absolute = ExactInteger.Abs(numerator);
+            ExactInteger quotient;
+            ExactInteger remainder;
+            ExactInteger.DivRem(absolute, denominator, out quotient, out remainder);
+            if (numerator.Sign < 0)
+            {
+                quotient = ExactInteger.Negate(quotient);
+            }
+            return ToInt64Checked(quotient);
+        }
+
+        /// <summary>
+        /// Compares two exact products of an Int64 fan total and RR's compiled Single
+        /// momentum coefficient. Former-idol labels receive RR's exact compiled 2.5f
+        /// multiplier. No Int64 result is materialized, so comparison remains exact even
+        /// when either product would exceed Int64.
+        /// </summary>
+        internal static int CompareSingleProducts(
+            long left,
+            float leftCoefficient,
+            bool leftFormerIdol,
+            long right,
+            float rightCoefficient,
+            bool rightFormerIdol)
+        {
+            const long exactSingleIntegerBoundary = 16777216L;
+            float leftProduct = (float)left * leftCoefficient;
+            if (leftFormerIdol)
+            {
+                leftProduct *= 2.5f;
+            }
+            float rightProduct = (float)right * rightCoefficient;
+            if (rightFormerIdol)
+            {
+                rightProduct *= 2.5f;
+            }
+
+            if (left >= -exactSingleIntegerBoundary &&
+                left <= exactSingleIntegerBoundary &&
+                right >= -exactSingleIntegerBoundary &&
+                right <= exactSingleIntegerBoundary &&
+                !float.IsNaN(leftProduct) &&
+                !float.IsInfinity(leftProduct) &&
+                !float.IsNaN(rightProduct) &&
+                !float.IsInfinity(rightProduct) &&
+                leftProduct >= -exactSingleIntegerBoundary &&
+                leftProduct <= exactSingleIntegerBoundary &&
+                rightProduct >= -exactSingleIntegerBoundary &&
+                rightProduct <= exactSingleIntegerBoundary)
+            {
+                return leftProduct.CompareTo(rightProduct);
+            }
+
+            ExactInteger leftNumerator = ExactInteger.FromInt64(left);
+            ExactInteger leftDenominator = ExactInteger.One;
+            ApplySingleCoefficients(
+                leftFormerIdol
+                    ? new float[] { leftCoefficient, 2.5f }
+                    : new float[] { leftCoefficient },
+                ref leftNumerator,
+                ref leftDenominator);
+
+            ExactInteger rightNumerator = ExactInteger.FromInt64(right);
+            ExactInteger rightDenominator = ExactInteger.One;
+            ApplySingleCoefficients(
+                rightFormerIdol
+                    ? new float[] { rightCoefficient, 2.5f }
+                    : new float[] { rightCoefficient },
+                ref rightNumerator,
+                ref rightDenominator);
+
+            return ExactInteger.Compare(
+                ExactInteger.Multiply(leftNumerator, rightDenominator),
+                ExactInteger.Multiply(rightNumerator, leftDenominator));
+        }
+
         internal static long FloorSingleProduct(long value, params float[] coefficients)
         {
             ExactInteger numerator = ExactInteger.FromInt64(value);

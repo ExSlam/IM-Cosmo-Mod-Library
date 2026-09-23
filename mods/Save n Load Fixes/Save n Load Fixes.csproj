@@ -127,6 +127,8 @@
     <Compile Include="src\Repairs\WideNumericState.cs" />
     <Compile Include="src\Repairs\WideNumericContinuation.cs" />
     <Compile Include="src\Repairs\TelModLibraryInterop.cs" />
+    <Compile Include="src\Repairs\RivalsRebornWideNumericInterop.cs" />
+    <Compile Include="src\Repairs\RivalsRebornWideNumericPatches.cs" />
     <Compile Include="src\Repairs\WideNumericContinuationPatches.cs" />
     <Compile Include="src\Transport\TransportPatchHealth.cs" />
     <Compile Include="src\Transport\OrderedSaveTransport.cs" />
