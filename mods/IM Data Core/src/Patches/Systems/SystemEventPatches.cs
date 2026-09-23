@@ -1419,11 +1419,32 @@ namespace IMDataCore
     internal static class data_girls_girls_Graduation_Announce_Confirm_IMDataCoreCapture_Patch
     {
         /// <summary>
-        /// Records one graduation-announced event after confirmation flow completes.
+        /// Snapshot whether the idol was already announced before confirmation. Never Graduate
+        /// can skip the original confirmation method, so method invocation alone is not evidence
+        /// that a graduation-announced transition actually occurred.
+        /// </summary>
+        [HarmonyPriority(Priority.First)]
+        [HarmonyBefore("com.tel.nevergraduate")]
+        private static void Prefix(data_girls.girls __instance, out bool __state)
+        {
+            __state = __instance != null &&
+                __instance.status == data_girls._status.announced_graduation;
+        }
+
+        /// <summary>
+        /// Records only a real transition into announced_graduation. This avoids false history
+        /// when Never Graduate (or another vetoing patch) prevents the confirmation method.
         /// </summary>
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(data_girls.girls __instance)
+        private static void Postfix(data_girls.girls __instance, bool __state)
         {
+            if (__instance == null ||
+                __state ||
+                __instance.status != data_girls._status.announced_graduation)
+            {
+                return;
+            }
+
             IMDataCoreController.Instance.CaptureIdolGraduationAnnounced(__instance);
         }
     }
