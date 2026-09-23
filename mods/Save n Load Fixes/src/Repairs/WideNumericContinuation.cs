@@ -816,7 +816,11 @@ namespace SaveNLoadFixes.Repairs
                 "resources.OnNewDay buzz preflight");
             WideNumericRepair.Add(resources.Get(resources.type.fame, false), fame,
                 "resources.OnNewDay fame preflight");
-            resources.FansChange = 0L;
+            // Fan Attrition intentionally carries yesterday's churn in FansChange until
+            // its OnNewDay Postfix consumes it. Its vanilla transpiler cannot affect
+            // this replacement body, so preserve the value when that mod is present.
+            if (!TelModLibraryInterop.FanAttritionLoaded)
+                resources.FansChange = 0L;
             instance.AddMoney(money);
             resources.Add(resources.type.buzz, buzz);
             resources.Add(resources.type.fame, fame);
@@ -1094,13 +1098,20 @@ namespace SaveNLoadFixes.Repairs
         /// </summary>
         internal static long GetTheaterWeeklyIncomeForDisplay()
         {
+            // Unofficial Patch owns the effective weekly-tooltip contract: seven
+            // ticket days plus subscription revenue normalized by 4.35 weeks/month.
+            // Calling the public method lets its Postfix compose with SNLF's wide
+            // six-day base and with Stale Theater Shows' GetSubRevenue Postfix.
+            if (TelModLibraryInterop.UnofficialPatchLoaded)
+                return Theaters.GetLastWeekEarning();
+
             long ticketIncome = GetTheaterLastWeekEarning();
             long monthlyStreamingIncome = 0L;
             foreach (Theaters._theater theater in Theaters.Theaters_)
             {
                 if (theater == null || !theater.AreSubsUnlocked()) continue;
                 monthlyStreamingIncome = WideNumericRepair.Add(
-                    monthlyStreamingIncome, GetTheaterSubscriptionRevenue(theater),
+                    monthlyStreamingIncome, theater.GetSubRevenue(),
                     "tooltip_money.Theater monthly streaming aggregate");
             }
             long weeklyStreamingIncome = WideNumericRepair.DivideRoundToEven(
@@ -1112,26 +1123,45 @@ namespace SaveNLoadFixes.Repairs
 
         internal static long GetTheaterAverageRevenue(Theaters._theater theater)
         {
+            return GetTheaterAverageRevenueCore(theater, false);
+        }
+
+        internal static long GetEffectiveTheaterAverageRevenue(Theaters._theater theater)
+        {
+            return GetTheaterAverageRevenueCore(
+                theater, TelModLibraryInterop.UnofficialPatchLoaded);
+        }
+
+        private static long GetTheaterAverageRevenueCore(
+            Theaters._theater theater, bool ignoreDaysOff)
+        {
             if (theater == null || theater.Stats == null || theater.Stats.Count == 0)
                 return 0L;
-            int count = Math.Min(7, theater.Stats.Count);
+            int daysToCheck = Math.Min(7, theater.Stats.Count);
             bool safe = true;
             float vanillaTotal = 0f;
             long exactTotal = 0L;
+            int counted = 0;
             for (int index = theater.Stats.Count - 1;
-                index >= theater.Stats.Count - count; index--)
+                index >= theater.Stats.Count - daysToCheck; index--)
             {
-                long revenue = theater.Stats[index].Revenue;
+                Theaters._theater._stat stat = theater.Stats[index];
+                if (ignoreDaysOff && stat.Schedule.Type ==
+                    Theaters._theater._schedule._type.day_off)
+                    continue;
+                long revenue = stat.Revenue;
                 if (revenue < -ExactSingleIntegerBoundary || revenue > ExactSingleIntegerBoundary)
                     safe = false;
                 vanillaTotal += (float)revenue;
                 exactTotal = WideNumericRepair.Add(exactTotal, revenue,
                     "Theaters._theater.GetAvgRevenue");
+                counted++;
             }
+            if (counted == 0) return 0L;
             if (safe && exactTotal >= -ExactSingleIntegerBoundary &&
                 exactTotal <= ExactSingleIntegerBoundary)
-                return Mathf.RoundToInt(vanillaTotal / (float)count);
-            return WideNumericRepair.DivideRoundToEven(exactTotal, count,
+                return Mathf.RoundToInt(vanillaTotal / (float)counted);
+            return WideNumericRepair.DivideRoundToEven(exactTotal, counted,
                 "Theaters._theater.GetAvgRevenue");
         }
 
@@ -1140,7 +1170,7 @@ namespace SaveNLoadFixes.Repairs
             Theaters._theater theater = Theater_Popup.Theater;
             if (view == null || theater == null) return;
             ExtensionMethods.SetText(view.Pricing_Revenue,
-                ExtensionMethods.formatMoney(GetTheaterAverageRevenue(theater),
+                ExtensionMethods.formatMoney(GetEffectiveTheaterAverageRevenue(theater),
                     false, false, false));
             if (theater.AreSubsUnlocked())
             {
@@ -1149,7 +1179,7 @@ namespace SaveNLoadFixes.Repairs
                         WideNumericState.GetTheaterSubscribers(theater), false, false));
                 ExtensionMethods.SetText(view.Pricing_Sub_Revenue,
                     ExtensionMethods.formatMoney(
-                        GetTheaterSubscriptionRevenue(theater), false, false, false));
+                        theater.GetSubRevenue(), false, false, false));
             }
         }
 
@@ -1178,24 +1208,29 @@ namespace SaveNLoadFixes.Repairs
 
         internal static int GetTheaterVisitors(Theaters._theater theater)
         {
-            float coefficient = 1f;
+            float coefficient;
             Groups._group group = theater.GetGroup();
             Theaters._theater._schedule schedule = theater.GetSchedule();
             long fans = schedule.FanType_Everyone
                 ? WideNumericRepair.CalculateGroupFansByType(group, (resources.fanType?)null)
                 : WideNumericRepair.CalculateGroupFansByType(group,
                     new resources.fanType?(schedule.FanType));
-            if (schedule.FanType_Everyone &&
-                theater.Doing_Now == Theaters._theater._schedule._type.manzai)
-                coefficient = 0.1f;
-            else if (schedule.FanType_Everyone) coefficient = 0.2f;
-            else if (schedule.FanType == resources.fanType.casual) coefficient = 0.3f;
-            else if (schedule.FanType == resources.fanType.teen) coefficient = 0.5f;
-            else if (schedule.FanType != resources.fanType.hardcore) coefficient = 0.75f;
-            if (!schedule.FanType_Everyone &&
-                theater.Doing_Now == Theaters._theater._schedule._type.manzai &&
-                schedule.FanType != resources.fanType.hardcore)
-                coefficient *= 0.75f;
+            if (!TelModLibraryInterop.TryGetStaleTheaterAttendanceMultiplier(
+                theater, out coefficient))
+            {
+                coefficient = 1f;
+                if (schedule.FanType_Everyone &&
+                    theater.Doing_Now == Theaters._theater._schedule._type.manzai)
+                    coefficient = 0.1f;
+                else if (schedule.FanType_Everyone) coefficient = 0.2f;
+                else if (schedule.FanType == resources.fanType.casual) coefficient = 0.3f;
+                else if (schedule.FanType == resources.fanType.teen) coefficient = 0.5f;
+                else if (schedule.FanType != resources.fanType.hardcore) coefficient = 0.75f;
+                if (!schedule.FanType_Everyone &&
+                    theater.Doing_Now == Theaters._theater._schedule._type.manzai &&
+                    schedule.FanType != resources.fanType.hardcore)
+                    coefficient *= 0.75f;
+            }
             if (theater.Ticket_Price > 40000) return 0;
             if (TheaterGetPriceCoeff == null)
             {
@@ -1263,7 +1298,7 @@ namespace SaveNLoadFixes.Repairs
                         WideNumericRepair.CalculateTicketSales(theater),
                         "Theaters.CompleteDay ticket total");
                 if (staticVars.dateTime.Day == 1)
-                    total = WideNumericRepair.Add(total, GetTheaterSubscriptionRevenue(theater),
+                    total = WideNumericRepair.Add(total, theater.GetSubRevenue(),
                         "Theaters.CompleteDay subscription total");
                 if (theater.AreSubsUnlocked())
                     preflight.SubscriberPlan = CalculateTheaterSubscriberPlan(theater);
@@ -1654,6 +1689,24 @@ namespace SaveNLoadFixes.Repairs
                     total = WideNumericRepair.Add(total,
                         WideNumericState.GetCafeProfit(cafe, index, cafe.Stats[index]),
                         "Cafes.GetLastWeekEarning");
+            }
+            return total;
+        }
+
+        internal static long GetCafeWeeklyIncomeForDisplay()
+        {
+            int days = TelModLibraryInterop.UnofficialPatchLoaded ? 7 : 6;
+            long total = 0L;
+            foreach (Cafes._cafe cafe in Cafes.Cafes_)
+            {
+                int count = 0;
+                for (int index = cafe.Stats.Count - 1;
+                    index >= 0 && count < days; index--, count++)
+                {
+                    total = WideNumericRepair.Add(total,
+                        WideNumericState.GetCafeProfit(cafe, index, cafe.Stats[index]),
+                        "tooltip_money.Cafe weekly income");
+                }
             }
             return total;
         }
@@ -2218,7 +2271,10 @@ namespace SaveNLoadFixes.Repairs
             long baseRevenue = WideNumericRepair.Multiply(
                 GetConcertSoldTickets(projected), projected.TicketPrice,
                 "SEvent_Concerts._projectedValues.GetRevenue tickets*price");
-            return RoundSingleCompatible(baseRevenue, projected.GetHype(),
+            float hype;
+            if (!TelModLibraryInterop.TryGetUnofficialPatchConcertHype(projected, out hype))
+                hype = projected.GetHype();
+            return RoundSingleCompatible(baseRevenue, hype,
                 "SEvent_Concerts._projectedValues.GetRevenue hype");
         }
 
@@ -2393,7 +2449,9 @@ namespace SaveNLoadFixes.Repairs
             ssk.RecalcFameBonus();
             List<SEvent_SSK._SSK._result> plannedResults =
                 new List<SEvent_SSK._SSK._result>();
-            for (int index = 0; index < 10 && index < values.Count; index++)
+            int resultLimit = TelModLibraryInterop.GetExtendedSskResultLimit(10);
+            resultLimit = Math.Min(resultLimit, ssk.FameBonus.Count);
+            for (int index = 0; index < resultLimit && index < values.Count; index++)
             {
                 plannedResults.Add(new SEvent_SSK._SSK._result
                 {
@@ -3372,8 +3430,9 @@ namespace SaveNLoadFixes.Repairs
                     WideNumericState.GetTourNetProductionCost(popup.Tour), false, false));
             ExtensionMethods.SetText(popup.ExpectedRevenue,
                 ExtensionMethods.formatMoney(expected, false, false));
+            long effectiveProduction = WideNumericState.GetTourNetProductionCost(popup.Tour);
             ExtensionMethods.SetColor(popup.ExpectedRevenue,
-                expected < production ? mainScript.red32 : mainScript.green32);
+                expected < effectiveProduction ? mainScript.red32 : mainScript.green32);
         }
 
         internal static void CorrectTourProjectButton(SEvent_Button_Tour view)
@@ -3845,6 +3904,10 @@ namespace SaveNLoadFixes.Repairs
             float baseValue = (float)fame * 0.5f * 0.1f * baseAudience;
             baseValue = (baseValue + (float)historicalFans) / 12f;
             if (SingleValueLeavesExactDomain(baseValue)) return true;
+            float fanAttritionAudienceCoefficient =
+                TelModLibraryInterop.GetFanAttritionAudienceCoefficient(show);
+            baseValue *= fanAttritionAudienceCoefficient;
+            if (SingleValueLeavesExactDomain(baseValue)) return true;
 
             float awardCoefficient = 1f;
             if (show.castType != Shows._show._castType.entireGroup)
@@ -3865,6 +3928,7 @@ namespace SaveNLoadFixes.Repairs
             float maximumRandomCoefficient = internet ? 1.14f : 1.09f;
             float fatigueCoefficient = 1f - show.GetFatigue(null) / 100f;
             long totalNewFans = 0L;
+            long viralBaseNewFans = 0L;
             foreach (resources._fan fan in resources.Fans)
             {
                 float audienceValue = baseValue;
@@ -3873,6 +3937,8 @@ namespace SaveNLoadFixes.Repairs
                 audienceValue *= awardCoefficient;
                 if (SingleValueLeavesExactDomain(audienceValue)) return true;
                 long audience = (long)Mathf.Round(audienceValue);
+                audience = TelModLibraryInterop.ApplyFanAttritionMcAudience(show, audience);
+                if (NeedsWideFanPath(audience)) return true;
                 if (audience < 0L) audience = 0L;
                 if (internet && audience < 1L) audience = 1L;
 
@@ -3885,12 +3951,19 @@ namespace SaveNLoadFixes.Repairs
                 if (show.episodeCount == 1 || show.episodeCount == 0)
                     newFans = WideNumericRepair.Multiply(newFans, 2L,
                         "Shows._show.SetSales path-selection premiere fans");
+                if (newFans > 0L)
+                    viralBaseNewFans = WideNumericRepair.Add(viralBaseNewFans, newFans,
+                        "Going Viral show path-selection base fans");
                 if (NeedsWideFanPath(newFans)) return true;
                 totalNewFans = WideNumericRepair.Add(totalNewFans, newFans,
                     "Shows._show.SetSales path-selection total new fans");
                 if (totalNewFans < int.MinValue || totalNewFans > int.MaxValue)
                     return true;
             }
+            long viralTarget;
+            if (TelModLibraryInterop.TryGetGoingViralTarget(viralBaseNewFans, out viralTarget) &&
+                (viralTarget < int.MinValue || viralTarget > int.MaxValue))
+                return true;
             return false;
         }
 
@@ -3937,7 +4010,13 @@ namespace SaveNLoadFixes.Repairs
                 staticVars.PlayerData.Chapter < tasks._chapter.chapter_5)
                 awardCoefficient *= 1.5f;
 
+            float fanAttritionAudienceCoefficient =
+                TelModLibraryInterop.GetFanAttritionAudienceCoefficient(show);
+            List<data_girls.girls> cast = show.GetCast();
+            List<KeyValuePair<resources._fan, long>> viralCasualBuckets =
+                new List<KeyValuePair<resources._fan, long>>();
             long totalNewFans = 0L;
+            long viralBaseNewFans = 0L;
             long totalAudience = 0L;
             List<singles._single._sales> plannedSales =
                 new List<singles._single._sales>();
@@ -3961,7 +4040,9 @@ namespace SaveNLoadFixes.Repairs
                     "Shows._show.SetSales audience",
                     show.GetFanAppeal(fan),
                     randomCoefficient,
-                    awardCoefficient);
+                    awardCoefficient,
+                    fanAttritionAudienceCoefficient);
+                audience = TelModLibraryInterop.ApplyFanAttritionMcAudience(show, audience);
                 if (audience < 0L) audience = 0L;
                 if (internet && audience < 1L) audience = 1L;
                 singles._single._sales sale = new singles._single._sales
@@ -3984,10 +4065,83 @@ namespace SaveNLoadFixes.Repairs
                 if (show.episodeCount == 1 || show.episodeCount == 0)
                     newFans = WideNumericRepair.Multiply(newFans, 2L,
                         "Shows._show.SetSales premiere fans");
-                PlanFansEquallyDemographic(fanPlan, newFans, fan, show.GetCast(),
+                PlanFansEquallyDemographic(fanPlan, newFans, fan, cast,
                     !NeedsWideFanPath(newFans));
+                if (newFans > 0L)
+                {
+                    viralBaseNewFans = WideNumericRepair.Add(viralBaseNewFans, newFans,
+                        "Going Viral wide show base fans");
+                    if (fan != null && fan.IsType(resources.fanType.casual))
+                        viralCasualBuckets.Add(
+                            new KeyValuePair<resources._fan, long>(fan, newFans));
+                }
                 totalNewFans = WideNumericRepair.Add(totalNewFans, newFans,
                     "Shows._show.SetSales total new fans");
+            }
+
+            // Going Viral normally records AddFans_Equally calls inside SetSales and
+            // injects the trending bonus from SetNewFans. The wide replacement bypasses
+            // both call sites, so carry the same bonus into the preflighted fan plan.
+            long displayedNewFans = totalNewFans;
+            long viralTarget;
+            if (TelModLibraryInterop.TryGetGoingViralTarget(viralBaseNewFans, out viralTarget))
+            {
+                // Going Viral's SetNewFans Prefix replaces the displayed episode-fan
+                // value with its positive recorded base even when no bonus can be
+                // assigned. Preserve that contract separately from actual fan mutations.
+                displayedNewFans = viralBaseNewFans;
+                long bonus = WideNumericRepair.Subtract(viralTarget, viralBaseNewFans,
+                    "Going Viral wide show bonus");
+                if (bonus > 0L && cast != null && cast.Count > 0 &&
+                    viralCasualBuckets.Count > 0)
+                {
+                    long casualBase = 0L;
+                    foreach (KeyValuePair<resources._fan, long> bucket in viralCasualBuckets)
+                        casualBase = WideNumericRepair.Add(casualBase, Math.Max(0L, bucket.Value),
+                            "Going Viral wide show casual base");
+
+                    long assigned = 0L;
+                    for (int index = 0; index < viralCasualBuckets.Count; index++)
+                    {
+                        KeyValuePair<resources._fan, long> bucket = viralCasualBuckets[index];
+                        long remaining = WideNumericRepair.Subtract(bonus, assigned,
+                            "Going Viral wide show remaining bonus");
+                        long share;
+                        if (index == viralCasualBuckets.Count - 1)
+                        {
+                            share = remaining;
+                        }
+                        else if (casualBase > 0L)
+                        {
+                            double scaled = bonus *
+                                (double)Math.Max(0L, bucket.Value) / (double)casualBase;
+                            if (double.IsNaN(scaled) || double.IsInfinity(scaled) ||
+                                scaled > long.MaxValue || scaled < long.MinValue)
+                            {
+                                WideNumericRepair.LatchInvariantFailure(
+                                    "Going Viral wide show bonus allocation became non-finite.");
+                                throw new OverflowException(
+                                    "Going Viral wide show bonus allocation overflowed.");
+                            }
+                            share = (long)Math.Round(scaled, MidpointRounding.AwayFromZero);
+                            if (share > remaining) share = remaining;
+                        }
+                        else
+                        {
+                            share = remaining / (viralCasualBuckets.Count - index);
+                        }
+
+                        if (share > 0L && bucket.Key != null)
+                        {
+                            PlanFansEquallyDemographic(fanPlan, share, bucket.Key, cast,
+                                !NeedsWideFanPath(share));
+                            assigned = WideNumericRepair.Add(assigned, share,
+                                "Going Viral wide show assigned bonus");
+                        }
+                    }
+                    displayedNewFans = WideNumericRepair.Add(viralBaseNewFans, assigned,
+                        "Going Viral wide show displayed fans");
+                }
             }
 
             show.sales.Clear();
@@ -3995,7 +4149,7 @@ namespace SaveNLoadFixes.Repairs
             fanPlan.CommitMutations();
             fanPlan.RunCallbacks();
             show.SetAudience(totalAudience);
-            WideNumericState.AppendShowFans(show, totalNewFans);
+            WideNumericState.AppendShowFans(show, displayedNewFans);
         }
 
         internal static void SetShowRevenueWide(Shows._show show)

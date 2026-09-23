@@ -20,7 +20,6 @@
     <Compile Include="src\Persistence\RepairEnvelopeV1.cs" />
     <Compile Include="src\Persistence\RepairEnvelopeCodec.cs" />
     <Compile Include="src\Persistence\RepairEnvelopeTransport.cs" />
-    <Compile Include="src\Repairs\AuditionPortraitRepair.cs" />
     <Compile Include="src\Repairs\RelationshipDynamicRepair.cs" />
     <Compile Include="src\Repairs\RelationshipDynamicRepairPatches.cs" />
     <Compile Include="src\Repairs\ShowFanAppealRepair.cs" />
@@ -127,6 +126,7 @@
     <Compile Include="src\Repairs\WideNumericRepairPatches.cs" />
     <Compile Include="src\Repairs\WideNumericState.cs" />
     <Compile Include="src\Repairs\WideNumericContinuation.cs" />
+    <Compile Include="src\Repairs\TelModLibraryInterop.cs" />
     <Compile Include="src\Repairs\WideNumericContinuationPatches.cs" />
     <Compile Include="src\Transport\TransportPatchHealth.cs" />
     <Compile Include="src\Transport\OrderedSaveTransport.cs" />

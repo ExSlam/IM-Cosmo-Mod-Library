@@ -13,6 +13,8 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "resources.Set(type,Int64)", typeof(resources), nameof(resources.Set),
             new Type[] { typeof(resources.type), typeof(long) }, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
+        [HarmonyPriority(Priority.Last)]
         private static bool Prefix(
             resources.type __0,
             long __1,
@@ -495,6 +497,14 @@ namespace SaveNLoadFixes.Repairs
             nameof(Theaters._theater.GetAvgRevenue), Type.EmptyTypes, typeof(int), false); }
         private static bool Prefix(Theaters._theater __instance, ref int __result)
         { __result = WideNumericMath.ClampToInt32(WideNumericContinuation.GetTheaterAverageRevenue(__instance)); return false; }
+
+        [HarmonyAfter(TelModLibraryInterop.UnofficialPatchOwner)]
+        private static void Postfix(Theaters._theater __instance, ref int __result)
+        {
+            if (!TelModLibraryInterop.UnofficialPatchLoaded) return;
+            __result = WideNumericMath.ClampToInt32(
+                WideNumericContinuation.GetEffectiveTheaterAverageRevenue(__instance));
+        }
     }
 
     [HarmonyPatch]
@@ -654,6 +664,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "singles.GenerateSales(_single)", typeof(singles), nameof(singles.GenerateSales),
             new Type[] { typeof(singles._single) }, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.MbtiOwner, TelModLibraryInterop.SisterGroupsOwner)]
         private static bool Prefix(singles __instance, singles._single __0)
         {
             if (!WideNumericContinuation.SingleNeedsWideSalesPath(__instance, __0)) return true;
@@ -778,6 +789,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "SEvent_Tour.tour.SelectCountry(country,Int32)", typeof(SEvent_Tour.tour), nameof(SEvent_Tour.tour.SelectCountry),
             new Type[] { typeof(SEvent_Tour.country), typeof(int) }, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.TourStaminaOwner)]
         private static bool Prefix(SEvent_Tour.tour __instance, SEvent_Tour.country __0, int __1)
         { WideNumericContinuation.SelectTourCountry(__instance, __0, __1); return false; }
     }
@@ -831,6 +843,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "SEvent_Tour.FinishTour()", typeof(SEvent_Tour), nameof(SEvent_Tour.FinishTour),
             Type.EmptyTypes, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.TraitsFixOwner)]
         private static bool Prefix(SEvent_Tour __instance)
         { WideNumericContinuation.FinishTour(__instance); return false; }
     }
@@ -851,6 +864,8 @@ namespace SaveNLoadFixes.Repairs
             "data_girls.AddFans_Equally(Int64,_fan,List)", typeof(data_girls), nameof(data_girls.AddFans_Equally),
             new Type[] { typeof(long), typeof(resources._fan), typeof(List<data_girls.girls>) },
             typeof(void), true); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
+        [HarmonyPriority(Priority.Last)]
         private static bool Prefix(long __0, resources._fan __1, List<data_girls.girls> __2)
         {
             if (!WideNumericContinuation.NeedsWideFanPath(__0) &&
@@ -882,6 +897,7 @@ namespace SaveNLoadFixes.Repairs
             "data_girls.AddFans(Int64,Nullable,List,girl)", typeof(data_girls), nameof(data_girls.AddFans),
             new Type[] { typeof(long), typeof(resources.fanType?), typeof(List<data_girls.girls>),
                 typeof(data_girls.girls) }, typeof(void), true); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
         private static bool Prefix(long __0, resources.fanType? __1,
             List<data_girls.girls> __2, data_girls.girls __3)
         {
@@ -913,6 +929,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "data_girls.girls.AddFans(Int64,Nullable)", typeof(data_girls.girls), nameof(data_girls.girls.AddFans),
             new Type[] { typeof(long), typeof(resources.fanType?) }, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
         private static bool Prefix(data_girls.girls __instance, long __0, resources.fanType? __1)
         {
             long cafeExact;
@@ -1009,6 +1026,8 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "Shows._show.SetNewFans(Int32)", typeof(Shows._show), "SetNewFans",
             new Type[] { typeof(int) }, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
+        [HarmonyPriority(Priority.Last)]
         private static bool Prefix(Shows._show __instance, int __0)
         { WideNumericState.AppendShowFans(__instance, __0); return false; }
     }
@@ -1019,6 +1038,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "Shows._show.SetSales()", typeof(Shows._show), "SetSales",
             Type.EmptyTypes, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
         private static bool Prefix(Shows._show __instance)
         {
             if (!WideNumericContinuation.ShowNeedsWideSalesPath(__instance)) return true;
@@ -1191,6 +1211,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "SEvent_SSK._SSK.GenerateResults()", typeof(SEvent_SSK._SSK),
             nameof(SEvent_SSK._SSK.GenerateResults), Type.EmptyTypes, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.MbtiOwner, TelModLibraryInterop.TraitsExpansionOwner)]
         private static bool Prefix(SEvent_SSK._SSK __instance)
         {
             if (!WideNumericContinuation.SskNeedsWideResultsPath(__instance)) return true;
@@ -1563,6 +1584,7 @@ namespace SaveNLoadFixes.Repairs
             "Relationships_Player.AddPoints(_type,girl,Int32)", typeof(Relationships_Player),
             nameof(Relationships_Player.AddPoints), new Type[] { typeof(Relationships_Player._type),
                 typeof(data_girls.girls), typeof(int) }, typeof(void), true); }
+        [HarmonyAfter(TelModLibraryInterop.MbtiOwner)]
         private static bool Prefix(Relationships_Player._type __0, data_girls.girls __1, int __2)
         { WideNumericContinuation.AddRelationshipPoints(__0, __1, __2); return false; }
     }
@@ -1827,7 +1849,7 @@ namespace SaveNLoadFixes.Repairs
         private static bool Prefix(ref long ___Total, ref string __result)
         {
             __result = WideNumericContinuation.AddWeeklyTooltipLine("TIP__CAFE",
-                WideNumericContinuation.GetCafeLastWeekEarning(), ref ___Total);
+                WideNumericContinuation.GetCafeWeeklyIncomeForDisplay(), ref ___Total);
             return false;
         }
     }
@@ -2160,6 +2182,7 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "Tour_Star.SetTooltip()", typeof(Tour_Star), nameof(Tour_Star.SetTooltip),
             Type.EmptyTypes, typeof(void), false); }
+        [HarmonyAfter(TelModLibraryInterop.TourStaminaOwner)]
         private static bool Prefix(Tour_Star __instance)
         { WideNumericContinuation.RenderTourStarTooltip(__instance); return false; }
     }
