@@ -724,6 +724,41 @@ namespace SaveNLoadFixes
             get { return BestSingleNominationRepair.LastDiagnostic; }
         }
 
+        public static bool MonthlyTransitionRepairImplemented
+        {
+            get { return MonthlyTransitionRepair.IsImplemented; }
+        }
+
+        public static int MonthlyTransitionResolvedTargetMethodCount
+        {
+            get { return MonthlyTransitionPatchHealth.ResolvedTargetMethodCount; }
+        }
+
+        public static int MonthlyTransitionInjectionSiteCount
+        {
+            get { return MonthlyTransitionPatchHealth.InjectionSiteCount; }
+        }
+
+        public static long MonthlyTransitionFirstOfMonthBoundaryCount
+        {
+            get { return MonthlyTransitionRepair.FirstOfMonthBoundaryCount; }
+        }
+
+        public static long MonthlyTransitionEventInvocationCount
+        {
+            get { return MonthlyTransitionRepair.MonthEventInvocationCount; }
+        }
+
+        public static long MonthlyTransitionNoSubscriberCount
+        {
+            get { return MonthlyTransitionRepair.NoSubscriberCount; }
+        }
+
+        public static string LastMonthlyTransitionDiagnostic
+        {
+            get { return MonthlyTransitionRepair.LastDiagnostic; }
+        }
+
         public static bool GroupTargetAudienceRepairImplemented
         {
             get { return GroupTargetAudienceRepair.IsImplemented; }

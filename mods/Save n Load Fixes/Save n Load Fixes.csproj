@@ -3,7 +3,7 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>5.5.1</Version>
+    <Version>5.5.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -111,6 +111,8 @@
     <Compile Include="src\Repairs\TutorialActiveIdRepairPatches.cs" />
     <Compile Include="src\Repairs\BestSingleNominationRepair.cs" />
     <Compile Include="src\Repairs\BestSingleNominationRepairPatches.cs" />
+    <Compile Include="src\Repairs\MonthlyTransitionRepair.cs" />
+    <Compile Include="src\Repairs\MonthlyTransitionRepairPatches.cs" />
     <Compile Include="src\Repairs\GroupTargetAudienceRepair.cs" />
     <Compile Include="src\Repairs\GroupTargetAudienceRepairPatches.cs" />
     <Compile Include="src\Repairs\EventManagerTerminalRepair.cs" />

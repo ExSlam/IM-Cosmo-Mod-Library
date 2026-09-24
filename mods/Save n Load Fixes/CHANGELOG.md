@@ -10,6 +10,14 @@
 - Consolidated durable SNLF purpose, contracts, compatibility notes, API rules, patch inventory, and validation status into `README.md`; removed historical sprint/task reports, A33 planning notes, one-off shutdown qualification markdown, and staged RR notes from the source bundle.
 - Corrected the unreleased RR bridge to compile against Idol Manager's Unity API by using `Mathf.Log(value, 10f)` instead of unavailable `Mathf.Log10`, and kept RR yearly-shakeout SNS posting reflection-only through `RivalsReborn.News.PostSNS` rather than introducing a direct RR symbol reference.
 
+## 5.5.2 - Monthly transition callback repair
+
+- Added A34 to restore the vanilla `mainScript.onNewMonth` callback that `TimeProgress` declares/subscribes but never raises.
+- Injects exactly once after vanilla `onNewDay` in the audited generated `mainScript.<TimeProgress>d__96.MoveNext` body and raises the monthly delegate only when the new in-game date is day 1.
+- Restores vanilla `Awards.OnNewMonth()` Best Employer condition tracking and `data_girls.OnNewMonth()` earnings-history rollover without duplicating either subscriber's logic.
+- Does not fire on save load or arbitrary `staticVars.SetTime` calls. Existing saves cannot reconstruct Best Employer failures from already elapsed months before A34 was active; subsequent month boundaries are tracked normally.
+- Bumps the public version from `5.5.1` to `5.5.2` under the decimal-carry release numbering scheme.
+
 ## 5.5.1 - Audition portrait hardening and version correction
 
 - Corrects the previous `0.55.1` label to `5.5.1`. Minor and patch components are decimal digits (0-9), carrying to the next component when incremented past 9; the major component can grow beyond 9.

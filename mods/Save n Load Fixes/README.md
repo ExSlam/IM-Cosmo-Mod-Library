@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.1
+## Version 5.5.2
 
-Current source version: **5.5.1**. This tree also contains unreleased cumulative Rivals Reborn wide-numeric compatibility work. The assembly/project version has intentionally not been bumped by this source-only patch series.
+Current source version: **5.5.2**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.1: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.2: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -103,6 +103,10 @@ The container format is versioned and stores each payload as validated JSON text
 `EncodeInt32` writes schema 1 and `EncodeInt64` writes schema 2. Int64 readers accept both and widen schema-1 values exactly. Int32 readers accept either only when every value fits Int32. Decimal strings and exact integer JSON tokens are accepted; fractional, exponent, malformed, noncanonical, or overflowing values are rejected. Values above `2^53` never pass through `Double`.
 
 This codec is only a storage option for EroEvents or another explicit caller. SNLF does not reinterpret EroEvents' existing string variables automatically.
+
+## Monthly transition repair (A34)
+
+A34 restores the vanilla `mainScript.onNewMonth` callback that is declared and subscribed but never invoked by `mainScript.TimeProgress`. The patch targets only the generated `TimeProgress.MoveNext` state machine and injects the existing monthly delegate immediately after vanilla raises `onNewDay`; it invokes `onNewMonth` only when the new game date is day 1. This restores vanilla monthly subscribers without duplicating their logic or firing during save loading. In the audited vanilla build, this reactivates `Awards.OnNewMonth()` (Best Employer condition tracking) and `data_girls.OnNewMonth()` (monthly idol earnings-history rollover). Existing saves cannot reconstruct missed historical monthly Best Employer failures from periods before A34 was active; future month boundaries are tracked normally, and the next post-awards yearly reset begins a fully repaired award cycle.
 
 ## Wide numeric continuity (A33)
 
