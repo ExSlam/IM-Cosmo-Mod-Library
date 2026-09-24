@@ -55,6 +55,7 @@ namespace SaveNLoadFixes.Repairs
 
                 int birthdayCount = 0;
                 int peakAgeCount = 0;
+                bool useTweaksPeakAgeRange = TweaksNQoLCompatibility.UseTweaksPeakAgeRange;
                 bool physicalPathUnavailableObserved = false;
                 List<data_girls.GirlData> girls = target.data_girls__Girls;
 
@@ -106,8 +107,17 @@ namespace SaveNLoadFixes.Repairs
                                 out usedPhysicalPath);
                         physicalPathUnavailableObserved |= !usedPhysicalPath;
 
-                        // Mirrors vanilla GeneratePeakAge(): Random.Range(16, 25).
-                        row.peakAge = stream.NextInt(16, 25);
+                        if (useTweaksPeakAgeRange)
+                        {
+                            // Shelon TweaksNQoL 1.0.0 replaces GeneratePeakAge with Random.Range(23,45).
+                            row.peakAge = stream.NextInt(23, 45);
+                            TweaksNQoLCompatibility.RecordPeakAgeMigration();
+                        }
+                        else
+                        {
+                            // Mirrors vanilla GeneratePeakAge(): Random.Range(16, 25).
+                            row.peakAge = stream.NextInt(16, 25);
+                        }
                         peakAgeCount++;
                     }
                 }

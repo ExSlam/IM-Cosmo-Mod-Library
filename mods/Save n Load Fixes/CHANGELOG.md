@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.5.6
+
+- Added strict optional compatibility for Shelon's Tweaks & QoL Improvements 1.0.0 (`im.mod.shelon.tweaksnqol`, assembly 1.0.0.0, informational version 1.0.0).
+- A20 deterministic legacy idol-profile migration now mirrors that audited mod's actual peak-age override, `Random.Range(23,45)` (23-44), when repairing a legacy `peakAge <= 1` field.
+- Without the exact audited TweaksNQoL build, A20 continues to use vanilla's `Random.Range(16,25)` domain (16-24). Unknown future versions are not assumed compatible.
+- TweaksNQoL's `Shows._param.GetTooltip()` postfix is left native and untouched because it has no SNLF state or wide-number interaction.
+- Added public diagnostics and static/source guards for the compatibility profile.
+
 ## 5.5.5 - BuffMe 1.0.0 wide-number compatibility and fan-multiplier correction
 
 - Adds strict, load-order-independent detection for Vanilas' `com.vanilas.buffme` 1.0.0 assembly and audited patch/constant shape. Unknown versions are left untouched.

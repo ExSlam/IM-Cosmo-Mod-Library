@@ -3,7 +3,7 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>5.5.5</Version>
+    <Version>5.5.6</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -69,6 +69,7 @@
     <Compile Include="src\Repairs\SnsMessageRepairPatches.cs" />
     <Compile Include="src\Repairs\LegacyMigrationDeterminism.cs" />
     <Compile Include="src\Repairs\LegacyIdolProfileMigration.cs" />
+    <Compile Include="src\Repairs\TweaksNQoLCompatibility.cs" />
     <Compile Include="src\Repairs\LegacyIdolProfileMigrationPatches.cs" />
     <Compile Include="src\Repairs\LegacyAggregateFanMigration.cs" />
     <Compile Include="src\Repairs\LegacyAggregateFanMigrationPatches.cs" />

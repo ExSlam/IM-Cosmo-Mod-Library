@@ -82,6 +82,21 @@ namespace SaveNLoadFixes
             get { return BuffMeWideNumericInterop.DuplicateFanCorrectionCount; }
         }
 
+        public static bool TweaksNQoLCompatibilityActive
+        {
+            get { return TweaksNQoLCompatibility.ProfileActive; }
+        }
+
+        public static string TweaksNQoLCompatibilityStatus
+        {
+            get { return TweaksNQoLCompatibility.Status; }
+        }
+
+        public static long TweaksNQoLPeakAgeMigrationCount
+        {
+            get { return TweaksNQoLCompatibility.AppliedPeakAgeMigrationCount; }
+        }
+
         public static bool RepairsImplemented
         {
             get { return true; }
