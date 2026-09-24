@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.2
+## Version 5.5.3
 
-Current source version: **5.5.2**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
+Current source version: **5.5.3**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.2: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.3: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -19,6 +19,7 @@ SNLF has no compile-time dependency on Rivals Reborn or the Tel Mod Library. Opt
 - **Save Write Ordering Fix (SWOF):** compatible. When both are present, the current standalone SWOF recognizes SNLF's ordered transport and delegates to it.
 - **CreateAnAlbum:** current CAA contains its own fallback SavedData transport. For the supplied current CAA source, use **SWOF together with SNLF + CAA** so CAA disables its embedded fallback and SNLF remains the authoritative transport owner. This is a transport-composition requirement, not a numeric-width requirement.
 - **Rivals Reborn:** SNLF contains an optional reflection-only wide-numeric bridge keyed to Harmony owner `rivalsreborn`. It does not reference `rivalsreborn.dll` and adds no RR persistence schema.
+- **Fans Watch Shows:** SNLF contains an optional, strict compatibility profile for TrueBlueSwablu's `com.tbs.fanswatch` **1.0.0** / assembly **1.0.0.0**. For that audited version only, SNLF reproduces the mod's existing audience formula and settings with wide-number-safe arithmetic. Unknown FWS versions are left untouched and reported as unsupported until reviewed. SNLF has no compile-time FWS dependency.
 - **Tel Mod Library:** SNLF has narrowly scoped reflection interop for current-head Going Viral, Fan Attrition, Stale Theater Shows, Extended SSK, Unofficial Patch, MBTI Personalities, Sister Groups, Tour Stamina, Traits Fix, and Traits Expansion where those mods intersect SNLF replacement paths. This is **not** a blanket claim that every Tel mod composes with every unrelated mod. Policy/UI JSON conflicts, for example, are outside SNLF's save/numeric contract.
 - **EroEvents:** `EroEventsDataCodec` is an opt-in exact Int32/Int64 payload codec owned by `com.seraph.eroevents`. It does not automatically migrate EroEvents variables or alter EroEvents policy definitions.
 - **IM Data Core / Graduation Details:** SNLF retains the coordinated checkpoint/witness behavior implemented by the current source. IMDC remains responsible for its own sidecar durability and schema.

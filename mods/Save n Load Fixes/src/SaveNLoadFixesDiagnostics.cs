@@ -32,6 +32,21 @@ namespace SaveNLoadFixes
             get { return SaveNLoadFixesConstants.DevelopmentStage; }
         }
 
+        public static bool FansWatchShowsWideNumericCompatibilityActive
+        {
+            get { return FansWatchShowsWideNumericInterop.ProfileActive; }
+        }
+
+        public static string FansWatchShowsWideNumericCompatibilityStatus
+        {
+            get { return FansWatchShowsWideNumericInterop.Status; }
+        }
+
+        public static long FansWatchShowsWideNumericCompatibilityAppliedCount
+        {
+            get { return FansWatchShowsWideNumericInterop.AppliedCount; }
+        }
+
         public static bool RepairsImplemented
         {
             get { return true; }

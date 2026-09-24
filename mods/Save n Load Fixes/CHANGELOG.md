@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.5.3 - Fans Watch Shows 1.0.0 wide-number compatibility
+
+- Added an optional, version-gated compatibility profile for TrueBlueSwablu's Fans Watch Shows (`com.tbs.fanswatch`) 1.0.0 / assembly 1.0.0.0.
+- Replaces only that audited version's `GetAudiencePatch.Postfix` implementation; future or shape-mismatched FWS builds are left untouched and reported as unsupported.
+- Preserves the FWS 1.0.0 gameplay formula, trait/media bonuses, fatigue behavior, debug message, and live `FWS_CASUAL_BASE`, `FWS_HARD_BASE`, and `FWS_STATIC` settings by reading the original mod's property getters.
+- Removes only numeric narrowing: fan/audience operands remain checked Int64 values, midpoint rounding preserves the original `Mathf.RoundToInt` ties-to-even intent, and the final static multiplier preserves the original truncation-toward-zero cast without first converting the audience to `Single`.
+- Adds no FWS save data, persistence ownership, rebalance, compile-time dependency, or compatibility claim for any FWS version other than the audited 1.0.0 profile.
+- Bumps the public version from `5.5.2` to `5.5.3` under the decimal-carry release numbering scheme.
+
 ## Rivals Reborn wide-numeric compatibility and documentation consolidation
 
 - Added optional reflection-only Rivals Reborn wide-numeric interop with no `rivalsreborn.dll` reference and no RR persistence ownership.
