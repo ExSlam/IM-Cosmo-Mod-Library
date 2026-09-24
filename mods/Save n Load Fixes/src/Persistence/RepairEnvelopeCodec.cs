@@ -383,12 +383,19 @@ namespace SaveNLoadFixes.Persistence
                 FiniteJsonValue child;
                 if (!node.ObjectValues.TryGetValue(field.Name, out child))
                 {
-                    if (targetType == typeof(WideNumericStateRecordV1) &&
-                        ((wideNumericVersion == 1 &&
-                          (string.Equals(field.Name, "has_story_ch4_scandal_points", StringComparison.Ordinal) ||
-                           string.Equals(field.Name, "story_ch4_scandal_points", StringComparison.Ordinal))) ||
-                         (wideNumericVersion < 3 &&
-                          string.Equals(field.Name, "business_contract_payments", StringComparison.Ordinal))))
+                    if ((targetType == typeof(WideNumericStateRecordV1) &&
+                         ((wideNumericVersion == 1 &&
+                           (string.Equals(field.Name, "has_story_ch4_scandal_points", StringComparison.Ordinal) ||
+                            string.Equals(field.Name, "story_ch4_scandal_points", StringComparison.Ordinal))) ||
+                          (wideNumericVersion < 3 &&
+                           string.Equals(field.Name, "business_contract_payments", StringComparison.Ordinal)) ||
+                          (wideNumericVersion < 4 &&
+                           (string.Equals(field.Name, "business_photoshoot_top_payment", StringComparison.Ordinal) ||
+                            string.Equals(field.Name, "business_ad_top_payment", StringComparison.Ordinal) ||
+                            string.Equals(field.Name, "business_tv_drama_top_payment", StringComparison.Ordinal))))) ||
+                        (targetType == typeof(WideBusinessContractPaymentRecordV1) &&
+                         wideNumericVersion < 4 &&
+                         string.Equals(field.Name, "fans_per_week", StringComparison.Ordinal)))
                     {
                         continue;
                     }

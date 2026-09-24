@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.6
+## Version 5.5.7
 
-Current source version: **5.5.6**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
+Current source version: **5.5.7**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.6: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.7: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -35,7 +35,13 @@ SNLF compatibility corrections used to bridge clamped vanilla ABI values are not
 
 ### A35 business proposal payment continuation
 
-Vanilla business proposal payments are widened before the original `Mathf.FloorToInt` generation boundary. SNLF keeps the exact base/effective payment in runtime sidecars, uses the vanilla `Int32` fields only as compatibility mirrors, carries exact weekly payments into accepted contracts, uses the exact values for liability, agency/idol earnings, weekly profit, history, and contract UI, and persists out-of-`Int32` active-contract payments in `wide_numeric_state_version = 3`. Pre-v3 saves seed business-contract payments from their surviving vanilla `Int32` values; SNLF does not claim to reconstruct already-lost historical high bits.
+Vanilla business proposal payments are widened before the original `Mathf.FloorToInt` generation boundary. SNLF keeps the exact base/effective payment in runtime sidecars, uses the vanilla `Int32` fields only as compatibility mirrors, carries exact weekly payments into accepted contracts, and uses the exact values for liability, agency/idol earnings, weekly profit, history, and contract UI. A35 introduced sparse exact active-contract payment persistence in wide-state schema v3. Later schemas remain backward compatible with that v3 payment data; pre-v3 saves seed business-contract payments from their surviving vanilla `Int32` values rather than inventing already-lost high bits.
+
+### A33.7 business fan continuation and residual vanilla widening
+
+Vanilla business fan rewards now use the same continuation principle as A35 payments. SNLF widens the generated proposal fan value before `Mathf.FloorToInt`, retains the exact proposal value while the vanilla `Int32` field remains a compatibility mirror, applies the vanilla idol/negotiation coefficients to the exact base value, carries exact weekly fans into accepted business contracts, and uses the exact value for immediate and weekly fan delivery plus the relevant UI. Wide-state schema v4 adds sparse exact business-contract fan persistence and exact business top-payment records. A v3 checkpoint keeps its exact A35 business payments while business fan and top-payment values seed honestly from their surviving vanilla mirrors.
+
+The same cumulative pass also uses the exact show-episode fan sidecar in the released-show results display, preserves exact business top-payment records behind their vanilla `Int32` mirrors, replaces large-population single fan-satisfaction summation with wide arithmetic, and widens the business liability-preview multiplication before formatting.
 
 ## Core save transport contract
 

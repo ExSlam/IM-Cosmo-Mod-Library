@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.5.7
+
+- Completes the vanilla business fan-reward widening path: proposal generation, negotiated/idol coefficients, accepted weekly contracts, save/load persistence, weekly delivery, and UI now retain exact Int64 values behind Int32 compatibility mirrors.
+- Advances the A33 wide-state envelope to schema v4. Existing v1-v3 envelopes remain supported; v3 exact business payments are preserved while business fan values seed honestly from vanilla mirrors.
+- Extends BuffMe 1.0.0 one-time fan compatibility through exact business proposal and contract rewards.
+- Uses exact show episode fan sidecars in the released-show result display.
+- Preserves exact business top-payment statistics alongside vanilla Int32 mirrors.
+- Removes large-fan float summation from single fan-satisfaction calculation and widens business liability preview arithmetic.
+
 ## 5.5.6
 
 - Added strict optional compatibility for Shelon's Tweaks & QoL Improvements 1.0.0 (`im.mod.shelon.tweaksnqol`, assembly 1.0.0.0, informational version 1.0.0).

@@ -298,6 +298,26 @@ namespace SaveNLoadFixes.Repairs
     }
 
     [HarmonyPatch]
+    internal static class WideNumeric_BusinessProposalFansGetter_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business._proposal.get_newFans()", typeof(business._proposal), "get_newFans",
+            Type.EmptyTypes, typeof(int), false); }
+        private static bool Prefix(business._proposal __instance, ref int __result)
+        { __result = WideNumericContinuation.GetBusinessProposalFansCompatibility(__instance); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessProposalFansSetter_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business._proposal.set_newFans(Int32)", typeof(business._proposal), "set_newFans",
+            new Type[] { typeof(int) }, typeof(void), false); }
+        private static void Postfix(business._proposal __instance, int __0)
+        { WideNumericContinuation.SetBusinessProposalFansCompatibility(__instance, __0); }
+    }
+
+    [HarmonyPatch]
     internal static class WideNumeric_BusinessGenerateProposalPayment_Patch
     {
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
@@ -359,6 +379,67 @@ namespace SaveNLoadFixes.Repairs
     }
 
     [HarmonyPatch]
+    internal static class WideNumeric_BusinessGenerateProposalFans_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.GenerateProposal(_data,_staff,Int32)-fans", typeof(business), "GenerateProposal",
+            new Type[] { typeof(business._data), typeof(staff._staff), typeof(int) },
+            typeof(void), false); }
+
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions)
+        {
+            List<CodeInstruction> code = new List<CodeInstruction>(instructions);
+            MethodInfo floor = AccessTools.Method(typeof(Mathf), nameof(Mathf.FloorToInt),
+                new Type[] { typeof(float) });
+            MethodInfo setter = AccessTools.PropertySetter(typeof(business._proposal), "newFans");
+            MethodInfo helper = AccessTools.Method(typeof(WideNumericContinuation),
+                nameof(WideNumericContinuation.SetGeneratedBusinessProposalFans));
+            if (floor == null || setter == null || helper == null)
+                throw new MissingMethodException(
+                    "A33.7 business proposal fan widening could not resolve its audited methods.");
+
+            int replacements = 0;
+            for (int i = 3; i + 1 < code.Count; i++)
+            {
+                if (!code[i].Calls(floor) || !code[i + 1].Calls(setter) ||
+                    code[i - 1].opcode != OpCodes.Mul ||
+                    code[i - 3].opcode != OpCodes.Conv_R4 ||
+                    !IsLoadLocal(code[i - 2].opcode))
+                    continue;
+
+                int start = i - 3;
+                int end = i + 1;
+                CodeInstruction coefficientLoad = new CodeInstruction(
+                    code[i - 2].opcode, code[i - 2].operand);
+                for (int j = start; j <= end; j++)
+                {
+                    coefficientLoad.labels.AddRange(code[j].labels);
+                    coefficientLoad.blocks.AddRange(code[j].blocks);
+                }
+                code.RemoveRange(start, end - start + 1);
+                code.Insert(start, coefficientLoad);
+                code.Insert(start + 1, new CodeInstruction(OpCodes.Call, helper));
+                replacements++;
+                i = start + 1;
+            }
+
+            if (replacements != 1)
+                throw new InvalidOperationException(
+                    "A33.7 expected exactly one business proposal fan FloorToInt/set_newFans sequence, found " +
+                    replacements + ".");
+            return code;
+        }
+
+        private static bool IsLoadLocal(OpCode opcode)
+        {
+            return opcode == OpCodes.Ldloc || opcode == OpCodes.Ldloc_S ||
+                opcode == OpCodes.Ldloc_0 || opcode == OpCodes.Ldloc_1 ||
+                opcode == OpCodes.Ldloc_2 || opcode == OpCodes.Ldloc_3;
+        }
+    }
+
+    [HarmonyPatch]
     internal static class WideNumeric_BusinessAddActiveProposal_Patch
     {
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
@@ -377,7 +458,10 @@ namespace SaveNLoadFixes.Repairs
             "Business_Popup.Set(_proposal)", typeof(Business_Popup), nameof(Business_Popup.Set),
             new Type[] { typeof(business._proposal) }, typeof(void), false); }
         private static void Postfix(Business_Popup __instance, business._proposal __0)
-        { WideNumericContinuation.CorrectBusinessPopupPayment(__instance, __0); }
+        {
+            WideNumericContinuation.CorrectBusinessPopupPayment(__instance, __0);
+            WideNumericContinuation.CorrectBusinessPopupFans(__instance, __0);
+        }
     }
 
     [HarmonyPatch]
@@ -387,7 +471,10 @@ namespace SaveNLoadFixes.Repairs
             "Contracts_Line.Set(active_proposal)", typeof(Contracts_Line), nameof(Contracts_Line.Set),
             new Type[] { typeof(business.active_proposal) }, typeof(void), false); }
         private static void Postfix(Contracts_Line __instance, business.active_proposal __0)
-        { WideNumericContinuation.CorrectBusinessContractPaymentLine(__instance, __0); }
+        {
+            WideNumericContinuation.CorrectBusinessContractPaymentLine(__instance, __0);
+            WideNumericContinuation.CorrectBusinessContractFansLine(__instance, __0);
+        }
     }
 
     [HarmonyPatch]
@@ -398,7 +485,9 @@ namespace SaveNLoadFixes.Repairs
             new Type[] { typeof(business._proposal) }, typeof(void), false); }
         private static bool Prefix(business._proposal __0)
         {
-            if (__0 == null || __0.newFans <= 16777216) return true;
+            if (__0 == null) return true;
+            long exact = WideNumericContinuation.GetBusinessProposalFans(__0);
+            if (exact <= 16777216L) return true;
             WideNumericContinuation.AddBusinessProposalFans(__0); return false;
         }
     }
@@ -411,8 +500,24 @@ namespace SaveNLoadFixes.Repairs
             new Type[] { typeof(business.active_proposal) }, typeof(void), false); }
         private static bool Prefix(business.active_proposal __0)
         {
-            if (__0 == null || __0.Fans_per_week <= 16777216) return true;
+            if (__0 == null) return true;
+            long exact = WideNumericState.GetBusinessContractFans(__0);
+            if (exact <= 16777216L) return true;
             WideNumericContinuation.AddBusinessWeeklyFans(__0); return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessDoWeeklyFans_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.DoWeeklyFans()", typeof(business), nameof(business.DoWeeklyFans),
+            Type.EmptyTypes, typeof(void), false); }
+        private static bool Prefix(business __instance)
+        {
+            if (!WideNumericContinuation.BusinessWeeklyFansNeedWidePath(__instance)) return true;
+            WideNumericContinuation.DoBusinessWeeklyFansWide(__instance);
+            return false;
         }
     }
 
@@ -1389,6 +1494,65 @@ namespace SaveNLoadFixes.Repairs
             if (type == resources.type.scandalPoints) return true;
             WideNumericContinuation.DoWideVnResource(__instance, __0, __1); return false;
         }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ShowReleasedFansDisplay_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Show_Released_Button.UpdateParams()", typeof(Show_Released_Button), "UpdateParams",
+            Type.EmptyTypes, typeof(void), false); }
+        private static void Postfix(Show_Released_Button __instance)
+        { WideNumericContinuation.CorrectReleasedShowFans(__instance); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_SingleFanSatisfaction_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "singles._single.ReleaseData_FanSatisfaction()", typeof(singles._single),
+            "ReleaseData_FanSatisfaction", Type.EmptyTypes, typeof(int), false); }
+        private static bool Prefix(singles._single __instance, ref int __result)
+        {
+            if (resources.GetFansTotal(null) <= 16777216L) return true;
+            __result = WideNumericContinuation.GetSingleFanSatisfaction(__instance);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessLiabilityPreview_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business._data.StringLiability(Boolean)", typeof(business._data), "StringLiability",
+            new Type[] { typeof(bool) }, typeof(string), false); }
+        private static bool Prefix(business._data __instance, bool __0, ref string __result)
+        {
+            if (__instance == null) return true;
+            __result = WideNumericContinuation.GetBusinessLiabilityPreview(__instance, __0);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_StatsBusinessTopPayment_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Stats.OnBusinessProposalAccepted(_proposal)-wide-top-payment", typeof(Stats),
+            nameof(Stats.OnBusinessProposalAccepted), new Type[] { typeof(business._proposal) },
+            typeof(void), true); }
+        private static void Postfix(business._proposal __0)
+        { WideNumericContinuation.RecordBusinessTopPayment(__0); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_StatsResetTopPayments_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Stats.Reset()-wide-top-payment", typeof(Stats), "Reset",
+            Type.EmptyTypes, typeof(void), false); }
+        private static void Postfix()
+        { WideNumericState.ResetBusinessTopPayments(); }
     }
 
     [HarmonyPatch]

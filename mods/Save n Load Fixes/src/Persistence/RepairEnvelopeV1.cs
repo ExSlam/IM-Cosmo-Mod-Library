@@ -229,6 +229,9 @@ namespace SaveNLoadFixes.Persistence
             new List<WideCafeProfitRecordV1>();
         public List<WideBusinessContractPaymentRecordV1> business_contract_payments =
             new List<WideBusinessContractPaymentRecordV1>();
+        public string business_photoshoot_top_payment;
+        public string business_ad_top_payment;
+        public string business_tv_drama_top_payment;
     }
 
     [Serializable]
@@ -322,6 +325,7 @@ namespace SaveNLoadFixes.Persistence
         public int type;
         public string end_date = string.Empty;
         public string payment_per_week = "0";
+        public string fans_per_week;
     }
 
     [Serializable]

@@ -18,7 +18,8 @@ namespace SaveNLoadFixes.Repairs
     {
         internal const int LegacySectionVersion = 1;
         internal const int PreviousSectionVersion = 2;
-        internal const int SectionVersion = 3;
+        internal const int BusinessPaymentSectionVersion = 3;
+        internal const int SectionVersion = 4;
 
         private static readonly object Sync = new object();
         private static long epoch;
@@ -48,6 +49,10 @@ namespace SaveNLoadFixes.Repairs
             new ConditionalWeakTable<business.active_proposal, WideBusinessContractRuntime>();
         private static List<long> statsTotalFans = new List<long>();
         private static List<long> statsFanChanges = new List<long>();
+        private static bool hasBusinessTopPayments;
+        private static long statsPhotoshootTopPayment;
+        private static long statsAdTopPayment;
+        private static long statsTvDramaTopPayment;
         private static bool hasStoryCh3;
         private static long storyCh3;
         private static bool hasStoryCh4;
@@ -126,6 +131,7 @@ namespace SaveNLoadFixes.Repairs
             }
             if ((records.wide_numeric_state_version != LegacySectionVersion &&
                     records.wide_numeric_state_version != PreviousSectionVersion &&
+                    records.wide_numeric_state_version != BusinessPaymentSectionVersion &&
                     records.wide_numeric_state_version != SectionVersion) ||
                 records.wide_numeric_state == null)
             {
@@ -279,20 +285,36 @@ namespace SaveNLoadFixes.Repairs
             {
                 WideBusinessContractPaymentRecordV1 item = state.business_contract_payments[index];
                 long payment;
+                long fans = 0L;
+                bool hasFans = records.wide_numeric_state_version >= SectionVersion;
                 if (item == null || item.ordinal < 0 || !ids.Add(item.ordinal) ||
                     item.girl_id < -1 || string.IsNullOrEmpty(item.end_date) ||
                     !TryParseCanonical(item.payment_per_week, out payment) ||
-                    (payment >= int.MinValue && payment <= int.MaxValue))
+                    (hasFans && !TryParseCanonical(item.fans_per_week, out fans)) ||
+                    (!hasFans && !string.IsNullOrEmpty(item.fans_per_week)) ||
+                    ((payment >= int.MinValue && payment <= int.MaxValue) &&
+                     (!hasFans || (fans >= int.MinValue && fans <= int.MaxValue))))
                 {
-                    error = "A33 business-contract payment records must be unique, witnessed, canonical, and sparse to out-of-Int32 values.";
+                    error = "A33 business-contract records must be unique, witnessed, canonical, version-correct, and sparse to an out-of-Int32 payment or fan value.";
                     return false;
                 }
             }
-            if (records.wide_numeric_state_version < SectionVersion &&
+            if (records.wide_numeric_state_version < BusinessPaymentSectionVersion &&
                 state.business_contract_payments.Count != 0)
             {
-                error = "A33 pre-v3 wide state unexpectedly contains business-contract payment records.";
+                error = "A33 pre-v3 wide state unexpectedly contains business-contract records.";
                 return false;
+            }
+            if (records.wide_numeric_state_version >= SectionVersion)
+            {
+                long photoshoot, ad, tvDrama;
+                if (!TryParseCanonical(state.business_photoshoot_top_payment, out photoshoot) ||
+                    !TryParseCanonical(state.business_ad_top_payment, out ad) ||
+                    !TryParseCanonical(state.business_tv_drama_top_payment, out tvDrama))
+                {
+                    error = "A33 v4 business top-payment statistics are missing or noncanonical.";
+                    return false;
+                }
             }
             return true;
         }
@@ -372,6 +394,45 @@ namespace SaveNLoadFixes.Repairs
             }
         }
 
+        internal static void SetBusinessProposalBaseFans(business._proposal proposal, long value)
+        {
+            if (proposal == null) return;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                WideBusinessProposalRuntime state;
+                if (!BusinessProposals.TryGetValue(proposal, out state))
+                {
+                    state = new WideBusinessProposalRuntime(proposal._payment);
+                    BusinessProposals.Add(proposal, state);
+                }
+                state.BaseFans = value;
+                state.HasFans = true;
+                proposal._newFans = WideNumericMath.ClampToInt32(value);
+            }
+        }
+
+        internal static long GetBusinessProposalBaseFans(business._proposal proposal)
+        {
+            if (proposal == null) return 0L;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                WideBusinessProposalRuntime state;
+                if (!BusinessProposals.TryGetValue(proposal, out state))
+                {
+                    state = new WideBusinessProposalRuntime(proposal._payment);
+                    BusinessProposals.Add(proposal, state);
+                }
+                if (!state.HasFans)
+                {
+                    state.BaseFans = proposal._newFans;
+                    state.HasFans = true;
+                }
+                return state.BaseFans;
+            }
+        }
+
         internal static void SetBusinessContractPayment(business.active_proposal proposal, long value)
         {
             if (proposal == null) return;
@@ -405,6 +466,82 @@ namespace SaveNLoadFixes.Repairs
                     BusinessContracts.Add(proposal, state);
                 }
                 return state.PaymentPerWeek;
+            }
+        }
+
+        internal static void SetBusinessContractFans(business.active_proposal proposal, long value)
+        {
+            if (proposal == null) return;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                WideBusinessContractRuntime state;
+                if (!BusinessContracts.TryGetValue(proposal, out state))
+                {
+                    state = new WideBusinessContractRuntime(proposal.Payment_per_week);
+                    BusinessContracts.Add(proposal, state);
+                }
+                state.FansPerWeek = value;
+                state.HasFans = true;
+                proposal.Fans_per_week = WideNumericMath.ClampToInt32(value);
+            }
+        }
+
+        internal static long GetBusinessContractFans(business.active_proposal proposal)
+        {
+            if (proposal == null) return 0L;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                WideBusinessContractRuntime state;
+                if (!BusinessContracts.TryGetValue(proposal, out state))
+                {
+                    state = new WideBusinessContractRuntime(proposal.Payment_per_week);
+                    BusinessContracts.Add(proposal, state);
+                }
+                if (!state.HasFans)
+                {
+                    state.FansPerWeek = proposal.Fans_per_week;
+                    state.HasFans = true;
+                }
+                return state.FansPerWeek;
+            }
+        }
+
+        internal static void RecordBusinessTopPayment(business._proposal proposal, long exactPayment)
+        {
+            if (proposal == null) return;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                EnsureBusinessTopPaymentsUnlocked();
+                if (proposal.type == business._type.photoshoot && exactPayment > statsPhotoshootTopPayment)
+                {
+                    statsPhotoshootTopPayment = exactPayment;
+                    Stats.data.business.photoshoot_top_payment = WideNumericMath.ClampToInt32(exactPayment);
+                }
+                else if (proposal.type == business._type.ad && exactPayment > statsAdTopPayment)
+                {
+                    statsAdTopPayment = exactPayment;
+                    Stats.data.business.ad_top_payment = WideNumericMath.ClampToInt32(exactPayment);
+                }
+                else if (proposal.type == business._type.tv_drama && exactPayment > statsTvDramaTopPayment)
+                {
+                    statsTvDramaTopPayment = exactPayment;
+                    Stats.data.business.tv_drama_top_payment = WideNumericMath.ClampToInt32(exactPayment);
+                }
+            }
+        }
+
+        internal static void ResetBusinessTopPayments()
+        {
+            EnsureEpoch();
+            lock (Sync)
+            {
+                hasBusinessTopPayments = true;
+                statsPhotoshootTopPayment = 0L;
+                statsAdTopPayment = 0L;
+                statsTvDramaTopPayment = 0L;
             }
         }
 
@@ -1036,6 +1173,7 @@ namespace SaveNLoadFixes.Repairs
             if (
                 (state.Envelope.records.wide_numeric_state_version != LegacySectionVersion &&
                     state.Envelope.records.wide_numeric_state_version != PreviousSectionVersion &&
+                    state.Envelope.records.wide_numeric_state_version != BusinessPaymentSectionVersion &&
                     state.Envelope.records.wide_numeric_state_version != SectionVersion) ||
                 state.Envelope.records.wide_numeric_state == null)
             {
@@ -1045,7 +1183,7 @@ namespace SaveNLoadFixes.Repairs
             }
 
             if (subsystem == Subsystem.BusinessContracts &&
-                state.Envelope.records.wide_numeric_state_version < SectionVersion)
+                state.Envelope.records.wide_numeric_state_version < BusinessPaymentSectionVersion)
             {
                 SeedLegacy(subsystem);
                 Interlocked.Increment(ref legacySeedCount);
@@ -1057,6 +1195,7 @@ namespace SaveNLoadFixes.Repairs
             bool restored = RestoreSubsystem(
                 subsystem,
                 state.Envelope.records.wide_numeric_state,
+                state.Envelope.records.wide_numeric_state_version,
                 out error);
             if (!restored)
             {
@@ -1085,6 +1224,7 @@ namespace SaveNLoadFixes.Repairs
         private static bool RestoreSubsystem(
             Subsystem subsystem,
             WideNumericStateRecordV1 source,
+            int sectionVersion,
             out string error)
         {
             lock (Sync)
@@ -1095,11 +1235,11 @@ namespace SaveNLoadFixes.Repairs
                     case Subsystem.Singles: return RestoreSingles(source, out error);
                     case Subsystem.Shows: return RestoreShows(source, out error);
                     case Subsystem.Theaters: return RestoreTheaters(source, out error);
-                    case Subsystem.Stats: return RestoreStats(source, out error);
+                    case Subsystem.Stats: return RestoreStats(source, sectionVersion, out error);
                     case Subsystem.Story: return RestoreStory(source, out error);
                     case Subsystem.Loans: return RestoreLoans(source, out error);
                     case Subsystem.Cafes: return RestoreCafes(source, out error);
-                    case Subsystem.BusinessContracts: return RestoreBusinessContracts(source, out error);
+                    case Subsystem.BusinessContracts: return RestoreBusinessContracts(source, sectionVersion, out error);
                     default: error = "unknown subsystem"; return false;
                 }
             }
@@ -1423,6 +1563,20 @@ namespace SaveNLoadFixes.Repairs
                 result.stats_total_fans_per_week.Add(Format(statsTotalFans[index]));
                 result.stats_fans_change_per_week.Add(Format(statsFanChanges[index]));
             }
+            EnsureBusinessTopPaymentsUnlocked();
+            if (!Mirror(statsPhotoshootTopPayment, Stats.data.business.photoshoot_top_payment,
+                    data.Stats__data.photoshoot_top_payment) ||
+                !Mirror(statsAdTopPayment, Stats.data.business.ad_top_payment,
+                    data.Stats__data.ad_top_payment) ||
+                !Mirror(statsTvDramaTopPayment, Stats.data.business.tv_drama_top_payment,
+                    data.Stats__data.tv_drama_top_payment))
+            {
+                error = "A33 business top-payment compatibility mirror differs from the frozen Stats DTO.";
+                return false;
+            }
+            result.business_photoshoot_top_payment = Format(statsPhotoshootTopPayment);
+            result.business_ad_top_payment = Format(statsAdTopPayment);
+            result.business_tv_drama_top_payment = Format(statsTvDramaTopPayment);
             return true;
         }
 
@@ -1614,12 +1768,15 @@ namespace SaveNLoadFixes.Repairs
                     return false;
                 }
                 long exact = GetBusinessContractPayment(live);
-                if (!Mirror(exact, live.Payment_per_week, saved.Payment_per_week))
+                long exactFans = GetBusinessContractFans(live);
+                if (!Mirror(exact, live.Payment_per_week, saved.Payment_per_week) ||
+                    !Mirror(exactFans, live.Fans_per_week, saved.Fans_per_week))
                 {
-                    error = "A33 business-contract payment differs from its Int32 compatibility mirror.";
+                    error = "A33 business-contract payment/fan value differs from its Int32 compatibility mirror.";
                     return false;
                 }
-                if (exact < int.MinValue || exact > int.MaxValue)
+                if (exact < int.MinValue || exact > int.MaxValue ||
+                    exactFans < int.MinValue || exactFans > int.MaxValue)
                 {
                     result.business_contract_payments.Add(new WideBusinessContractPaymentRecordV1
                     {
@@ -1628,7 +1785,8 @@ namespace SaveNLoadFixes.Repairs
                         skill = (int)live.Skill,
                         type = (int)live.Type,
                         end_date = ExtensionMethods.ToDataString(live.EndDate),
-                        payment_per_week = Format(exact)
+                        payment_per_week = Format(exact),
+                        fans_per_week = Format(exactFans)
                     });
                 }
             }
@@ -1845,7 +2003,7 @@ namespace SaveNLoadFixes.Repairs
             return true;
         }
 
-        private static bool RestoreStats(WideNumericStateRecordV1 source, out string error)
+        private static bool RestoreStats(WideNumericStateRecordV1 source, int sectionVersion, out string error)
         {
             error = string.Empty;
             if (source.stats_total_fans_per_week.Count != Stats.data.fans.total_fans_per_week.Count ||
@@ -1872,6 +2030,29 @@ namespace SaveNLoadFixes.Repairs
             }
             statsTotalFans = totals;
             statsFanChanges = changes;
+            if (sectionVersion >= SectionVersion)
+            {
+                long photoshoot, ad, tvDrama;
+                if (!TryParseCanonical(source.business_photoshoot_top_payment, out photoshoot) ||
+                    !TryParseCanonical(source.business_ad_top_payment, out ad) ||
+                    !TryParseCanonical(source.business_tv_drama_top_payment, out tvDrama) ||
+                    !Mirror(photoshoot, Stats.data.business.photoshoot_top_payment) ||
+                    !Mirror(ad, Stats.data.business.ad_top_payment) ||
+                    !Mirror(tvDrama, Stats.data.business.tv_drama_top_payment))
+                {
+                    error = "business top-payment statistic is inconsistent with its vanilla mirror";
+                    return false;
+                }
+                statsPhotoshootTopPayment = photoshoot;
+                statsAdTopPayment = ad;
+                statsTvDramaTopPayment = tvDrama;
+                hasBusinessTopPayments = true;
+            }
+            else
+            {
+                hasBusinessTopPayments = false;
+                EnsureBusinessTopPaymentsUnlocked();
+            }
             return true;
         }
 
@@ -1989,7 +2170,7 @@ namespace SaveNLoadFixes.Repairs
             return true;
         }
 
-        private static bool RestoreBusinessContracts(WideNumericStateRecordV1 source, out string error)
+        private static bool RestoreBusinessContracts(WideNumericStateRecordV1 source, int sectionVersion, out string error)
         {
             error = string.Empty;
             mainScript main = Camera.main == null ? null : Camera.main.GetComponent<mainScript>();
@@ -2009,7 +2190,8 @@ namespace SaveNLoadFixes.Repairs
                     error = "current business-contract set contains a null row";
                     return false;
                 }
-                pending.Add(live, new WideBusinessContractRuntime(live.Payment_per_week));
+                pending.Add(live, new WideBusinessContractRuntime(
+                    live.Payment_per_week, live.Fans_per_week));
             }
 
             foreach (WideBusinessContractPaymentRecordV1 item in source.business_contract_payments)
@@ -2021,18 +2203,23 @@ namespace SaveNLoadFixes.Repairs
                 }
                 business.active_proposal live = manager.ActiveProposals[item.ordinal];
                 long exact;
+                long exactFans = live.Fans_per_week;
                 int girlId = live.Girl == null ? -1 : live.Girl.id;
                 if (!TryParseCanonical(item.payment_per_week, out exact) ||
+                    (sectionVersion >= SectionVersion &&
+                        !TryParseCanonical(item.fans_per_week, out exactFans)) ||
                     item.girl_id != girlId || item.skill != (int)live.Skill || item.type != (int)live.Type ||
                     item.end_date != ExtensionMethods.ToDataString(live.EndDate) ||
-                    !Mirror(exact, live.Payment_per_week))
+                    !Mirror(exact, live.Payment_per_week) ||
+                    (sectionVersion >= SectionVersion && !Mirror(exactFans, live.Fans_per_week)))
                 {
-                    error = "business-contract payment identity/witness/mirror is inconsistent";
+                    error = "business-contract payment/fan identity/witness/mirror is inconsistent";
                     return false;
                 }
                 pending.Remove(live);
-                pending.Add(live, new WideBusinessContractRuntime(exact));
+                pending.Add(live, new WideBusinessContractRuntime(exact, exactFans));
                 live.Payment_per_week = WideNumericMath.ClampToInt32(exact);
+                live.Fans_per_week = WideNumericMath.ClampToInt32(exactFans);
             }
             BusinessContracts = pending;
             return true;
@@ -2075,6 +2262,8 @@ namespace SaveNLoadFixes.Repairs
                     case Subsystem.Stats:
                         statsTotalFans = Mirror(Stats.data.fans.total_fans_per_week);
                         statsFanChanges = Mirror(Stats.data.fans.fans_change_per_week);
+                        hasBusinessTopPayments = false;
+                        EnsureBusinessTopPaymentsUnlocked();
                         break;
                     case Subsystem.Story:
                         hasStoryCh3 = true;
@@ -2105,7 +2294,9 @@ namespace SaveNLoadFixes.Repairs
                         business manager = main == null || main.Data == null ? null : main.Data.GetComponent<business>();
                         if (manager != null && manager.ActiveProposals != null)
                             foreach (business.active_proposal proposal in manager.ActiveProposals)
-                                if (proposal != null) BusinessContracts.Add(proposal, new WideBusinessContractRuntime(proposal.Payment_per_week));
+                                if (proposal != null) BusinessContracts.Add(proposal,
+                                    new WideBusinessContractRuntime(proposal.Payment_per_week,
+                                        proposal.Fans_per_week));
                         break;
                     }
                 }
@@ -2220,6 +2411,15 @@ namespace SaveNLoadFixes.Repairs
                 statsFanChanges = Mirror(Stats.data.fans.fans_change_per_week);
         }
 
+        private static void EnsureBusinessTopPaymentsUnlocked()
+        {
+            if (hasBusinessTopPayments) return;
+            statsPhotoshootTopPayment = Stats.data.business.photoshoot_top_payment;
+            statsAdTopPayment = Stats.data.business.ad_top_payment;
+            statsTvDramaTopPayment = Stats.data.business.tv_drama_top_payment;
+            hasBusinessTopPayments = true;
+        }
+
         private static void EnsureEpoch()
         {
             long current = LoadEpoch.Current;
@@ -2233,6 +2433,10 @@ namespace SaveNLoadFixes.Repairs
                 BusinessContracts = new ConditionalWeakTable<business.active_proposal, WideBusinessContractRuntime>();
                 statsTotalFans = new List<long>();
                 statsFanChanges = new List<long>();
+                hasBusinessTopPayments = false;
+                statsPhotoshootTopPayment = 0L;
+                statsAdTopPayment = 0L;
+                statsTvDramaTopPayment = 0L;
                 hasStoryCh3 = false; storyCh3 = 0L; hasStoryCh4 = false; storyCh4 = 0L;
                 hasStoryCh4Scandal = false; storyCh4Scandal = 0L;
                 epoch = current;
@@ -2356,13 +2560,23 @@ namespace SaveNLoadFixes.Repairs
     internal sealed class WideBusinessProposalRuntime
     {
         internal long BasePayment;
+        internal long BaseFans;
+        internal bool HasFans;
         internal WideBusinessProposalRuntime(long value) { BasePayment = value; }
     }
 
     internal sealed class WideBusinessContractRuntime
     {
         internal long PaymentPerWeek;
+        internal long FansPerWeek;
+        internal bool HasFans;
         internal WideBusinessContractRuntime(long value) { PaymentPerWeek = value; }
+        internal WideBusinessContractRuntime(long payment, long fans)
+        {
+            PaymentPerWeek = payment;
+            FansPerWeek = fans;
+            HasFans = true;
+        }
     }
 
     internal sealed class WideSingleRuntime
