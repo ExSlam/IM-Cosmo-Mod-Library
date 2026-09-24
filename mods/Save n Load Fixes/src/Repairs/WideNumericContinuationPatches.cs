@@ -273,8 +273,121 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "business.AddWeeklyEarnings()", typeof(business), nameof(business.AddWeeklyEarnings),
             Type.EmptyTypes, typeof(void), false); }
-        private static void Prefix(business __instance)
-        { WideNumericContinuation.PreflightBusinessWeeklyEarnings(__instance); }
+        private static bool Prefix(business __instance)
+        { WideNumericContinuation.AddBusinessWeeklyEarnings(__instance); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessProposalPaymentGetter_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business._proposal.get_payment()", typeof(business._proposal), "get_payment",
+            Type.EmptyTypes, typeof(int), false); }
+        private static bool Prefix(business._proposal __instance, ref int __result)
+        { __result = WideNumericContinuation.GetBusinessProposalPaymentCompatibility(__instance); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessProposalPaymentSetter_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business._proposal.set_payment(Int32)", typeof(business._proposal), "set_payment",
+            new Type[] { typeof(int) }, typeof(void), false); }
+        private static void Postfix(business._proposal __instance, int __0)
+        { WideNumericContinuation.SetBusinessProposalPaymentCompatibility(__instance, __0); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessGenerateProposalPayment_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.GenerateProposal(_data,_staff,Int32)", typeof(business), "GenerateProposal",
+            new Type[] { typeof(business._data), typeof(staff._staff), typeof(int) },
+            typeof(void), false); }
+
+        private static IEnumerable<CodeInstruction> Transpiler(
+            IEnumerable<CodeInstruction> instructions)
+        {
+            List<CodeInstruction> code = new List<CodeInstruction>(instructions);
+            MethodInfo floor = AccessTools.Method(typeof(Mathf), nameof(Mathf.FloorToInt),
+                new Type[] { typeof(float) });
+            MethodInfo setter = AccessTools.PropertySetter(typeof(business._proposal), "payment");
+            MethodInfo helper = AccessTools.Method(typeof(WideNumericContinuation),
+                nameof(WideNumericContinuation.SetGeneratedBusinessProposalPayment));
+            if (floor == null || setter == null || helper == null)
+                throw new MissingMethodException(
+                    "A33.4 business proposal payment widening could not resolve its audited methods.");
+
+            int replacements = 0;
+            for (int i = 3; i + 1 < code.Count; i++)
+            {
+                if (!code[i].Calls(floor) || !code[i + 1].Calls(setter) ||
+                    code[i - 1].opcode != OpCodes.Mul ||
+                    code[i - 3].opcode != OpCodes.Conv_R4 ||
+                    !IsLoadLocal(code[i - 2].opcode))
+                    continue;
+
+                int start = i - 3;
+                int end = i + 1;
+                CodeInstruction coefficientLoad = new CodeInstruction(
+                    code[i - 2].opcode, code[i - 2].operand);
+                for (int j = start; j <= end; j++)
+                {
+                    coefficientLoad.labels.AddRange(code[j].labels);
+                    coefficientLoad.blocks.AddRange(code[j].blocks);
+                }
+                code.RemoveRange(start, end - start + 1);
+                code.Insert(start, coefficientLoad);
+                code.Insert(start + 1, new CodeInstruction(OpCodes.Call, helper));
+                replacements++;
+                i = start + 1;
+            }
+
+            if (replacements != 1)
+                throw new InvalidOperationException(
+                    "A33.4 expected exactly one business proposal payment FloorToInt/set_payment sequence, found " +
+                    replacements + ".");
+            return code;
+        }
+
+        private static bool IsLoadLocal(OpCode opcode)
+        {
+            return opcode == OpCodes.Ldloc || opcode == OpCodes.Ldloc_S ||
+                opcode == OpCodes.Ldloc_0 || opcode == OpCodes.Ldloc_1 ||
+                opcode == OpCodes.Ldloc_2 || opcode == OpCodes.Ldloc_3;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessAddActiveProposal_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.AddActiveProposal(_proposal)", typeof(business), nameof(business.AddActiveProposal),
+            new Type[] { typeof(business._proposal) }, typeof(void), false); }
+        private static void Prefix(business __instance, out int __state)
+        { __state = __instance == null || __instance.ActiveProposals == null ? -1 : __instance.ActiveProposals.Count; }
+        private static void Postfix(business __instance, business._proposal __0, int __state)
+        { if (__state >= 0) WideNumericContinuation.CompleteBusinessActiveProposalAdd(__instance, __0, __state); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessPopupPayment_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Business_Popup.Set(_proposal)", typeof(Business_Popup), nameof(Business_Popup.Set),
+            new Type[] { typeof(business._proposal) }, typeof(void), false); }
+        private static void Postfix(Business_Popup __instance, business._proposal __0)
+        { WideNumericContinuation.CorrectBusinessPopupPayment(__instance, __0); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ContractsLinePayment_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Contracts_Line.Set(active_proposal)", typeof(Contracts_Line), nameof(Contracts_Line.Set),
+            new Type[] { typeof(business.active_proposal) }, typeof(void), false); }
+        private static void Postfix(Contracts_Line __instance, business.active_proposal __0)
+        { WideNumericContinuation.CorrectBusinessContractPaymentLine(__instance, __0); }
     }
 
     [HarmonyPatch]
@@ -770,7 +883,12 @@ namespace SaveNLoadFixes.Repairs
             "SEvent_Tour.tour.AddRevenue(Int32)", typeof(SEvent_Tour.tour), nameof(SEvent_Tour.tour.AddRevenue),
             new Type[] { typeof(int) }, typeof(void), false); }
         private static bool Prefix(SEvent_Tour.tour __instance, int __0)
-        { WideNumericState.AddTourRevenue(__instance, __0); if (__instance.Update != null) __instance.Update(); return false; }
+        {
+            long adjusted = TbsBalancePatchWideNumericInterop.ApplyTourRevenueMultiplier(__0);
+            WideNumericState.AddTourRevenue(__instance, adjusted);
+            if (__instance.Update != null) __instance.Update();
+            return false;
+        }
     }
 
     [HarmonyPatch]
@@ -2392,5 +2510,13 @@ namespace SaveNLoadFixes.Repairs
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
             "Cafes.LoadFunction()", typeof(Cafes), nameof(Cafes.LoadFunction), Type.EmptyTypes, typeof(void), false); }
         private static void Postfix() { WideNumericState.RestoreCafesAfterVanillaLoad(); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessLoad_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.LoadFunction()", typeof(business), nameof(business.LoadFunction), Type.EmptyTypes, typeof(void), false); }
+        private static void Postfix() { WideNumericState.RestoreBusinessContractsAfterVanillaLoad(); }
     }
 }

@@ -307,7 +307,8 @@ namespace SaveNLoadFixes.Persistence
             if (marker == null ||
                 (marker.Kind != FiniteJsonKind.Number && marker.Kind != FiniteJsonKind.String) ||
                 (!string.Equals(marker.Text, "1", StringComparison.Ordinal) &&
-                 !string.Equals(marker.Text, "2", StringComparison.Ordinal)))
+                 !string.Equals(marker.Text, "2", StringComparison.Ordinal) &&
+                 !string.Equals(marker.Text, "3", StringComparison.Ordinal)))
             {
                 // The typed materializer/section validator reports zero or unsupported
                 // marker values. Only a claimed current section needs the raw presence proof.
@@ -320,11 +321,12 @@ namespace SaveNLoadFixes.Persistence
                 error = "A33 wide_numeric_state marker is present but its raw state object is missing.";
                 return false;
             }
+            int wideVersion = int.Parse(marker.Text, CultureInfo.InvariantCulture);
             return TryRequireCompleteRawSchema(
                 wide,
                 typeof(WideNumericStateRecordV1),
                 "$.records.wide_numeric_state",
-                string.Equals(marker.Text, "1", StringComparison.Ordinal),
+                wideVersion,
                 out error);
         }
 
@@ -332,7 +334,7 @@ namespace SaveNLoadFixes.Persistence
             FiniteJsonValue node,
             Type targetType,
             string path,
-            bool allowLegacyA33StoryFields,
+            int wideNumericVersion,
             out string error)
         {
             error = string.Empty;
@@ -355,7 +357,7 @@ namespace SaveNLoadFixes.Persistence
                             node.ArrayValues[index],
                             elementType,
                             path + "[" + index.ToString(CultureInfo.InvariantCulture) + "]",
-                            false,
+                            wideNumericVersion,
                             out error))
                     {
                         return false;
@@ -381,12 +383,12 @@ namespace SaveNLoadFixes.Persistence
                 FiniteJsonValue child;
                 if (!node.ObjectValues.TryGetValue(field.Name, out child))
                 {
-                    if (allowLegacyA33StoryFields &&
-                        targetType == typeof(WideNumericStateRecordV1) &&
-                        (string.Equals(field.Name, "has_story_ch4_scandal_points",
-                             StringComparison.Ordinal) ||
-                         string.Equals(field.Name, "story_ch4_scandal_points",
-                             StringComparison.Ordinal)))
+                    if (targetType == typeof(WideNumericStateRecordV1) &&
+                        ((wideNumericVersion == 1 &&
+                          (string.Equals(field.Name, "has_story_ch4_scandal_points", StringComparison.Ordinal) ||
+                           string.Equals(field.Name, "story_ch4_scandal_points", StringComparison.Ordinal))) ||
+                         (wideNumericVersion < 3 &&
+                          string.Equals(field.Name, "business_contract_payments", StringComparison.Ordinal))))
                     {
                         continue;
                     }
@@ -398,7 +400,7 @@ namespace SaveNLoadFixes.Persistence
                         child,
                         field.FieldType,
                         path + "." + field.Name,
-                        false,
+                        wideNumericVersion,
                         out error))
                 {
                     return false;

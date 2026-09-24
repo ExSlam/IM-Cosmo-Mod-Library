@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.5.4 - Business payment widening and TBS Balance Patch 1.0.0 compatibility
+
+- Adds A35/A33.4 continuation for vanilla business proposal payments. The generated payment is widened before `Mathf.FloorToInt`, exact proposal payment remains in an Int64 sidecar, and vanilla `int` fields are retained only as clamped compatibility mirrors.
+- Carries exact business payment through proposal liability, acceptance, agency money, idol earnings, history, recurring active-contract income, weekly profit, money-earned calculations, and the relevant proposal/contract UI.
+- Advances the A33 wide-state section to version 3 and persists sparse out-of-Int32 active-contract weekly payments with ordinal, idol, skill, type, date, and compatibility-mirror witnesses. Pre-v3 saves seed from their surviving vanilla Int32 values rather than inventing lost high bits.
+- Adds an optional, load-order-independent compatibility profile for TrueBlueSwablu's TBS Balance Patch (`com.tbs.balancepatch`) 1.0.0 / assembly 1.0.0.0. Unknown or shape-mismatched versions are left untouched and reported as unsupported.
+- Preserves the audited Balance Patch proposal, tour, sister-group fan, CD softcap, idol salary, and hard-mode loan settings/formulas while applying them to SNLF's authoritative wide values and avoiding Single/Int32 narrowing where values leave the original exact domain.
+- Integrates Balance Patch proposal scaling on top of the new vanilla business-payment continuation, so the +business-payment setting can operate on exact values instead of the clamped vanilla `int` property.
+- Corrects the audited Balance Patch 1.0.0 main-group fan postfix in the SNLF compatibility replacement: the source mod computes a fame-scaled `mult` but mistakenly applies raw `MAIN_GROUP_MULT`; SNLF applies the computed `mult` as the source code's log/tooltip and apparent intent indicate.
+- Integrates Balance Patch tour and sister-group modifiers into SNLF paths that otherwise bypass the original patched vanilla methods, and integrates its hard-mode loan modifier into SNLF's direct available-loan calculation.
+- Bumps the public version from `5.5.3` to `5.5.4` under the decimal-carry release numbering scheme.
+
 ## 5.5.3 - Fans Watch Shows 1.0.0 wide-number compatibility
 
 - Added an optional, version-gated compatibility profile for TrueBlueSwablu's Fans Watch Shows (`com.tbs.fanswatch`) 1.0.0 / assembly 1.0.0.0.

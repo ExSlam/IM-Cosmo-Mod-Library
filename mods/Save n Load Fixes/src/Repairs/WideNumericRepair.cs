@@ -490,7 +490,7 @@ namespace SaveNLoadFixes.Repairs
                     "loans.GetTotalAvailableAmount bank multiplier");
             }
 
-            return amount;
+            return TbsBalancePatchWideNumericInterop.ApplyLoanAvailabilityMultiplier(amount);
         }
 
         internal static long CalculateAmountAvailableForLoan(loans._loan._type type)
@@ -532,7 +532,7 @@ namespace SaveNLoadFixes.Repairs
                 "business.active_proposal.GetMoneyEarned elapsed weeks");
             return Multiply(
                 completedWeeks,
-                (long)proposal.Payment_per_week,
+                WideNumericState.GetBusinessContractPayment(proposal),
                 "business.active_proposal.GetMoneyEarned");
         }
 
@@ -544,7 +544,7 @@ namespace SaveNLoadFixes.Repairs
                 return 0L;
             }
 
-            long payment = (long)proposal.payment;
+            long payment = WideNumericContinuation.GetBusinessProposalPayment(proposal);
             long liability;
             if (proposal.duration == 0)
             {
@@ -595,33 +595,38 @@ namespace SaveNLoadFixes.Repairs
 
             business._proposal proposal = owner.ActiveProposal;
             WideNumericContinuation.PreflightBusinessAcceptCounters(proposal);
-            if (proposal.duration <= 0)
+            long exactPayment = WideNumericContinuation.GetBusinessProposalPayment(proposal);
+            int observedPayment = WideNumericMath.ClampToInt32(exactPayment);
+
+            // Accept applies one immediate payment to both agency money and the idol's
+            // career earnings even when the proposal also becomes a weekly contract.
+            // Preflight the authoritative exact mutation before vanilla commits the
+            // Int32 compatibility image.
+            long agencyBefore = resources.Get(resources.type.money, false);
+            Add(agencyBefore, exactPayment, "business.Accept agency payment preflight");
+            if (proposal.girl != null)
+                Add(proposal.girl.Earnings_CurrentMonth, exactPayment,
+                    "business.Accept idol earnings preflight");
+
+            long exactMoney = exactPayment;
+            long expectedVanillaMoney = observedPayment;
+            if (proposal.duration > 0)
             {
-                // Vanilla already widens the immediate-payment branch before any
-                // arithmetic. It is intentionally left completely untouched, including
-                // its source-order payment getter after the one-off training mutation.
-                return null;
+                exactMoney = Multiply(exactMoney, (long)proposal.duration,
+                    "business.Accept history duration");
+                exactMoney = Multiply(exactMoney, 4L,
+                    "business.Accept history weeks per month");
+                expectedVanillaMoney = (long)unchecked(observedPayment * proposal.duration * 4);
             }
-
-            int observedPayment = proposal.payment;
-            long exactMoney = Multiply(
-                (long)observedPayment,
-                (long)proposal.duration,
-                "business.Accept history duration");
-            exactMoney = Multiply(
-                exactMoney,
-                4L,
-                "business.Accept history weeks per month");
-
-            int vanillaWrappedMoney = unchecked(
-                observedPayment * proposal.duration * 4);
 
             return new WideBusinessAcceptState
             {
                 Proposal = proposal,
                 HistoryCount = business.History.Count,
+                ExactPayment = exactPayment,
+                CompatibilityPayment = observedPayment,
                 ExactHistoryMoney = exactMoney,
-                ExpectedVanillaHistoryMoney = (long)vanillaWrappedMoney
+                ExpectedVanillaHistoryMoney = expectedVanillaMoney
             };
         }
 
@@ -630,6 +635,17 @@ namespace SaveNLoadFixes.Repairs
             if (state == null)
             {
                 return;
+            }
+
+            long paymentCorrection = Subtract(
+                state.ExactPayment,
+                state.CompatibilityPayment,
+                "business.Accept exact payment correction");
+            if (paymentCorrection != 0L)
+            {
+                resources.Add(resources.type.money, paymentCorrection);
+                if (state.Proposal != null && state.Proposal.girl != null)
+                    state.Proposal.girl.Earn(paymentCorrection);
             }
 
             if (business.History == null ||
@@ -940,6 +956,8 @@ namespace SaveNLoadFixes.Repairs
     {
         internal business._proposal Proposal;
         internal int HistoryCount;
+        internal long ExactPayment;
+        internal int CompatibilityPayment;
         internal long ExactHistoryMoney;
         internal long ExpectedVanillaHistoryMoney;
     }

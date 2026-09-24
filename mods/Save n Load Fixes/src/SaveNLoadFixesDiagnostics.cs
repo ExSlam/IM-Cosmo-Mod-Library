@@ -47,6 +47,21 @@ namespace SaveNLoadFixes
             get { return FansWatchShowsWideNumericInterop.AppliedCount; }
         }
 
+        public static bool TbsBalancePatchWideNumericCompatibilityActive
+        {
+            get { return TbsBalancePatchWideNumericInterop.ProfileActive; }
+        }
+
+        public static string TbsBalancePatchWideNumericCompatibilityStatus
+        {
+            get { return TbsBalancePatchWideNumericInterop.Status; }
+        }
+
+        public static long TbsBalancePatchWideNumericCompatibilityAppliedCount
+        {
+            get { return TbsBalancePatchWideNumericInterop.AppliedCount; }
+        }
+
         public static bool RepairsImplemented
         {
             get { return true; }

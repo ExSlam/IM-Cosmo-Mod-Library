@@ -743,11 +743,67 @@ namespace SaveNLoadFixes.Repairs
                         room.addFloat(Floats.type.icon_money, "", false, null, 0f, 1f, 0f, null);
         }
 
+        internal static void SetGeneratedBusinessProposalPayment(
+            business._proposal proposal, int basePayment, float generationCoefficient)
+        {
+            if (proposal == null) return;
+            long exact = FloorSingleCompatible(
+                basePayment,
+                generationCoefficient,
+                "business.GenerateProposal payment");
+            WideNumericState.SetBusinessProposalBasePayment(proposal, exact);
+        }
+
+        internal static long GetBusinessProposalPayment(business._proposal proposal)
+        {
+            if (proposal == null) return 0L;
+            long basis = WideNumericState.GetBusinessProposalBasePayment(proposal);
+            float girlCoefficient = proposal.girl == null ? 1f : proposal.GetGirlCoeff(proposal.girl);
+            return RoundSingleProductCompatible(
+                basis,
+                "business._proposal.payment",
+                girlCoefficient,
+                proposal.negotiationCoeff);
+        }
+
+        internal static int GetBusinessProposalPaymentCompatibility(business._proposal proposal)
+        {
+            return WideNumericMath.ClampToInt32(GetBusinessProposalPayment(proposal));
+        }
+
+        internal static void SetBusinessProposalPaymentCompatibility(
+            business._proposal proposal, int value)
+        {
+            WideNumericState.SetBusinessProposalBasePayment(proposal, value);
+        }
+
+        internal static void CompleteBusinessActiveProposalAdd(
+            business owner, business._proposal source, int priorCount)
+        {
+            if (owner == null || source == null || owner.ActiveProposals == null ||
+                owner.ActiveProposals.Count != priorCount + 1)
+            {
+                WideNumericRepair.LatchInvariantFailure(
+                    "business.AddActiveProposal did not append exactly one active contract.");
+                return;
+            }
+            business.active_proposal active = owner.ActiveProposals[owner.ActiveProposals.Count - 1];
+            if (active == null || active.Girl != source.girl || active.Type != source.type ||
+                active.Skill != source.skill)
+            {
+                WideNumericRepair.LatchInvariantFailure(
+                    "business.AddActiveProposal appended a contract that does not match its source proposal.");
+                return;
+            }
+            WideNumericState.SetBusinessContractPayment(active, GetBusinessProposalPayment(source));
+        }
+
         internal static long GetBusinessWeeklyProfit(business instance)
         {
             long total = 0L;
             foreach (business.active_proposal proposal in instance.ActiveProposals)
-                total = WideNumericRepair.Add(total, proposal.Payment_per_week,
+                total = WideNumericRepair.Add(total,
+                    WideNumericState.GetBusinessContractPayment(proposal),
                     "business.GetTotalWeeklyProfit");
             return total;
         }
@@ -891,8 +947,47 @@ namespace SaveNLoadFixes.Repairs
                 if (!projected.TryGetValue(proposal.Girl, out current))
                     current = proposal.Girl.Earnings_CurrentMonth;
                 projected[proposal.Girl] = WideNumericRepair.Add(current,
-                    proposal.Payment_per_week, "business.AddWeeklyEarnings");
+                    WideNumericState.GetBusinessContractPayment(proposal),
+                    "business.AddWeeklyEarnings");
             }
+        }
+
+        internal static void AddBusinessWeeklyEarnings(business instance)
+        {
+            PreflightBusinessWeeklyEarnings(instance);
+            foreach (business.active_proposal proposal in instance.ActiveProposals)
+            {
+                if (proposal == null || proposal.Girl == null) continue;
+                proposal.Girl.Earn(WideNumericState.GetBusinessContractPayment(proposal));
+            }
+        }
+
+        internal static void CorrectBusinessPopupPayment(Business_Popup view, business._proposal proposal)
+        {
+            if (view == null || view.rightCol == null || proposal == null) return;
+            long exact = GetBusinessProposalPayment(proposal);
+            int mirror = WideNumericMath.ClampToInt32(exact);
+            if (exact == mirror) return;
+            TMPro.TextMeshProUGUI text = view.rightCol.GetComponent<TMPro.TextMeshProUGUI>();
+            if (text == null || string.IsNullOrEmpty(text.text)) return;
+            string before = ExtensionMethods.color(
+                mainScript.yen + ExtensionMethods.formatNumber(mirror, false, false),
+                mainScript.green);
+            string after = ExtensionMethods.color(
+                mainScript.yen + ExtensionMethods.formatNumber(exact, false, false),
+                mainScript.green);
+            int index = text.text.IndexOf(before, StringComparison.Ordinal);
+            if (index >= 0)
+                text.text = text.text.Substring(0, index) + after +
+                    text.text.Substring(index + before.Length);
+        }
+
+        internal static void CorrectBusinessContractPaymentLine(
+            Contracts_Line view, business.active_proposal proposal)
+        {
+            if (view == null || view.Payment == null || proposal == null) return;
+            ExtensionMethods.SetText(view.Payment, ExtensionMethods.formatMoney(
+                WideNumericState.GetBusinessContractPayment(proposal), false, false));
         }
 
         internal static void AddBusinessProposalFans(business._proposal proposal)
@@ -3032,16 +3127,26 @@ namespace SaveNLoadFixes.Repairs
             long exactFans = WideNumericRepair.CalculateGroupFansByType(
                 group, gender, hardcoreness, age);
             int maxFans = Groups.GetMaxFans(gender, hardcoreness, age);
-            if (exactFans <= maxFans || maxFans <= 0) return baseValue;
-            if (exactFans >= WideNumericRepair.Multiply(maxFans, 2L,
+            long result;
+            if (exactFans <= maxFans || maxFans <= 0)
+            {
+                result = baseValue;
+            }
+            else if (exactFans >= WideNumericRepair.Multiply(maxFans, 2L,
                 "Groups._group.GetNewFansPerSingle saturation"))
-                return RoundSingleCompatible(baseValue, 0.01f,
+            {
+                result = RoundSingleCompatible(baseValue, 0.01f,
                     "Groups._group.GetNewFansPerSingle minimum");
-            long numerator = WideNumericRepair.Subtract(
-                WideNumericRepair.Multiply(maxFans, 2L,
-                    "Groups._group.GetNewFansPerSingle coefficient"),
-                exactFans, "Groups._group.GetNewFansPerSingle coefficient");
-            return WideNumericMath.RoundRatioToEven(baseValue, numerator, maxFans);
+            }
+            else
+            {
+                long numerator = WideNumericRepair.Subtract(
+                    WideNumericRepair.Multiply(maxFans, 2L,
+                        "Groups._group.GetNewFansPerSingle coefficient"),
+                    exactFans, "Groups._group.GetNewFansPerSingle coefficient");
+                result = WideNumericMath.RoundRatioToEven(baseValue, numerator, maxFans);
+            }
+            return TbsBalancePatchWideNumericInterop.ApplySisterGroupMultiplier(result);
         }
 
         private static long SumSingleSales(List<singles._single._sales> sales)
@@ -3485,13 +3590,15 @@ namespace SaveNLoadFixes.Repairs
             int attendancePercent = Mathf.RoundToInt(
                 (float)attendance / (float)capacity * 100f);
             long existingFans = WideNumericState.GetTourCountryFans(tour, ordinal);
-            WideNumericRepair.Add(WideNumericState.GetTourRevenue(tour), revenue,
+            long adjustedRevenue =
+                TbsBalancePatchWideNumericInterop.ApplyTourRevenueMultiplier(revenue);
+            WideNumericRepair.Add(WideNumericState.GetTourRevenue(tour), adjustedRevenue,
                 "Tour_Popup_Country.AnimateAttendance tour revenue preflight");
 
             selected.Attendance = attendancePercent;
             WideNumericState.SetTourCountryValues(tour, ordinal, attendance,
                 existingFans, revenue);
-            WideNumericState.AddTourRevenue(tour, revenue);
+            WideNumericState.AddTourRevenue(tour, adjustedRevenue);
 
             string attendanceText = (string)TourPopupAttendanceString.Invoke(
                 popup, new object[] { attendance, selected.Level });
@@ -5522,6 +5629,10 @@ namespace SaveNLoadFixes.Repairs
             "resources.Buzz_Daily()", "resources.Fame_Daily()", "resources.DailyFansChange()",
             "business.GetTotalWeeklyProfit()", "business.GetTotalWeeklyBuzz()",
             "business.GetTotalWeeklyFame()", "business.AddWeeklyEarnings()",
+            "business._proposal.get_payment()", "business._proposal.set_payment(Int32)",
+            "business.GenerateProposal(_data,_staff,Int32)",
+            "business.AddActiveProposal(_proposal)", "Business_Popup.Set(_proposal)",
+            "Contracts_Line.Set(active_proposal)",
             "business.AddFans(_proposal)", "business.AddFans(active_proposal)",
             "Rivals.OnNewMonth(Boolean)",
             "loans.GetTotalPaymentPerWeek()",
@@ -5552,7 +5663,7 @@ namespace SaveNLoadFixes.Repairs
             "singles.GetNewSingleID()", "Shows.GetNewShowID()",
             "SEvent_Tour.LoadFunction()", "singles.LoadFunction()", "Shows.LoadFunction()",
             "Theaters.LoadFunction()", "Stats.LoadFunction()", "tasks.LoadFunction()",
-            "loans.LoadFunction()", "Cafes.LoadFunction()",
+            "loans.LoadFunction()", "Cafes.LoadFunction()", "business.LoadFunction()",
             "data_girls.AddFans_Equally(Int64,_fan,List)",
             "data_girls.AddFans_Equally(Int64,List)",
             "data_girls.AddFans(Int64,Nullable,List,girl)",

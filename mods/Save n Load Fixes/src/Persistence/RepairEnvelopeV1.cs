@@ -227,6 +227,8 @@ namespace SaveNLoadFixes.Persistence
             new List<WideLoanPaymentRecordV1>();
         public List<WideCafeProfitRecordV1> cafe_profits =
             new List<WideCafeProfitRecordV1>();
+        public List<WideBusinessContractPaymentRecordV1> business_contract_payments =
+            new List<WideBusinessContractPaymentRecordV1>();
     }
 
     [Serializable]
@@ -311,6 +313,16 @@ namespace SaveNLoadFixes.Persistence
         public string new_fans = "0";
     }
 
+    [Serializable]
+    internal sealed class WideBusinessContractPaymentRecordV1
+    {
+        public int ordinal = -1;
+        public int girl_id = -1;
+        public int skill;
+        public int type;
+        public string end_date = string.Empty;
+        public string payment_per_week = "0";
+    }
 
     [Serializable]
     internal sealed class SnsMessageNodeRecordV1
