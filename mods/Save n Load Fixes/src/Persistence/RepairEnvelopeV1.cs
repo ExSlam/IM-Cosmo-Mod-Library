@@ -195,9 +195,10 @@ namespace SaveNLoadFixes.Persistence
         public List<SnsMessageNodeRecordV1> sns_message_nodes =
             new List<SnsMessageNodeRecordV1>();
 
-        // A33 keeps ABI-narrow gameplay quantities in load-epoch-bound Int64
-        // shadows. Every value below is an intentional canonical decimal string,
-        // not a scalar damaged by SimpleJSON's historical rewrite.
+        // A33 keeps ABI-narrow gameplay quantities in load-epoch-bound exact shadows.
+        // Int64 continuations use canonical decimal strings; A33.8 research balances use
+        // canonical finite Double strings so fractional accumulation survives Single loss.
+        // None of these values rely on SimpleJSON's historical numeric rewrite.
         public int wide_numeric_state_version;
         public WideNumericStateRecordV1 wide_numeric_state =
             new WideNumericStateRecordV1();
@@ -232,6 +233,15 @@ namespace SaveNLoadFixes.Persistence
         public string business_photoshoot_top_payment;
         public string business_ad_top_payment;
         public string business_tv_drama_top_payment;
+        public List<WideResearchPointsRecordV1> research_points =
+            new List<WideResearchPointsRecordV1>();
+    }
+
+    [Serializable]
+    internal sealed class WideResearchPointsRecordV1
+    {
+        public int type;
+        public string exact_points = "0";
     }
 
     [Serializable]

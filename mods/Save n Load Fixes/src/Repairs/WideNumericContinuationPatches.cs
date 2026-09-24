@@ -2633,6 +2633,103 @@ namespace SaveNLoadFixes.Repairs
     }
 
     [HarmonyPatch]
+    internal static class WideNumeric_ResearchAddPoints_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Research.category.AddPoints(Single)", typeof(Research.category),
+            nameof(Research.category.AddPoints), new Type[] { typeof(float) }, typeof(void), false); }
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static void Prefix(Research.category __instance, ref float __0)
+        {
+            WideNumericState.AddResearchPoints(__instance, __0);
+            __0 = 0f;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ResearchGetPoints_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Research.category.GetPoints()", typeof(Research.category),
+            nameof(Research.category.GetPoints), Type.EmptyTypes, typeof(long), false); }
+        [HarmonyPrefix]
+        [HarmonyPriority(Priority.Last)]
+        private static bool Prefix(Research.category __instance, ref long __result)
+        {
+            __result = WideNumericState.GetResearchSpendablePoints(__instance);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BiggestLiabilityGirl_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "data_girls.GetGirlWithBiggestLiability()", typeof(data_girls),
+            nameof(data_girls.GetGirlWithBiggestLiability), Type.EmptyTypes,
+            typeof(data_girls._girl_val), true); }
+        [HarmonyPrefix]
+        private static bool Prefix(ref data_girls._girl_val __result)
+        {
+            __result = WideNumericContinuation.GetGirlWithBiggestLiabilityExact();
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_DialogueFormatting_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "ActiveDialogueController.ApplyParameters(String,_variable,Boolean,Boolean,Boolean)",
+            typeof(ActiveDialogueController), nameof(ActiveDialogueController.ApplyParameters),
+            new Type[] { typeof(string), typeof(ActiveDialogueController._variable), typeof(bool),
+                typeof(bool), typeof(bool) }, typeof(string), true); }
+        [HarmonyPrefix]
+        private static bool Prefix(
+            string __0,
+            ActiveDialogueController._variable __1,
+            bool __2,
+            bool __3,
+            bool __4,
+            ref string __result)
+        {
+            string widened;
+            if (!WideNumericContinuation.TryApplyWideDialogueParameters(
+                    __0, __1, __2, __3, __4, out widened))
+            {
+                return true;
+            }
+            __result = widened;
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_SpoiledRecruitMoney_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "tasks._story_data.Set_Spoiled_Recruit_Money()", typeof(tasks._story_data),
+            nameof(tasks._story_data.Set_Spoiled_Recruit_Money), Type.EmptyTypes,
+            typeof(void), false); }
+        [HarmonyPrefix]
+        private static bool Prefix(tasks._story_data __instance)
+        {
+            WideNumericContinuation.SetSpoiledRecruitMoneyWide(__instance);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ResearchLoad_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Research.LoadFunction()", typeof(Research), nameof(Research.LoadFunction),
+            Type.EmptyTypes, typeof(void), false); }
+        private static void Postfix() { WideNumericState.RestoreResearchAfterVanillaLoad(); }
+    }
+
+    [HarmonyPatch]
     internal static class WideNumeric_TourLoad_Patch
     {
         private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(

@@ -2764,6 +2764,126 @@ namespace SaveNLoadFixes.Repairs
             ssk.Results.AddRange(plannedResults);
         }
 
+        internal static data_girls._girl_val GetGirlWithBiggestLiabilityExact()
+        {
+            data_girls._girl_val result = new data_girls._girl_val();
+            long best = 0L;
+            foreach (data_girls.girls girl in data_girls.girl)
+            {
+                if (girl == null || girl.status == data_girls._status.graduated) continue;
+                long liability = girl.GetLiability();
+                if (liability > best)
+                {
+                    best = liability;
+                    result.Girl = girl;
+                }
+            }
+            result.Val = (float)best;
+            return result;
+        }
+
+        internal static bool TryApplyWideDialogueParameters(
+            string input,
+            ActiveDialogueController._variable variable,
+            bool richText,
+            bool forceBlue,
+            bool vn,
+            out string result)
+        {
+            result = null;
+            if (!richText || variable == null ||
+                (!variable.HasParameter("money") && !variable.HasParameter("number")))
+            {
+                return false;
+            }
+
+            string value = input;
+            if (variable.HasParameter("age"))
+            {
+                data_girls.girls girl = null;
+                if (variable.actor != null && variable.actor.girl != null)
+                    girl = variable.actor.girl;
+                else if (variable.actor_event != null && variable.actor_event.girl != null)
+                    girl = variable.actor_event.girl;
+                if (girl == null) return false;
+                value = ExtensionMethods.formatNumber(girl.GetAge(), false, false);
+            }
+
+            long parsed;
+            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed) ||
+                (parsed >= int.MinValue && parsed <= int.MaxValue))
+            {
+                return false;
+            }
+
+            if (variable.HasParameter("money"))
+            {
+                MonoBehaviour.print(value);
+                value = ExtensionMethods.formatMoney(parsed, false, false, false);
+            }
+            else
+            {
+                value = ExtensionMethods.formatNumber(parsed, false, false);
+            }
+
+            if (variable.HasParameter("red"))
+                value = ExtensionMethods.color(value, mainScript.red);
+            else if (variable.HasParameter("green"))
+                value = ExtensionMethods.color(value, mainScript.green);
+            else if (variable.HasParameter("white"))
+                value = ExtensionMethods.color(value, mainScript.white);
+            else if (variable.HasParameter("blue") || forceBlue)
+                value = ExtensionMethods.color(value, vn ? "#A9ACDD" : mainScript.lightBlue);
+
+            if (variable.HasParameter("lowercase"))
+                value = value.ToLower();
+            else if (variable.HasParameter("uppercase"))
+                value = value.ToUpper();
+
+            result = value;
+            return true;
+        }
+
+        internal static void SetSpoiledRecruitMoneyWide(tasks._story_data story)
+        {
+            if (story == null) throw new ArgumentNullException(nameof(story));
+            long value = resources.Money();
+            if (value < 0L)
+            {
+                value = WideNumericRepair.Multiply(
+                    value, -1L, "tasks._story_data.Set_Spoiled_Recruit_Money absolute money");
+            }
+            else
+            {
+                value = 10000000L;
+            }
+
+            value = RoundPositiveToMultiple(
+                value, 1000000L, "tasks._story_data.Set_Spoiled_Recruit_Money first rounding");
+            if (value <= 10000000L)
+            {
+                value = 10000000L;
+            }
+            else
+            {
+                value = WideNumericRepair.Add(
+                    value, 5000000L, "tasks._story_data.Set_Spoiled_Recruit_Money premium");
+            }
+            value = RoundPositiveToMultiple(
+                value, 1000000L, "tasks._story_data.Set_Spoiled_Recruit_Money final rounding");
+            story.substory_spoiled_recruit_money = value;
+        }
+
+        private static long RoundPositiveToMultiple(long value, long multiple, string context)
+        {
+            if (value < 0L || multiple <= 0L)
+                throw new ArgumentOutOfRangeException(nameof(value));
+            long half = multiple / 2L;
+            long adjusted = WideNumericRepair.Add(value, half, context + " midpoint");
+            long quotient = adjusted / multiple;
+            return WideNumericRepair.Multiply(quotient, multiple, context + " product");
+        }
+
         internal static void BuyResearchPoints(Research.category category)
         {
             long current = Research.Buying_Cost;
@@ -5906,6 +6026,10 @@ namespace SaveNLoadFixes.Repairs
             "SEvent_Concerts._projectedValues.SetAttendance()",
             "SEvent_SSK._SSK.GetProductionCost()", "SEvent_SSK._SSK.TotalProductionCost()",
             "SEvent_SSK._SSK.GenerateResults()", "Research.category.Buy_Points()",
+            "Research.category.AddPoints(Single)", "Research.category.GetPoints()",
+            "Research.LoadFunction()", "data_girls.GetGirlWithBiggestLiability()",
+            "ActiveDialogueController.ApplyParameters(String,_variable,Boolean,Boolean,Boolean)",
+            "tasks._story_data.Set_Spoiled_Recruit_Money()",
             "Event_Requirements.Check(_action)", "vn_actions.DoResource(String,String,_activeEvent)",
             "data_girls.girls.GetExpectedSalary()",
             "data_girls.girls.GetExpectedSalary_Total()",

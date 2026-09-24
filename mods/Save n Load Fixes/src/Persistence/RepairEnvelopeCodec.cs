@@ -308,7 +308,9 @@ namespace SaveNLoadFixes.Persistence
                 (marker.Kind != FiniteJsonKind.Number && marker.Kind != FiniteJsonKind.String) ||
                 (!string.Equals(marker.Text, "1", StringComparison.Ordinal) &&
                  !string.Equals(marker.Text, "2", StringComparison.Ordinal) &&
-                 !string.Equals(marker.Text, "3", StringComparison.Ordinal)))
+                 !string.Equals(marker.Text, "3", StringComparison.Ordinal) &&
+                 !string.Equals(marker.Text, "4", StringComparison.Ordinal) &&
+                 !string.Equals(marker.Text, "5", StringComparison.Ordinal)))
             {
                 // The typed materializer/section validator reports zero or unsupported
                 // marker values. Only a claimed current section needs the raw presence proof.
@@ -392,7 +394,9 @@ namespace SaveNLoadFixes.Persistence
                           (wideNumericVersion < 4 &&
                            (string.Equals(field.Name, "business_photoshoot_top_payment", StringComparison.Ordinal) ||
                             string.Equals(field.Name, "business_ad_top_payment", StringComparison.Ordinal) ||
-                            string.Equals(field.Name, "business_tv_drama_top_payment", StringComparison.Ordinal))))) ||
+                            string.Equals(field.Name, "business_tv_drama_top_payment", StringComparison.Ordinal))) ||
+                          (wideNumericVersion < 5 &&
+                           string.Equals(field.Name, "research_points", StringComparison.Ordinal)))) ||
                         (targetType == typeof(WideBusinessContractPaymentRecordV1) &&
                          wideNumericVersion < 4 &&
                          string.Equals(field.Name, "fans_per_week", StringComparison.Ordinal)))

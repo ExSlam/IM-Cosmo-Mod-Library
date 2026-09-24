@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.7
+## Version 5.5.8
 
-Current source version: **5.5.7**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
+Current source version: **5.5.8**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.7: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.8: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -42,6 +42,12 @@ Vanilla business proposal payments are widened before the original `Mathf.FloorT
 Vanilla business fan rewards now use the same continuation principle as A35 payments. SNLF widens the generated proposal fan value before `Mathf.FloorToInt`, retains the exact proposal value while the vanilla `Int32` field remains a compatibility mirror, applies the vanilla idol/negotiation coefficients to the exact base value, carries exact weekly fans into accepted business contracts, and uses the exact value for immediate and weekly fan delivery plus the relevant UI. Wide-state schema v4 adds sparse exact business-contract fan persistence and exact business top-payment records. A v3 checkpoint keeps its exact A35 business payments while business fan and top-payment values seed honestly from their surviving vanilla mirrors.
 
 The same cumulative pass also uses the exact show-episode fan sidecar in the released-show results display, preserves exact business top-payment records behind their vanilla `Int32` mirrors, replaces large-population single fan-satisfaction summation with wide arithmetic, and widens the business liability-preview multiplication before formatting.
+
+### A33.8 research precision and residual wide consumers
+
+Vanilla research balances are stored and saved as `float`, so sufficiently large balances stop accepting small increments accurately. Schema v5 adds one canonical finite `double` balance per research category. `Research.category.Points` remains a compatibility mirror for vanilla and other mods, while `GetPoints()` derives the spendable Int64 total from the exact sidecar. Saves written before v5 seed research precision from the surviving vanilla float and do not claim to reconstruct fractional precision already lost before SNLF observed it.
+
+The same pass removes three remaining narrow consumers of already-wide state: largest-business-liability idol selection compares the exact Int64 liabilities, dialogue `money` / `number` parameters can format Int64 values outside `Int32`, and spoiled-recruit payment setup uses checked arithmetic instead of overflowing when negating `Int64.MinValue` or rounding near the Int64 boundary.
 
 ## Core save transport contract
 

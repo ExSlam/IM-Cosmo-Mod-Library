@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.5.8
+
+- Adds A33.8 research-point precision continuation. Vanilla `Research.category.Points` and `ResearchData.Points` remain `float` compatibility mirrors, while SNLF accumulates the exact sequence of Single deltas in a finite `double` sidecar so small research gains do not disappear at large balances.
+- Advances the A33 wide-state envelope to schema v5 and persists one canonical finite Double balance for each research category. Existing v1-v4 envelopes remain readable; pre-v5 research balances seed honestly from the surviving vanilla Single values without claiming already-lost fractional precision.
+- Replaces `Research.category.GetPoints()` with an Int64 spendable-points view derived from the exact balance, while preserving vanilla `AddPoints()` observer timing by updating the sidecar/mirror in a last-priority prefix and passing a zero delta through the original method.
+- Fixes `data_girls.GetGirlWithBiggestLiability()` so idol selection compares exact Int64 liabilities instead of narrowing them to `float` before ranking.
+- Extends dialogue `money` / `number` formatting to Int64 values outside the vanilla `Convert.ToInt32` range while leaving ordinary Int32 and malformed-input behavior on the vanilla path.
+- Replaces the spoiled-recruit money setup with checked Int64 arithmetic, including fail-closed handling of the `Int64.MinValue` absolute-value case and checked million-yen rounding/addition.
+- Keeps schema-v4 exact business fan/top-payment restoration intact under the new v5 marker and extends raw-envelope completeness validation to the v5 research precision records.
+
 ## 5.5.7
 
 - Completes the vanilla business fan-reward widening path: proposal generation, negotiated/idol coefficients, accepted weekly contracts, save/load persistence, weekly delivery, and UI now retain exact Int64 values behind Int32 compatibility mirrors.

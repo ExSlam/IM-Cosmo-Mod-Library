@@ -10,16 +10,19 @@ using UnityEngine;
 namespace SaveNLoadFixes.Repairs
 {
     /// <summary>
-    /// Owns A33 values whose vanilla ABI/DTO is Int32. The registry is bound to the
-    /// current LoadEpoch and is never used as cross-career history. Int32 members in
-    /// Assembly-CSharp are compatibility mirrors only.
+    /// Owns A33 values whose vanilla ABI/DTO is too narrow for exact long-running state.
+    /// Most shadows are Int64 continuations of Int32 fields; A33.8 also preserves research
+    /// point accumulation beyond Single precision. The registry is bound to the current
+    /// LoadEpoch and is never used as cross-career history. Vanilla narrow members remain
+    /// compatibility mirrors only.
     /// </summary>
     internal static class WideNumericState
     {
         internal const int LegacySectionVersion = 1;
         internal const int PreviousSectionVersion = 2;
         internal const int BusinessPaymentSectionVersion = 3;
-        internal const int SectionVersion = 4;
+        internal const int BusinessFansSectionVersion = 4;
+        internal const int SectionVersion = 5;
 
         private static readonly object Sync = new object();
         private static long epoch;
@@ -47,6 +50,8 @@ namespace SaveNLoadFixes.Repairs
             new ConditionalWeakTable<business._proposal, WideBusinessProposalRuntime>();
         private static ConditionalWeakTable<business.active_proposal, WideBusinessContractRuntime> BusinessContracts =
             new ConditionalWeakTable<business.active_proposal, WideBusinessContractRuntime>();
+        private static readonly Dictionary<int, double> ResearchPoints =
+            new Dictionary<int, double>();
         private static List<long> statsTotalFans = new List<long>();
         private static List<long> statsFanChanges = new List<long>();
         private static bool hasBusinessTopPayments;
@@ -115,6 +120,27 @@ namespace SaveNLoadFixes.Repairs
                 string.Equals(Format(parsed), value, StringComparison.Ordinal);
         }
 
+        internal static string FormatResearchPoints(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                throw new OverflowException("Research point balance is not finite.");
+            }
+            return value.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        internal static bool TryParseCanonicalResearchPoints(string value, out double parsed)
+        {
+            parsed = 0d;
+            if (string.IsNullOrEmpty(value) ||
+                !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) ||
+                double.IsNaN(parsed) || double.IsInfinity(parsed))
+            {
+                return false;
+            }
+            return string.Equals(FormatResearchPoints(parsed), value, StringComparison.Ordinal);
+        }
+
         internal static bool TryValidateEnvelopeRecord(
             RepairEnvelopeRecordsV1 records,
             out string error)
@@ -132,6 +158,7 @@ namespace SaveNLoadFixes.Repairs
             if ((records.wide_numeric_state_version != LegacySectionVersion &&
                     records.wide_numeric_state_version != PreviousSectionVersion &&
                     records.wide_numeric_state_version != BusinessPaymentSectionVersion &&
+                    records.wide_numeric_state_version != BusinessFansSectionVersion &&
                     records.wide_numeric_state_version != SectionVersion) ||
                 records.wide_numeric_state == null)
             {
@@ -286,7 +313,7 @@ namespace SaveNLoadFixes.Repairs
                 WideBusinessContractPaymentRecordV1 item = state.business_contract_payments[index];
                 long payment;
                 long fans = 0L;
-                bool hasFans = records.wide_numeric_state_version >= SectionVersion;
+                bool hasFans = records.wide_numeric_state_version >= BusinessFansSectionVersion;
                 if (item == null || item.ordinal < 0 || !ids.Add(item.ordinal) ||
                     item.girl_id < -1 || string.IsNullOrEmpty(item.end_date) ||
                     !TryParseCanonical(item.payment_per_week, out payment) ||
@@ -305,7 +332,7 @@ namespace SaveNLoadFixes.Repairs
                 error = "A33 pre-v3 wide state unexpectedly contains business-contract records.";
                 return false;
             }
-            if (records.wide_numeric_state_version >= SectionVersion)
+            if (records.wide_numeric_state_version >= BusinessFansSectionVersion)
             {
                 long photoshoot, ad, tvDrama;
                 if (!TryParseCanonical(state.business_photoshoot_top_payment, out photoshoot) ||
@@ -315,6 +342,33 @@ namespace SaveNLoadFixes.Repairs
                     error = "A33 v4 business top-payment statistics are missing or noncanonical.";
                     return false;
                 }
+            }
+            if (records.wide_numeric_state_version >= SectionVersion)
+            {
+                if (state.research_points == null ||
+                    state.research_points.Count != Enum.GetValues(typeof(Research.type)).Length)
+                {
+                    error = "A33 v5 research-point precision records are missing or incomplete.";
+                    return false;
+                }
+                ids.Clear();
+                for (int index = 0; index < state.research_points.Count; index++)
+                {
+                    WideResearchPointsRecordV1 item = state.research_points[index];
+                    double exact;
+                    if (item == null || !Enum.IsDefined(typeof(Research.type), item.type) ||
+                        !ids.Add(item.type) ||
+                        !TryParseCanonicalResearchPoints(item.exact_points, out exact))
+                    {
+                        error = "A33 v5 research-point precision records contain an invalid type, duplicate, or noncanonical finite Double.";
+                        return false;
+                    }
+                }
+            }
+            else if (state.research_points != null && state.research_points.Count != 0)
+            {
+                error = "A33 pre-v5 wide state unexpectedly contains research-point precision records.";
+                return false;
             }
             return true;
         }
@@ -349,13 +403,81 @@ namespace SaveNLoadFixes.Repairs
                     !CaptureStory(data, result, out error) ||
                     !CaptureLoans(data, result, out error) ||
                     !CaptureCafes(data, result, out error) ||
-                    !CaptureBusinessContracts(data, result, out error))
+                    !CaptureBusinessContracts(data, result, out error) ||
+                    !CaptureResearch(data, result, out error))
                 {
                     return false;
                 }
                 record = result;
                 return true;
             }
+        }
+
+        internal static void AddResearchPoints(Research.category category, float delta)
+        {
+            if (category == null) return;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                int key = (int)category.Type;
+                double current;
+                if (!ResearchPoints.TryGetValue(key, out current))
+                {
+                    current = category.Points;
+                }
+                double next = current + (double)delta;
+                if (double.IsNaN(next) || double.IsInfinity(next))
+                {
+                    WideNumericRepair.LatchInvariantFailure(
+                        "A33.8 research-point precision continuation produced a non-finite balance.");
+                    throw new OverflowException("Research point balance exceeded finite Double range.");
+                }
+                ResearchPoints[key] = next;
+                category.Points = ResearchMirror(next);
+            }
+        }
+
+        internal static double GetResearchPointsExact(Research.category category)
+        {
+            if (category == null) return 0d;
+            EnsureEpoch();
+            lock (Sync)
+            {
+                int key = (int)category.Type;
+                double value;
+                if (!ResearchPoints.TryGetValue(key, out value))
+                {
+                    value = category.Points;
+                    ResearchPoints[key] = value;
+                }
+                return value;
+            }
+        }
+
+        internal static long GetResearchSpendablePoints(Research.category category)
+        {
+            double exact = GetResearchPointsExact(category);
+            double floored = Math.Floor(exact / 10d);
+            if (double.IsNaN(floored) || double.IsInfinity(floored) ||
+                floored >= 9223372036854775808d || floored < -9223372036854775808d)
+            {
+                WideNumericRepair.LatchInvariantFailure(
+                    "A33.8 research spendable-point conversion exceeded Int64 range.");
+                throw new OverflowException("Research spendable points exceed Int64 range.");
+            }
+            return (long)floored;
+        }
+
+        private static float ResearchMirror(double value)
+        {
+            if (value > float.MaxValue) return float.MaxValue;
+            if (value < -float.MaxValue) return -float.MaxValue;
+            return (float)value;
+        }
+
+        private static bool ResearchMirrorMatches(double exact, float mirror)
+        {
+            return ResearchMirror(exact).Equals(mirror);
         }
 
         internal static void SetBusinessProposalBasePayment(business._proposal proposal, long value)
@@ -1135,6 +1257,7 @@ namespace SaveNLoadFixes.Repairs
         internal static void RestoreLoansAfterVanillaLoad() { Restore(Subsystem.Loans); }
         internal static void RestoreCafesAfterVanillaLoad() { Restore(Subsystem.Cafes); }
         internal static void RestoreBusinessContractsAfterVanillaLoad() { Restore(Subsystem.BusinessContracts); }
+        internal static void RestoreResearchAfterVanillaLoad() { Restore(Subsystem.Research); }
 
         private static void Restore(Subsystem subsystem)
         {
@@ -1174,6 +1297,7 @@ namespace SaveNLoadFixes.Repairs
                 (state.Envelope.records.wide_numeric_state_version != LegacySectionVersion &&
                     state.Envelope.records.wide_numeric_state_version != PreviousSectionVersion &&
                     state.Envelope.records.wide_numeric_state_version != BusinessPaymentSectionVersion &&
+                    state.Envelope.records.wide_numeric_state_version != BusinessFansSectionVersion &&
                     state.Envelope.records.wide_numeric_state_version != SectionVersion) ||
                 state.Envelope.records.wide_numeric_state == null)
             {
@@ -1188,6 +1312,14 @@ namespace SaveNLoadFixes.Repairs
                 SeedLegacy(subsystem);
                 Interlocked.Increment(ref legacySeedCount);
                 SetDiagnostic("A33.4 seeded BusinessContracts from pre-v3 vanilla Int32 compatibility values; unavailable pre-v3 wide preimages were not claimed as recovered.");
+                return;
+            }
+            if (subsystem == Subsystem.Research &&
+                state.Envelope.records.wide_numeric_state_version < SectionVersion)
+            {
+                SeedLegacy(subsystem);
+                Interlocked.Increment(ref legacySeedCount);
+                SetDiagnostic("A33.8 seeded Research from pre-v5 vanilla Single compatibility balances; unavailable pre-v5 fractional precision was not claimed as recovered.");
                 return;
             }
 
@@ -1240,6 +1372,7 @@ namespace SaveNLoadFixes.Repairs
                     case Subsystem.Loans: return RestoreLoans(source, out error);
                     case Subsystem.Cafes: return RestoreCafes(source, out error);
                     case Subsystem.BusinessContracts: return RestoreBusinessContracts(source, sectionVersion, out error);
+                    case Subsystem.Research: return RestoreResearch(source, sectionVersion, out error);
                     default: error = "unknown subsystem"; return false;
                 }
             }
@@ -1793,6 +1926,64 @@ namespace SaveNLoadFixes.Repairs
             return true;
         }
 
+        private static bool CaptureResearch(
+            SaveManager.SavedData data,
+            WideNumericStateRecordV1 result,
+            out string error)
+        {
+            error = string.Empty;
+            if (data.research__ResearchData == null || Research.Categories == null ||
+                data.research__ResearchData.Count != Research.Categories.Count)
+            {
+                error = "A33.8 research DTO/live counts do not match.";
+                return false;
+            }
+
+            Dictionary<int, Research.ResearchData> saved =
+                new Dictionary<int, Research.ResearchData>();
+            foreach (Research.ResearchData item in data.research__ResearchData)
+            {
+                int key = item == null ? -1 : (int)item.Type;
+                if (item == null || !Enum.IsDefined(typeof(Research.type), key) || saved.ContainsKey(key))
+                {
+                    error = "A33.8 research DTO set contains a null, invalid, or duplicate category.";
+                    return false;
+                }
+                saved.Add(key, item);
+            }
+
+            HashSet<int> seen = new HashSet<int>();
+            foreach (Research.category category in Research.Categories)
+            {
+                if (category == null)
+                {
+                    error = "A33.8 research live category set contains a null row.";
+                    return false;
+                }
+                int key = (int)category.Type;
+                Research.ResearchData dto;
+                if (!seen.Add(key) || !saved.TryGetValue(key, out dto))
+                {
+                    error = "A33.8 research live/DTO category identity does not match.";
+                    return false;
+                }
+                double exact = GetResearchPointsExact(category);
+                if (!ResearchMirrorMatches(exact, category.Points) ||
+                    !category.Points.Equals(dto.Points))
+                {
+                    error = "A33.8 research compatibility mirror differs from the frozen DTO.";
+                    return false;
+                }
+                result.research_points.Add(new WideResearchPointsRecordV1
+                {
+                    type = key,
+                    exact_points = FormatResearchPoints(exact)
+                });
+            }
+            result.research_points.Sort((left, right) => left.type.CompareTo(right.type));
+            return true;
+        }
+
         private static bool RestoreTours(WideNumericStateRecordV1 source, out string error)
         {
             error = string.Empty;
@@ -2030,7 +2221,7 @@ namespace SaveNLoadFixes.Repairs
             }
             statsTotalFans = totals;
             statsFanChanges = changes;
-            if (sectionVersion >= SectionVersion)
+            if (sectionVersion >= BusinessFansSectionVersion)
             {
                 long photoshoot, ad, tvDrama;
                 if (!TryParseCanonical(source.business_photoshoot_top_payment, out photoshoot) ||
@@ -2206,12 +2397,12 @@ namespace SaveNLoadFixes.Repairs
                 long exactFans = live.Fans_per_week;
                 int girlId = live.Girl == null ? -1 : live.Girl.id;
                 if (!TryParseCanonical(item.payment_per_week, out exact) ||
-                    (sectionVersion >= SectionVersion &&
+                    (sectionVersion >= BusinessFansSectionVersion &&
                         !TryParseCanonical(item.fans_per_week, out exactFans)) ||
                     item.girl_id != girlId || item.skill != (int)live.Skill || item.type != (int)live.Type ||
                     item.end_date != ExtensionMethods.ToDataString(live.EndDate) ||
                     !Mirror(exact, live.Payment_per_week) ||
-                    (sectionVersion >= SectionVersion && !Mirror(exactFans, live.Fans_per_week)))
+                    (sectionVersion >= BusinessFansSectionVersion && !Mirror(exactFans, live.Fans_per_week)))
                 {
                     error = "business-contract payment/fan identity/witness/mirror is inconsistent";
                     return false;
@@ -2222,6 +2413,60 @@ namespace SaveNLoadFixes.Repairs
                 live.Fans_per_week = WideNumericMath.ClampToInt32(exactFans);
             }
             BusinessContracts = pending;
+            return true;
+        }
+
+        private static bool RestoreResearch(
+            WideNumericStateRecordV1 source,
+            int sectionVersion,
+            out string error)
+        {
+            error = string.Empty;
+            if (sectionVersion < SectionVersion)
+            {
+                SeedLegacy(Subsystem.Research);
+                return true;
+            }
+            if (source.research_points == null || Research.Categories == null ||
+                source.research_points.Count != Research.Categories.Count)
+            {
+                error = "research precision record/current counts are not one-to-one";
+                return false;
+            }
+
+            Dictionary<int, Research.category> live = new Dictionary<int, Research.category>();
+            foreach (Research.category category in Research.Categories)
+            {
+                int key = category == null ? -1 : (int)category.Type;
+                if (category == null || live.ContainsKey(key))
+                {
+                    error = "current research category set is invalid or duplicated";
+                    return false;
+                }
+                live.Add(key, category);
+            }
+
+            Dictionary<int, double> pending = new Dictionary<int, double>();
+            foreach (WideResearchPointsRecordV1 item in source.research_points)
+            {
+                Research.category category;
+                double exact;
+                if (item == null || !live.TryGetValue(item.type, out category) ||
+                    !TryParseCanonicalResearchPoints(item.exact_points, out exact) ||
+                    !ResearchMirrorMatches(exact, category.Points) || pending.ContainsKey(item.type))
+                {
+                    error = "research precision identity/value is inconsistent with its vanilla Single mirror";
+                    return false;
+                }
+                pending.Add(item.type, exact);
+            }
+
+            ResearchPoints.Clear();
+            foreach (KeyValuePair<int, double> pair in pending)
+            {
+                ResearchPoints.Add(pair.Key, pair.Value);
+                live[pair.Key].Points = ResearchMirror(pair.Value);
+            }
             return true;
         }
 
@@ -2299,6 +2544,12 @@ namespace SaveNLoadFixes.Repairs
                                         proposal.Fans_per_week));
                         break;
                     }
+                    case Subsystem.Research:
+                        ResearchPoints.Clear();
+                        if (Research.Categories != null)
+                            foreach (Research.category category in Research.Categories)
+                                if (category != null) ResearchPoints[(int)category.Type] = category.Points;
+                        break;
                 }
             }
         }
@@ -2431,6 +2682,7 @@ namespace SaveNLoadFixes.Repairs
                 TheaterStats.Clear(); LoanPayments.Clear(); CafeProfits.Clear(); CafeNewFans.Clear();
                 BusinessProposals = new ConditionalWeakTable<business._proposal, WideBusinessProposalRuntime>();
                 BusinessContracts = new ConditionalWeakTable<business.active_proposal, WideBusinessContractRuntime>();
+                ResearchPoints.Clear();
                 statsTotalFans = new List<long>();
                 statsFanChanges = new List<long>();
                 hasBusinessTopPayments = false;
@@ -2554,7 +2806,7 @@ namespace SaveNLoadFixes.Repairs
             lock (Sync) { lastDiagnostic = value ?? string.Empty; }
         }
 
-        private enum Subsystem { Tours, Singles, Shows, Theaters, Stats, Story, Loans, Cafes, BusinessContracts }
+        private enum Subsystem { Tours, Singles, Shows, Theaters, Stats, Story, Loans, Cafes, BusinessContracts, Research }
     }
 
     internal sealed class WideBusinessProposalRuntime
