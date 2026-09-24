@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Birthday Text Fix</ModName>
+    <RootNamespace>BirthdayTextFix</RootNamespace>
+    <AssemblyName>com.cosmo.birthdaytextfix</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\BirthdayTextFix.cs" />
+  </ItemGroup>
+</Project>

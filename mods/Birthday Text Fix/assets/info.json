@@ -1,0 +1,8 @@
+{
+  "Title": "Birthday Text Fix",
+  "Description": "Fixes incorrect English ordinal endings in idol birthday popup titles.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["gameplay", "fix", "patch", "bugfix"],
+  "HarmonyID": "com.cosmo.birthdaytextfix"
+}

@@ -1,0 +1,7 @@
+[h1]Birthday Text Fix[/h1]
+
+Birthday Text Fix corrects the age shown in English idol birthday popups so the number uses the proper ending.
+
+No more awkward birthday titles such as 21th, 22st, or 23th. Ages are shown correctly as 21st, 22nd, 23rd, 31st, 32nd, 33rd, and so on, while 11th, 12th, and 13th remain correct.
+
+This fix only changes the English birthday title. Other languages are left exactly as the game normally displays them.
