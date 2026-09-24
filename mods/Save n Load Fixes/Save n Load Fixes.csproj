@@ -3,7 +3,7 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>5.5.4</Version>
+    <Version>5.5.5</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -135,6 +135,8 @@
     <Compile Include="src\Repairs\FansWatchShowsWideNumericPatches.cs" />
     <Compile Include="src\Repairs\TbsBalancePatchWideNumericInterop.cs" />
     <Compile Include="src\Repairs\TbsBalancePatchWideNumericPatches.cs" />
+    <Compile Include="src\Repairs\BuffMeWideNumericInterop.cs" />
+    <Compile Include="src\Repairs\BuffMeWideNumericPatches.cs" />
     <Compile Include="src\Repairs\WideNumericContinuationPatches.cs" />
     <Compile Include="src\Transport\TransportPatchHealth.cs" />
     <Compile Include="src\Transport\OrderedSaveTransport.cs" />

@@ -4,7 +4,7 @@ Save n Load Fixes repairs save/load bugs and related gameplay problems in Idol M
 [*][b]Saving and loading:[/b] Prevents overlapping saves from finishing in the wrong order and loading from reading an unfinished save.
 [*][b]Save and Exit:[/b] Waits for SNLF and participating mods to finish their save attempts before exiting or returning to the main menu, including attempts that fail.
 [*][b]Save notifications:[/b] Shows when saving starts, finishes or fails.
-[*][b]Money and large totals:[/b] Fixes calculations and displays that could turn large amounts into incorrect or negative numbers, including salaries, loans, business income, theater revenue and fan totals. Includes support for Fans Watch Shows 1.0.0 so very large fan counts do not distort the extra show audience it adds.
+[*][b]Money and large totals:[/b] Fixes calculations and displays that could turn large amounts into incorrect or negative numbers, including salaries, loans, business income, theater revenue and fan totals. Includes compatibility support for Fans Watch Shows 1.0.0, TBS Balance Patch 1.0.0 and BuffMe 1.0.0. BuffMe fan bonuses are also corrected so the fan multiplier is applied once instead of twice.
 [*][b]Training and business:[/b] Preserves training progress, paused idols, remaining job time and business proposals selected by events.
 [*][b]Singles, shows, concerts, tours and elections:[/b] Restores missing project progress information and fixes scheduling and completion-date errors.
 [*][b]Fans and target audiences:[/b] Preserves show fan appeal, single comparisons and group audience settings after loading.

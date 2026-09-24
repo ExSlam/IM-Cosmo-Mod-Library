@@ -57,6 +57,7 @@ namespace SaveNLoadFixes.Repairs
             resources.fame onFameChange,
             resources.resourceChanged onResourceChange)
         {
+            delta = BuffMeWideNumericInterop.ApplyResourceDelta(type, delta);
             if (delta == 0L) return;
             long value = WideNumericRepair.Add(
                 resources.Get(type, false), delta, "resources._Add(" + type + ")");
@@ -74,7 +75,15 @@ namespace SaveNLoadFixes.Repairs
                     onMoneyChange(value);
                     break;
                 case resources.type.fans:
-                    resources.AddFans(delta, null, null, null);
+                    BuffMeWideNumericInterop.BeginResourceFanDistribution();
+                    try
+                    {
+                        resources.AddFans(delta, null, null, null);
+                    }
+                    finally
+                    {
+                        BuffMeWideNumericInterop.EndResourceFanDistribution();
+                    }
                     onFansChange(value);
                     break;
                 case resources.type.scandalPoints:
@@ -442,7 +451,8 @@ namespace SaveNLoadFixes.Repairs
                     : WideNumericRepair.DivideRoundToEven(reward, active.Count,
                         "Activities.Performance idol earnings share");
             }
-            WideNumericRepair.Add(resources.Money(), reward,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, reward),
                 "Activities.Performance resource preflight");
             foreach (data_girls.girls girl in active)
                 WideNumericRepair.Add(girl.Earnings_CurrentMonth, idolShare,
@@ -622,7 +632,8 @@ namespace SaveNLoadFixes.Repairs
             long severance = GetStaffSeverance(person);
             long debit = WideNumericRepair.Subtract(0L, severance,
                 "staff._staff.Fire_Severance debit");
-            WideNumericRepair.Add(resources.Money(), debit,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, debit),
                 "staff._staff.Fire_Severance money preflight");
             if (person.room != null) person.room.RemoveStaffer();
             staff.Staff.Remove(person);
@@ -684,7 +695,8 @@ namespace SaveNLoadFixes.Repairs
             if (remainder == 0L) return 0L;
             long debit = WideNumericRepair.Subtract(0L, exact,
                 "Staff_Fire.DoComplete exact debit");
-            WideNumericRepair.Add(resources.Money(), debit,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, debit),
                 "Staff_Fire.DoComplete exact money preflight");
             return remainder;
         }
@@ -867,7 +879,9 @@ namespace SaveNLoadFixes.Repairs
                 instance.GetDailyBuzzReduction(), "resources.OnNewDay buzz reduction");
             long fame = GetBusinessDailyFame(business);
             // Preflight every resource mutation before changing the first one.
-            WideNumericRepair.Add(resources.Money(), money, "resources.OnNewDay money preflight");
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, money),
+                "resources.OnNewDay money preflight");
             WideNumericRepair.Add(resources.Get(resources.type.buzz, false), buzz,
                 "resources.OnNewDay buzz preflight");
             WideNumericRepair.Add(resources.Get(resources.type.fame, false), fame,
@@ -887,7 +901,8 @@ namespace SaveNLoadFixes.Repairs
             long expenses = GetWeeklyExpenses(false);
             long delta = WideNumericRepair.Subtract(0L, expenses,
                 "resources.OnNewWeek expense negation");
-            WideNumericRepair.Add(resources.Money(), delta,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, delta),
                 "resources.OnNewWeek money preflight");
             EmitRentFloats();
             instance.AddMoney(delta);
@@ -1400,7 +1415,8 @@ namespace SaveNLoadFixes.Repairs
                 lock (PendingSync) PendingTheaterDays.Add(theater.ID, preflight);
             }
             if (total > 0L)
-                WideNumericRepair.Add(resources.Money(), total,
+                WideNumericRepair.Add(resources.Money(),
+                    BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, total),
                     "Theaters.CompleteDay resource-credit preflight");
         }
 
@@ -1895,7 +1911,8 @@ namespace SaveNLoadFixes.Repairs
             if (addMoney)
             {
                 money = GetCafeFloorMoney(cafes, occupancy);
-                WideNumericRepair.Add(resources.Money(), money,
+                WideNumericRepair.Add(resources.Money(),
+                    BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, money),
                     "Cafes.RenderRooms money preflight");
                 each = money >= -ExactSingleIntegerBoundary &&
                         money <= ExactSingleIntegerBoundary
@@ -2062,10 +2079,13 @@ namespace SaveNLoadFixes.Repairs
             long exact = GetCafeMoneyToAdd(cafe);
             int mirror = WideNumericMath.ClampToInt32(exact);
             long credited = Mathf.RoundToInt((float)mirror);
-            long afterCredit = WideNumericRepair.Add(resources.Money(), credited,
+            long effectiveCredited = BuffMeWideNumericInterop.PreviewResourceDelta(
+                resources.type.money, credited);
+            long afterCredit = WideNumericRepair.Add(resources.Money(), effectiveCredited,
                 "Cafes.RenderCafe compatibility credit preflight");
-            long correction = WideNumericRepair.Subtract(exact, credited,
-                "Cafes.RenderCafe compatibility correction preflight");
+            long correction = BuffMeWideNumericInterop.CalculateExactResourceCorrection(
+                resources.type.money, exact, credited,
+                "Cafes.RenderCafe BuffMe-aware compatibility correction preflight");
             WideNumericRepair.Add(afterCredit, correction,
                 "Cafes.RenderCafe exact money preflight");
 
@@ -2184,10 +2204,21 @@ namespace SaveNLoadFixes.Repairs
             finalFanSeries.Add(preflight.ExactNewFans);
 
             WideNumericState.ReplaceCafeStatSeries(cafe, finalSeries, finalFanSeries);
-            long correction = WideNumericRepair.Subtract(
-                preflight.ExactMoney, preflight.CreditedMoney,
-                "Cafes.RenderCafe compatibility correction");
-            if (correction != 0L) resources.Add(resources.type.money, correction);
+            long correction = BuffMeWideNumericInterop.CalculateExactResourceCorrection(
+                resources.type.money, preflight.ExactMoney, preflight.CreditedMoney,
+                "Cafes.RenderCafe BuffMe-aware compatibility correction");
+            if (correction != 0L)
+            {
+                BuffMeWideNumericInterop.BeginResourceMultiplierSuppression();
+                try
+                {
+                    resources.Add(resources.type.money, correction);
+                }
+                finally
+                {
+                    BuffMeWideNumericInterop.EndResourceMultiplierSuppression();
+                }
+            }
         }
 
         internal static bool TryResolveCafeFanAddition(
@@ -2569,7 +2600,8 @@ namespace SaveNLoadFixes.Repairs
             long next = RoundSingleCompatible(current, 1.2f,
                 "Research.category.Buy_Points next cost");
             long debit = WideNumericMath.Negate(current);
-            WideNumericRepair.Add(resources.Money(), debit,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, debit),
                 "Research.category.Buy_Points money preflight");
             resources.Add(resources.type.money, debit);
             Research.Buying_Cost = next;
@@ -3706,25 +3738,38 @@ namespace SaveNLoadFixes.Repairs
             if (tour == null) return;
             long profit = WideNumericState.GetTourProfit(tour);
             long fans = WideNumericState.GetTourNewFans(tour);
+            long effectiveProfit = BuffMeWideNumericInterop.PreviewResourceDelta(
+                resources.type.money, profit);
+            long effectiveFans = BuffMeWideNumericInterop.PreviewResourceDelta(
+                resources.type.fans, fans);
             List<data_girls.girls> activeGirls = data_girls.GetActiveGirls(null);
             long earning = activeGirls.Count == 0 ? 0L : profit / activeGirls.Count;
             resources resourceOwner = instance.GetComponent<resources>();
-            bool planFanCredit = NeedsWideFanPath(fans) ||
-                FanDistributionMayOverflow(fans, null, null, null);
+            bool planFanCredit = NeedsWideFanPath(effectiveFans) ||
+                FanDistributionMayOverflow(effectiveFans, null, null, null);
             FanMutationPlan fanPlan = null;
             long fanObserverTotal = 0L;
             if (planFanCredit)
             {
                 fanObserverTotal = WideNumericRepair.Add(
-                    resources.GetFansTotal(null), fans,
+                    resources.GetFansTotal(null), effectiveFans,
                     "SEvent_Tour.FinishTour fan observer preflight");
                 fanPlan = new FanMutationPlan();
-                PlanFansWeighted(fanPlan, fans, null, null, null);
+                BuffMeWideNumericInterop.BeginResourceFanDistribution();
+                try
+                {
+                    PlanFansWeighted(fanPlan, effectiveFans, null, null, null);
+                }
+                finally
+                {
+                    BuffMeWideNumericInterop.EndResourceFanDistribution();
+                }
             }
 
             // Preflight all authoritative mutations before closing UI or changing status.
-            WideNumericRepair.Add(resources.Money(), profit, "SEvent_Tour.FinishTour money");
-            WideNumericRepair.Add(resources.GetFansTotal(null), fans,
+            WideNumericRepair.Add(resources.Money(), effectiveProfit,
+                "SEvent_Tour.FinishTour money");
+            WideNumericRepair.Add(resources.GetFansTotal(null), effectiveFans,
                 "SEvent_Tour.FinishTour aggregate fans");
             foreach (data_girls.girls girl in activeGirls)
                 WideNumericRepair.Add(girl.Earnings_CurrentMonth, earning,
@@ -3825,7 +3870,8 @@ namespace SaveNLoadFixes.Repairs
             long gross = GetSingleMoney(single);
             long profit = WideNumericRepair.Subtract(gross, single.GetProductionCost(),
                 "singles.AddMoney profit");
-            WideNumericRepair.Add(resources.Money(), profit,
+            WideNumericRepair.Add(resources.Money(),
+                BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, profit),
                 "singles.AddMoney resource preflight");
 
             Dictionary<data_girls.girls, long> earnings =
@@ -4820,7 +4866,8 @@ namespace SaveNLoadFixes.Repairs
             {
                 long debit = WideNumericRepair.Subtract(0L, owner.roomCost(roomType),
                     "agency.addRoom construction debit");
-                WideNumericRepair.Add(resources.Money(), debit,
+                WideNumericRepair.Add(resources.Money(),
+                    BuffMeWideNumericInterop.PreviewResourceDelta(resources.type.money, debit),
                     "agency.addRoom construction resource preflight");
             }
         }
@@ -5355,6 +5402,7 @@ namespace SaveNLoadFixes.Repairs
             long value,
             resources.fanType? fanType)
         {
+            value = BuffMeWideNumericInterop.ApplyDirectGirlFanDelta(value);
             if (value == 0L) return;
             if (girl.Fans.Count == 0) girl.CreateFans();
             girl.RecalcFanAppeal();

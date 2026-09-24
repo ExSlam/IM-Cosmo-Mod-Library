@@ -809,6 +809,25 @@ namespace SaveNLoadFixes.Repairs
             return ToInt64Checked(quotient);
         }
 
+        internal static long TruncateRatio(long value, long numerator, long denominator)
+        {
+            if (denominator <= 0L)
+            {
+                throw new ArgumentOutOfRangeException(nameof(denominator));
+            }
+
+            ExactInteger product = ExactInteger.Multiply(
+                ExactInteger.FromInt64(value),
+                ExactInteger.FromInt64(numerator));
+            ExactInteger absolute = ExactInteger.Abs(product);
+            ExactInteger quotient;
+            ExactInteger remainder;
+            ExactInteger.DivRem(absolute, ExactInteger.FromInt64(denominator),
+                out quotient, out remainder);
+            if (product.Sign < 0) quotient = ExactInteger.Negate(quotient);
+            return ToInt64Checked(quotient);
+        }
+
         internal static long RoundRatioToEven(long value, long numerator, long denominator)
         {
             if (denominator <= 0L)

@@ -62,6 +62,26 @@ namespace SaveNLoadFixes
             get { return TbsBalancePatchWideNumericInterop.AppliedCount; }
         }
 
+        public static bool BuffMeWideNumericCompatibilityActive
+        {
+            get { return BuffMeWideNumericInterop.ProfileActive; }
+        }
+
+        public static string BuffMeWideNumericCompatibilityStatus
+        {
+            get { return BuffMeWideNumericInterop.Status; }
+        }
+
+        public static long BuffMeWideNumericCompatibilityAppliedCount
+        {
+            get { return BuffMeWideNumericInterop.AppliedCount; }
+        }
+
+        public static long BuffMeDuplicateFanMultiplierCorrectionCount
+        {
+            get { return BuffMeWideNumericInterop.DuplicateFanCorrectionCount; }
+        }
+
         public static bool RepairsImplemented
         {
             get { return true; }

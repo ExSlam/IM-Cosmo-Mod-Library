@@ -4,9 +4,9 @@ namespace SaveNLoadFixes
     {
         internal const string ModName = "Save n Load Fixes";
         internal const string HarmonyId = "com.cosmo.savenloadfixes";
-        internal const string Version = "5.5.4";
+        internal const string Version = "5.5.5";
         internal const string DevelopmentStage =
-            "A35 business-payment widening and TBS Balance Patch 1.0.0 compatibility cumulative over A34/A33 and earlier repairs";
+            "Task 50 - A23 cumulative foundation; BuffMe 1.0.0 wide-number compatibility and duplicate-fan correction cumulative over A35/A34/A33 and earlier repairs";
         internal const string LogPrefix = "[Save n Load Fixes] ";
 
         internal const string DataSaverSaveMethodName = "saveData";

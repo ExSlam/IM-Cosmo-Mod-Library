@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.5.5 - BuffMe 1.0.0 wide-number compatibility and fan-multiplier correction
+
+- Adds strict, load-order-independent detection for Vanilas' `com.vanilas.buffme` 1.0.0 assembly and audited patch/constant shape. Unknown versions are left untouched.
+- Neutralizes BuffMe 1.0.0's two numeric Harmony prefixes and reproduces positive money/fan multipliers with wide-safe arithmetic while preserving the configured Mod Menu percentages.
+- Corrects BuffMe 1.0.0's duplicate fan multiplication. Resource-level fan rewards and subsequent idol distribution now receive the configured fan multiplier exactly once; direct idol fan rewards still receive it once.
+- Continues that one-time fan multiplier through SNLF wide fan paths, including wide tours, weighted/equal distributions, business fans, café fans, and oshihen redistribution where vanilla would have crossed the patched idol `AddFans(Int64, Nullable<fanType>)` boundary.
+- Makes A35 business-payment and café money compatibility corrections BuffMe-aware: the agency correction is `Buff(exact) - Buff(compatibility)`, and the correction transaction itself is not multiplied again. Idol business earnings remain unbuffed, matching BuffMe 1.0.0's original scope.
+- Leaves BuffMe's stamina-use patch native and unchanged.
+- Bumps the public version from `5.5.4` to `5.5.5` under the existing decimal-carry release numbering scheme.
+
 ## 5.5.4 - Business payment widening and TBS Balance Patch 1.0.0 compatibility
 
 - Adds A35/A33.4 continuation for vanilla business proposal payments. The generated payment is widened before `Mathf.FloorToInt`, exact proposal payment remains in an Int64 sidecar, and vanilla `int` fields are retained only as clamped compatibility mirrors.

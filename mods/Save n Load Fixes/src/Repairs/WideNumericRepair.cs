@@ -637,16 +637,27 @@ namespace SaveNLoadFixes.Repairs
                 return;
             }
 
-            long paymentCorrection = Subtract(
-                state.ExactPayment,
-                state.CompatibilityPayment,
-                "business.Accept exact payment correction");
+            long paymentCorrection = BuffMeWideNumericInterop.CalculateExactResourceCorrection(
+                resources.type.money, state.ExactPayment, state.CompatibilityPayment,
+                "business.Accept BuffMe-aware exact payment correction");
+            long idolEarningsCorrection = Subtract(
+                state.ExactPayment, state.CompatibilityPayment,
+                "business.Accept exact idol-earnings correction");
             if (paymentCorrection != 0L)
             {
-                resources.Add(resources.type.money, paymentCorrection);
-                if (state.Proposal != null && state.Proposal.girl != null)
-                    state.Proposal.girl.Earn(paymentCorrection);
+                BuffMeWideNumericInterop.BeginResourceMultiplierSuppression();
+                try
+                {
+                    resources.Add(resources.type.money, paymentCorrection);
+                }
+                finally
+                {
+                    BuffMeWideNumericInterop.EndResourceMultiplierSuppression();
+                }
             }
+            if (idolEarningsCorrection != 0L && state.Proposal != null &&
+                state.Proposal.girl != null)
+                state.Proposal.girl.Earn(idolEarningsCorrection);
 
             if (business.History == null ||
                 business.History.Count != state.HistoryCount + 1)

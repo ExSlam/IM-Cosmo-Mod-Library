@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.4
+## Version 5.5.5
 
-Current source version: **5.5.4**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
+Current source version: **5.5.5**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.4: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.5: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -24,6 +24,12 @@ SNLF has no compile-time dependency on Rivals Reborn or the Tel Mod Library. Opt
 - **Tel Mod Library:** SNLF has narrowly scoped reflection interop for current-head Going Viral, Fan Attrition, Stale Theater Shows, Extended SSK, Unofficial Patch, MBTI Personalities, Sister Groups, Tour Stamina, Traits Fix, and Traits Expansion where those mods intersect SNLF replacement paths. This is **not** a blanket claim that every Tel mod composes with every unrelated mod. Policy/UI JSON conflicts, for example, are outside SNLF's save/numeric contract.
 - **EroEvents:** `EroEventsDataCodec` is an opt-in exact Int32/Int64 payload codec owned by `com.seraph.eroevents`. It does not automatically migrate EroEvents variables or alter EroEvents policy definitions.
 - **IM Data Core / Graduation Details:** SNLF retains the coordinated checkpoint/witness behavior implemented by the current source. IMDC remains responsible for its own sidecar durability and schema.
+
+### BuffMe 1.0.0 compatibility
+
+When the exact audited **Vanilas BuffMe 1.0.0** assembly is enabled, SNLF replaces BuffMe's positive money/fan `Double` narrowing with wide-safe arithmetic. It also corrects BuffMe 1.0.0's duplicate fan multiplication: a positive semantic fan award receives the configured `Fan_Multiplier` exactly once, whether it enters through `resources._Add(fans, ...)`, a direct idol `AddFans(...)` call, or an SNLF wide continuation. BuffMe's stamina reduction patch remains untouched. Unknown BuffMe versions are not overridden.
+
+SNLF compatibility corrections used to bridge clamped vanilla ABI values are not treated as second rewards. Business and café correction deltas are calculated as the difference between the BuffMe-scaled exact reward and the BuffMe-scaled compatibility reward.
 
 ### A35 business proposal payment continuation
 

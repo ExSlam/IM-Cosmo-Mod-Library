@@ -1048,7 +1048,7 @@ namespace SaveNLoadFixes.Repairs
             "data_girls.girls.AddFans(Int64,Nullable)", typeof(data_girls.girls), nameof(data_girls.girls.AddFans),
             new Type[] { typeof(long), typeof(resources.fanType?) }, typeof(void), false); }
         [HarmonyAfter(TelModLibraryInterop.GoingViralOwner)]
-        private static bool Prefix(data_girls.girls __instance, long __0, resources.fanType? __1)
+        private static bool Prefix(data_girls.girls __instance, ref long __0, resources.fanType? __1)
         {
             long cafeExact;
             if (WideNumericContinuation.TryResolveCafeFanAddition(
@@ -1057,10 +1057,23 @@ namespace SaveNLoadFixes.Repairs
                 WideNumericContinuation.AddGirlFans(__instance, cafeExact, __1);
                 return false;
             }
+
             if (!WideNumericContinuation.NeedsWideFanPath(__0) &&
                 !WideNumericContinuation.GirlFanAdditionMayOverflow(
-                    __instance, __0, __1)) return true;
-            WideNumericContinuation.AddGirlFans(__instance, __0, __1); return false;
+                    __instance, __0, __1))
+            {
+                long effective = BuffMeWideNumericInterop.PreviewDirectGirlFanDelta(__0);
+                if (!WideNumericContinuation.NeedsWideFanPath(effective) &&
+                    !WideNumericContinuation.GirlFanAdditionMayOverflow(
+                        __instance, effective, __1))
+                {
+                    __0 = BuffMeWideNumericInterop.ApplyDirectGirlFanDelta(__0);
+                    return true;
+                }
+            }
+
+            WideNumericContinuation.AddGirlFans(__instance, __0, __1);
+            return false;
         }
     }
 
