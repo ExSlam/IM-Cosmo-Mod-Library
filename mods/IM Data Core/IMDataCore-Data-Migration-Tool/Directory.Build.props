@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Deliberately stops MSBuild's upward Directory.Build.props search here.
+    The data migration tool is often checked out beneath Cosmo-Mod-Library, whose root props
+    target Unity/.NET Framework mods and disable default Compile items. Those
+    settings are not applicable to this standalone .NET 8 WinForms utility.
+  -->
+  <PropertyGroup>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

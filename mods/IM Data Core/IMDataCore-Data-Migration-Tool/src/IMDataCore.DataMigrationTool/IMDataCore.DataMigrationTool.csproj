@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Keep this project buildable even if copied beneath a repo that disables SDK default compile items. -->
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <AssemblyName>IMDataCore Data Migration Tool</AssemblyName>
+    <RootNamespace>IMDataCore.DataMigrationTool</RootNamespace>
+    <ApplicationIcon>Assets\data_migration_tool.ico</ApplicationIcon>
+    <Version>2.0.1</Version>
+    <Authors>Cosmo</Authors>
+    <Company>Cosmo Mod Library</Company>
+    <Product>IMDataCore Data Migration Tool</Product>
+    <AssemblyTitle>IMDataCore Data Migration Tool</AssemblyTitle>
+    <Description>Offline migration tool for IMDataCore 1.0.0-1.3.0 legacy data to the current IMDataCore v6 format for Idol Manager.</Description>
+    <Copyright>Copyright © Cosmo</Copyright>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <!--
+    Defensive cleanup for the common case where only this project directory is
+    copied under Cosmo-Mod-Library without this tool's local Directory.Build.props.
+    These Remove entries are harmless when no parent mod-build props are present.
+  -->
+  <ItemGroup>
+    <PackageReference Remove="Microsoft.NETFramework.ReferenceAssemblies.net46" />
+    <Reference Remove="Assembly-CSharp;Assembly-CSharp-firstpass;0Harmony;UnityEngine.CoreModule;UnityEngine.UIModule;UnityEngine.UI;UnityEngine.TextRenderingModule;UnityEngine.JSONSerializeModule;UnityEngine.InputLegacyModule;Unity.TextMeshPro;UnityEngine.ImageConversionModule" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Assets\data_migration_tool.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets\data_migration_tool.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets\data_migration_tool_banner.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

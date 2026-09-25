@@ -1,0 +1,24 @@
+IMDataCore Data Migration Tool 2.0.1 - static check report
+
+Scope
+- Renamed the product to IMDataCore Data Migration Tool throughout the project, executable metadata, source namespace, reports, logs, migration provenance labels, assets, documentation, and user-facing text.
+- The tool is described as migrating legacy IMDataCore 1.0.0-1.3.0 data to the current IMDataCore data format v6 and change-journal format v3.
+- Reworked Japanese, Russian, Korean, and Simplified Chinese UI terminology so ordinary visible labels use native-script wording instead of English technical terms.
+- Simplified Chinese displays IMDataCore as 偶像经理数据核心 and the product name as 偶像经理数据核心迁移工具.
+- Localized accessibility/Narrator names and descriptions so assistive text follows the selected GUI language.
+- Replaced the text-bearing banner with a text-free decorative banner so English branding is not baked into non-English interfaces.
+- Exact filenames, paths, command names, and URLs that users must recognize remain literal where translating them would make instructions inaccurate.
+
+Static verification
+- 30 C# files checked for balanced braces, brackets, parentheses, string/character literal termination, and comment termination.
+- Project XML and Directory.Build.props parse successfully.
+- Solution, project, assembly, root namespace, application assets, product metadata, and version consistently use IMDataCore Data Migration Tool 2.0.1.
+- Localization dictionaries contain 233 keys in each of 7 languages, with identical key sets, no duplicate keys, and matching format placeholders.
+- Japanese, Russian, Korean, and Simplified Chinese localization values contain no ASCII-letter leakage.
+- Native-language Help content uses Latin letters only for exact literal filenames that users must identify, such as save.json, auto_save.json, and im_data_core.db.
+- Help contains 13 user-facing topics in each of the 7 supported GUI languages.
+- Help topic references are valid and regular C# string literals contain no raw physical newlines.
+- Accessibility labels use localized resources instead of hard-coded English text.
+- No old product branding remains in source, documentation, scripts, solution/project metadata, or text reports.
+
+- Built executable name: IMDataCore Data Migration Tool.exe (AssemblyName uses the human-facing product name).
