@@ -1,14 +1,14 @@
 # Save n Load Fixes
 
-## Version 5.5.8
+## Version 5.5.9
 
-Current source version: **5.5.8**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
+Current source version: **5.5.9**. This tree also contains cumulative Rivals Reborn wide-numeric compatibility work.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.5.8: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.5.9: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
@@ -48,6 +48,14 @@ The same cumulative pass also uses the exact show-episode fan sidecar in the rel
 Vanilla research balances are stored and saved as `float`, so sufficiently large balances stop accepting small increments accurately. Schema v5 adds one canonical finite `double` balance per research category. `Research.category.Points` remains a compatibility mirror for vanilla and other mods, while `GetPoints()` derives the spendable Int64 total from the exact sidecar. Saves written before v5 seed research precision from the surviving vanilla float and do not claim to reconstruct fractional precision already lost before SNLF observed it.
 
 The same pass removes three remaining narrow consumers of already-wide state: largest-business-liability idol selection compares the exact Int64 liabilities, dialogue `money` / `number` parameters can format Int64 values outside `Int32`, and spoiled-recruit payment setup uses checked arithmetic instead of overflowing when negating `Int64.MinValue` or rounding near the Int64 boundary.
+
+### A33.9 Int64 aggregate closure
+
+The next preflight found no new narrow persistent ledger, but it did find several places where vanilla already stores `long` values and then combines them with unchecked `+=`. SNLF now closes those seams at the lowest useful layer: per-idol fan-type/total aggregation, business liability queries, show total sales, and agency-wide show profit all use checked Int64 addition. This ensures an outer checked total never receives a subtotal that has already wrapped.
+
+Business contract breaking is preflighted transactionally. SNLF calculates the complete checked liability before removing any matching active proposal; only after that succeeds does it remove the contracts and charge the agency. This prevents an overflow from producing a half-broken contract set.
+
+VN group fan actions keep an exact temporary Int64 result for their post-action text instead of narrowing the accumulated `FansAdded` total to `float`. Abbreviated number/money formatting also uses integer/unsigned-magnitude arithmetic rather than `Single`, including a safe abbreviated path for `Int64.MinValue`. These changes add no new persisted state, so the wide-state schema remains v5.
 
 ## Core save transport contract
 
@@ -149,7 +157,7 @@ The numeric rules are:
 - keep exact repair shadows as canonical decimal strings where vanilla storage cannot represent the authoritative value;
 - avoid a `System.Numerics` runtime dependency so old Unity/Mono loads do not depend on an unavailable assembly.
 
-`wide_numeric_state_version = 2` is the current exact-shadow format. Version 1 remains readable under its documented legacy fallback rules.
+`wide_numeric_state_version = 5` is the current exact-shadow format. Versions 1-4 remain readable under their documented legacy fallback rules; v5 adds research precision while retaining the earlier business-payment, business-fan, and top-payment records.
 
 ## Rivals Reborn wide-numeric compatibility
 

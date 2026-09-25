@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.5.9
+
+- Adds A33.9 checked Int64 aggregation at the lowest remaining fan subtotal layer: `data_girls.girls.GetFan_Count(fanType)` and `GetFans_Total(Nullable<fanType>)` now use checked addition so global/group fan totals cannot receive an already-wrapped idol subtotal.
+- Replaces both business liability aggregation overloads with checked Int64 sums and makes both `BreakContracts(...)` overloads transactional: the full liability is preflighted before any contract is removed, so overflow cannot leave a partially mutated contract list.
+- Replaces `Shows._show.GetTotalSales()` and static `Shows.GetTotalProfit()` aggregation with checked Int64 addition.
+- Continues VN `group/add_fans` reporting with an exact temporary Int64 result. The actual fan awards still use the normal widened idol fan path, while the dialogue result no longer sums unchecked or narrows the reported total through `float`.
+- Hardens abbreviated `formatNumber(long, ...)` / `formatMoney(long, ...)` rendering so large Int64 values no longer pass through `Single`, and abbreviated money safely handles `Int64.MinValue`. Full-width rendering behavior remains under the existing exact formatter.
+- Adds frozen A33.9 implementation/source contracts for the audited vanilla aggregation and formatting seams. No persistence schema change is required; `wide_numeric_state_version` remains v5.
+
 ## 5.5.8
 
 - Adds A33.8 research-point precision continuation. Vanilla `Research.category.Points` and `ResearchData.Points` remain `float` compatibility mirrors, while SNLF accumulates the exact sequence of Single deltas in a finite `double` sidecar so small research gains do not disappear at large balances.

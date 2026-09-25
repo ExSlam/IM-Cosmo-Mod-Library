@@ -106,10 +106,10 @@ namespace SaveNLoadFixes.Repairs
                     string failure = WideNumericContinuationPatchHealth.Failure;
                     if (!string.IsNullOrEmpty(failure))
                     {
-                        return "A33.2-A33.6 patch health failed: " + failure;
+                        return "A33.2-A33.9 patch health failed: " + failure;
                     }
                     return string.Concat(
-                        "A33.2-A33.6 patch manifest is incomplete (",
+                        "A33.2-A33.9 patch manifest is incomplete (",
                         WideNumericContinuationPatchHealth.ResolvedTargetMethodCount.ToString(
                             CultureInfo.InvariantCulture),
                         "/",

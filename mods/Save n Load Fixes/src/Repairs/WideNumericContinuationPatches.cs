@@ -2072,11 +2072,11 @@ namespace SaveNLoadFixes.Repairs
             typeof(string), true); }
         private static bool Prefix(long __0, bool __1, bool __2, bool __3, ref string __result)
         {
-            // Preserve intentionally abbreviated UI.  Every full-width money label,
-            // including calls routed through the Int32 overload, gets an exact whole
-            // Int64 rendering with a safe Int64.MinValue path.
-            if (__1 || __2) return true;
-            __result = WideNumericContinuation.FormatMoneyExact(__0, __3);
+            if (__1 || __2)
+                __result = WideNumericContinuation.FormatMoneyAbbreviatedExact(
+                    __0, __1, __2, __3);
+            else
+                __result = WideNumericContinuation.FormatMoneyExact(__0, __3);
             return false;
         }
     }
@@ -2716,6 +2716,146 @@ namespace SaveNLoadFixes.Repairs
         private static bool Prefix(tasks._story_data __instance)
         {
             WideNumericContinuation.SetSpoiledRecruitMoneyWide(__instance);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_GirlFanCountAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "data_girls.girls.GetFan_Count(fanType)", typeof(data_girls.girls),
+            nameof(data_girls.girls.GetFan_Count), new Type[] { typeof(resources.fanType) },
+            typeof(long), false); }
+        private static bool Prefix(data_girls.girls __instance, resources.fanType __0, ref long __result)
+        { __result = WideNumericContinuation.GetGirlFanCountExact(__instance, __0); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_GirlFansTotalAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "data_girls.girls.GetFans_Total(Nullable)", typeof(data_girls.girls),
+            nameof(data_girls.girls.GetFans_Total), new Type[] { typeof(resources.fanType?) },
+            typeof(long), false); }
+        private static bool Prefix(data_girls.girls __instance, resources.fanType? __0, ref long __result)
+        { __result = WideNumericContinuation.GetGirlFansTotalExact(__instance, __0); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessGirlLiabilityAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.GetLiability(girl)", typeof(business), nameof(business.GetLiability),
+            new Type[] { typeof(data_girls.girls) }, typeof(long), false); }
+        private static bool Prefix(business __instance, data_girls.girls __0, ref long __result)
+        { __result = WideNumericContinuation.GetBusinessLiabilityExact(__instance, __0); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessActorLiabilityAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.GetLiability(List<actor>,List<action>)", typeof(business),
+            nameof(business.GetLiability),
+            new Type[] { typeof(List<Event_Manager._activeEvent._actor>), typeof(List<data_dialogues._action>) },
+            typeof(long), false); }
+        private static bool Prefix(
+            business __instance,
+            List<Event_Manager._activeEvent._actor> __0,
+            List<data_dialogues._action> __1,
+            ref long __result)
+        { __result = WideNumericContinuation.GetBusinessLiabilityExact(__instance, __0, __1); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessBreakGirlContracts_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.BreakContracts(girl)", typeof(business), nameof(business.BreakContracts),
+            new Type[] { typeof(data_girls.girls) }, typeof(void), false); }
+        private static bool Prefix(business __instance, data_girls.girls __0)
+        { WideNumericContinuation.BreakBusinessContractsExact(__instance, __0); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_BusinessBreakActorContracts_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "business.BreakContracts(List<actor>)", typeof(business), nameof(business.BreakContracts),
+            new Type[] { typeof(List<Event_Manager._activeEvent._actor>) }, typeof(void), false); }
+        private static bool Prefix(business __instance, List<Event_Manager._activeEvent._actor> __0)
+        { WideNumericContinuation.BreakBusinessContractsExact(__instance, __0); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ShowTotalSalesAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Shows._show.GetTotalSales()", typeof(Shows._show), nameof(Shows._show.GetTotalSales),
+            Type.EmptyTypes, typeof(long), false); }
+        private static bool Prefix(Shows._show __instance, ref long __result)
+        { __result = WideNumericContinuation.GetShowTotalSalesExact(__instance); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_AllShowsProfitAggregate_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "Shows.GetTotalProfit()", typeof(Shows), nameof(Shows.GetTotalProfit),
+            Type.EmptyTypes, typeof(long), true); }
+        private static bool Prefix(ref long __result)
+        { __result = WideNumericContinuation.GetAllShowsProfitExact(); return false; }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_VnActionListFanReset_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "vn_actions.Do(List<action>,_activeEvent)", typeof(vn_actions), nameof(vn_actions.Do),
+            new Type[] { typeof(List<data_dialogues._action>), typeof(Event_Manager._activeEvent) },
+            typeof(void), false); }
+        private static void Prefix(vn_actions __instance, List<data_dialogues._action> __0)
+        { WideNumericContinuation.ClearVnGroupFanResults(__instance, __0); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_VnGroupFansAction_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "vn_actions.DoGroup(String,String)", typeof(vn_actions), "DoGroup",
+            new Type[] { typeof(string), typeof(string) }, typeof(void), false); }
+        private static bool Prefix(vn_actions __instance, string __0, string __1)
+        { return !WideNumericContinuation.TryDoVnGroupFans(__instance, __0, __1); }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_VnGroupFansString_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "vn_actions.GetGroupString(String,String)", typeof(vn_actions), "GetGroupString",
+            new Type[] { typeof(string), typeof(string) }, typeof(string), false); }
+        private static bool Prefix(vn_actions __instance, string __0, ref string __result)
+        {
+            string exact;
+            if (!WideNumericContinuation.TryGetVnGroupFansString(__instance, __0, out exact))
+                return true;
+            __result = exact;
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class WideNumeric_ExactAbbreviatedNumberFormatter_Patch
+    {
+        private static MethodBase TargetMethod() { return WideNumericTargets.Resolve(
+            "ExtensionMethods.formatNumber(Int64,Boolean,Boolean)",
+            typeof(ExtensionMethods), nameof(ExtensionMethods.formatNumber),
+            new Type[] { typeof(long), typeof(bool), typeof(bool) }, typeof(string), true); }
+        private static bool Prefix(long __0, bool __1, bool __2, ref string __result)
+        {
+            if (!__1 && !__2) return true;
+            __result = WideNumericContinuation.FormatNumberAbbreviatedExact(__0, __1, __2);
             return false;
         }
     }

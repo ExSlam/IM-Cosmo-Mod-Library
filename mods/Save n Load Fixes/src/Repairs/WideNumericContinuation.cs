@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using HarmonyLib;
 using UnityEngine;
@@ -9,7 +10,7 @@ using UnityEngine;
 namespace SaveNLoadFixes.Repairs
 {
     /// <summary>
-    /// A33.2-A33.6 producer/consumer implementations. Public vanilla signatures
+    /// A33.2-A33.9 producer/consumer implementations. Public vanilla signatures
     /// remain unchanged; methods ending in Compatibility return only a clamped ABI
     /// mirror while the corresponding Int64 helper remains authoritative.
     /// </summary>
@@ -5921,6 +5922,333 @@ namespace SaveNLoadFixes.Repairs
             else resources._OnFansChange();
         }
 
+
+        // A33.9: close residual unchecked Int64 aggregation seams around already-wide state.
+        private static readonly ConditionalWeakTable<vn_actions, List<VnGroupFanResult>>
+            ExactVnGroupFans = new ConditionalWeakTable<vn_actions, List<VnGroupFanResult>>();
+
+        internal static long GetGirlFanCountExact(data_girls.girls girl, resources.fanType type)
+        {
+            if (girl == null) throw new ArgumentNullException(nameof(girl));
+            long total = 0L;
+            foreach (resources._fan fan in girl.Fans)
+            {
+                if (fan.gender == type || fan.hardcoreness == type || fan.age == type)
+                    total = WideNumericRepair.Add(total, fan.people,
+                        "data_girls.girls.GetFan_Count(fanType)");
+            }
+            return total;
+        }
+
+        internal static long GetGirlFansTotalExact(
+            data_girls.girls girl,
+            resources.fanType? type)
+        {
+            if (girl == null) throw new ArgumentNullException(nameof(girl));
+            if (girl.Fans.Count == 0) return 0L;
+            long total = 0L;
+            foreach (resources._fan fan in girl.Fans)
+            {
+                if (type != null && fan.gender != type.Value &&
+                    fan.hardcoreness != type.Value && fan.age != type.Value)
+                    continue;
+                total = WideNumericRepair.Add(total, fan.people,
+                    "data_girls.girls.GetFans_Total(Nullable)");
+            }
+            return total;
+        }
+
+        internal static long GetBusinessLiabilityExact(
+            business owner,
+            data_girls.girls girl)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            long total = 0L;
+            foreach (business.active_proposal proposal in owner.ActiveProposals)
+            {
+                if (proposal.Girl == girl)
+                    total = WideNumericRepair.Add(total, proposal.Liability,
+                        "business.GetLiability(girl)");
+            }
+            return total;
+        }
+
+        internal static long GetBusinessLiabilityExact(
+            business owner,
+            List<Event_Manager._activeEvent._actor> actors,
+            List<data_dialogues._action> actions)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            if (actors == null) throw new ArgumentNullException(nameof(actors));
+            if (actions != null)
+            {
+                bool hasScandalIncrease = false;
+                foreach (data_dialogues._action action in actions)
+                {
+                    if (action.parameter == "scandalPoints" && int.Parse(action.formula) >= 1)
+                    {
+                        hasScandalIncrease = true;
+                        break;
+                    }
+                }
+                if (!hasScandalIncrease) return 0L;
+            }
+
+            long total = 0L;
+            foreach (Event_Manager._activeEvent._actor actor in actors)
+            {
+                if (actor.girl == null) continue;
+                foreach (business.active_proposal proposal in owner.ActiveProposals)
+                {
+                    if (proposal.Girl == actor.girl)
+                        total = WideNumericRepair.Add(total, proposal.Liability,
+                            "business.GetLiability(actors,actions)");
+                }
+            }
+            return total;
+        }
+
+        internal static void BreakBusinessContractsExact(
+            business owner,
+            data_girls.girls girl)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            long total = 0L;
+            for (int index = owner.ActiveProposals.Count - 1; index >= 0; index--)
+            {
+                business.active_proposal proposal = owner.ActiveProposals[index];
+                if (proposal.Girl == girl)
+                    total = WideNumericRepair.Add(total, proposal.Liability,
+                        "business.BreakContracts(girl) preflight");
+            }
+
+            // Do not mutate the contract list until the complete liability has passed
+            // checked preflight. This prevents a partial break on overflow.
+            for (int index = owner.ActiveProposals.Count - 1; index >= 0; index--)
+                if (owner.ActiveProposals[index].Girl == girl)
+                    owner.ActiveProposals.RemoveAt(index);
+
+            if (total < 1L) return;
+            NotificationManager.AddNotification(
+                "[" + girl.GetName(true) + "] " + Language.Insert(
+                    "BUSINESS__BROKEN_CONTRACT",
+                    new string[] { ExtensionMethods.formatMoney(total, false, false, false) }),
+                mainScript.red32,
+                NotificationManager._notification._type.other);
+            resources.Add(resources.type.money, WideNumericRepair.Subtract(
+                0L, total, "business.BreakContracts(girl) charge"));
+        }
+
+        internal static void BreakBusinessContractsExact(
+            business owner,
+            List<Event_Manager._activeEvent._actor> actors)
+        {
+            if (owner == null) throw new ArgumentNullException(nameof(owner));
+            if (actors == null) throw new ArgumentNullException(nameof(actors));
+            HashSet<data_girls.girls> girls = new HashSet<data_girls.girls>();
+            foreach (Event_Manager._activeEvent._actor actor in actors)
+                if (actor.girl != null) girls.Add(actor.girl);
+
+            long total = 0L;
+            for (int index = owner.ActiveProposals.Count - 1; index >= 0; index--)
+            {
+                business.active_proposal proposal = owner.ActiveProposals[index];
+                if (girls.Contains(proposal.Girl))
+                    total = WideNumericRepair.Add(total, proposal.Liability,
+                        "business.BreakContracts(actors) preflight");
+            }
+
+            for (int index = owner.ActiveProposals.Count - 1; index >= 0; index--)
+                if (girls.Contains(owner.ActiveProposals[index].Girl))
+                    owner.ActiveProposals.RemoveAt(index);
+
+            resources.Add(resources.type.money, WideNumericRepair.Subtract(
+                0L, total, "business.BreakContracts(actors) charge"));
+        }
+
+        internal static long GetShowTotalSalesExact(Shows._show show)
+        {
+            if (show == null) throw new ArgumentNullException(nameof(show));
+            long total = 0L;
+            foreach (singles._single._sales sale in show.sales)
+                total = WideNumericRepair.Add(total, sale.sales,
+                    "Shows._show.GetTotalSales");
+            return total;
+        }
+
+        internal static long GetAllShowsProfitExact()
+        {
+            long total = 0L;
+            foreach (Shows._show show in Shows.shows)
+            {
+                if (show.status != Shows._show._status.normal &&
+                    show.status != Shows._show._status.working &&
+                    show.status != Shows._show._status.canceled)
+                {
+                    total = WideNumericRepair.Add(total, show.GetProfit(null),
+                        "Shows.GetTotalProfit");
+                }
+            }
+            return total;
+        }
+
+        internal static void ClearVnGroupFanResults(vn_actions owner, List<data_dialogues._action> actions)
+        {
+            if (owner == null || actions == null) return;
+            foreach (data_dialogues._action action in actions)
+            {
+                if (action.target == "group" && action.parameter == "add_fans")
+                {
+                    List<VnGroupFanResult> values = ExactVnGroupFans.GetOrCreateValue(owner);
+                    values.Clear();
+                    return;
+                }
+            }
+        }
+
+        internal static bool TryDoVnGroupFans(vn_actions owner, string parameter, string formula)
+        {
+            if (owner == null || parameter != "add_fans") return false;
+            List<VnGroupFanResult> exact = ExactVnGroupFans.GetOrCreateValue(owner);
+            foreach (VnGroupFanInput input in ParseVnGroupFanFormula(formula))
+            {
+                long total = 0L;
+                foreach (data_girls.girls girl in data_girls.girl)
+                {
+                    if (girl.status == data_girls._status.graduated) continue;
+                    girl.AddFans(new resources.fanType?(input.Type), input.Value, false);
+                    total = WideNumericRepair.Add(total, girl.FansAdded,
+                        "vn_actions.DoGroup(add_fans)");
+                }
+                exact.Add(new VnGroupFanResult(input.Type, total));
+            }
+            return true;
+        }
+
+        internal static bool TryGetVnGroupFansString(
+            vn_actions owner,
+            string parameter,
+            out string result)
+        {
+            result = null;
+            if (owner == null || parameter != "add_fans") return false;
+            List<VnGroupFanResult> exact;
+            if (!ExactVnGroupFans.TryGetValue(owner, out exact)) return false;
+            string text = string.Empty;
+            foreach (VnGroupFanResult value in exact)
+            {
+                if (text != string.Empty) text += "\n";
+                text += resources.GetFanTitle(value.Type) + " " + Language.Data["FANS"] + ": ";
+                string formatted = ExtensionMethods.formatNumber(value.Value, false, false);
+                if (value.Value > 0L)
+                    formatted = ExtensionMethods.color("+" + formatted, mainScript.green);
+                else
+                {
+                    formatted = ExtensionMethods.color(formatted, mainScript.red);
+                    Event_Manager.YABE = true;
+                }
+                text += formatted;
+            }
+            result = text;
+            return true;
+        }
+
+        private static List<VnGroupFanInput> ParseVnGroupFanFormula(string formula)
+        {
+            List<VnGroupFanInput> result = new List<VnGroupFanInput>();
+            string[] entries = formula.Trim().Split(new string[] { " " }, StringSplitOptions.None);
+            foreach (string entry in entries)
+            {
+                string[] pair = entry.Trim().Split(new string[] { "=" }, StringSplitOptions.None);
+                resources.fanType type;
+                switch (pair[0])
+                {
+                    case "M": type = resources.fanType.male; break;
+                    case "F": type = resources.fanType.female; break;
+                    case "C": type = resources.fanType.casual; break;
+                    case "HC": type = resources.fanType.hardcore; break;
+                    case "T": type = resources.fanType.teen; break;
+                    case "YA": type = resources.fanType.youngAdult; break;
+                    case "A": type = resources.fanType.adult; break;
+                    default: type = default(resources.fanType); break;
+                }
+                result.Add(new VnGroupFanInput(type, float.Parse(pair[1])));
+            }
+            return result;
+        }
+
+        internal static string FormatNumberAbbreviatedExact(
+            long value,
+            bool shorten,
+            bool shortenMid)
+        {
+            if (!shorten && !shortenMid)
+                return value.ToString("N0", CultureInfo.CurrentCulture);
+            if (!shorten && shortenMid)
+            {
+                if (value >= 10000000L)
+                    return (value / 1000000L).ToString("N0", CultureInfo.CurrentCulture) + "M";
+                if (value >= 1000000L)
+                    return (value / 1000L).ToString("N0", CultureInfo.CurrentCulture) + "K";
+                return value.ToString("N0", CultureInfo.CurrentCulture);
+            }
+            if (value >= 10000000L)
+                return (value / 1000000L).ToString("0,0", CultureInfo.CurrentCulture) + "M";
+            if (value >= 1000L)
+                return (value / 1000L).ToString("0,0", CultureInfo.CurrentCulture) + "K";
+            return value.ToString("0,0", CultureInfo.CurrentCulture);
+        }
+
+        internal static string FormatMoneyAbbreviatedExact(
+            long value,
+            bool shorten,
+            bool shortenMid,
+            bool color)
+        {
+            bool negative = value < 0L;
+            ulong magnitude = negative
+                ? (ulong)(-(value + 1L)) + 1UL
+                : (ulong)value;
+            string number;
+            if (!shorten && shortenMid)
+            {
+                if (magnitude >= 10000000UL)
+                    number = (magnitude / 1000000UL).ToString("N0", CultureInfo.CurrentCulture) + "M";
+                else if (magnitude >= 1000000UL)
+                    number = (magnitude / 1000UL).ToString("N0", CultureInfo.CurrentCulture) + "K";
+                else number = magnitude.ToString("N0", CultureInfo.CurrentCulture);
+            }
+            else if (shorten)
+            {
+                if (magnitude >= 10000000UL)
+                    number = (magnitude / 1000000UL).ToString("0,0", CultureInfo.CurrentCulture) + "M";
+                else if (magnitude >= 1000UL)
+                    number = (magnitude / 1000UL).ToString("0,0", CultureInfo.CurrentCulture) + "K";
+                else number = magnitude.ToString("0,0", CultureInfo.CurrentCulture);
+            }
+            else number = magnitude.ToString("N0", CultureInfo.CurrentCulture);
+
+            string text = (negative ? "-" : string.Empty) + mainScript.yen + number;
+            if (!color) return text;
+            return ExtensionMethods.color(text, negative ? mainScript.red : mainScript.green);
+        }
+
+        private sealed class VnGroupFanInput
+        {
+            internal readonly resources.fanType Type;
+            internal readonly float Value;
+            internal VnGroupFanInput(resources.fanType type, float value)
+            { Type = type; Value = value; }
+        }
+
+        private sealed class VnGroupFanResult
+        {
+            internal readonly resources.fanType Type;
+            internal readonly long Value;
+            internal VnGroupFanResult(resources.fanType type, long value)
+            { Type = type; Value = value; }
+        }
+
         private sealed class SskTempResult
         {
             internal readonly data_girls.girls Girl;
@@ -5974,6 +6302,8 @@ namespace SaveNLoadFixes.Repairs
             "business.AddActiveProposal(_proposal)", "Business_Popup.Set(_proposal)",
             "Contracts_Line.Set(active_proposal)", "business.DoWeeklyFans()",
             "business.AddFans(_proposal)", "business.AddFans(active_proposal)",
+            "business.GetLiability(girl)", "business.GetLiability(List<actor>,List<action>)",
+            "business.BreakContracts(girl)", "business.BreakContracts(List<actor>)",
             "Rivals.OnNewMonth(Boolean)",
             "loans.GetTotalPaymentPerWeek()",
             "loans._loan.GetInterest()", "loans._loan.GetTotalAmount()",
@@ -5993,6 +6323,7 @@ namespace SaveNLoadFixes.Repairs
             "singles.ValueAfterMarketing(Int64,Single,Single,_fan,_special_type,_result)",
             "Shows._show.GetAverageParam(List<Int64>)", "Shows._show.GetAverageParam(List<Int32>)",
             "Shows._show.GetTotalParam(List<Int32>)", "Shows._show.GetAllNewFans()",
+            "Shows._show.GetTotalSales()", "Shows.GetTotalProfit()",
             "Groups._group.GetFansOfType(demographic)", "Groups._group.GetFansOfType(Nullable)",
             "SEvent_Tour.tour.GetProfit()", "SEvent_Tour.tour.AddRevenue(Int32)",
             "SEvent_Tour.tour.AddFans(Int32)", "SEvent_Tour.tour.SelectCountry(country,Int32)",
@@ -6012,6 +6343,8 @@ namespace SaveNLoadFixes.Repairs
             "data_girls.girls.AddFans(demographic,Int64)",
             "data_girls.girls.GetFansToAdd(Int64,Single)",
             "data_girls.girls.AddFans(Nullable,Single,Boolean)",
+            "data_girls.girls.GetFan_Count(fanType)",
+            "data_girls.girls.GetFans_Total(Nullable)",
             "singles.AddBonusFans(_single)", "singles.AddNewFans(_single)",
             "Shows._show.SetNewFans(Int32)", "Shows._show.SetSales()",
             "Cafes._cafe.GetMoneyToAdd()", "Cafes._cafe.GetFansToAdd()",
@@ -6031,6 +6364,8 @@ namespace SaveNLoadFixes.Repairs
             "ActiveDialogueController.ApplyParameters(String,_variable,Boolean,Boolean,Boolean)",
             "tasks._story_data.Set_Spoiled_Recruit_Money()",
             "Event_Requirements.Check(_action)", "vn_actions.DoResource(String,String,_activeEvent)",
+            "vn_actions.Do(List<action>,_activeEvent)", "vn_actions.DoGroup(String,String)",
+            "vn_actions.GetGroupString(String,String)",
             "data_girls.girls.GetExpectedSalary()",
             "data_girls.girls.GetExpectedSalary_Total()",
             "data_girls.girls.IncreaseSalary()", "data_girls.girls.LowerSalary()",
@@ -6041,6 +6376,7 @@ namespace SaveNLoadFixes.Repairs
             "ContextMenu_Office.SetFireColor()", "CM_Dance.SetFireColor()",
             "Staff_Fire.DoComplete()",
             "ExtensionMethods.formatMoney(Int64,Boolean,Boolean,Boolean)",
+            "ExtensionMethods.formatNumber(Int64,Boolean,Boolean)",
             "Salary_Line.Render()", "data_girls.girls.GetEarningsString()",
             "tooltip_money.BusinessContracts()", "tooltip_money.Media()",
             "tooltip_money.Cafe()", "tooltip_money.Theater()",
@@ -6111,14 +6447,14 @@ namespace SaveNLoadFixes.Repairs
             if (method == null || method.DeclaringType != type || method.ReturnType != result ||
                 method.IsStatic != isStatic)
             {
-                ReportFailure("A33.2-A33.6 could not resolve frozen target " + id + ".");
+                ReportFailure("A33.2-A33.9 could not resolve frozen target " + id + ".");
                 throw new MissingMethodException(type.FullName, name);
             }
             lock (Sync)
             {
                 if (!Expected.Contains(id))
                 {
-                    failure = "A33.2-A33.6 resolved unrecognized target " + id + ".";
+                    failure = "A33.2-A33.9 resolved unrecognized target " + id + ".";
                 }
                 else
                 {
