@@ -9,7 +9,7 @@ namespace SaveNLoadFixes.Repairs
     {
         private static MethodBase TargetMethod()
         {
-            TbsBalancePatchWideNumericInterop.EnsureInitialized();
+            TbsBalancePatchWideNumericInterop.SafeEnsureInitialized();
             MethodInfo method = AccessTools.Method(typeof(Mods), nameof(Mods.LoadMods), Type.EmptyTypes);
             if (method == null) throw new MissingMethodException(typeof(Mods).FullName, nameof(Mods.LoadMods));
             return method;

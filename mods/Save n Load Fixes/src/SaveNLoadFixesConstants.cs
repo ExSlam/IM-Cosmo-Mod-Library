@@ -4,9 +4,9 @@ namespace SaveNLoadFixes
     {
         internal const string ModName = "Save n Load Fixes";
         internal const string HarmonyId = "com.cosmo.savenloadfixes";
-        internal const string Version = "5.5.9";
+        internal const string Version = "5.6.0";
         internal const string DevelopmentStage =
-            "Task 50 - A23 cumulative foundation; A33.9 Int64 aggregate closure and exact VN fan reporting cumulative over research/schema-v5, business fan/payment, TweaksNQoL/BuffMe/TBS/FWS/A35/A34/A33 and earlier repairs";
+            "Task 50 - A23 cumulative foundation; 5.6.0 optional-integration isolation and load-order-safe late binding cumulative over A33.9, research/schema-v5, business fan/payment, TweaksNQoL/BuffMe/TBS/FWS/A35/A34/A33 and earlier repairs";
         internal const string LogPrefix = "[Save n Load Fixes] ";
 
         internal const string DataSaverSaveMethodName = "saveData";

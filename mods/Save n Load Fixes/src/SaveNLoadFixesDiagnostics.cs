@@ -32,6 +32,36 @@ namespace SaveNLoadFixes
             get { return SaveNLoadFixesConstants.DevelopmentStage; }
         }
 
+        public static bool RivalsRebornWideNumericCompatibilityDetected
+        {
+            get { return RivalsRebornWideNumericInterop.ProfileDetected; }
+        }
+
+        public static bool RivalsRebornWideNumericCompatibilityActive
+        {
+            get { return RivalsRebornWideNumericInterop.ProfileActive; }
+        }
+
+        public static string RivalsRebornWideNumericCompatibilityStatus
+        {
+            get { return RivalsRebornWideNumericInterop.Status; }
+        }
+
+        public static int RivalsRebornWideNumericInstalledSurfaceCount
+        {
+            get { return RivalsRebornWideNumericInterop.InstalledSurfaceCount; }
+        }
+
+        public static int RivalsRebornWideNumericExpectedSurfaceCount
+        {
+            get { return RivalsRebornWideNumericInterop.ExpectedSurfaceCount; }
+        }
+
+        public static int RivalsRebornWideNumericFailedSurfaceCount
+        {
+            get { return RivalsRebornWideNumericInterop.FailedSurfaceCount; }
+        }
+
         public static bool FansWatchShowsWideNumericCompatibilityActive
         {
             get { return FansWatchShowsWideNumericInterop.ProfileActive; }

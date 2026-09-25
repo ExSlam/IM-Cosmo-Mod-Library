@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.6.0
+
+- Makes optional-mod absence non-fatal by construction. Rivals Reborn's fifteen external compatibility targets are removed from SNLF's assembly-wide `PatchAll` discovery and installed dynamically only after an RR assembly is actually present.
+- Adds a stable vanilla `Mods.LoadMods` bootstrap plus `AppDomain.AssemblyLoad` observation, so RR compatibility is independent of whether RR loads before or after SNLF. Disabled/absent RR is a quiet normal state.
+- Contains RR compatibility failures per surface. Missing/changed RR methods are reported as a degraded optional profile while core SNLF patches, ordered transport, and persistence remain untouched.
+- Hardens the existing BuffMe, TBS Balance Patch, and Fans Watch Shows late-bound profiles so bootstrap/probe exceptions are caught inside the optional integration rather than escaping into SNLF `PatchAll` or assembly-load dispatch.
+- Adds public RR detected/active/status and installed/expected/failed-surface diagnostics, plus source guards that forbid optional external targets from re-entering ordinary SNLF Harmony discovery.
+- No repair-envelope or wide-state schema bump is required. Transport API remains v3.
+
 ## 5.5.9
 
 - Adds A33.9 checked Int64 aggregation at the lowest remaining fan subtotal layer: `data_girls.girls.GetFan_Count(fanType)` and `GetFans_Total(Nullable<fanType>)` now use checked addition so global/group fan totals cannot receive an already-wrapped idol subtotal.

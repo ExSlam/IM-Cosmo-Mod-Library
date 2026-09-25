@@ -31,68 +31,386 @@ namespace SaveNLoadFixes.Repairs
         private const string RLabelTypeName = "RivalsReborn.RLabel";
         private const string NewsTypeName = "RivalsReborn.News";
 
+        private const int ExpectedSurfaceCountValue = 15;
+
         private static readonly object Sync = new object();
         private static readonly HashSet<string> Warnings = new HashSet<string>();
+        private static readonly HashSet<string> InstalledSurfaces = new HashSet<string>();
+        private static readonly HashSet<string> FailedSurfaces = new HashSet<string>();
+        private static bool initialized;
+        private static bool installInProgress;
+        private static bool profileDetected;
+        private static bool profileActive;
+        private static string status = "Rivals Reborn not detected.";
+        private static string lastLoggedStatus = string.Empty;
 
-        internal static IEnumerable<MethodBase> ResolveRosterMethod(string name, Type[] parameters)
+        internal static bool ProfileDetected
         {
-            return ResolveMethod(RosterSimTypeName, "RosterSim", name, parameters);
+            get { lock (Sync) return profileDetected; }
         }
 
-        internal static IEnumerable<MethodBase> ResolveSpecialLabelsMethod(string name, Type[] parameters)
+        internal static bool ProfileActive
         {
-            return ResolveMethod(SpecialLabelsTypeName, "SpecialLabels", name, parameters);
+            get { lock (Sync) return profileActive; }
         }
 
-        internal static IEnumerable<MethodBase> ResolvePortraitsMethod(string name, Type[] parameters)
+        internal static string Status
         {
-            return ResolveMethod(PortraitsTypeName, "Portraits", name, parameters);
+            get { lock (Sync) return status; }
         }
 
-        internal static IEnumerable<MethodBase> ResolvePoachMethod(string name, Type[] parameters)
+        internal static int ExpectedSurfaceCount
         {
-            return ResolveMethod(PoachSimTypeName, "PoachSim", name, parameters);
+            get { return ExpectedSurfaceCountValue; }
         }
 
-        internal static IEnumerable<MethodBase> ResolveRivalAwardsMethod(string name, Type[] parameters)
+        internal static int InstalledSurfaceCount
         {
-            return ResolveMethod(RivalAwardsTypeName, "RivalAwards", name, parameters);
+            get { lock (Sync) return InstalledSurfaces.Count; }
         }
 
-        internal static IEnumerable<MethodBase> ResolveRivalsUiMethod(string name, Type[] parameters)
+        internal static int FailedSurfaceCount
         {
-            return ResolveMethod(RivalsUiTypeName, "RivalsUI", name, parameters);
+            get { lock (Sync) return FailedSurfaces.Count; }
         }
 
-        internal static IEnumerable<MethodBase> ResolveXRelMethod(string name, Type[] parameters)
+        /// <summary>
+        /// Initializes the optional RR bridge without making RR a PatchAll-time dependency.
+        /// The scan handles assemblies that are already present and AssemblyLoad handles
+        /// either load order. Absence is the normal, quiet state.
+        /// </summary>
+        internal static void EnsureInitialized()
         {
-            return ResolveMethod(XRelSimTypeName, "XRelSim", name, parameters);
+            bool scanAll = false;
+            lock (Sync)
+            {
+                if (!initialized)
+                {
+                    initialized = true;
+                    AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
+                    scanAll = true;
+                }
+            }
+
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int index = 0; index < assemblies.Length; index++)
+            {
+                if (scanAll || IsRivalsAssembly(assemblies[index]))
+                    TryInstallProfileSafe(assemblies[index]);
+            }
         }
 
-        private static IEnumerable<MethodBase> ResolveMethod(
+        /// <summary>
+        /// Patch-discovery-safe wrapper. Optional integration initialization must never
+        /// escape into SNLF's assembly-wide Harmony PatchAll operation.
+        /// </summary>
+        internal static void SafeEnsureInitialized()
+        {
+            try
+            {
+                EnsureInitialized();
+            }
+            catch (Exception ex)
+            {
+                RecordInstallerFailure(
+                    "bootstrap",
+                    "Rivals Reborn optional compatibility bootstrap failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        {
+            if (args == null || args.LoadedAssembly == null) return;
+            TryInstallProfileSafe(args.LoadedAssembly);
+        }
+
+        private static void TryInstallProfileSafe(Assembly assembly)
+        {
+            try
+            {
+                TryInstallProfile(assembly);
+            }
+            catch (Exception ex)
+            {
+                RecordInstallerFailure(
+                    "assembly-load",
+                    "Rivals Reborn optional compatibility probe failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static bool IsRivalsAssembly(Assembly assembly)
+        {
+            if (assembly == null) return false;
+            try
+            {
+                return assembly.GetType(RosterSimTypeName, false) != null ||
+                    assembly.GetType(SpecialLabelsTypeName, false) != null ||
+                    assembly.GetType(PortraitsTypeName, false) != null ||
+                    assembly.GetType(PoachSimTypeName, false) != null ||
+                    assembly.GetType(RivalAwardsTypeName, false) != null ||
+                    assembly.GetType(RivalsUiTypeName, false) != null ||
+                    assembly.GetType(XRelSimTypeName, false) != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void TryInstallProfile(Assembly assembly)
+        {
+            if (!IsRivalsAssembly(assembly)) return;
+
+            lock (Sync)
+            {
+                profileDetected = true;
+                if (installInProgress) return;
+                installInProgress = true;
+            }
+
+            try
+            {
+                Harmony harmony = new Harmony(SaveNLoadFixesConstants.HarmonyId);
+
+                TryPatchTranspiler(harmony, "RosterSim.DampFanGrowth",
+                    ResolveOptionalMethod(RosterSimTypeName, "DampFanGrowth", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteDampFanGrowth));
+                TryPatchTranspiler(harmony, "RosterSim.AdjustSales",
+                    ResolveOptionalMethod(RosterSimTypeName, "AdjustSales", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteAdjustSales));
+                TryPatchTranspiler(harmony, "SpecialLabels.DoAccusation",
+                    ResolveOptionalMethod(SpecialLabelsTypeName, "DoAccusation", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteDoAccusation));
+                TryPatchTranspiler(harmony, "Portraits.ComputeIdolFans",
+                    ResolveOptionalMethod(PortraitsTypeName, "ComputeIdolFans", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteComputeIdolFans));
+                TryPatchTranspiler(harmony, "Portraits.RefreshFans",
+                    ResolveOptionalMethod(PortraitsTypeName, "RefreshFans", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteRefreshFans));
+                TryPatchTranspiler(harmony, "SpecialLabels.FoundFromRetiree",
+                    ResolveOptionalMethod(SpecialLabelsTypeName, "FoundFromRetiree",
+                        new Type[] { typeof(data_girls.girls) }),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteFoundFromRetiree));
+                TryPatchTranspiler(harmony, "PoachSim.PickTarget",
+                    ResolveOptionalMethod(PoachSimTypeName, "PickTarget", Type.EmptyTypes),
+                    nameof(RivalsRebornWideNumericTranspiler.RewritePickTarget));
+
+                Type labelType = AccessTools.TypeByName(RLabelTypeName);
+                MethodInfo buyout = labelType == null ? null : ResolveOptionalMethod(
+                    PoachSimTypeName,
+                    "BuyoutPrice",
+                    new Type[] { labelType, typeof(data_girls.girls) });
+                TryPatchTranspiler(harmony, "PoachSim.BuyoutPrice", buyout,
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteBuyoutPrice));
+
+                TryPatchTranspiler(harmony, "PoachSim.ResolveTempt",
+                    ResolveOptionalMethod(PoachSimTypeName, "ResolveTempt",
+                        new Type[] { typeof(string) }),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteResolveTempt));
+                TryPatchTranspiler(harmony, "SpecialLabels.QueueFounderRoll",
+                    ResolveOptionalMethod(SpecialLabelsTypeName, "QueueFounderRoll",
+                        new Type[] { typeof(data_girls.girls) }),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteQueueFounderRoll));
+                TryPatchTranspiler(harmony, "RosterSim.FromPlayerGirl",
+                    ResolveOptionalMethod(RosterSimTypeName, "FromPlayerGirl",
+                        new Type[] { typeof(data_girls.girls) }),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteFromPlayerGirl));
+                TryPatchTranspiler(harmony, "XRelSim.ResolveDatingChoice",
+                    ResolveOptionalMethod(XRelSimTypeName, "ResolveDatingChoice",
+                        new Type[] { typeof(string) }),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteResolveDatingChoice));
+                TryPatchTranspiler(harmony, "RivalAwards.PickLabel",
+                    ResolveOptionalMethod(RivalAwardsTypeName, "PickLabel", null),
+                    nameof(RivalsRebornWideNumericTranspiler.RewriteRivalAwardsPickLabel));
+                TryPatchPrefix(harmony, "RivalsUI.FormatFans",
+                    ResolveOptionalMethod(RivalsUiTypeName, "FormatFans",
+                        new Type[] { typeof(long) }),
+                    nameof(FormatFansPrefix));
+                TryPatchPrefix(harmony, "RosterSim.YearlyShakeout",
+                    ResolveOptionalMethod(RosterSimTypeName, "YearlyShakeout",
+                        new Type[] { typeof(DateTime) }),
+                    nameof(YearlyShakeoutPrefix));
+            }
+            finally
+            {
+                lock (Sync) installInProgress = false;
+                RefreshStatus();
+            }
+        }
+
+        private static MethodInfo ResolveOptionalMethod(
             string typeName,
-            string displayType,
-            string name,
+            string methodName,
             Type[] parameters)
         {
             Type type = AccessTools.TypeByName(typeName);
-            if (type == null)
+            if (type == null) return null;
+            return parameters == null
+                ? AccessTools.Method(type, methodName)
+                : AccessTools.Method(type, methodName, parameters);
+        }
+
+        private static void TryPatchTranspiler(
+            Harmony harmony,
+            string surface,
+            MethodInfo target,
+            string transpilerName)
+        {
+            MethodInfo patchMethod = AccessTools.Method(
+                typeof(RivalsRebornWideNumericTranspiler), transpilerName);
+            TryPatch(harmony, surface, target, patchMethod, false);
+        }
+
+        private static void TryPatchPrefix(
+            Harmony harmony,
+            string surface,
+            MethodInfo target,
+            string prefixName)
+        {
+            MethodInfo patchMethod = AccessTools.Method(
+                typeof(RivalsRebornWideNumericInterop), prefixName);
+            TryPatch(harmony, surface, target, patchMethod, true);
+        }
+
+        private static void TryPatch(
+            Harmony harmony,
+            string surface,
+            MethodInfo target,
+            MethodInfo patchMethod,
+            bool prefix)
+        {
+            if (target == null)
             {
-                yield break;
+                MarkSurfaceFailure(surface,
+                    "Rivals Reborn compatibility target " + surface +
+                    " was not found; only this optional surface was skipped.");
+                return;
+            }
+            if (patchMethod == null)
+            {
+                MarkSurfaceFailure(surface,
+                    "SNLF compatibility method for " + surface +
+                    " was not found; only this optional surface was skipped.");
+                return;
             }
 
-            MethodInfo method = parameters == null
-                ? AccessTools.Method(type, name)
-                : AccessTools.Method(type, name, parameters);
-            if (method == null)
+            if (HasSnlfPatch(target))
             {
-                string qualified = displayType + "." + name;
-                WarnOnce(qualified, "Rivals Reborn wide-numeric target " + qualified +
-                    " was not found; this compatibility patch was skipped.");
-                yield break;
+                MarkSurfaceInstalled(surface);
+                return;
             }
 
-            yield return method;
+            try
+            {
+                HarmonyMethod method = new HarmonyMethod(patchMethod);
+                method.priority = Priority.Last;
+                method.after = new string[] { Owner };
+                if (prefix)
+                    harmony.Patch(target, prefix: method);
+                else
+                    harmony.Patch(target, transpiler: method);
+
+                if (!HasSnlfPatch(target))
+                    throw new InvalidOperationException(
+                        "Harmony did not report the SNLF owner after patching.");
+                MarkSurfaceInstalled(surface);
+            }
+            catch (Exception ex)
+            {
+                MarkSurfaceFailure(surface,
+                    "Rivals Reborn optional compatibility surface " + surface +
+                    " failed safely: " + ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static bool HasSnlfPatch(MethodBase target)
+        {
+            Patches patches = Harmony.GetPatchInfo(target);
+            if (patches == null || patches.Owners == null) return false;
+            foreach (string owner in patches.Owners)
+            {
+                if (string.Equals(owner, SaveNLoadFixesConstants.HarmonyId,
+                    StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static void MarkSurfaceInstalled(string surface)
+        {
+            lock (Sync)
+            {
+                InstalledSurfaces.Add(surface);
+                FailedSurfaces.Remove(surface);
+            }
+        }
+
+        private static void MarkSurfaceFailure(string surface, string message)
+        {
+            lock (Sync)
+            {
+                InstalledSurfaces.Remove(surface);
+                FailedSurfaces.Add(surface);
+            }
+            WarnOnce("install:" + surface, message);
+        }
+
+        private static void RecordInstallerFailure(string key, string message)
+        {
+            lock (Sync)
+            {
+                profileActive = false;
+                status = message;
+            }
+            WarnOnce("installer:" + key, message);
+        }
+
+        private static void RefreshStatus()
+        {
+            string next;
+            bool active;
+            bool detected;
+            int installed;
+            int failed;
+            lock (Sync)
+            {
+                detected = profileDetected;
+                installed = InstalledSurfaces.Count;
+                failed = FailedSurfaces.Count;
+                active = detected && installed == ExpectedSurfaceCountValue && failed == 0;
+                profileActive = active;
+                if (!detected)
+                    next = "Rivals Reborn not detected.";
+                else if (active)
+                    next = "Rivals Reborn wide-number compatibility active: " +
+                        installed + "/" + ExpectedSurfaceCountValue + " optional surfaces installed.";
+                else
+                    next = "Rivals Reborn detected; optional compatibility is degraded (" +
+                        installed + "/" + ExpectedSurfaceCountValue + " surfaces installed, " +
+                        failed + " unresolved). Core SNLF remains active.";
+                status = next;
+                if (string.Equals(lastLoggedStatus, next, StringComparison.Ordinal)) return;
+                lastLoggedStatus = next;
+            }
+
+            if (detected)
+            {
+                if (active) Debug.Log(SaveNLoadFixesConstants.LogPrefix + next);
+                else Debug.LogWarning(SaveNLoadFixesConstants.LogPrefix + next);
+            }
+        }
+
+        private static bool FormatFansPrefix(long fans, ref string __result)
+        {
+            __result = FormatFansWide(fans);
+            return false;
+        }
+
+        private static bool YearlyShakeoutPrefix(DateTime now)
+        {
+            return !TryRunYearlyShakeout(now);
         }
 
         internal static long GetExactFanTotal(data_girls.girls girl)

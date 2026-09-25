@@ -14,7 +14,7 @@ namespace SaveNLoadFixes.Repairs
     {
         private static MethodBase TargetMethod()
         {
-            BuffMeWideNumericInterop.EnsureInitialized();
+            BuffMeWideNumericInterop.SafeEnsureInitialized();
             MethodInfo method = AccessTools.Method(typeof(Mods), nameof(Mods.LoadMods), Type.EmptyTypes);
             if (method == null)
                 throw new MissingMethodException(typeof(Mods).FullName, nameof(Mods.LoadMods));

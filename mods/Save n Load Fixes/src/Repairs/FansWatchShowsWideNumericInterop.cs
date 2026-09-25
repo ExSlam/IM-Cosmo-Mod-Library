@@ -68,7 +68,7 @@ namespace SaveNLoadFixes.Repairs
             if (shouldScan)
             {
                 foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-                    TryInstallProfile(assembly);
+                    TryInstallProfileSafe(assembly);
             }
             else
             {
@@ -81,17 +81,45 @@ namespace SaveNLoadFixes.Repairs
                     if (identity != null && string.Equals(identity.Name,
                         ExpectedAssemblyName, StringComparison.Ordinal))
                     {
-                        TryInstallProfile(assembly);
+                        TryInstallProfileSafe(assembly);
                         break;
                     }
                 }
             }
         }
 
+        internal static void SafeEnsureInitialized()
+        {
+            try
+            {
+                EnsureInitialized();
+            }
+            catch (Exception ex)
+            {
+                SetStatus(false,
+                    "Fans Watch Shows optional compatibility bootstrap failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static void TryInstallProfileSafe(Assembly assembly)
+        {
+            try
+            {
+                TryInstallProfile(assembly);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(false,
+                    "Fans Watch Shows optional compatibility probe failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
         private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
         {
             if (args == null || args.LoadedAssembly == null) return;
-            TryInstallProfile(args.LoadedAssembly);
+            TryInstallProfileSafe(args.LoadedAssembly);
         }
 
         private static void TryInstallProfile(Assembly assembly)

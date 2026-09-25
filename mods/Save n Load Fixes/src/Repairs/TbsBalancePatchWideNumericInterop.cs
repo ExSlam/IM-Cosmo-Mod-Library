@@ -65,7 +65,7 @@ namespace SaveNLoadFixes.Repairs
             if (scan)
             {
                 foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-                    TryInstallProfile(assembly);
+                    TryInstallProfileSafe(assembly);
             }
             else
             {
@@ -74,16 +74,44 @@ namespace SaveNLoadFixes.Repairs
                     AssemblyName name = assembly.GetName();
                     if (name != null && string.Equals(name.Name, ExpectedAssemblyName, StringComparison.Ordinal))
                     {
-                        TryInstallProfile(assembly);
+                        TryInstallProfileSafe(assembly);
                         break;
                     }
                 }
             }
         }
 
+        internal static void SafeEnsureInitialized()
+        {
+            try
+            {
+                EnsureInitialized();
+            }
+            catch (Exception ex)
+            {
+                SetStatus(false,
+                    "TBS Balance Patch optional compatibility bootstrap failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static void TryInstallProfileSafe(Assembly assembly)
+        {
+            try
+            {
+                TryInstallProfile(assembly);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(false,
+                    "TBS Balance Patch optional compatibility probe failed safely: " +
+                    ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
         private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
         {
-            if (args != null && args.LoadedAssembly != null) TryInstallProfile(args.LoadedAssembly);
+            if (args != null && args.LoadedAssembly != null) TryInstallProfileSafe(args.LoadedAssembly);
         }
 
         private static void TryInstallProfile(Assembly assembly)
