@@ -258,8 +258,9 @@ internal sealed class BulkConvertForm : Form
         catch (Exception ex)
         {
             AppLog.Error("Bulk convert planning failed.", ex);
-            MessageBox.Show(this, ex.Message, Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-            _summary.Text = ex.Message;
+            string localized = LocalizedLogFormatter.TranslateRuntimeMessage(ex.Message);
+            MessageBox.Show(this, localized, Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _summary.Text = localized;
         }
         finally
         {
@@ -353,7 +354,7 @@ internal sealed class BulkConvertForm : Form
         catch (Exception ex)
         {
             AppLog.Error("Bulk conversion execution failed.", ex);
-            MessageBox.Show(this, ex.Message, Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, LocalizedLogFormatter.TranslateRuntimeMessage(ex.Message), Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -398,7 +399,7 @@ internal sealed class BulkConvertForm : Form
             $"{Localization.T("bulk_col_branches")}: {item.BranchCount}{Environment.NewLine}" +
             $"{Localization.T("bulk_convert_output_col")}: {item.OutputSidecarPath}{Environment.NewLine}" +
             (item.RepairBranchIndex.HasValue ? $"Repair branch: {item.RepairBranchIndex} ({item.RepairConfidence}){Environment.NewLine}" : "") +
-            Environment.NewLine + item.Details;
+            Environment.NewLine + LocalizedLogFormatter.TranslateMultiline(item.Details);
     }
 
     private void UpdateResolveButton()
@@ -443,7 +444,7 @@ internal sealed class BulkConvertForm : Form
         catch (Exception ex)
         {
             AppLog.Error("Manual bulk match resolution failed.", ex);
-            MessageBox.Show(this, ex.Message, Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, LocalizedLogFormatter.TranslateRuntimeMessage(ex.Message), Localization.T("title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

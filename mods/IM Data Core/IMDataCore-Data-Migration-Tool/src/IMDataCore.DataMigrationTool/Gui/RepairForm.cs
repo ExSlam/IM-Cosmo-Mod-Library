@@ -140,7 +140,7 @@ internal sealed class RepairForm : Form
         {
             UseWaitCursor = true;
             _analysis = _service.AnalyzeRepair(_plan);
-            _summary.Text = _analysis.ToMultilineString();
+            _summary.Text = LocalizedLogFormatter.FormatRepairAnalysis(_analysis);
             PopulateBranches(_analysis);
             if (_analysis.RecommendedBranchIndex.HasValue)
             {
@@ -155,7 +155,7 @@ internal sealed class RepairForm : Form
         catch (Exception ex)
         {
             AppLog.Error("Branch repair analysis failed.", ex);
-            _summary.Text = ex.Message + Environment.NewLine + Environment.NewLine + "Diagnostic log: " + AppLog.SessionLogPath;
+            _summary.Text = LocalizedLogFormatter.TranslateRuntimeMessage(ex.Message) + Environment.NewLine + Environment.NewLine + Localization.Format("log_session_diagnostic", AppLog.SessionLogPath);
             _repair.Enabled = false;
             _validate.Enabled = false;
         }
@@ -243,10 +243,10 @@ internal sealed class RepairForm : Form
             }
         }
 
-        _summary.Text = report.ToMultilineString();
+        _summary.Text = LocalizedLogFormatter.FormatReport(report);
         MessageBox.Show(
             this,
-            report.Summary,
+            LocalizedLogFormatter.TranslateRuntimeMessage(report.Summary),
             report.Success ? Localization.T("title") : Localization.T("message_blocked_title"),
             MessageBoxButtons.OK,
             report.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);

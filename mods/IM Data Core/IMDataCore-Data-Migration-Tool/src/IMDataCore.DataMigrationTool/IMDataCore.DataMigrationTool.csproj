@@ -10,7 +10,7 @@
     <AssemblyName>IMDataCore Data Migration Tool</AssemblyName>
     <RootNamespace>IMDataCore.DataMigrationTool</RootNamespace>
     <ApplicationIcon>Assets\data_migration_tool.ico</ApplicationIcon>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Authors>Cosmo</Authors>
     <Company>Cosmo Mod Library</Company>
     <Product>IMDataCore Data Migration Tool</Product>

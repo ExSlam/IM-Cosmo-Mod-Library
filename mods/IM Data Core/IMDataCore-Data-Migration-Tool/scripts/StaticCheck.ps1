@@ -18,6 +18,7 @@ $required = @(
   'src\IMDataCore.DataMigrationTool\Migration\BulkConversionService.cs',
   'src\IMDataCore.DataMigrationTool\Gui\MainForm.cs',
   'src\IMDataCore.DataMigrationTool\Gui\Localization.cs',
+  'src\IMDataCore.DataMigrationTool\Gui\LocalizedLogFormatter.cs',
   'src\IMDataCore.DataMigrationTool\Gui\BulkScanForm.cs',
   'src\IMDataCore.DataMigrationTool\Gui\BulkConvertForm.cs',
   'src\IMDataCore.DataMigrationTool\Gui\RepairForm.cs',
@@ -38,8 +39,8 @@ foreach ($item in $required) {
 
 $toolInfo = Get-Content -Raw (Join-Path $root 'src\IMDataCore.DataMigrationTool\ToolInfo.cs')
 $localization = Get-Content -Raw (Join-Path $root 'src\IMDataCore.DataMigrationTool\Gui\Localization.cs')
-if ($toolInfo -notmatch 'ProductName\s*=\s*"IMDataCore Data Migration Tool"' -or $toolInfo -notmatch 'Version\s*=\s*"2\.0\.1"') {
-  throw 'Product name/version metadata is not IMDataCore Data Migration Tool 2.0.1.'
+if ($toolInfo -notmatch 'ProductName\s*=\s*"IMDataCore Data Migration Tool"' -or $toolInfo -notmatch 'Version\s*=\s*"2\.0\.2"') {
+  throw 'Product name/version metadata is not IMDataCore Data Migration Tool 2.0.2.'
 }
 foreach ($needle in @('アイエムデータコア データ移行ツール', 'Инструмент переноса данных Ай-Эм Дата Кор', '아이엠데이터코어 데이터 이전 도구', '偶像经理数据核心迁移工具')) {
   if ($localization -notmatch [regex]::Escape($needle)) { throw "Native-script product localization is missing: $needle" }

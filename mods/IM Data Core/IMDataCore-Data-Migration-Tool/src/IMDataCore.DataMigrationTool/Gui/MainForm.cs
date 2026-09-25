@@ -153,7 +153,7 @@ internal sealed class MainForm : Form
         Shown += (_, _) =>
         {
             AppLog.Info("Main window shown successfully.");
-            Append("Session diagnostic log: " + AppLog.SessionLogPath);
+            Append(Localization.Format("log_session_diagnostic", AppLog.SessionLogPath));
         };
         Resize += (_, _) => UpdateBannerLayout();
         FormClosed += (_, _) => AppLog.Info("Main window closed.");
@@ -789,7 +789,7 @@ internal sealed class MainForm : Form
         }
 
         _legacyMatches.SelectedIndex = 0;
-        Append(Localization.T("legacy_candidates_log") + Environment.NewLine + string.Join(Environment.NewLine, matches.Select(x => "  " + x)));
+        Append(Localization.T("legacy_candidates_log") + Environment.NewLine + string.Join(Environment.NewLine, matches.Select(x => "  " + LocalizedLogFormatter.FormatLegacySourceCandidate(x))));
 
         bool uniqueBest = matches.Count == 1 || matches[0].Score > matches[1].Score;
         if (autoUseUniqueBest && uniqueBest && matches[0].Score >= 90 && string.IsNullOrWhiteSpace(_source.Text))
@@ -838,12 +838,12 @@ internal sealed class MainForm : Form
         {
             LegacyInspection info = _service.InspectLegacy(_source.Text);
             _lastLegacyInspection = info;
-            _sourceInfo.Text = info.DetectedVersion + " • " + info.BackendKind + (info.HasCheckpointSupport ? " • exact checkpoint capable" : " • pre-checkpoint generation");
+            _sourceInfo.Text = LocalizedLogFormatter.FormatSourceInfo(info);
             _saveKey.Items.Clear();
             _saveKey.Items.Add(Localization.T("auto_save_key"));
             foreach (string key in info.SaveKeys) _saveKey.Items.Add(key);
             _saveKey.SelectedIndex = 0;
-            Append(info.ToMultilineString());
+            Append(LocalizedLogFormatter.FormatInspection(info));
 
             if (_selectedSaveInfo is null && Directory.Exists(VanillaSaveReader.DefaultDataDirectory()))
                 await PopulateReverseMatchesAsync(info, null);
@@ -1050,8 +1050,8 @@ internal sealed class MainForm : Form
                     report.Messages.Add("Legacy source cleanup: " + cleanupReason);
                 }
             }
-            Append(report.ToMultilineString());
-            MessageBox.Show(this, report.Summary, report.Success ? Localization.T("message_success_title") : Localization.T("message_blocked_title"), MessageBoxButtons.OK, report.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            Append(LocalizedLogFormatter.FormatReport(report));
+            MessageBox.Show(this, LocalizedLogFormatter.TranslateRuntimeMessage(report.Summary), report.Success ? Localization.T("message_success_title") : Localization.T("message_blocked_title"), MessageBoxButtons.OK, report.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
         catch (Exception ex)
         {
@@ -1098,7 +1098,8 @@ internal sealed class MainForm : Form
     private void ShowError(string message)
     {
         AppLog.Error(message);
-        Append("ERROR: " + message);
-        MessageBox.Show(this, message, Localization.T("message_error_title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+        string localized = LocalizedLogFormatter.TranslateRuntimeMessage(message);
+        Append(Localization.Format("log_error", localized));
+        MessageBox.Show(this, localized, Localization.T("message_error_title"), MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }

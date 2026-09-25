@@ -138,9 +138,11 @@ internal sealed class VanillaSaveInfo
         sb.AppendLine(t("save_label") + (string.IsNullOrWhiteSpace(SaveDisplayName) ? t("unnamed_save") : SaveDisplayName));
         sb.AppendLine(t("group_agency_label") + Empty(GroupName, t));
         sb.AppendLine(t("player_label") + Empty(PlayerName, t));
-        sb.AppendLine($"{t("mode_label")}{(IsStoryMode ? t("mode_story") : t("mode_freeplay"))} • {SaveKind}" + (string.IsNullOrWhiteSpace(ChapterName) ? "" : " • " + ChapterName));
-        sb.AppendLine(t("last_saved_label") + Empty(LastSave, t) + " • " + t("ingame_date_label") + Empty(GameDateTime, t) + " • " + t("playtime_label") + FormatPlaytime(PlaytimeSeconds));
-        sb.AppendLine($"{t("content_label")}{IdolCount} idols • {StaffCount} staff • {SingleCount} singles • {ShowCount} shows" + (string.IsNullOrWhiteSpace(GameVersion) ? "" : " • game " + GameVersion));
+        sb.AppendLine($"{t("mode_label")}{(IsStoryMode ? t("mode_story") : t("mode_freeplay"))} • {LocalizedSaveKind(SaveKind, t)}" + (string.IsNullOrWhiteSpace(ChapterName) ? "" : " • " + ChapterName));
+        sb.AppendLine(t("last_saved_label") + Empty(LastSave, t) + " • " + t("ingame_date_label") + Empty(GameDateTime, t) + " • " + t("playtime_label") + FormatPlaytime(PlaytimeSeconds, t));
+        string counts = string.Format(System.Globalization.CultureInfo.CurrentCulture, t("content_counts_format"), IdolCount, StaffCount, SingleCount, ShowCount);
+        string game = string.IsNullOrWhiteSpace(GameVersion) ? "" : " • " + string.Format(System.Globalization.CultureInfo.CurrentCulture, t("game_version_format"), GameVersion);
+        sb.AppendLine(t("content_label") + counts + game);
         sb.Append(t("vanilla_path_label") + RelativeSavePath);
         return sb.ToString();
     }
@@ -171,12 +173,24 @@ internal sealed class VanillaSaveInfo
 
     private static string Empty(string value, Func<string, string> t) => string.IsNullOrWhiteSpace(value) ? t("not_stored") : value;
 
-    private static string FormatPlaytime(long seconds)
+    private static string LocalizedSaveKind(string saveKind, Func<string, string> t) => saveKind switch
+    {
+        "autosave" => t("save_kind_autosave"),
+        "manual save" => t("save_kind_manual_save"),
+        "manual slot" => t("save_kind_manual_slot"),
+        "story autosave" => t("save_kind_story_autosave"),
+        "story manual save" => t("save_kind_story_manual_save"),
+        "story manual slot" => t("save_kind_story_manual_slot"),
+        "story chapter snapshot" => t("save_kind_story_chapter_snapshot"),
+        _ => t("save_kind_generic")
+    };
+
+    private static string FormatPlaytime(long seconds, Func<string, string> t)
     {
         if (seconds < 0) seconds = 0;
         TimeSpan span = TimeSpan.FromSeconds(seconds);
         long hours = (long)span.TotalHours;
-        return $"{hours}h {span.Minutes}m";
+        return string.Format(System.Globalization.CultureInfo.CurrentCulture, t("playtime_format"), hours, span.Minutes);
     }
 }
 

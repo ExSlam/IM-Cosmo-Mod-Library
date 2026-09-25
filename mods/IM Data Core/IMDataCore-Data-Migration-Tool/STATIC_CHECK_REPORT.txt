@@ -1,4 +1,4 @@
-IMDataCore Data Migration Tool 2.0.1 - static check report
+IMDataCore Data Migration Tool 2.0.2 - static check report
 
 Scope
 - Renamed the product to IMDataCore Data Migration Tool throughout the project, executable metadata, source namespace, reports, logs, migration provenance labels, assets, documentation, and user-facing text.
@@ -10,11 +10,12 @@ Scope
 - Exact filenames, paths, command names, and URLs that users must recognize remain literal where translating them would make instructions inaccurate.
 
 Static verification
-- 30 C# files checked for balanced braces, brackets, parentheses, string/character literal termination, and comment termination.
+- 31 C# files checked for balanced braces, brackets, parentheses, string/character literal termination, and comment termination.
 - Project XML and Directory.Build.props parse successfully.
-- Solution, project, assembly, root namespace, application assets, product metadata, and version consistently use IMDataCore Data Migration Tool 2.0.1.
-- Localization dictionaries contain 233 keys in each of 7 languages, with identical key sets, no duplicate keys, and matching format placeholders.
-- Japanese, Russian, Korean, and Simplified Chinese localization values contain no ASCII-letter leakage.
+- Solution, project, assembly, root namespace, application assets, product metadata, and version consistently use IMDataCore Data Migration Tool 2.0.2.
+- Localization dictionaries contain 348 keys in each of 7 languages, with identical key sets, no duplicate keys, and matching format placeholders.
+- Validation/migration log labels, normal migration results, source-format explanations, save-kind labels, content counts, repair summaries, and common warnings are localized across all 7 GUI languages.
+- Literal file paths, hashes, exact filenames, command names, and version numbers remain unchanged where translating them would make the information inaccurate.
 - Native-language Help content uses Latin letters only for exact literal filenames that users must identify, such as save.json, auto_save.json, and im_data_core.db.
 - Help contains 13 user-facing topics in each of the 7 supported GUI languages.
 - Help topic references are valid and regular C# string literals contain no raw physical newlines.

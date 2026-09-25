@@ -3,14 +3,12 @@
 **Purpose:** migrate legacy IMDataCore **1.0.0–1.3.0** data to the current IMDataCore **sidecar format v6**, with current **journal format v3** compatibility.
 
 
-## What is new in 2.0.1
+## What is new in 2.0.2
 
-- The built executable is now emitted as `IMDataCore Data Migration Tool.exe` while the internal C# namespace remains `IMDataCore.DataMigrationTool`.
-
-- Renamed the product to **IMDataCore Data Migration Tool**. The English UI now states explicitly that it migrates IMDataCore **1.0.0–1.3.0** data to current **data format v6** with **journal format v3** compatibility.
-- Reworked Russian, Japanese, Korean, and Simplified Chinese UI terminology so visible technical concepts are written in the language's native script rather than leaking English labels such as sidecar, journal, backup, Windows, SQLite, Logs, or data.
-- Simplified Chinese now displays IMDataCore as **偶像经理数据核心** and the tool as **偶像经理数据核心迁移工具** in normal user-facing text. Exact filenames, paths, and web addresses remain unchanged where users must recognize them literally.
-- Replaced the old text-bearing banner with a text-free decorative banner so changing languages does not leave English branding baked into the image.
+- Completed localization of the main validation/migration log instead of dumping English migration-layer diagnostics into non-English interfaces.
+- Localized source type, version detection explanations, checkpoint status, warnings, validation/migration results, repair summaries, and common cleanup messages.
+- Localized save-kind labels, playtime, idol/staff/single/show counts, and game-version labels in the save identity summary.
+- Japanese, Russian, Korean, and Simplified Chinese log output now uses native-script user-facing terminology; literal paths, hashes, filenames, and version numbers remain exact.
 
 ## What is new in 1.10.0
 
