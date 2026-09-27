@@ -62,6 +62,7 @@ namespace CheatsMod
         internal const string NotificationRevealDislikedIdols = "notification.reveal_disliked_idols";
         internal const string NotificationRevealCliques = "notification.reveal_cliques";
         internal const string NotificationRevealBullies = "notification.reveal_bullies";
+        internal const string NotificationEndAllBullying = "notification.end_all_bullying";
         internal const string NotificationRevealAllRelationships = "notification.reveal_all_relationships";
         internal const string NotificationMaxResearch = "notification.max_research";
         internal const string NotificationMaxAgencyActivities = "notification.max_agency_activities";
@@ -115,6 +116,7 @@ namespace CheatsMod
         internal const string NotificationRevealDislikedIdols = "Disliked idol relationships revealed.";
         internal const string NotificationRevealCliques = "Cliques revealed.";
         internal const string NotificationRevealBullies = "Bullying targets revealed.";
+        internal const string NotificationEndAllBullying = "All bullying ended.";
         internal const string NotificationRevealAllRelationships = "All idol relationships, cliques, and bullying targets revealed.";
         internal const string NotificationMaxResearch = "All research unlocked and set to level 10.";
         internal const string NotificationMaxAgencyActivities = "Performance and Promotion agency activities set to level 10.";
@@ -394,6 +396,21 @@ namespace CheatsMod
         public static void RevealBullies()
         {
             Execute(RevealBulliesCore);
+        }
+
+        public static void EndAllBullying()
+        {
+            Execute(EndAllBullyingCore);
+        }
+
+        public static void OpenCancelGraduationPopup()
+        {
+            Execute(GraduationCheatPopup.OpenCancelAnnouncement);
+        }
+
+        public static void OpenChangeGraduationDatePopup()
+        {
+            Execute(GraduationCheatPopup.OpenChangeDate);
         }
 
         public static void RevealAllRelationships()
@@ -1047,6 +1064,55 @@ namespace CheatsMod
             NotifySuccess(
                 CheatLocalizationKeys.NotificationRevealBullies,
                 CheatFallbackText.NotificationRevealBullies,
+                NotificationManager._notification._type.idol_relationship_change);
+        }
+
+        private static void EndAllBullyingCore()
+        {
+            if (!RequireGameData())
+            {
+                return;
+            }
+
+            if (Relationships.Cliques == null || Relationships.Cliques.Count == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoBullying, CheatFallbackText.NotificationNoBullying);
+                return;
+            }
+
+            int endedCount = CheatAmounts.ZeroCount;
+            for (int cliqueIndex = 0; cliqueIndex < Relationships.Cliques.Count; cliqueIndex++)
+            {
+                Relationships._clique clique = Relationships.Cliques[cliqueIndex];
+                if (clique == null || clique.Bullied_Girls == null || clique.Bullied_Girls.Count == CheatAmounts.ZeroCount)
+                {
+                    continue;
+                }
+
+                List<data_girls.girls> targets = new List<data_girls.girls>(clique.Bullied_Girls);
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+                {
+                    data_girls.girls target = targets[targetIndex];
+                    if (target == null || !clique.Bullied_Girls.Contains(target))
+                    {
+                        continue;
+                    }
+
+                    clique.StopBullying(target);
+                    endedCount++;
+                }
+            }
+
+            if (endedCount == CheatAmounts.ZeroCount)
+            {
+                NotifyWarning(CheatLocalizationKeys.NotificationNoBullying, CheatFallbackText.NotificationNoBullying);
+                return;
+            }
+
+            RefreshIdolList();
+            NotifySuccess(
+                CheatLocalizationKeys.NotificationEndAllBullying,
+                CheatFallbackText.NotificationEndAllBullying,
                 NotificationManager._notification._type.idol_relationship_change);
         }
 

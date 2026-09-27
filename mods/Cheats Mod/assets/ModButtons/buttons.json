@@ -280,6 +280,16 @@
 		"method": "RevealBullies"
 	},
 	{
+		"label": "End all bullying",
+		"codeLabel": "cheat.button.end_all_bullying",
+		"tooltip": "Stop every active bullying relationship.",
+		"codeTooltip": "cheat.tooltip.end_all_bullying",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "EndAllBullying"
+	},
+	{
 		"label": "Reveal all relationships",
 		"codeLabel": "cheat.button.reveal_all_relationships",
 		"tooltip": "Reveal all idol relationships, cliques, and bullying targets.",
@@ -358,6 +368,26 @@
 		"assembly": "com.cosmo.cheatsmod",
 		"class": "CheatsMod.Cheats",
 		"method": "HealAndEndHiatus"
+	},
+	{
+		"label": "Cancel graduation",
+		"codeLabel": "cheat.button.cancel_graduation",
+		"tooltip": "Open a picker to cancel an idol's announced graduation.",
+		"codeTooltip": "cheat.tooltip.cancel_graduation",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenCancelGraduationPopup"
+	},
+	{
+		"label": "Change graduation date",
+		"codeLabel": "cheat.button.change_graduation_date",
+		"tooltip": "Set a non-announced idol's graduation date to a date at least three months away.",
+		"codeTooltip": "cheat.tooltip.change_graduation_date",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenChangeGraduationDatePopup"
 	},
 	{
 		"label": "Recruit unique idol",
