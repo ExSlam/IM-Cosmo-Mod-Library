@@ -35,10 +35,10 @@ Generation note:
 
 ## Summary
 
-- Queryable built-in event types: 173
+- Queryable built-in event types: 175
 - Queryable event domains: 41
 - Internal transient event constants: 3
-- Payload JSON field constants: 443
+- Payload JSON field constants: 455
 - Payload field domains: 52
 
 ## Queryable Built-in Event Types
@@ -115,6 +115,8 @@ Generation note:
 | idol_graduation_outcome | EventTypeIdolGraduationOutcome | idol |
 | idol_group_transferred | EventTypeIdolGroupTransferred | idol |
 | idol_hired | EventTypeIdolHired | idol |
+| idol_name_changed | EventTypeIdolNameChanged | idol |
+| idol_nationality_changed | EventTypeIdolNationalityChanged | idol |
 | idol_outfit_changed | EventTypeIdolOutfitChanged | idol |
 | idol_relationship_created | EventTypeIdolRelationshipCreated | idol |
 | idol_relationship_removed | EventTypeIdolRelationshipRemoved | idol |
@@ -409,6 +411,18 @@ These implementation-telemetry captures are filtered by `CoreEventRetention` bef
 | idol_hire_provenance | JsonFieldIdolHireProvenance | idol |
 | idol_hiring_date | JsonFieldIdolHiringDate | idol |
 | idol_id | JsonFieldIdolId | idol |
+| idol_nationality_code | JsonFieldIdolNationalityCode | idol |
+| idol_nationality_name | JsonFieldIdolNationalityName | idol |
+| idol_new_display_name | JsonFieldIdolNewDisplayName | idol |
+| idol_new_first_name | JsonFieldIdolNewFirstName | idol |
+| idol_new_last_name | JsonFieldIdolNewLastName | idol |
+| idol_new_nationality_code | JsonFieldIdolNewNationalityCode | idol |
+| idol_new_nationality_name | JsonFieldIdolNewNationalityName | idol |
+| idol_old_display_name | JsonFieldIdolOldDisplayName | idol |
+| idol_old_first_name | JsonFieldIdolOldFirstName | idol |
+| idol_old_last_name | JsonFieldIdolOldLastName | idol |
+| idol_old_nationality_code | JsonFieldIdolOldNationalityCode | idol |
+| idol_old_nationality_name | JsonFieldIdolOldNationalityName | idol |
 | idol_portrait_accessory_asset_id | JsonFieldIdolPortraitAccessoryAssetId | idol |
 | idol_portrait_body_asset_id | JsonFieldIdolPortraitBodyAssetId | idol |
 | idol_portrait_custom_id | JsonFieldIdolPortraitCustomId | idol |

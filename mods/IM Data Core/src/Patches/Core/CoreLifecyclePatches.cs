@@ -21,6 +21,7 @@ namespace IMDataCore
             try
             {
                 IMDataCoreController.Instance.BootstrapIfNeeded();
+                MadxisIdolNationalityInterop.EnsureInstalled();
             }
             catch (Exception exception)
             {

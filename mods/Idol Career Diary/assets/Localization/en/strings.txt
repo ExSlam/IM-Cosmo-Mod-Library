@@ -1129,6 +1129,13 @@ CodeLabel.vocal=Vocal
 CodeLabel.webstream=Web Stream
 CodeLabel.youngadult=Young Adults
 
+# Optional idol identity editor history.
+TextIdolNameChanged=Idol Name Changed
+TextIdolNationalityChanged=Idol Nationality Changed
+TextNameTransitionFormat=Name: {0} -> {1}
+TextNationalityTransitionFormat=Nationality: {0} -> {1}
+TextDisplayedNameTransitionFormat=Displayed Name: {0} -> {1}
+
 # Raw IM Data Core text variants.
 RawText.Activity_Performance=Activity Performance
 RawText.Activity_Promotion=Activity Promotion

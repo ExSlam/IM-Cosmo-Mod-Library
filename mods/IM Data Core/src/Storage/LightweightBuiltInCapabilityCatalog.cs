@@ -13,7 +13,7 @@ namespace IMDataCore
     internal static class LightweightBuiltInCapabilityCatalog
     {
         internal const int CatalogRevision = 1;
-        internal const int QueryableDurableCapabilityCount = 173;
+        internal const int QueryableDurableCapabilityCount = 175;
 
         internal static LightweightCoverageCapabilitySetRecord CreateCurrentDescriptor()
         {
@@ -97,6 +97,8 @@ namespace IMDataCore
                     Create(CoreConstants.EventTypeIdolGraduationOutcome, CatalogRevision), // idol
                     Create(CoreConstants.EventTypeIdolGroupTransferred, CatalogRevision), // idol
                     Create(CoreConstants.EventTypeIdolHired, CatalogRevision), // idol
+                    Create(CoreConstants.EventTypeIdolNameChanged, CatalogRevision), // idol
+                    Create(CoreConstants.EventTypeIdolNationalityChanged, CatalogRevision), // idol
                     Create(CoreConstants.EventTypeIdolOutfitChanged, CatalogRevision), // idol
                     Create(CoreConstants.EventTypeIdolRelationshipCreated, CatalogRevision), // idol
                     Create(CoreConstants.EventTypeIdolRelationshipRemoved, CatalogRevision), // idol

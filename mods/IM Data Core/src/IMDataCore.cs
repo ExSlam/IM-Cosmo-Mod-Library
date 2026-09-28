@@ -186,6 +186,8 @@ namespace IMDataCore
         internal const string EventTypeTaskDone = "task_done";
         internal const string EventTypeTaskRemovedOnGraduation = "task_removed_on_graduation";
         internal const string EventTypeIdolOutfitChanged = "idol_outfit_changed";
+        internal const string EventTypeIdolNameChanged = "idol_name_changed";
+        internal const string EventTypeIdolNationalityChanged = "idol_nationality_changed";
         internal const string EventTypeConcertCardUsed = "concert_card_used";
         internal const string EventTypeConcertCrisisDecision = "concert_crisis_decision";
         internal const string EventTypeConcertCrisisApplied = "concert_crisis_applied";
@@ -376,6 +378,8 @@ namespace IMDataCore
         internal const string EventSourceDataGirlsGraduationAnnounceConfirmPatch = "patch.data_girls.girls.Graduation_Announce_Confirm.Postfix";
         internal const string EventSourceDataGirlsGraduatePatch = "patch.data_girls.girls.Graduate.Postfix";
         internal const string EventSourceDataGirlsIncreaseSalaryPatch = "patch.data_girls.girls.IncreaseSalary.Postfix";
+        internal const string EventSourceMadxisIdolNameEditorPatch = "interop.com.madxis.idolnationality.NationalityProfileUIController.SaveEditedName.Postfix";
+        internal const string EventSourceMadxisIdolNationalityEditorPatch = "interop.com.madxis.idolnationality.NationalityProfileUIController.SelectNationality.Postfix";
         internal const string EventSourceDataGirlsLowerSalaryPatch = "patch.data_girls.girls.LowerSalary.Postfix";
         internal const string EventSourceSalaryManualOnSavePatch = "patch.Salary_Manual.OnSave.Postfix";
         internal const string EventSourceLoansAddLoanPatch = "patch.loans.AddLoan.Postfix";
@@ -836,6 +840,18 @@ namespace IMDataCore
         internal const string JsonFieldIdolTrivia = "idol_trivia";
         internal const string JsonFieldIdolCustomTrivia = "idol_custom_trivia";
         internal const string JsonFieldIdolGraduationWithDialogue = "idol_graduation_with_dialogue";
+        internal const string JsonFieldIdolOldFirstName = "idol_old_first_name";
+        internal const string JsonFieldIdolOldLastName = "idol_old_last_name";
+        internal const string JsonFieldIdolNewFirstName = "idol_new_first_name";
+        internal const string JsonFieldIdolNewLastName = "idol_new_last_name";
+        internal const string JsonFieldIdolOldDisplayName = "idol_old_display_name";
+        internal const string JsonFieldIdolNewDisplayName = "idol_new_display_name";
+        internal const string JsonFieldIdolNationalityCode = "idol_nationality_code";
+        internal const string JsonFieldIdolNationalityName = "idol_nationality_name";
+        internal const string JsonFieldIdolOldNationalityCode = "idol_old_nationality_code";
+        internal const string JsonFieldIdolNewNationalityCode = "idol_new_nationality_code";
+        internal const string JsonFieldIdolOldNationalityName = "idol_old_nationality_name";
+        internal const string JsonFieldIdolNewNationalityName = "idol_new_nationality_name";
         // Stable portrait identity captured with lifecycle milestones. These are asset
         // references, not copied images, so consumers can reconstruct normal/modded
         // portraits and identify vanilla SpriteAtlas-backed unique idols.

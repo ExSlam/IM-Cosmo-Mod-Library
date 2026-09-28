@@ -543,6 +543,8 @@ namespace IdolCareerDiary
         internal const string EventTaskDone = "task_done";
         internal const string EventTaskRemovedOnGraduation = "task_removed_on_graduation";
         internal const string EventIdolOutfitChanged = "idol_outfit_changed";
+        internal const string EventIdolNameChanged = "idol_name_changed";
+        internal const string EventIdolNationalityChanged = "idol_nationality_changed";
         internal const string EventWishGenerated = "wish_generated";
         internal const string EventWishFulfilled = "wish_fulfilled";
         internal const string EventWishDone = "wish_done";
@@ -668,6 +670,18 @@ namespace IdolCareerDiary
         internal const string JsonDatingUsedGoods = "dating_used_goods";
         internal const string JsonDatingDatedIdol = "dating_dated_idol";
         internal const string JsonIdolId = "idol_id";
+        internal const string JsonIdolOldFirstName = "idol_old_first_name";
+        internal const string JsonIdolOldLastName = "idol_old_last_name";
+        internal const string JsonIdolNewFirstName = "idol_new_first_name";
+        internal const string JsonIdolNewLastName = "idol_new_last_name";
+        internal const string JsonIdolOldDisplayName = "idol_old_display_name";
+        internal const string JsonIdolNewDisplayName = "idol_new_display_name";
+        internal const string JsonIdolNationalityCode = "idol_nationality_code";
+        internal const string JsonIdolNationalityName = "idol_nationality_name";
+        internal const string JsonIdolOldNationalityCode = "idol_old_nationality_code";
+        internal const string JsonIdolNewNationalityCode = "idol_new_nationality_code";
+        internal const string JsonIdolOldNationalityName = "idol_old_nationality_name";
+        internal const string JsonIdolNewNationalityName = "idol_new_nationality_name";
         internal const string JsonStaffId = "staff_id";
         internal const string JsonStaffName = "staff_name";
         internal const string JsonStaffRole = "staff_role";
@@ -1472,6 +1486,11 @@ namespace IdolCareerDiary
         internal const string KeyActiveAfter = "active_after";
         internal static string TextAvailableFrom { get { return ModLocalization.Get("TextAvailableFrom", "Available From"); } }
         internal const string KeyAvailableFrom = "available_from";
+        internal static string TextIdolNameChanged { get { return ModLocalization.Get("TextIdolNameChanged", "Idol Name Changed"); } }
+        internal static string TextIdolNationalityChanged { get { return ModLocalization.Get("TextIdolNationalityChanged", "Idol Nationality Changed"); } }
+        internal static string TextNameTransitionFormat { get { return ModLocalization.Get("TextNameTransitionFormat", "Name: {0} -> {1}"); } }
+        internal static string TextNationalityTransitionFormat { get { return ModLocalization.Get("TextNationalityTransitionFormat", "Nationality: {0} -> {1}"); } }
+        internal static string TextDisplayedNameTransitionFormat { get { return ModLocalization.Get("TextDisplayedNameTransitionFormat", "Displayed Name: {0} -> {1}"); } }
         internal static string TextOutfitChanged { get { return ModLocalization.Get("TextOutfitChanged", "Outfit Changed"); } }
         internal static string TextOutfitChangeAction { get { return ModLocalization.Get("TextOutfitChangeAction", "Outfit Change"); } }
         internal const string KeyOutfitChangeAction = "outfit_change_action";
@@ -16564,6 +16583,11 @@ namespace IdolCareerDiary
                     BuildIdolLifecyclePresentation(type, ev, payload, p, outcomeLines);
                     return true;
 
+                case C.EventIdolNameChanged:
+                case C.EventIdolNationalityChanged:
+                    BuildIdolIdentityEditPresentation(type, ev, payload, p, outcomeLines);
+                    return true;
+
                 case C.EventIdolBirthday:
                     BuildIdolBirthdayPresentation(ev, payload, p, outcomeLines);
                     return true;
@@ -16727,6 +16751,120 @@ namespace IdolCareerDiary
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Renders durable identity edits emitted by the optional Madxis nationality/name editor bridge.
+        /// Historical values are always read from the event payload instead of the idol's current profile,
+        /// so later edits cannot rewrite what an older diary entry says.
+        /// </summary>
+        private static void BuildIdolIdentityEditPresentation(
+            string eventType,
+            IMDataCoreEvent ev,
+            JSONNode payload,
+            Presentation p,
+            List<string> outcomeLines)
+        {
+            string oldDisplayName = ReadIdentityHistoryText(payload, C.JsonIdolOldDisplayName);
+            string newDisplayName = ReadIdentityHistoryText(payload, C.JsonIdolNewDisplayName);
+            p.WithWhom = newDisplayName != C.LabelUnknown
+                ? newDisplayName
+                : (oldDisplayName != C.LabelUnknown ? oldDisplayName : ResolveIdolNameById(ev.IdolId));
+
+            if (string.Equals(eventType, C.EventIdolNameChanged, StringComparison.Ordinal))
+            {
+                p.Title = C.TextIdolNameChanged;
+                string oldName = oldDisplayName;
+                string newName = newDisplayName;
+                if (oldName == C.LabelUnknown)
+                {
+                    oldName = BuildIdentityNameFromParts(
+                        ReadIdentityHistoryText(payload, C.JsonIdolOldFirstName),
+                        ReadIdentityHistoryText(payload, C.JsonIdolOldLastName));
+                }
+                if (newName == C.LabelUnknown)
+                {
+                    newName = BuildIdentityNameFromParts(
+                        ReadIdentityHistoryText(payload, C.JsonIdolNewFirstName),
+                        ReadIdentityHistoryText(payload, C.JsonIdolNewLastName));
+                }
+
+                outcomeLines.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    C.TextNameTransitionFormat,
+                    oldName,
+                    newName));
+                return;
+            }
+
+            p.Title = C.TextIdolNationalityChanged;
+            string oldNationality = FormatIdentityNationality(
+                ReadIdentityHistoryText(payload, C.JsonIdolOldNationalityName),
+                ReadIdentityHistoryText(payload, C.JsonIdolOldNationalityCode));
+            string newNationality = FormatIdentityNationality(
+                ReadIdentityHistoryText(payload, C.JsonIdolNewNationalityName),
+                ReadIdentityHistoryText(payload, C.JsonIdolNewNationalityCode));
+            outcomeLines.Add(string.Format(
+                CultureInfo.InvariantCulture,
+                C.TextNationalityTransitionFormat,
+                oldNationality,
+                newNationality));
+
+            if (oldDisplayName != C.LabelUnknown &&
+                newDisplayName != C.LabelUnknown &&
+                !string.Equals(oldDisplayName, newDisplayName, StringComparison.Ordinal))
+            {
+                outcomeLines.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    C.TextDisplayedNameTransitionFormat,
+                    oldDisplayName,
+                    newDisplayName));
+            }
+        }
+
+        private static string ReadIdentityHistoryText(JSONNode payload, string key)
+        {
+            string value = (ReadStr(payload, key) ?? string.Empty).Trim();
+            return value.Length > C.ZeroIndex ? value : C.LabelUnknown;
+        }
+
+        private static string BuildIdentityNameFromParts(string firstName, string lastName)
+        {
+            bool hasFirst = firstName != C.LabelUnknown;
+            bool hasLast = lastName != C.LabelUnknown;
+            if (hasFirst && hasLast)
+            {
+                return firstName + C.SeparatorSpace + lastName;
+            }
+            if (hasFirst)
+            {
+                return firstName;
+            }
+            if (hasLast)
+            {
+                return lastName;
+            }
+            return C.LabelUnknown;
+        }
+
+        private static string FormatIdentityNationality(string displayName, string code)
+        {
+            bool hasName = displayName != C.LabelUnknown;
+            bool hasCode = code != C.LabelUnknown;
+            if (hasName && hasCode &&
+                !string.Equals(displayName, code, StringComparison.OrdinalIgnoreCase))
+            {
+                return displayName + " (" + code.ToUpperInvariant() + ")";
+            }
+            if (hasName)
+            {
+                return displayName;
+            }
+            if (hasCode)
+            {
+                return code.ToUpperInvariant();
+            }
+            return C.LabelUnknown;
         }
 
         /// <summary>

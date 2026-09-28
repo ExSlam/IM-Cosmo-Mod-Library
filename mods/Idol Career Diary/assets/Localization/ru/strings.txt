@@ -1092,3 +1092,9 @@ TextSkillValue=Значение навыка
 TextNoConcertCardsUsed=Карты не использовались.
 TextNoConcertDisasters=Происшествий не было.
 TextIdolGraduationOutcome=После выпуска
+# Optional idol identity editor history.
+TextIdolNameChanged=Имя идола изменено
+TextIdolNationalityChanged=Национальность идола изменена
+TextNameTransitionFormat=Имя: {0} -> {1}
+TextNationalityTransitionFormat=Национальность: {0} -> {1}
+TextDisplayedNameTransitionFormat=Отображаемое имя: {0} -> {1}

@@ -1091,3 +1091,9 @@ TextSkillValue=技能值
 TextNoConcertCardsUsed=未使用任何卡片。
 TextNoConcertDisasters=未发生任何事故。
 TextIdolGraduationOutcome=毕业后
+# Optional idol identity editor history.
+TextIdolNameChanged=偶像姓名已更改
+TextIdolNationalityChanged=偶像国籍已更改
+TextNameTransitionFormat=姓名：{0} -> {1}
+TextNationalityTransitionFormat=国籍：{0} -> {1}
+TextDisplayedNameTransitionFormat=显示姓名：{0} -> {1}

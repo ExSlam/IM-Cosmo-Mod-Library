@@ -1091,3 +1091,9 @@ TextSkillValue=スキル値
 TextNoConcertCardsUsed=カードは使用されませんでした。
 TextNoConcertDisasters=トラブルは発生しませんでした。
 TextIdolGraduationOutcome=卒業後
+# Optional idol identity editor history.
+TextIdolNameChanged=アイドル名を変更
+TextIdolNationalityChanged=アイドルの国籍を変更
+TextNameTransitionFormat=名前: {0} -> {1}
+TextNationalityTransitionFormat=国籍: {0} -> {1}
+TextDisplayedNameTransitionFormat=表示名: {0} -> {1}

@@ -2,11 +2,11 @@
 
 `Idol Career Diary` adds a profile-integrated timeline view that turns IM Data Core events into readable career history.
 
-The current Release build and compiled API resolver pass against IMDataCore 3.4.34 (sidecar v6 / journal v3). Native Unity testing also passes Diary's birthday append-once method and mapped history reader before and after a real Save As/restart. See [current compatibility evidence and remaining qualification](../IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md).
+The current source target and API resolver are aligned with IMDataCore 3.4.35 (sidecar v6 / journal v3). Native Unity testing also passes Diary's birthday append-once method and mapped history reader before and after a real Save As/restart. See [current compatibility evidence and remaining qualification](../IM%20Data%20Core/docs/V6V3_QUALIFICATION_STATUS.md).
 
 ## Dependencies
 
-- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.33` or higher, with the v6 consumer interop contract
+- `IM Data Core` (`com.cosmo.imdatacore`) version `3.4.35`, with the current v6 consumer interop contract
 - `IM UI Framework` (`com.cosmo.imuiframework`) version `2.0.3` or higher
 
 This mod does not ship a separate persistence backend. It reads timeline events and supplemental state through IM Data Core and renders UI with IM UI Framework.
@@ -18,6 +18,8 @@ Idol Career Diary uses IM Data Core's read-only query API plus the reflection-sa
 Timeline source rows are career-windowed before aggregation/deduplication: events before the idol's hiring date and events after an actually completed graduation are excluded from that idol's diary. The graduation day itself remains included.
 
 IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Graduation** using vanilla's resolved `Graduation_Trivia_Text`, preserving JSON-only graduation-trivia additions without a hard dependency on the mod that supplied them. Election rankings use IM Data Core's persisted `election_number`, not event identity, and concert details retain the captured ordered setlist/talk-break snapshot.
+
+When Madxis' optional **Idol Nationality + Name Editor** is detected by IM Data Core, the diary renders durable rename and nationality-switch rows. Each entry uses the identity values stored at the time of the edit, so later changes do not rewrite older diary history; the diary detail's Date field shows when the edit occurred.
 
 The last-selected diary entry is supplemental state stored through IM Data Core. It is immediately visible in the active session and becomes durable at the next vanilla save boundary.
 
@@ -109,7 +111,7 @@ Harmony/API mods that append events through IM Data Core are also attributed whe
 
 ## Installation
 
-1. Install `IM Data Core` 3.4.33 or newer with the v6 consumer interop contract.
+1. Install `IM Data Core` 3.4.35 with the current v6 consumer interop contract.
 2. Install `IM UI Framework` 2.0.3 or newer.
 3. Install `Idol Career Diary`.
 4. Launch the game and open an idol profile to verify the diary UI appears.

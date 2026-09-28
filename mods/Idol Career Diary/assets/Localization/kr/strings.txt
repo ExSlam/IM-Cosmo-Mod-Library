@@ -1090,3 +1090,9 @@ RawText.Idol_Hired=아이돌 영입됨
 RawText.Idol_Relationship_Status_Changed=아이돌 관계 상태 변경
 RawText.Player_Relationship_Changed=프로듀서 관계 변경
 TextIdolGraduationOutcome=졸업 후
+# Optional idol identity editor history.
+TextIdolNameChanged=아이돌 이름 변경
+TextIdolNationalityChanged=아이돌 국적 변경
+TextNameTransitionFormat=이름: {0} -> {1}
+TextNationalityTransitionFormat=국적: {0} -> {1}
+TextDisplayedNameTransitionFormat=표시 이름: {0} -> {1}

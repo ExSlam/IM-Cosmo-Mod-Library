@@ -1089,3 +1089,9 @@ RawText.Idol_Hired=Idole embauchée
 RawText.Idol_Relationship_Status_Changed=Statut de relation des idoles modifié
 RawText.Player_Relationship_Changed=Relation avec le producteur modifiée
 TextIdolGraduationOutcome=Après la graduation
+# Optional idol identity editor history.
+TextIdolNameChanged=Nom de l'idole modifié
+TextIdolNationalityChanged=Nationalité de l'idole modifiée
+TextNameTransitionFormat=Nom : {0} -> {1}
+TextNationalityTransitionFormat=Nationalité : {0} -> {1}
+TextDisplayedNameTransitionFormat=Nom affiché : {0} -> {1}

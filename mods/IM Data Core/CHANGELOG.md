@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.4.35
+
+- Added an optional reflection-only bridge for Madxis' current `Idol Nationality + Name Editor` (`com.madxis.idolnationality`) without taking a compile-time dependency on that mod.
+- Captures successful `SaveEditedName()` and `SelectNationality(int, string, string)` edits as durable `idol_name_changed` and `idol_nationality_changed` events, preserving both old and new identity values plus the in-game event date.
+- Identity capture is no-op suppressed, save/load replay suppressed, and indexed to the edited idol; later edits do not overwrite earlier history.
+- Expanded the current durable built-in capability catalog from 173 to 175 event types while keeping sidecar v6 / journal v3 unchanged.
+
 ## 3.4.33
 
 - Activated sidecar v6 / journal v3 as the atomic current persistence generation in Wave 5 Task 6 and converted the static staging guards into current-generation anti-rollback guards.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+
+- Added explicit Career Diary rendering for IM Data Core `idol_name_changed` and `idol_nationality_changed` events emitted from Madxis' Idol Nationality + Name Editor integration.
+- Rename entries show the persisted old name -> new name transition and keep that historical transition stable after later renames.
+- Nationality entries show persisted old nationality -> new nationality values, country codes, and any display-name ordering change caused by the switch.
+- Added localized labels for all seven existing Idol Career Diary language sets.
+
 ## 1.3.0
 
 - Updated the IM Data Core dependency contract to 3.4.33 v6 APIs.

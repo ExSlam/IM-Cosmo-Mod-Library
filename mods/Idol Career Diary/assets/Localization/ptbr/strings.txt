@@ -1092,3 +1092,9 @@ TextSkillValue=Valor da habilidade
 TextNoConcertCardsUsed=Nenhum cartão foi usado.
 TextNoConcertDisasters=Nenhum incidente ocorreu.
 TextIdolGraduationOutcome=Após a formatura
+# Optional idol identity editor history.
+TextIdolNameChanged=Nome da idol alterado
+TextIdolNationalityChanged=Nacionalidade da idol alterada
+TextNameTransitionFormat=Nome: {0} -> {1}
+TextNationalityTransitionFormat=Nacionalidade: {0} -> {1}
+TextDisplayedNameTransitionFormat=Nome exibido: {0} -> {1}
