@@ -1,7 +1,7 @@
 Don't cheat. Cheating is bad. But if you need to, for testing the mod you're making or something, here you go. Let me know if there are any other cheats you want me to add. Inspired by Shelon's cheat mod.
 
 Requires:
-1. IM Harmony : https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863 and https://github.com/ui3TD/IM-HarmonyIntegration
+1. IM Harmony : https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863 and [https://github.com/ui3TD/IM-HarmonyIntegration](https://github.com/ui3TD/IM-HarmonyIntegration)
 2. Buttons Mod : https://steamcommunity.com/sharedfiles/filedetails/?id=3728516714
 
 Instructions to use:
@@ -10,42 +10,50 @@ Click on the gear icon in the game on the left side of the screen. Click on Acti
 List of cheats:
 
 [olist]
-    [*] Add 10k fans
-    [*] Add 10k fame
-    [*] Add 1B yen to company funds
-    [*] Add 100 buzz
-    [*] Set active idol physical stamina to 100
-    [*] Set active idol mental stamina to 100
-    [*] Reduce general scandal points by 1
-    [*] Add 1 general scandal point
-    [*] Add 1 scandal point to all idols
-    [*] Set general and idol scandal points to 0
-    [*] Trigger a random dating scandal
-    [*] Increase every active idol's influence by one level
-    [*] Increase every active idol's friendship by one level
-    [*] Increase every active idol's romance by one level
-    [*] Max active idol influence, friendship, and romance with only one representative relationship popup
-    [*] Max relationship with all rival idols from [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3768235126]Rivals Reborn[/url] if that mod is installed and enabled
-    [*] Add 25k EXP to all staff skills
-    [*] Set every staff skill level to 20
-    [*] Add 1k points to every research type
-    [*] Unlock all research and set every research level to 10
-    [*] Set Performance and Promotion activities to level 10
-    [*] Increase every idol's fame by one level
-    [*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
-    [*] Reveal idol friend relationships
-    [*] Reveal idol best friend relationships
-    [*] Reveal idol dislike and hate relationships
-    [*] Reveal all idol cliques
-    [*] Reveal all known bullying targets
-    [*] Reveal all idol relationships, cliques, and bullying targets
-    [*] Reveal every idol's current dating status
-    [*] Reveal every idol's dating preference
-    [*] End all idol dating relationships except relationships with the producer
-    [*] Reset special event cooldowns
-    [*] Reset regional and nationwide audition cooldowns
-    [*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
-    [*] Recruit Unique Idol cheat with selection popup
-    [*] Reset cooldown for changing idol groups for all idols
-    [*] Add custom amount of fans
+[*] Add 10k fans
+[*] Add 10k fame
+[*] Add 1B yen to company funds
+[*] Add 100 buzz
+[*] Set active idol physical stamina to 100
+[*] Set active idol mental stamina to 100
+[*] Reduce general scandal points by 1
+[*] Add 1 general scandal point
+[*] Add 1 scandal point to all idols
+[*] Set general and idol scandal points to 0
+[*] Trigger a random dating scandal
+[*] Increase every active idol's influence by one level
+[*] Increase every active idol's friendship by one level
+[*] Increase every active idol's romance by one level
+[*] Max active idol influence, friendship, and romance with only one representative relationship popup
+[*] Max relationship with all rival idols from [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3768235126]Rivals Reborn[/url] if that mod is installed and enabled
+[*] Add 25k EXP to all staff skills
+[*] Set every staff skill level to 20
+[*] Add 10k points to every research type
+[*] Unlock all research and set every research level to 10
+[*] Set Performance and Promotion activities to level 10
+[*] Increase every idol's fame by one level
+[*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
+[*] Reveal idol friend relationships
+[*] Reveal idol best friend relationships
+[*] Reveal idol dislike and hate relationships
+[*] Reveal all idol cliques
+[*] Reveal all known bullying targets
+[*] End all bullying
+[*] Reveal all idol relationships, cliques, and bullying targets
+[*] Reveal every idol's current dating status
+[*] Reveal every idol's dating preference
+[*] End all idol dating relationships except relationships with the producer
+[*] Reset special event cooldowns
+[*] Reset regional and nationwide audition cooldowns
+[*] Reset cooldown for changing idol groups for all idols
+[*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
+[*] Cancel announced '3 months until graduation' phase and assign a new future graduation date for selected idol
+[*] Change graduation date for selected idol
+[*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for selected idol
+[*] Set selected idol's fame to a custom level from 1-10
+[*] Generate a random dating scandal for selected idol
+[*] Break up selected idol's non-producer dating relationship
+[*] Max influence, friendship, and romance with selected idol
+[*] Recruit Unique Idol cheat with selection popup
+[*] Add custom amount of fans
 [/olist]

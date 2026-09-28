@@ -390,6 +390,56 @@
 		"method": "OpenChangeGraduationDatePopup"
 	},
 	{
+		"label": "Selected idol stats 100",
+		"codeLabel": "cheat.button.selected_idol_stats_100",
+		"tooltip": "Pick an idol and set all eight core stats to 100.",
+		"codeTooltip": "cheat.tooltip.selected_idol_stats_100",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenSelectedIdolStatsPopup"
+	},
+	{
+		"label": "Set selected idol fame",
+		"codeLabel": "cheat.button.selected_idol_fame",
+		"tooltip": "Pick an idol and set fame to a chosen level from 1 to 10.",
+		"codeTooltip": "cheat.tooltip.selected_idol_fame",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenSelectedIdolFamePopup"
+	},
+	{
+		"label": "Generate idol scandal",
+		"codeLabel": "cheat.button.selected_idol_random_scandal",
+		"tooltip": "Pick an eligible idol and generate a random dating scandal event for her.",
+		"codeTooltip": "cheat.tooltip.selected_idol_random_scandal",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenSelectedIdolScandalPopup"
+	},
+	{
+		"label": "Break up selected idol",
+		"codeLabel": "cheat.button.selected_idol_breakup",
+		"tooltip": "Pick an idol and end her non-producer dating relationship.",
+		"codeTooltip": "cheat.tooltip.selected_idol_breakup",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenSelectedIdolBreakupPopup"
+	},
+	{
+		"label": "Max selected idol relationships",
+		"codeLabel": "cheat.button.selected_idol_max_relationships",
+		"tooltip": "Pick an idol and max influence, friendship, and romance with the producer.",
+		"codeTooltip": "cheat.tooltip.selected_idol_max_relationships",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenSelectedIdolMaxRelationshipsPopup"
+	},
+	{
 		"label": "Recruit unique idol",
 		"codeLabel": "cheat.button.recruit_unique_idol",
 		"tooltip": "Open a picker to recruit any loaded unique idol.",

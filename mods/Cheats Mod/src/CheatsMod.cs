@@ -413,6 +413,31 @@ namespace CheatsMod
             Execute(GraduationCheatPopup.OpenChangeDate);
         }
 
+        public static void OpenSelectedIdolStatsPopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenStats100);
+        }
+
+        public static void OpenSelectedIdolFamePopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenFame);
+        }
+
+        public static void OpenSelectedIdolScandalPopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenRandomScandal);
+        }
+
+        public static void OpenSelectedIdolBreakupPopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenBreakupDating);
+        }
+
+        public static void OpenSelectedIdolMaxRelationshipsPopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenMaxPlayerRelationships);
+        }
+
         public static void RevealAllRelationships()
         {
             Execute(RevealAllRelationshipsCore);

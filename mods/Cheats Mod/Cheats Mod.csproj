@@ -3,13 +3,14 @@
     <ModName>Cheats Mod</ModName>
     <RootNamespace>CheatsMod</RootNamespace>
     <AssemblyName>com.cosmo.cheatsmod</AssemblyName>
-    <Version>1.6.0</Version>
+    <Version>1.7.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="src\CheatsMod.cs" />
     <Compile Include="src\UniqueIdolRecruitmentPopup.cs" />
     <Compile Include="src\GraduationCheatPopup.cs" />
+    <Compile Include="src\IdolTargetCheatPopup.cs" />
   </ItemGroup>
 
   <ItemGroup>
