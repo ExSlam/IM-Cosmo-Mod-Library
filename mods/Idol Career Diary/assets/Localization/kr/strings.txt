@@ -1096,3 +1096,15 @@ TextIdolNationalityChanged=아이돌 국적 변경
 TextNameTransitionFormat=이름: {0} -> {1}
 TextNationalityTransitionFormat=국적: {0} -> {1}
 TextDisplayedNameTransitionFormat=표시 이름: {0} -> {1}
+
+# Concert incident timeline
+TitleConcertEvents=콘서트 이벤트 / 사고
+TitleConcertOutcome=콘서트 결과
+TextConcertCrisisEvent=사고
+TextNoConcertEvents=사용한 카드나 발생한 사고가 기록되지 않았습니다.
+TextCardConsumed=소모됨
+TextAccidentPreventionPercent=사고 발생 확률 감소 (%)
+TextCrisisSuccessBonusPercent=사고 성공 확률 보너스 (%)
+TextCriticalFailureProtection=치명적 실패 방지
+TextHype=기대감
+TextSongsWithoutAccidents=사고 없이 진행된 무대

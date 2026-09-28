@@ -1098,3 +1098,15 @@ TextIdolNationalityChanged=Национальность идола измене�
 TextNameTransitionFormat=Имя: {0} -> {1}
 TextNationalityTransitionFormat=Национальность: {0} -> {1}
 TextDisplayedNameTransitionFormat=Отображаемое имя: {0} -> {1}
+
+# Concert incident timeline
+TitleConcertEvents=События / происшествия концерта
+TitleConcertOutcome=Итог концерта
+TextConcertCrisisEvent=Происшествие
+TextNoConcertEvents=Использование карт и происшествия не зафиксированы.
+TextCardConsumed=Израсходована
+TextAccidentPreventionPercent=Снижение вероятности происшествия (%)
+TextCrisisSuccessBonusPercent=Бонус шанса успеха происшествия (%)
+TextCriticalFailureProtection=Защита от критической неудачи
+TextHype=Хайп
+TextSongsWithoutAccidents=Номера без происшествий

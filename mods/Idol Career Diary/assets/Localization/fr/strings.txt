@@ -1095,3 +1095,15 @@ TextIdolNationalityChanged=Nationalité de l'idole modifiée
 TextNameTransitionFormat=Nom : {0} -> {1}
 TextNationalityTransitionFormat=Nationalité : {0} -> {1}
 TextDisplayedNameTransitionFormat=Nom affiché : {0} -> {1}
+
+# Concert incident timeline
+TitleConcertEvents=Événements / incidents du concert
+TitleConcertOutcome=Résultat du concert
+TextConcertCrisisEvent=Incident
+TextNoConcertEvents=Aucune utilisation de carte ni aucun incident n'a été enregistré.
+TextCardConsumed=Consommée
+TextAccidentPreventionPercent=Réduction du risque d'incident (%)
+TextCrisisSuccessBonusPercent=Bonus de réussite d'incident (%)
+TextCriticalFailureProtection=Protection contre l'échec critique
+TextHype=Engouement
+TextSongsWithoutAccidents=Numéros sans incident

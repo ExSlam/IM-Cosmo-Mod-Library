@@ -21,6 +21,8 @@ IM Data Core's `idol_graduation_outcome` milestone is rendered as **After Gradua
 
 When Madxis' optional **Idol Nationality + Name Editor** is detected by IM Data Core, the diary renders durable rename and nationality-switch rows. Each entry uses the identity values stored at the time of the edit, so later changes do not rewrite older diary history; the diary detail's Date field shows when the edit occurred.
 
+Concert diary details consume IM Data Core's retained `concert_card_used`, `concert_crisis_decision`, `concert_crisis_applied`, and `concert_final_resolved` rows without promoting those technical rows into the idol's main timeline. Cards and crises are rendered in chronological order; each crisis merges its decision and applied result so the diary shows the selected Safe/Risky option, success chance, success/failure/critical-failure result, expected hype effect, and actual hype before/after change. The final concert summary also shows accident and accident-free counts.
+
 The last-selected diary entry is supplemental state stored through IM Data Core. It is immediately visible in the active session and becomes durable at the next vanilla save boundary.
 
 ### IM Data Core v6 integration

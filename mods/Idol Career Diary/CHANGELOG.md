@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.2
+
+- Expanded concert diary details into one chronological **Concert Events / Incidents** stream while keeping IM Data Core's technical concert rows out of the main idol timeline.
+- Concert action-card entries now show card type, level/effect, card consumption and remaining-card transition, plus changed accident-prevention, crisis-success, and critical-failure-protection modifiers.
+- Concert crises now merge the captured decision and applied-outcome rows into one readable incident showing Safe/Risky choice, success chance, result, critical-failure protection, expected hype change, hype before -> after, and actual hype delta.
+- Added a final concert outcome summary with total accidents, accident-free performances, recorded accident titles, and total idol payout.
+- Added localized incident/detail labels for all seven existing Idol Career Diary language sets.
+
 ## 1.3.1
 
 - Added explicit Career Diary rendering for IM Data Core `idol_name_changed` and `idol_nationality_changed` events emitted from Madxis' Idol Nationality + Name Editor integration.

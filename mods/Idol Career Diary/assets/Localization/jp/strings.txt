@@ -1097,3 +1097,15 @@ TextIdolNationalityChanged=アイドルの国籍を変更
 TextNameTransitionFormat=名前: {0} -> {1}
 TextNationalityTransitionFormat=国籍: {0} -> {1}
 TextDisplayedNameTransitionFormat=表示名: {0} -> {1}
+
+# Concert incident timeline
+TitleConcertEvents=コンサートイベント / トラブル
+TitleConcertOutcome=コンサート結果
+TextConcertCrisisEvent=トラブル
+TextNoConcertEvents=カード使用やトラブルは記録されていません。
+TextCardConsumed=消費
+TextAccidentPreventionPercent=トラブル発生率軽減 (%)
+TextCrisisSuccessBonusPercent=トラブル成功率ボーナス (%)
+TextCriticalFailureProtection=致命的失敗防止
+TextHype=注目度
+TextSongsWithoutAccidents=トラブルなしの演目

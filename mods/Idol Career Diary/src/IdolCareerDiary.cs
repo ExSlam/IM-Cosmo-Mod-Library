@@ -1077,6 +1077,18 @@ namespace IdolCareerDiary
         internal static string TextCardsRemaining { get { return ModLocalization.Get("TextCardsRemaining", "Cards Remaining"); } }
         internal const string KeyCardsBefore = "cards_before";
         internal const string KeyCardsAfter = "cards_after";
+        internal static string TextCardConsumed { get { return ModLocalization.Get("TextCardConsumed", "Consumed"); } }
+        internal const string KeyCardConsumed = "card_consumed";
+        internal static string TextAccidentPreventionPercent { get { return ModLocalization.Get("TextAccidentPreventionPercent", "Accident Prevention (%)"); } }
+        internal const string KeyCardAccidentHappeningBefore = "card_accident_happening_before";
+        internal const string KeyCardAccidentHappeningAfter = "card_accident_happening_after";
+        internal static string TextCrisisSuccessBonusPercent { get { return ModLocalization.Get("TextCrisisSuccessBonusPercent", "Crisis Success Bonus (%)"); } }
+        internal const string KeyCardAccidentSuccessBefore = "card_accident_success_before";
+        internal const string KeyCardAccidentSuccessAfter = "card_accident_success_after";
+        internal static string TextCriticalFailureProtection { get { return ModLocalization.Get("TextCriticalFailureProtection", "Critical Failure Protection"); } }
+        internal const string KeyCardNoCriticalFailureBefore = "card_no_critical_failure_before";
+        internal const string KeyCardNoCriticalFailureAfter = "card_no_critical_failure_after";
+        internal const string KeyNoCriticalFailure = "no_critical_failure";
         internal static string LabelCrisis { get { return ModLocalization.Get("LabelCrisis", "Crisis"); } }
         internal const string KeyAccidentTitle = "accident_title";
         internal static string LabelChoice { get { return ModLocalization.Get("LabelChoice", "Choice"); } }
@@ -1084,6 +1096,9 @@ namespace IdolCareerDiary
         internal static string LabelResult { get { return ModLocalization.Get("LabelResult", "Result"); } }
         internal const string KeyResultType = "result_type";
         internal static string TextHypeDelta { get { return ModLocalization.Get("TextHypeDelta", "Hype Change"); } }
+        internal static string TextHype { get { return ModLocalization.Get("TextHype", "Hype"); } }
+        internal const string KeyHypeBefore = "hype_before";
+        internal const string KeyHypeAfter = "hype_after";
         internal const string KeyHypeDeltaApplied = "hype_delta_applied";
         internal const string KeyResultHypeDelta = "result_hype_delta";
         internal static string TextExpectedHypeDelta { get { return ModLocalization.Get("TextExpectedHypeDelta", "Expected Hype Change"); } }
@@ -1098,10 +1113,17 @@ namespace IdolCareerDiary
         internal const string KeyIdolPayoutTotal = "idol_payout_total";
         internal static string LabelAccidents { get { return ModLocalization.Get("LabelAccidents", "Accidents"); } }
         internal const string KeyUsedAccidentTitles = "used_accident_titles";
+        internal const string KeyUsedAccidentCount = "used_accident_count";
+        internal static string TextSongsWithoutAccidents { get { return ModLocalization.Get("TextSongsWithoutAccidents", "Performances Without Accidents"); } }
+        internal const string KeyNoAccidentCounter = "no_accident_counter";
         internal const string KeyConcertFinishDate = "concert_finish_date";
         internal static string LabelDate { get { return ModLocalization.Get("LabelDate", "Date"); } }
         internal const string KeyEventDate = "event_date";
         internal static string TitleConcertSetlist { get { return ModLocalization.Get("TitleConcertSetlist", "Concert Setlist"); } }
+        internal static string TitleConcertEvents { get { return ModLocalization.Get("TitleConcertEvents", "Concert Events / Incidents"); } }
+        internal static string TitleConcertOutcome { get { return ModLocalization.Get("TitleConcertOutcome", "Concert Outcome"); } }
+        internal static string TextConcertCrisisEvent { get { return ModLocalization.Get("TextConcertCrisisEvent", "Crisis"); } }
+        internal static string TextNoConcertEvents { get { return ModLocalization.Get("TextNoConcertEvents", "No card uses or crises were recorded."); } }
         internal static string TitleConcertCardsUsed { get { return ModLocalization.Get("TitleConcertCardsUsed", "Cards Used"); } }
         internal static string TitleConcertDisasters { get { return ModLocalization.Get("TitleConcertDisasters", "Disasters"); } }
         internal static string TextTalkBreak { get { return ModLocalization.Get("TextTalkBreak", "Talk Break #"); } }
@@ -10834,7 +10856,7 @@ namespace IdolCareerDiary
         }
 
         /// <summary>
-        /// Renders the ordered setlist plus concert-wide card and disaster history.
+        /// Renders the ordered setlist plus chronological concert events/incidents and final outcome.
         /// </summary>
         private void RenderConcertDetailContext(IMDataCoreEvent ev, JSONNode payload)
         {
@@ -10887,57 +10909,402 @@ namespace IdolCareerDiary
 
             List<IMDataCoreEvent> concertEvents = ResolveConcertDetailEvents(ev.EntityId);
             AddDivider(diaryDetailContentRoot);
-            AddTitle(diaryDetailContentRoot, C.TitleConcertCardsUsed);
-            int renderedCards = C.ZeroIndex;
+            AddTitle(diaryDetailContentRoot, C.TitleConcertEvents);
+
+            int renderedEvents = C.ZeroIndex;
+            HashSet<int> consumedAppliedEventIndexes = new HashSet<int>();
             for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
             {
                 IMDataCoreEvent detailEvent = concertEvents[eventIndex];
-                if (detailEvent == null || !string.Equals(detailEvent.EventType, C.EventConcertCardUsed, StringComparison.Ordinal))
+                if (detailEvent == null)
                 {
                     continue;
                 }
 
-                JSONNode cardPayload = ParsePayload(detailEvent.PayloadJson);
-                renderedCards++;
-                AddText(
-                    diaryDetailContentRoot,
-                    C.SeparatorHash + renderedCards.ToString(CultureInfo.InvariantCulture) +
-                    C.SeparatorSpace + HumanizeUnknown(ReadStr(cardPayload, C.KeyCardType)) +
-                    C.MetadataPipeSeparator + C.TextCardLevel + C.SeparatorColonSpace +
-                    ReadInt(cardPayload, C.KeyCardLevel).ToString(CultureInfo.InvariantCulture) +
-                    C.MetadataPipeSeparator + C.TextCardEffect + C.SeparatorColonSpace +
-                    ReadInt(cardPayload, C.KeyCardEffectValue).ToString(CultureInfo.InvariantCulture));
+                if (string.Equals(detailEvent.EventType, C.EventConcertCardUsed, StringComparison.Ordinal))
+                {
+                    renderedEvents++;
+                    RenderConcertCardIncident(ParsePayload(detailEvent.PayloadJson), renderedEvents);
+                    continue;
+                }
+
+                if (string.Equals(detailEvent.EventType, C.EventConcertCrisisDecision, StringComparison.Ordinal))
+                {
+                    JSONNode decisionPayload = ParsePayload(detailEvent.PayloadJson);
+                    int appliedIndex = FindMatchingConcertCrisisAppliedIndex(
+                        concertEvents,
+                        eventIndex,
+                        decisionPayload,
+                        consumedAppliedEventIndexes);
+                    JSONNode appliedPayload = null;
+                    if (appliedIndex >= C.ZeroIndex)
+                    {
+                        consumedAppliedEventIndexes.Add(appliedIndex);
+                        appliedPayload = ParsePayload(concertEvents[appliedIndex].PayloadJson);
+                    }
+
+                    renderedEvents++;
+                    RenderConcertCrisisIncident(decisionPayload, appliedPayload, renderedEvents);
+                    continue;
+                }
+
+                if (string.Equals(detailEvent.EventType, C.EventConcertCrisisApplied, StringComparison.Ordinal) &&
+                    !consumedAppliedEventIndexes.Contains(eventIndex))
+                {
+                    renderedEvents++;
+                    RenderConcertCrisisIncident(null, ParsePayload(detailEvent.PayloadJson), renderedEvents);
+                }
             }
 
-            if (renderedCards == C.ZeroIndex)
+            if (renderedEvents == C.ZeroIndex)
             {
-                AddText(diaryDetailContentRoot, C.TextNoConcertCardsUsed);
+                AddText(diaryDetailContentRoot, C.TextNoConcertEvents);
             }
 
+            RenderConcertOutcomeSummary(concertEvents);
+        }
+
+        /// <summary>
+        /// Renders one tactical concert card as a chronological incident entry.
+        /// </summary>
+        private void RenderConcertCardIncident(JSONNode cardPayload, int cardNumber)
+        {
+            string cardType = HumanizeUnknown(ReadStr(cardPayload, C.KeyCardType));
+            AddTitle(
+                diaryDetailContentRoot,
+                C.SeparatorHash + cardNumber.ToString(CultureInfo.InvariantCulture) +
+                C.SeparatorSpace + C.TextConcertCardUsed + C.SeparatorColonSpace + cardType);
+
+            List<string> primaryLines = new List<string>();
+            int cardLevel;
+            if (TryReadIntField(cardPayload, C.KeyCardLevel, out cardLevel))
+            {
+                primaryLines.Add(C.TextCardLevel + C.SeparatorColonSpace + cardLevel.ToString(CultureInfo.InvariantCulture));
+            }
+
+            int cardEffect;
+            if (TryReadIntField(cardPayload, C.KeyCardEffectValue, out cardEffect))
+            {
+                primaryLines.Add(C.TextCardEffect + C.SeparatorColonSpace + FormatSignedNumber(cardEffect));
+            }
+
+            int cardsBefore;
+            int cardsAfter;
+            if (TryReadIntField(cardPayload, C.KeyCardsBefore, out cardsBefore) &&
+                TryReadIntField(cardPayload, C.KeyCardsAfter, out cardsAfter))
+            {
+                primaryLines.Add(
+                    C.TextCardsRemaining + C.SeparatorColonSpace +
+                    cardsBefore.ToString(CultureInfo.InvariantCulture) + C.SeparatorArrow +
+                    cardsAfter.ToString(CultureInfo.InvariantCulture));
+            }
+
+            bool cardConsumed;
+            if (TryReadBoolField(cardPayload, C.KeyCardConsumed, out cardConsumed))
+            {
+                primaryLines.Add(C.TextCardConsumed + C.SeparatorColonSpace + YesNo(cardConsumed));
+            }
+
+            if (primaryLines.Count > C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, string.Join(C.MetadataPipeSeparator, primaryLines.ToArray()));
+            }
+
+            List<string> effectLines = new List<string>();
+            AddConcertFloatTransitionIfChanged(
+                effectLines,
+                C.TextAccidentPreventionPercent,
+                cardPayload,
+                C.KeyCardAccidentHappeningBefore,
+                C.KeyCardAccidentHappeningAfter);
+            AddConcertFloatTransitionIfChanged(
+                effectLines,
+                C.TextCrisisSuccessBonusPercent,
+                cardPayload,
+                C.KeyCardAccidentSuccessBefore,
+                C.KeyCardAccidentSuccessAfter);
+            AddConcertBoolTransitionIfChanged(
+                effectLines,
+                C.TextCriticalFailureProtection,
+                cardPayload,
+                C.KeyCardNoCriticalFailureBefore,
+                C.KeyCardNoCriticalFailureAfter);
+
+            if (effectLines.Count > C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, string.Join(C.MetadataPipeSeparator, effectLines.ToArray()));
+            }
+        }
+
+        /// <summary>
+        /// Renders one concert crisis by merging the decision snapshot and applied outcome.
+        /// </summary>
+        private void RenderConcertCrisisIncident(JSONNode decisionPayload, JSONNode appliedPayload, int crisisNumber)
+        {
+            JSONNode headingPayload = appliedPayload ?? decisionPayload;
+            string accidentTitle = NormalizeRawText(ReadStr(headingPayload, C.KeyAccidentTitle));
+            AddTitle(
+                diaryDetailContentRoot,
+                C.SeparatorHash + crisisNumber.ToString(CultureInfo.InvariantCulture) +
+                C.SeparatorSpace + C.TextConcertCrisisEvent + C.SeparatorColonSpace + accidentTitle);
+
+            List<string> decisionLines = new List<string>();
+            string choiceType = ReadPreferredConcertValue(appliedPayload, decisionPayload, C.KeyChoiceType);
+            if (!string.IsNullOrEmpty(choiceType))
+            {
+                decisionLines.Add(C.LabelChoice + C.SeparatorColonSpace + HumanizeUnknown(choiceType));
+            }
+
+            int successChance;
+            if (decisionPayload != null &&
+                TryReadIntField(decisionPayload, C.KeyAccidentSuccessChance, out successChance))
+            {
+                decisionLines.Add(
+                    C.TextSuccessChance + C.SeparatorColonSpace +
+                    successChance.ToString(CultureInfo.InvariantCulture) + "%");
+            }
+
+            string resultType = ReadPreferredConcertValue(appliedPayload, decisionPayload, C.KeyResultType);
+            if (!string.IsNullOrEmpty(resultType))
+            {
+                decisionLines.Add(C.LabelResult + C.SeparatorColonSpace + HumanizeUnknown(resultType));
+            }
+
+            bool criticalFailureProtection;
+            if (decisionPayload != null &&
+                TryReadBoolField(decisionPayload, C.KeyNoCriticalFailure, out criticalFailureProtection))
+            {
+                decisionLines.Add(
+                    C.TextCriticalFailureProtection + C.SeparatorColonSpace +
+                    YesNo(criticalFailureProtection));
+            }
+
+            if (decisionLines.Count > C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, string.Join(C.MetadataPipeSeparator, decisionLines.ToArray()));
+            }
+
+            List<string> outcomeLines = new List<string>();
+            int expectedHypeDelta;
+            if (appliedPayload != null &&
+                TryReadIntField(appliedPayload, C.KeyExpectedHypeDelta, out expectedHypeDelta))
+            {
+                outcomeLines.Add(C.TextExpectedHypeDelta + C.SeparatorColonSpace + FormatSignedNumber(expectedHypeDelta));
+            }
+            else if (decisionPayload != null &&
+                TryReadIntField(decisionPayload, C.KeyResultHypeDelta, out expectedHypeDelta))
+            {
+                outcomeLines.Add(C.TextExpectedHypeDelta + C.SeparatorColonSpace + FormatSignedNumber(expectedHypeDelta));
+            }
+
+            float hypeBefore;
+            float hypeAfter;
+            if (appliedPayload != null &&
+                TryReadFloatField(appliedPayload, C.KeyHypeBefore, out hypeBefore) &&
+                TryReadFloatField(appliedPayload, C.KeyHypeAfter, out hypeAfter))
+            {
+                outcomeLines.Add(
+                    C.TextHype + C.SeparatorColonSpace +
+                    hypeBefore.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture) +
+                    C.SeparatorArrow +
+                    hypeAfter.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture));
+            }
+
+            float appliedHypeDelta;
+            if (appliedPayload != null &&
+                TryReadFloatField(appliedPayload, C.KeyHypeDeltaApplied, out appliedHypeDelta))
+            {
+                outcomeLines.Add(C.TextHypeDelta + C.SeparatorColonSpace + FormatSignedMetric(appliedHypeDelta));
+            }
+
+            if (outcomeLines.Count > C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, string.Join(C.MetadataPipeSeparator, outcomeLines.ToArray()));
+            }
+        }
+
+        /// <summary>
+        /// Pairs a crisis decision with the next matching applied-outcome row.
+        /// </summary>
+        private static int FindMatchingConcertCrisisAppliedIndex(
+            List<IMDataCoreEvent> concertEvents,
+            int decisionIndex,
+            JSONNode decisionPayload,
+            HashSet<int> consumedAppliedEventIndexes)
+        {
+            if (concertEvents == null)
+            {
+                return C.InvalidId;
+            }
+
+            string decisionTitle = ReadStr(decisionPayload, C.KeyAccidentTitle);
+            for (int eventIndex = decisionIndex + C.LastFromCount; eventIndex < concertEvents.Count; eventIndex++)
+            {
+                IMDataCoreEvent candidate = concertEvents[eventIndex];
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(candidate.EventType, C.EventConcertCrisisDecision, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                if (!string.Equals(candidate.EventType, C.EventConcertCrisisApplied, StringComparison.Ordinal) ||
+                    (consumedAppliedEventIndexes != null && consumedAppliedEventIndexes.Contains(eventIndex)))
+                {
+                    continue;
+                }
+
+                JSONNode appliedPayload = ParsePayload(candidate.PayloadJson);
+                string appliedTitle = ReadStr(appliedPayload, C.KeyAccidentTitle);
+                if (string.IsNullOrEmpty(decisionTitle) ||
+                    string.IsNullOrEmpty(appliedTitle) ||
+                    string.Equals(decisionTitle, appliedTitle, StringComparison.Ordinal))
+                {
+                    return eventIndex;
+                }
+            }
+
+            return C.InvalidId;
+        }
+
+        /// <summary>
+        /// Returns the first known string value from preferred then fallback crisis payloads.
+        /// </summary>
+        private static string ReadPreferredConcertValue(JSONNode preferredPayload, JSONNode fallbackPayload, string key)
+        {
+            string preferred = ReadStr(preferredPayload, key);
+            if (!string.IsNullOrEmpty(preferred))
+            {
+                return preferred;
+            }
+
+            return ReadStr(fallbackPayload, key);
+        }
+
+        /// <summary>
+        /// Adds a changed float transition from a concert card payload.
+        /// </summary>
+        private static void AddConcertFloatTransitionIfChanged(
+            List<string> lines,
+            string label,
+            JSONNode payload,
+            string beforeField,
+            string afterField)
+        {
+            if (lines == null)
+            {
+                return;
+            }
+
+            float beforeValue;
+            float afterValue;
+            if (!TryReadFloatField(payload, beforeField, out beforeValue) ||
+                !TryReadFloatField(payload, afterField, out afterValue) ||
+                Mathf.Abs(afterValue - beforeValue) <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            lines.Add(
+                label + C.SeparatorColonSpace +
+                beforeValue.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture) +
+                C.SeparatorArrow +
+                afterValue.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// Adds a changed bool transition from a concert card payload.
+        /// </summary>
+        private static void AddConcertBoolTransitionIfChanged(
+            List<string> lines,
+            string label,
+            JSONNode payload,
+            string beforeField,
+            string afterField)
+        {
+            if (lines == null)
+            {
+                return;
+            }
+
+            bool beforeValue;
+            bool afterValue;
+            if (!TryReadBoolField(payload, beforeField, out beforeValue) ||
+                !TryReadBoolField(payload, afterField, out afterValue) ||
+                beforeValue == afterValue)
+            {
+                return;
+            }
+
+            lines.Add(label + C.SeparatorColonSpace + YesNo(beforeValue) + C.SeparatorArrow + YesNo(afterValue));
+        }
+
+        /// <summary>
+        /// Renders the final aggregate accident/no-accident result captured by IM Data Core.
+        /// </summary>
+        private void RenderConcertOutcomeSummary(List<IMDataCoreEvent> concertEvents)
+        {
+            IMDataCoreEvent finalResolved = null;
+            if (concertEvents != null)
+            {
+                for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
+                {
+                    IMDataCoreEvent candidate = concertEvents[eventIndex];
+                    if (candidate != null &&
+                        string.Equals(candidate.EventType, C.EventConcertFinalResolved, StringComparison.Ordinal))
+                    {
+                        finalResolved = candidate;
+                    }
+                }
+            }
+
+            if (finalResolved == null)
+            {
+                return;
+            }
+
+            JSONNode payload = ParsePayload(finalResolved.PayloadJson);
             AddDivider(diaryDetailContentRoot);
-            AddTitle(diaryDetailContentRoot, C.TitleConcertDisasters);
-            int renderedDisasters = C.ZeroIndex;
-            for (int eventIndex = C.ZeroIndex; eventIndex < concertEvents.Count; eventIndex++)
-            {
-                IMDataCoreEvent detailEvent = concertEvents[eventIndex];
-                if (detailEvent == null || !string.Equals(detailEvent.EventType, C.EventConcertCrisisApplied, StringComparison.Ordinal))
-                {
-                    continue;
-                }
+            AddTitle(diaryDetailContentRoot, C.TitleConcertOutcome);
 
-                JSONNode disasterPayload = ParsePayload(detailEvent.PayloadJson);
-                renderedDisasters++;
-                AddText(
-                    diaryDetailContentRoot,
-                    C.SeparatorHash + renderedDisasters.ToString(CultureInfo.InvariantCulture) +
-                    C.SeparatorSpace + NormalizeRawText(ReadStr(disasterPayload, C.KeyAccidentTitle)) +
-                    C.MetadataPipeSeparator + C.LabelResult + C.SeparatorColonSpace +
-                    HumanizeUnknown(ReadStr(disasterPayload, C.KeyResultType)));
+            List<string> outcomeLines = new List<string>();
+            int usedAccidentCount;
+            if (TryReadIntField(payload, C.KeyUsedAccidentCount, out usedAccidentCount))
+            {
+                outcomeLines.Add(
+                    C.LabelAccidents + C.SeparatorColonSpace +
+                    usedAccidentCount.ToString(CultureInfo.InvariantCulture));
             }
 
-            if (renderedDisasters == C.ZeroIndex)
+            int noAccidentCounter;
+            if (TryReadIntField(payload, C.KeyNoAccidentCounter, out noAccidentCounter))
             {
-                AddText(diaryDetailContentRoot, C.TextNoConcertDisasters);
+                outcomeLines.Add(
+                    C.TextSongsWithoutAccidents + C.SeparatorColonSpace +
+                    noAccidentCounter.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (outcomeLines.Count > C.ZeroIndex)
+            {
+                AddText(diaryDetailContentRoot, string.Join(C.MetadataPipeSeparator, outcomeLines.ToArray()));
+            }
+
+            string usedAccidentTitles = NormalizeRawText(ReadStr(payload, C.KeyUsedAccidentTitles));
+            if (!string.Equals(usedAccidentTitles, C.LabelUnknown, StringComparison.Ordinal))
+            {
+                AddText(diaryDetailContentRoot, C.LabelAccidents + C.SeparatorColonSpace + usedAccidentTitles);
+            }
+
+            long idolPayoutTotal;
+            if (TryReadLongField(payload, C.KeyIdolPayoutTotal, out idolPayoutTotal))
+            {
+                AddText(
+                    diaryDetailContentRoot,
+                    C.TextIdolPayout + C.SeparatorColonSpace +
+                    idolPayoutTotal.ToString(C.FormatNumberNoDecimal, CultureInfo.InvariantCulture));
             }
         }
 
@@ -20853,6 +21220,20 @@ namespace IdolCareerDiary
         private static string FormatSignedNumber(long value)
         {
             return value.ToString(C.FormatZeroZeroZero, CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Formats signed float metrics with an explicit positive prefix and compact decimals.
+        /// </summary>
+        private static string FormatSignedMetric(float value)
+        {
+            if (Mathf.Abs(value) <= Mathf.Epsilon)
+            {
+                return C.FloatZero.ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture);
+            }
+
+            string magnitude = Mathf.Abs(value).ToString(C.FormatSingleMetricTwoDecimals, CultureInfo.InvariantCulture);
+            return value > C.FloatZero ? "+" + magnitude : "-" + magnitude;
         }
 
         /// <summary>
