@@ -34,6 +34,8 @@ Every player-facing string and displayed value must support all seven standard l
 - Embedded helpers must coexist with other embedded copies and the standalone localization mod. Scope implementation types appropriately and avoid duplicate global patches or ambiguous public helper types.
 - Player-facing metadata and Workshop descriptions require translated versions through the host's supported localization mechanisms. Keep `info.json` valid for Idol Manager; do not invent unsupported metadata fields to simulate translation. Identify any unsupported display path instead of claiming it is localized.
 - Check key coverage and placeholder compatibility in all seven languages. For changed UI, verify font coverage, wrapping, clipping, and layout with translated text. Report any checks that could not be performed.
+- Numeric versioning and version control: Mod versions go from x.y.z to the next incremental version with the maximum values for y and z being 9. If z reaches '10' then add 1 to y and set z to 0. if y reaches 10, add one to x and set y to 0. For example, 1.0.9 is a valid value, but 1.0.55 is invalid and should be 1.5.5 instead.
+- Player-facing text must not be needlessly complex or developer-y.
 
 ## 3. Authorship and precise documentation
 
