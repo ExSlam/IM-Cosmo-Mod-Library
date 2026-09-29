@@ -488,6 +488,11 @@ namespace CheatsMod
             Execute(UniqueIdolRecruitmentPopup.Open);
         }
 
+        public static void OpenEroEventsCheatsPopup()
+        {
+            Execute(EroEventsCheatPopup.Open);
+        }
+
         private static void AddOneBillionYenCore()
         {
             AddResource(

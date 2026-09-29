@@ -450,6 +450,16 @@
 		"method": "OpenUniqueIdolRecruitmentPopup"
 	},
 	{
+		"label": "EroEvents cheats",
+		"codeLabel": "cheat.button.eroevents_cheats",
+		"tooltip": "Open optional EroEvents progression and grind shortcuts.",
+		"codeTooltip": "cheat.tooltip.eroevents_cheats",
+		"icon": "",
+		"assembly": "com.cosmo.cheatsmod",
+		"class": "CheatsMod.Cheats",
+		"method": "OpenEroEventsCheatsPopup"
+	},
+	{
 		"label": "Add fans",
 		"codeLabel": "cheat.button.add_custom_fans",
 		"tooltip": "Add the specified number of fans.",

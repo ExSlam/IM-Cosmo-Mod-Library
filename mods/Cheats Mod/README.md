@@ -43,3 +43,16 @@ Adds cheat actions to the Mod Buttons action hub.
 - Heal idols, cure injuries/depression, and return idols from hiatus
 - Max active idol influence, friendship, and romance, with only one representative relationship popup
 - Max friendship, influence, and romance with Rivals Reborn rival idols when Rivals Reborn is enabled
+- Open an optional EroEvents cheat browser with searchable progression, unlock, and training shortcuts when EroEvents is enabled
+
+### EroEvents selected-idol progression cheats
+
+The EroEvents cheat browser can also hand off to the existing selected-idol picker for persistent per-idol progression flags only. It does not expose temporary EroEvents handoff/target markers such as `ee_training_target`, `ee_beach_girl`, `ee_xmas_target`, or similar scene-routing state.
+
+Included selected-idol actions:
+- mark Culture 1 progression complete (`ee_culture1`)
+- mark Culture 2 progression complete (`ee_culture2`)
+- mark Sexy training complete (`ee_training_complete` + `ee_trained_sexy`)
+- mark Cute training complete (`ee_training_complete` + `ee_trained_cute`)
+
+Training-completion actions refuse to modify the current `ee_training_target`, and refuse to create a state where the same idol is marked as having completed both Sexy and Cute training routes.

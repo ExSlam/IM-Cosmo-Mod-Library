@@ -101,6 +101,42 @@ namespace CheatsMod
         private const string NoDatingFallback = "The selected idol is not dating a non-producer partner.";
         private const string RelationshipsAppliedKey = "notification.selected_idol_max_relationships";
         private const string RelationshipsAppliedFallback = "{0}'s influence, friendship, and romance with the producer were maxed.";
+        private const string EeCulture1TitleKey = "ui.idol_cheat.ee_culture1.title";
+        private const string EeCulture1TitleFallback = "Mark EroEvents Culture 1 Complete";
+        private const string EeCulture1DescriptionKey = "ui.idol_cheat.ee_culture1.description";
+        private const string EeCulture1DescriptionFallback = "Mark the selected idol as already having completed her Culture 1 EroEvents progression flag.";
+        private const string EeCulture1ActionKey = "ui.idol_cheat.ee_culture1.action";
+        private const string EeCulture1ActionFallback = "Mark Culture 1 complete";
+        private const string EeCulture2TitleKey = "ui.idol_cheat.ee_culture2.title";
+        private const string EeCulture2TitleFallback = "Mark EroEvents Culture 2 Complete";
+        private const string EeCulture2DescriptionKey = "ui.idol_cheat.ee_culture2.description";
+        private const string EeCulture2DescriptionFallback = "Mark the selected idol as already having completed her Culture 2 EroEvents progression flag.";
+        private const string EeCulture2ActionKey = "ui.idol_cheat.ee_culture2.action";
+        private const string EeCulture2ActionFallback = "Mark Culture 2 complete";
+        private const string EeSexyTrainingTitleKey = "ui.idol_cheat.ee_trained_sexy.title";
+        private const string EeSexyTrainingTitleFallback = "Mark EroEvents Sexy Training Complete";
+        private const string EeSexyTrainingDescriptionKey = "ui.idol_cheat.ee_trained_sexy.description";
+        private const string EeSexyTrainingDescriptionFallback = "Mark the selected idol as an EroEvents training veteran who completed the Sexy training route.";
+        private const string EeSexyTrainingActionKey = "ui.idol_cheat.ee_trained_sexy.action";
+        private const string EeSexyTrainingActionFallback = "Mark Sexy training complete";
+        private const string EeCuteTrainingTitleKey = "ui.idol_cheat.ee_trained_cute.title";
+        private const string EeCuteTrainingTitleFallback = "Mark EroEvents Cute Training Complete";
+        private const string EeCuteTrainingDescriptionKey = "ui.idol_cheat.ee_trained_cute.description";
+        private const string EeCuteTrainingDescriptionFallback = "Mark the selected idol as an EroEvents training veteran who completed the Cute training route.";
+        private const string EeCuteTrainingActionKey = "ui.idol_cheat.ee_trained_cute.action";
+        private const string EeCuteTrainingActionFallback = "Mark Cute training complete";
+        private const string EeCulture1AppliedKey = "notification.selected_idol_ee_culture1";
+        private const string EeCulture1AppliedFallback = "{0} was marked as having completed EroEvents Culture 1 progression.";
+        private const string EeCulture2AppliedKey = "notification.selected_idol_ee_culture2";
+        private const string EeCulture2AppliedFallback = "{0} was marked as having completed EroEvents Culture 2 progression.";
+        private const string EeSexyTrainingAppliedKey = "notification.selected_idol_ee_trained_sexy";
+        private const string EeSexyTrainingAppliedFallback = "{0} was marked as having completed EroEvents Sexy training.";
+        private const string EeCuteTrainingAppliedKey = "notification.selected_idol_ee_trained_cute";
+        private const string EeCuteTrainingAppliedFallback = "{0} was marked as having completed EroEvents Cute training.";
+        private const string EeActiveTrainingTargetKey = "notification.selected_idol_ee_active_training_target";
+        private const string EeActiveTrainingTargetFallback = "That idol is the current EroEvents training target. Finish or change the active training session instead.";
+        private const string EeOtherTrainingCompleteKey = "notification.selected_idol_ee_other_training_complete";
+        private const string EeOtherTrainingCompleteFallback = "That idol is already marked as having completed the other EroEvents training route.";
         private const string FailedKey = "notification.selected_idol_cheat_failed";
         private const string FailedFallback = "Selected-idol cheat action failed.";
 
@@ -132,7 +168,11 @@ namespace CheatsMod
             Fame,
             RandomScandal,
             BreakupDating,
-            MaxPlayerRelationships
+            MaxPlayerRelationships,
+            EeCulture1,
+            EeCulture2,
+            EeTrainedSexy,
+            EeTrainedCute
         }
 
         internal static void OpenStats100()
@@ -160,7 +200,27 @@ namespace CheatsMod
             Open(Mode.MaxPlayerRelationships);
         }
 
-        private static void Open(Mode mode)
+        internal static bool TryOpenEroEventsCulture1()
+        {
+            return Open(Mode.EeCulture1);
+        }
+
+        internal static bool TryOpenEroEventsCulture2()
+        {
+            return Open(Mode.EeCulture2);
+        }
+
+        internal static bool TryOpenEroEventsTrainedSexy()
+        {
+            return Open(Mode.EeTrainedSexy);
+        }
+
+        internal static bool TryOpenEroEventsTrainedCute()
+        {
+            return Open(Mode.EeTrainedCute);
+        }
+
+        private static bool Open(Mode mode)
         {
             try
             {
@@ -169,7 +229,7 @@ namespace CheatsMod
                 if (manager == null || dataGirls == null || data_girls.girl == null)
                 {
                     NotifyWarning(CheatLocalizationKeys.NotificationGameUnavailable, CheatFallbackText.NotificationGameUnavailable);
-                    return;
+                    return false;
                 }
 
                 List<data_girls.girls> eligible = BuildEligibleGirls(mode);
@@ -178,20 +238,20 @@ namespace CheatsMod
                     NotifyWarning(
                         mode == Mode.RandomScandal ? NoScandalEligibleIdolsKey : NoSelectableIdolsKey,
                         mode == Mode.RandomScandal ? NoScandalEligibleIdolsFallback : NoSelectableIdolsFallback);
-                    return;
+                    return false;
                 }
 
                 if (mode == Mode.RandomScandal && Event_Templates.GetTemplate(DatingScandalTemplateId) == null)
                 {
                     NotifyWarning(ScandalFailedKey, ScandalFailedFallback);
-                    return;
+                    return false;
                 }
 
                 GameObject girlButtonPrefab = GetStylistGirlButtonPrefab(manager);
                 if (girlButtonPrefab == null)
                 {
                     NotifyWarning(FailedKey, FailedFallback);
-                    return;
+                    return false;
                 }
 
                 currentMode = mode;
@@ -201,15 +261,17 @@ namespace CheatsMod
                 if (!CreatePopup(manager, eligible, girlButtonPrefab))
                 {
                     NotifyWarning(FailedKey, FailedFallback);
-                    return;
+                    return false;
                 }
 
                 PopupManager.OpenPopup((PopupManager._type)PopupTypeValue);
+                return true;
             }
             catch (Exception exception)
             {
                 Debug.LogError("[CheatsMod] Selected-idol cheat popup failed: " + exception);
                 NotifyWarning(FailedKey, FailedFallback);
+                return false;
             }
         }
 
@@ -584,6 +646,14 @@ namespace CheatsMod
                         selectedGirl.GetRelationshipLevel(Relationships_Player._type.Influence),
                         selectedGirl.GetRelationshipLevel(Relationships_Player._type.Friendship),
                         selectedGirl.GetRelationshipLevel(Relationships_Player._type.Romance));
+                case Mode.EeCulture1:
+                    return GetLocalized(EeCulture1DescriptionKey, EeCulture1DescriptionFallback);
+                case Mode.EeCulture2:
+                    return GetLocalized(EeCulture2DescriptionKey, EeCulture2DescriptionFallback);
+                case Mode.EeTrainedSexy:
+                    return GetLocalized(EeSexyTrainingDescriptionKey, EeSexyTrainingDescriptionFallback);
+                case Mode.EeTrainedCute:
+                    return GetLocalized(EeCuteTrainingDescriptionKey, EeCuteTrainingDescriptionFallback);
                 default:
                     return string.Empty;
             }
@@ -622,6 +692,14 @@ namespace CheatsMod
                     return GetLocalized(BreakupTitleKey, BreakupTitleFallback);
                 case Mode.MaxPlayerRelationships:
                     return GetLocalized(RelationshipsTitleKey, RelationshipsTitleFallback);
+                case Mode.EeCulture1:
+                    return GetLocalized(EeCulture1TitleKey, EeCulture1TitleFallback);
+                case Mode.EeCulture2:
+                    return GetLocalized(EeCulture2TitleKey, EeCulture2TitleFallback);
+                case Mode.EeTrainedSexy:
+                    return GetLocalized(EeSexyTrainingTitleKey, EeSexyTrainingTitleFallback);
+                case Mode.EeTrainedCute:
+                    return GetLocalized(EeCuteTrainingTitleKey, EeCuteTrainingTitleFallback);
                 default:
                     return string.Empty;
             }
@@ -641,6 +719,14 @@ namespace CheatsMod
                     return GetLocalized(BreakupActionKey, BreakupActionFallback);
                 case Mode.MaxPlayerRelationships:
                     return GetLocalized(RelationshipsActionKey, RelationshipsActionFallback);
+                case Mode.EeCulture1:
+                    return GetLocalized(EeCulture1ActionKey, EeCulture1ActionFallback);
+                case Mode.EeCulture2:
+                    return GetLocalized(EeCulture2ActionKey, EeCulture2ActionFallback);
+                case Mode.EeTrainedSexy:
+                    return GetLocalized(EeSexyTrainingActionKey, EeSexyTrainingActionFallback);
+                case Mode.EeTrainedCute:
+                    return GetLocalized(EeCuteTrainingActionKey, EeCuteTrainingActionFallback);
                 default:
                     return string.Empty;
             }
@@ -672,6 +758,18 @@ namespace CheatsMod
                         break;
                     case Mode.MaxPlayerRelationships:
                         ApplyMaxPlayerRelationships();
+                        break;
+                    case Mode.EeCulture1:
+                        ApplyEroEventsCulture1();
+                        break;
+                    case Mode.EeCulture2:
+                        ApplyEroEventsCulture2();
+                        break;
+                    case Mode.EeTrainedSexy:
+                        ApplyEroEventsTrainingComplete(true);
+                        break;
+                    case Mode.EeTrainedCute:
+                        ApplyEroEventsTrainingComplete(false);
                         break;
                 }
             }
@@ -986,6 +1084,61 @@ namespace CheatsMod
                 GetLocalized(RelationshipsAppliedKey, RelationshipsAppliedFallback),
                 idolName),
                 NotificationManager._notification._type.idol_relationship_change);
+            Close();
+        }
+
+        private static void ApplyEroEventsCulture1()
+        {
+            string idolName = SafeGirlName(selectedGirl);
+            selectedGirl.SetVariable("ee_culture1");
+            RefreshGirlAndList(selectedGirl);
+            NotifySuccess(string.Format(
+                CultureInfo.CurrentCulture,
+                GetLocalized(EeCulture1AppliedKey, EeCulture1AppliedFallback),
+                idolName),
+                NotificationManager._notification._type.other);
+            Close();
+        }
+
+        private static void ApplyEroEventsCulture2()
+        {
+            string idolName = SafeGirlName(selectedGirl);
+            selectedGirl.SetVariable("ee_culture2");
+            RefreshGirlAndList(selectedGirl);
+            NotifySuccess(string.Format(
+                CultureInfo.CurrentCulture,
+                GetLocalized(EeCulture2AppliedKey, EeCulture2AppliedFallback),
+                idolName),
+                NotificationManager._notification._type.other);
+            Close();
+        }
+
+        private static void ApplyEroEventsTrainingComplete(bool sexy)
+        {
+            if (selectedGirl.IsVariable("ee_training_target"))
+            {
+                NotifyWarning(EeActiveTrainingTargetKey, EeActiveTrainingTargetFallback);
+                return;
+            }
+
+            string oppositeFlag = sexy ? "ee_trained_cute" : "ee_trained_sexy";
+            if (selectedGirl.IsVariable(oppositeFlag))
+            {
+                NotifyWarning(EeOtherTrainingCompleteKey, EeOtherTrainingCompleteFallback);
+                return;
+            }
+
+            string idolName = SafeGirlName(selectedGirl);
+            selectedGirl.SetVariable("ee_training_complete");
+            selectedGirl.SetVariable(sexy ? "ee_trained_sexy" : "ee_trained_cute");
+            RefreshGirlAndList(selectedGirl);
+            NotifySuccess(string.Format(
+                CultureInfo.CurrentCulture,
+                GetLocalized(
+                    sexy ? EeSexyTrainingAppliedKey : EeCuteTrainingAppliedKey,
+                    sexy ? EeSexyTrainingAppliedFallback : EeCuteTrainingAppliedFallback),
+                idolName),
+                NotificationManager._notification._type.other);
             Close();
         }
 
