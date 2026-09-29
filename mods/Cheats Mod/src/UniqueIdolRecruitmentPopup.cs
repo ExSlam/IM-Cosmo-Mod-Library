@@ -3,8 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text;
 using ModLocalizationSystem;
+using CheatsMod.EmbeddedIMUiFramework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -13,19 +13,17 @@ using UnityEngine.UI;
 
 namespace CheatsMod
 {
-    internal static class UniqueIdolRecruitmentPopup
+    internal static partial class UniqueIdolRecruitmentPopup
     {
         private const int UniqueIdolRecruitmentPopupTypeValue = 1431194192;
         private const int ZeroCount = 0;
         private const int SortLeftAfterRight = 1;
         private const int SortLeftBeforeRight = -1;
         private const int FirstItemIndex = 0;
-        private const int FirstTemplateIndex = 0;
         private const int PreviousPartSelectionOffset = -1;
         private const int NextPartSelectionOffset = 1;
         private const int MinimumGridColumns = 1;
         private const int MaximumDisplayedPotential = 100;
-        private const int StatColumnItemCount = 4;
         private const int PortraitLoadTimeoutSeconds = 10;
         private const int PngDimensionHeaderLength = 24;
         private const int PngWidthByteOffset = 16;
@@ -68,56 +66,42 @@ namespace CheatsMod
         private const int RandomFrameGreen = 104;
         private const int RandomFrameBlue = 190;
         private const int TitleFontSize = 34;
-        private const int CloseButtonFontSize = 20;
         private const int RarityFontSize = 14;
         private const int NameFontSize = 15;
         private const int AgeFontSize = 13;
-        private const int StatFontSize = 10;
-        private const int StatusFontSize = 12;
-        private const int SearchInputFontSize = 16;
+        private const int StatFontSize = 13;
         private const int SelectorLabelFontSize = 12;
-        private const int SelectorArrowFontSize = 18;
         private const int ContentPaddingLeft = 14;
         private const int ContentPaddingRight = 14;
         private const int ContentPaddingTop = 14;
         private const int ContentPaddingBottom = 18;
 
-        private const float HiddenAlpha = 0f;
-        private const float VisibleAlpha = 1f;
         private const float CenterAnchor = 0.5f;
         private const float EdgeAnchor = 1f;
         private const float BaseAnchor = 0f;
         private const float MinimumPanelWidth = 760f;
-        private const float MaximumPanelWidth = 2200f;
+        private const float MaximumPanelWidth = 1480f;
         private const float MinimumPanelHeight = 360f;
-        private const float MaximumPanelHeight = 1050f;
+        private const float MaximumPanelHeight = 880f;
         private const float FallbackScreenWidth = 1280f;
         private const float FallbackScreenHeight = 720f;
         private const float MaximumPanelScreenWidthRatio = 0.90f;
         private const float MaximumPanelScreenHeightRatio = 0.90f;
         private const float MinimumVerticalScreenMargin = 42f;
-        private const float PanelVerticalOffset = -4f;
         private const float PanelVerticalChromeHeight = 198f;
-        private const float TitleWidth = 900f;
         private const float TitleHeight = 44f;
         private const float TitleVerticalOffset = -18f;
         private const float SearchBarOffsetLeft = 42f;
         private const float SearchBarOffsetRight = -46f;
         private const float SearchBarOffsetTop = -68f;
         private const float SearchBarOffsetBottom = -108f;
-        private const float SearchTextHorizontalPadding = 12f;
-        private const float SearchTextVerticalPadding = 3f;
         private const float ScrollViewOffsetLeft = 28f;
         private const float ScrollViewOffsetRight = -32f;
         private const float ScrollViewOffsetTop = -122f;
         private const float ScrollViewOffsetBottom = 64f;
         private const float ScrollbarViewportReserve = 30f;
-        private const float ScrollSensitivity = 34f;
-        private const float ScrollbarWidth = 12f;
-        private const float ScrollbarOffsetX = -6f;
-        private const float ScrollbarSpacing = 8f;
         private const float TileWidth = 320f;
-        private const float TileHeight = 692f;
+        private const float TileHeight = 876f;
         private const float TileSpacingX = 20f;
         private const float TileSpacingY = 20f;
         private const float InnerCardInset = 6f;
@@ -126,19 +110,16 @@ namespace CheatsMod
         private const float NameTop = -30f;
         private const float NameHeight = 28f;
         private const float AgeTop = -60f;
-        private const float AgeHeight = 18f;
-        private const float PortraitTop = -82f;
+        private const float AgeHeight = 24f;
+        private const float PortraitTop = -94f;
         private const float PortraitWidth = 270f;
         private const float PortraitHeight = 390f;
-        private const float SelectorTop = -476f;
+        private const float SelectorTop = -488f;
         private const float SelectorRowHeight = 20f;
         private const float SelectorRowSpacing = 2f;
         private const float SelectorHorizontalInset = 18f;
         private const float SelectorArrowButtonWidth = 34f;
-        private const float StatsTop = -568f;
-        private const float StatsHeight = 48f;
-        private const float StatColumnWidth = 126f;
-        private const float StatColumnSpacing = 8f;
+        private const float StatsTop = -580f;
         private const float RecruitButtonWidth = 250f;
         private const float RecruitButtonHeight = 38f;
         private const float RecruitButtonBottom = 12f;
@@ -153,17 +134,11 @@ namespace CheatsMod
             PortraitHeight * PortraitSourceCanvasWidth / PortraitSourceCanvasHeight;
         private const float PortraitSpritePixelsPerUnit = 100f;
 
+        private const string ArrowTemplateError = "[CheatsMod] Native arrow template is unavailable.";
         private const string PopupName = "CheatsModUniqueIdolRecruitmentPopup";
-        private const string PanelObjectName = "UniqueIdolRecruitmentPanel";
         private const string TitleObjectName = "Title";
         private const string SearchInputObjectName = "SearchInput";
-        private const string SearchTextObjectName = "SearchText";
-        private const string SearchPlaceholderObjectName = "SearchPlaceholder";
         private const string ScrollViewObjectName = "ScrollView";
-        private const string ViewportObjectName = "Viewport";
-        private const string ContentObjectName = "Content";
-        private const string ScrollbarObjectName = "Scrollbar";
-        private const string ScrollbarHandleObjectName = "Handle";
         private const string TileSlotObjectNamePrefix = "UniqueIdolSlot_";
         private const string TileObjectNamePrefix = "UniqueIdolTile_";
         private const string InnerCardObjectName = "InnerCard";
@@ -177,11 +152,8 @@ namespace CheatsMod
         private const string SelectorLabelObjectName = "Label";
         private const string NameObjectName = "Name";
         private const string AgeObjectName = "Age";
-        private const string StatLeftObjectName = "StatsLeft";
-        private const string StatRightObjectName = "StatsRight";
         private const string RecruitButtonObjectName = "Recruit";
         private const string CloseButtonObjectName = "Close";
-        private const string ButtonTextObjectName = "Text";
         private const string UniqueAssetKeySeparator = "|";
         private const string EmptyString = "";
         private const string DefaultTextureAssetModName = "";
@@ -192,7 +164,6 @@ namespace CheatsMod
         private const string CommonRarityValue = "common";
         private const string NormalRarityValue = "normal";
         private const string RandomRarityValue = "random";
-        private const string StatLineBreak = "\n";
         private const string NamePartSeparator = " ";
         private const string SelectorPreviousSymbol = "<";
         private const string SelectorNextSymbol = ">";
@@ -205,12 +176,8 @@ namespace CheatsMod
         private const string TooltipRecruitUniqueIdolFallback = "Open a picker to recruit any loaded unique idol.";
         private const string PopupTitleKey = "ui.unique_idols.title";
         private const string PopupTitleFallback = "Recruit Unique Idol";
-        private const string SearchPlaceholderKey = "ui.unique_idols.search_placeholder";
-        private const string SearchPlaceholderFallback = "Search by idol or mod name";
         private const string CloseButtonKey = "ui.unique_idols.close";
-        private const string CloseButtonFallback = "Close";
         private const string RecruitButtonKey = "ui.unique_idols.recruit";
-        private const string RecruitButtonFallback = "Recruit";
         private const string AgeFormatKey = "ui.unique_idols.age_format";
         private const string AgeFormatFallback = "Age: {0}";
         private const string StatFormatKey = "ui.unique_idols.stat_format";
@@ -226,9 +193,7 @@ namespace CheatsMod
         private const string RandomRarityKey = "ui.unique_idols.rarity.random";
         private const string RandomRarityFallback = "Random";
         private const string RecruitedStatusKey = "ui.unique_idols.status.recruited";
-        private const string RecruitedStatusFallback = "Recruited";
         private const string AlreadyRecruitedStatusKey = "ui.unique_idols.status.already_recruited";
-        private const string AlreadyRecruitedStatusFallback = "Already recruited";
         private const string StatCuteKey = "ui.unique_idols.stat.cute";
         private const string StatCuteFallback = "Cute";
         private const string StatCoolKey = "ui.unique_idols.stat.cool";
@@ -307,7 +272,6 @@ namespace CheatsMod
             };
 
         private static GameObject popupRoot;
-        private static TextMeshProUGUI defaultFontSource;
         private static Audition_Golden_Card rarityFrameTemplate;
 
         internal static void Open()
@@ -717,32 +681,10 @@ namespace CheatsMod
             Vector2 panelSize = CalculatePanelSize(entries.Count, parent as RectTransform);
             int gridColumns = CalculateGridColumnCount(panelSize.x);
 
-            GameObject root = new GameObject(PopupName, typeof(RectTransform), typeof(CanvasGroup));
-            root.transform.SetParent(parent, false);
-            root.transform.SetAsLastSibling();
-            SetLayerRecursively(root, parent.gameObject.layer);
-            RectTransform rootRect = root.GetComponent<RectTransform>();
-            rootRect.anchorMin = Vector2.zero;
-            rootRect.anchorMax = Vector2.one;
-            rootRect.offsetMin = Vector2.zero;
-            rootRect.offsetMax = Vector2.zero;
-            CanvasGroup canvasGroup = root.GetComponent<CanvasGroup>();
-            canvasGroup.alpha = HiddenAlpha;
-            canvasGroup.blocksRaycasts = true;
-            canvasGroup.interactable = true;
-            root.SetActive(false);
-
-            GameObject panel = CreateUIObject(PanelObjectName, root.transform);
-            RectTransform panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(CenterAnchor, CenterAnchor);
-            panelRect.anchorMax = new Vector2(CenterAnchor, CenterAnchor);
-            panelRect.pivot = new Vector2(CenterAnchor, CenterAnchor);
-            panelRect.sizeDelta = panelSize;
-            panelRect.anchoredPosition = new Vector2(BaseAnchor, PanelVerticalOffset);
-            Image panelImage = panel.AddComponent<Image>();
-            panelImage.color = GetPanelBackgroundColor();
-            panelImage.raycastTarget = true;
-
+            Transform panelTransform;
+            GameObject root = CheatUi.CreateShell(manager, PopupName, panelSize, out panelTransform);
+            recruitmentPanel = panelTransform;
+            GameObject panel = panelTransform.gameObject;
             CreateTitle(panel.transform);
             ScrollRect scrollRect;
             RectTransform contentRect;
@@ -770,13 +712,6 @@ namespace CheatsMod
 
             CreateSearchBar(panel.transform, viewportLoader);
             CreateCloseButton(panel.transform);
-            Popup popup = root.AddComponent<Popup>();
-            popup.ShowAnimation = true;
-            popup.HideAnimation = true;
-            popup.HideFast = false;
-            popup.Increase_Popup_Counter = true;
-            popup.OnOpen = new UnityEvent();
-
             if (!TryRegisterPopup(manager, root))
             {
                 UnityEngine.Object.Destroy(root);
@@ -796,129 +731,32 @@ namespace CheatsMod
                 TitleFontSize,
                 TextAlignmentOptions.Center,
                 mainScript.black32);
-            title.enableWordWrapping = false;
+            title.enableWordWrapping = true;
             RectTransform titleRect = title.GetComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(CenterAnchor, EdgeAnchor);
-            titleRect.anchorMax = new Vector2(CenterAnchor, EdgeAnchor);
+            titleRect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
+            titleRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
             titleRect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            titleRect.sizeDelta = new Vector2(TitleWidth, TitleHeight);
+            titleRect.sizeDelta = new Vector2(-SearchBarOffsetLeft - SearchBarOffsetLeft, TitleHeight);
             titleRect.anchoredPosition = new Vector2(BaseAnchor, TitleVerticalOffset);
         }
 
-        private static void CreateSearchBar(
-            Transform panel,
-            UniqueIdolRecruitmentViewport viewportLoader)
+        private static void CreateSearchBar(Transform panel, UniqueIdolRecruitmentViewport viewportLoader)
         {
-            if (panel == null || viewportLoader == null)
-            {
-                return;
-            }
-
-            GameObject searchObject = CreateUIObject(SearchInputObjectName, panel);
-            RectTransform searchRect = searchObject.GetComponent<RectTransform>();
-            searchRect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
-            searchRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            searchRect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            searchRect.offsetMin = new Vector2(SearchBarOffsetLeft, SearchBarOffsetBottom);
-            searchRect.offsetMax = new Vector2(SearchBarOffsetRight, SearchBarOffsetTop);
-
-            Image searchBackground = searchObject.AddComponent<Image>();
-            searchBackground.color = mainScript.white32;
-            searchBackground.raycastTarget = true;
-            TMP_InputField searchInput = searchObject.AddComponent<TMP_InputField>();
-            searchInput.targetGraphic = searchBackground;
-            searchInput.textViewport = searchRect;
-            searchInput.contentType = TMP_InputField.ContentType.Standard;
-            searchInput.lineType = TMP_InputField.LineType.SingleLine;
-
-            TextMeshProUGUI searchText = CreateText(
-                searchObject.transform,
-                SearchTextObjectName,
-                EmptyString,
-                SearchInputFontSize,
-                TextAlignmentOptions.MidlineLeft,
-                mainScript.black32);
-            ConfigureSearchTextRect(searchText.GetComponent<RectTransform>());
-            searchInput.textComponent = searchText;
-
-            TextMeshProUGUI searchPlaceholder = CreateText(
-                searchObject.transform,
-                SearchPlaceholderObjectName,
-                GetLocalized(SearchPlaceholderKey, SearchPlaceholderFallback),
-                SearchInputFontSize,
-                TextAlignmentOptions.MidlineLeft,
-                new Color32(
-                    MutedTextColorChannel,
-                    MutedTextColorChannel,
-                    MutedTextColorChannel,
-                    SolidColorAlpha));
-            ConfigureSearchTextRect(searchPlaceholder.GetComponent<RectTransform>());
-            searchInput.placeholder = searchPlaceholder;
-            searchInput.text = EmptyString;
-            searchInput.onValueChanged = new TMP_InputField.OnChangeEvent();
-            searchInput.onValueChanged.AddListener(viewportLoader.ApplyFilter);
+            GameObject search = CheatUi.SearchInput(panel, SearchInputObjectName, viewportLoader.ApplyFilter);
+            RectTransform rect = search.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
+            rect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
+            rect.offsetMin = new Vector2(SearchBarOffsetLeft, SearchBarOffsetBottom);
+            rect.offsetMax = new Vector2(SearchBarOffsetRight, SearchBarOffsetTop);
         }
 
-        private static void ConfigureSearchTextRect(RectTransform textRect)
+        private static void CreateScrollArea(Transform panel, out ScrollRect scrollRect, out RectTransform contentRect)
         {
-            if (textRect == null)
-            {
-                return;
-            }
-
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(
-                SearchTextHorizontalPadding,
-                SearchTextVerticalPadding);
-            textRect.offsetMax = new Vector2(
-                -SearchTextHorizontalPadding,
-                -SearchTextVerticalPadding);
-        }
-
-        private static void CreateScrollArea(
-            Transform panel,
-            out ScrollRect scrollRect,
-            out RectTransform contentRect)
-        {
-            GameObject scrollView = CreateUIObject(ScrollViewObjectName, panel);
-            RectTransform scrollViewRect = scrollView.GetComponent<RectTransform>();
-            scrollViewRect.anchorMin = new Vector2(BaseAnchor, BaseAnchor);
-            scrollViewRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            scrollViewRect.offsetMin = new Vector2(ScrollViewOffsetLeft, ScrollViewOffsetBottom);
-            scrollViewRect.offsetMax = new Vector2(ScrollViewOffsetRight, ScrollViewOffsetTop);
-            Image scrollImage = scrollView.AddComponent<Image>();
-            scrollImage.color = GetContentBackgroundColor();
-            scrollImage.raycastTarget = true;
-            scrollRect = scrollView.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            scrollRect.scrollSensitivity = ScrollSensitivity;
-
-            GameObject viewport = CreateUIObject(ViewportObjectName, scrollView.transform);
-            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = Vector2.zero;
-            viewportRect.offsetMax = new Vector2(-ScrollbarViewportReserve, BaseAnchor);
-            Image viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = GetContentBackgroundColor();
-            viewportImage.raycastTarget = true;
-            Mask mask = viewport.AddComponent<Mask>();
-            mask.showMaskGraphic = false;
-
-            GameObject content = CreateUIObject(ContentObjectName, viewport.transform);
-            contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
-            contentRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            contentRect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = new Vector2(BaseAnchor, BaseAnchor);
-
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            CreateScrollbar(scrollView.transform, scrollRect);
+            IMUiScrollViewHandle handle = CheatUi.Scroll(panel, ScrollViewObjectName,
+                new Vector2(ScrollViewOffsetLeft, ScrollViewOffsetBottom),
+                new Vector2(ScrollViewOffsetRight, ScrollViewOffsetTop));
+            scrollRect = handle.ScrollRect;
+            contentRect = scrollRect.content;
         }
 
         private static void AddUniqueIdolSlot(
@@ -1011,6 +849,7 @@ namespace CheatsMod
             innerRect.offsetMin = new Vector2(InnerCardInset, InnerCardInset);
             innerRect.offsetMax = new Vector2(-InnerCardInset, -InnerCardInset);
             Image innerImage = inner.AddComponent<Image>();
+            IMUiPrimitives.TryCopyVanillaPanelVisual(innerImage);
             innerImage.color = canRecruit ? GetCardBackgroundColor() : GetDisabledColor(GetCardBackgroundColor());
             innerImage.raycastTarget = false;
 
@@ -1206,39 +1045,21 @@ namespace CheatsMod
             partState.SelectorLabel = selectorLabel;
         }
 
-        private static void CreateSelectorArrowButton(
-            Transform parent,
-            string objectName,
-            string symbol,
-            bool alignLeft,
-            UnityAction onClick)
+        private static void CreateSelectorArrowButton(Transform parent, string objectName,
+            string symbol, bool alignLeft, UnityAction onClick)
         {
-            GameObject buttonObject = CreateUIObject(objectName, parent);
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            buttonRect.anchorMin = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, BaseAnchor);
-            buttonRect.anchorMax = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, EdgeAnchor);
-            buttonRect.pivot = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, CenterAnchor);
-            buttonRect.sizeDelta = new Vector2(SelectorArrowButtonWidth, BaseAnchor);
-            buttonRect.anchoredPosition = Vector2.zero;
-            Image buttonImage = buttonObject.AddComponent<Image>();
-            buttonImage.color = mainScript.blue32;
-            Button button = buttonObject.AddComponent<Button>();
-            button.targetGraphic = buttonImage;
-            button.onClick.AddListener(onClick);
-
-            TextMeshProUGUI arrowLabel = CreateText(
-                buttonObject.transform,
-                ButtonTextObjectName,
-                symbol,
-                SelectorArrowFontSize,
-                TextAlignmentOptions.Center,
-                mainScript.white32);
-            arrowLabel.enableWordWrapping = false;
-            RectTransform arrowLabelRect = arrowLabel.GetComponent<RectTransform>();
-            arrowLabelRect.anchorMin = Vector2.zero;
-            arrowLabelRect.anchorMax = Vector2.one;
-            arrowLabelRect.offsetMin = Vector2.zero;
-            arrowLabelRect.offsetMax = Vector2.zero;
+            Button button;
+            if (!IMUiPrimitives.TryCreateButton(parent, new IMUiButtonOptions
+            {
+                ObjectName = objectName, Preset = alignLeft ? IMUiButtonPreset.ChartPreviousMonth : IMUiButtonPreset.ChartNextMonth,
+                Size = new Vector2(SelectorArrowButtonWidth, SelectorRowHeight), OnClick = onClick
+            }, out button)) throw new InvalidOperationException(ArrowTemplateError);
+            RectTransform rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, BaseAnchor);
+            rect.anchorMax = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, EdgeAnchor);
+            rect.pivot = new Vector2(alignLeft ? BaseAnchor : EdgeAnchor, CenterAnchor);
+            rect.sizeDelta = new Vector2(SelectorArrowButtonWidth, BaseAnchor);
+            rect.anchoredPosition = Vector2.zero;
         }
 
         internal static bool EnsurePreviewGirl(
@@ -1274,6 +1095,7 @@ namespace CheatsMod
             previewGirl.createListOfParams();
             ApplyFallbackPreviewStats(previewGirl, entry.Rarity);
             ApplyUniqueAssetData(previewGirl, entry.Asset);
+            entry.OriginalAge = entry.Asset.Age > ZeroCount ? entry.Asset.Age : previewGirl.GetAge();
             entry.PreviewGirl = previewGirl;
             entry.Name = previewGirl.GetName(true);
             return true;
@@ -1598,6 +1420,10 @@ namespace CheatsMod
             entry.TileObject = null;
             entry.RecruitButton = null;
             entry.StatusText = null;
+            entry.NameText = null;
+            entry.AgeText = null;
+            entry.StatLabels.Clear();
+            entry.EditButtons.Clear();
             if (entry.PortraitParts == null)
             {
                 return;
@@ -1744,19 +1570,19 @@ namespace CheatsMod
             if (partState == null || partState.SelectedAsset == null)
             {
                 return string.Format(
-                    CultureInfo.CurrentCulture,
+                    CheatUi.Culture,
                     GetLocalized(NoPartSelectionFormatKey, NoPartSelectionFormatFallback),
                     partLabel,
                     GetLocalized(NoPartSelectionKey, NoPartSelectionFallback));
             }
 
             return string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(PartSelectionFormatKey, PartSelectionFormatFallback),
                 partLabel,
                 (partState.SelectedIndex + NextPartSelectionOffset)
-                    .ToString(CultureInfo.CurrentCulture),
-                partState.Assets.Count.ToString(CultureInfo.CurrentCulture));
+                    .ToString(CheatUi.Culture),
+                partState.Assets.Count.ToString(CheatUi.Culture));
         }
 
         private static string GetPortraitPartLabel(data_girls_textures._spriteType partType)
@@ -1784,233 +1610,27 @@ namespace CheatsMod
             return EmptyString;
         }
 
-        private static void CreateNameLabel(
-            Transform parent,
-            UniqueIdolEntry entry,
-            data_girls.girls girl,
-            bool canRecruit)
+        private static Button CreateRecruitButton(Transform parent, UniqueIdolEntry entry,
+            bool canRecruit, out TextMeshProUGUI label)
         {
-            TextMeshProUGUI name = CreateText(
-                parent,
-                NameObjectName,
-                girl.GetName(true),
-                NameFontSize,
-                TextAlignmentOptions.Center,
-                GetCardPrimaryTextColor(entry, canRecruit));
-            name.enableWordWrapping = true;
-            name.enableAutoSizing = true;
-            name.fontSizeMin = StatFontSize;
-            name.fontSizeMax = NameFontSize;
-            RectTransform nameRect = name.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
-            nameRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            nameRect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            nameRect.offsetMin = new Vector2(InnerCardInset, NameTop - NameHeight);
-            nameRect.offsetMax = new Vector2(-InnerCardInset, NameTop);
-        }
-
-        private static void CreateAgeLabel(
-            Transform parent,
-            UniqueIdolEntry entry,
-            data_girls.girls girl,
-            bool canRecruit)
-        {
-            string ageText = string.Format(
-                CultureInfo.CurrentCulture,
-                GetLocalized(AgeFormatKey, AgeFormatFallback),
-                girl.GetAge().ToString(CultureInfo.CurrentCulture));
-            TextMeshProUGUI age = CreateText(
-                parent,
-                AgeObjectName,
-                ageText,
-                AgeFontSize,
-                TextAlignmentOptions.Center,
-                GetCardSecondaryTextColor(entry, canRecruit));
-            age.enableWordWrapping = false;
-            RectTransform ageRect = age.GetComponent<RectTransform>();
-            ageRect.anchorMin = new Vector2(BaseAnchor, EdgeAnchor);
-            ageRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            ageRect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            ageRect.offsetMin = new Vector2(InnerCardInset, AgeTop - AgeHeight);
-            ageRect.offsetMax = new Vector2(-InnerCardInset, AgeTop);
-        }
-
-        private static void CreateStatsLabels(
-            Transform parent,
-            UniqueIdolEntry entry,
-            data_girls.girls girl,
-            bool canRecruit)
-        {
-            Color32 statColor = GetCardPrimaryTextColor(entry, canRecruit);
-            TextMeshProUGUI leftStats = CreateText(
-                parent,
-                StatLeftObjectName,
-                BuildStatsText(girl, FirstItemIndex, StatColumnItemCount),
-                StatFontSize,
-                TextAlignmentOptions.Left,
-                statColor);
-            TextMeshProUGUI rightStats = CreateText(
-                parent,
-                StatRightObjectName,
-                BuildStatsText(girl, StatColumnItemCount, StatColumnItemCount),
-                StatFontSize,
-                TextAlignmentOptions.Left,
-                statColor);
-            ConfigureStatColumn(leftStats, true);
-            ConfigureStatColumn(rightStats, false);
-        }
-
-        private static void ConfigureStatColumn(TextMeshProUGUI text, bool left)
-        {
-            text.enableWordWrapping = false;
-            RectTransform rect = text.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(CenterAnchor, EdgeAnchor);
-            rect.anchorMax = new Vector2(CenterAnchor, EdgeAnchor);
-            rect.pivot = new Vector2(CenterAnchor, EdgeAnchor);
-            rect.sizeDelta = new Vector2(StatColumnWidth, StatsHeight);
-            float columnOffset = left
-                ? -(StatColumnWidth + StatColumnSpacing) / 2f
-                : (StatColumnWidth + StatColumnSpacing) / 2f;
-            rect.anchoredPosition = new Vector2(columnOffset, StatsTop);
-        }
-
-        private static Button CreateRecruitButton(
-            Transform parent,
-            UniqueIdolEntry entry,
-            bool canRecruit,
-            out TextMeshProUGUI label)
-        {
-            GameObject buttonObject = CreateUIObject(RecruitButtonObjectName, parent);
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            buttonRect.anchorMin = new Vector2(CenterAnchor, BaseAnchor);
-            buttonRect.anchorMax = new Vector2(CenterAnchor, BaseAnchor);
-            buttonRect.pivot = new Vector2(CenterAnchor, BaseAnchor);
-            buttonRect.sizeDelta = new Vector2(RecruitButtonWidth, RecruitButtonHeight);
-            buttonRect.anchoredPosition = new Vector2(BaseAnchor, RecruitButtonBottom);
-
-            Image buttonImage = buttonObject.AddComponent<Image>();
-            buttonImage.color = canRecruit ? mainScript.green32 : mainScript.red32;
-            Button button = buttonObject.AddComponent<Button>();
-            button.targetGraphic = buttonImage;
-            button.interactable = canRecruit;
-            if (canRecruit)
-            {
-                button.onClick.AddListener(delegate
-                {
-                    RecruitUniqueIdol(entry);
-                });
-            }
-
-            label = CreateText(
-                buttonObject.transform,
-                ButtonTextObjectName,
-                canRecruit
-                    ? GetLocalized(RecruitButtonKey, RecruitButtonFallback)
-                    : GetLocalized(AlreadyRecruitedStatusKey, AlreadyRecruitedStatusFallback),
-                StatusFontSize,
-                TextAlignmentOptions.Center,
-                mainScript.white32);
-            label.enableWordWrapping = false;
-            RectTransform labelRect = label.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
+            Button button = CheatUi.Button(parent, RecruitButtonObjectName,
+                CheatUi.Text(canRecruit ? RecruitButtonKey : AlreadyRecruitedStatusKey),
+                RecruitButtonWidth, RecruitButtonHeight, delegate { RecruitUniqueIdol(entry); });
+            CheatUi.SetButtonInteractable(button, canRecruit);
+            RectTransform rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(CenterAnchor, BaseAnchor);
+            rect.anchoredPosition = new Vector2(BaseAnchor, RecruitButtonBottom);
+            label = IMUiCompat.GetComponentInChildren<TextMeshProUGUI>(button.gameObject);
             return button;
         }
 
         private static void CreateCloseButton(Transform parent)
         {
-            GameObject closeObject = CreateUIObject(CloseButtonObjectName, parent);
-            RectTransform closeRect = closeObject.GetComponent<RectTransform>();
-            closeRect.anchorMin = new Vector2(CenterAnchor, BaseAnchor);
-            closeRect.anchorMax = new Vector2(CenterAnchor, BaseAnchor);
-            closeRect.pivot = new Vector2(CenterAnchor, BaseAnchor);
-            closeRect.sizeDelta = new Vector2(CloseButtonWidth, CloseButtonHeight);
-            closeRect.anchoredPosition = new Vector2(BaseAnchor, CloseButtonOffsetY);
-            Image closeImage = closeObject.AddComponent<Image>();
-            closeImage.color = mainScript.green32;
-            Button closeButton = closeObject.AddComponent<Button>();
-            closeButton.targetGraphic = closeImage;
-            closeButton.onClick.AddListener(Close);
-            TextMeshProUGUI label = CreateText(
-                closeObject.transform,
-                ButtonTextObjectName,
-                GetLocalized(CloseButtonKey, CloseButtonFallback),
-                CloseButtonFontSize,
-                TextAlignmentOptions.Center,
-                mainScript.white32);
-            label.enableWordWrapping = false;
-            RectTransform labelRect = label.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-        }
-
-        private static void CreateScrollbar(Transform parent, ScrollRect target)
-        {
-            if (parent == null || target == null)
-            {
-                return;
-            }
-
-            Scrollbar template = GetScrollbarTemplate();
-            GameObject scrollbarObject;
-            Scrollbar scrollbar;
-            if (template != null)
-            {
-                scrollbarObject = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
-                scrollbarObject.name = ScrollbarObjectName;
-                SetLayerRecursively(scrollbarObject, parent.gameObject.layer);
-                scrollbarObject.SetActive(true);
-                scrollbar = scrollbarObject.GetComponent<Scrollbar>();
-                if (scrollbar == null)
-                {
-                    scrollbar = scrollbarObject.AddComponent<Scrollbar>();
-                }
-                CanvasGroup group = scrollbarObject.GetComponent<CanvasGroup>();
-                if (group != null)
-                {
-                    group.alpha = VisibleAlpha;
-                    group.interactable = true;
-                    group.blocksRaycasts = true;
-                }
-            }
-            else
-            {
-                scrollbarObject = CreateUIObject(ScrollbarObjectName, parent);
-                Image trackImage = scrollbarObject.AddComponent<Image>();
-                trackImage.color = GetScrollbarTrackColor();
-                trackImage.raycastTarget = true;
-                scrollbar = scrollbarObject.AddComponent<Scrollbar>();
-                GameObject handleObject = CreateUIObject(ScrollbarHandleObjectName, scrollbarObject.transform);
-                RectTransform handleRect = handleObject.GetComponent<RectTransform>();
-                handleRect.anchorMin = Vector2.zero;
-                handleRect.anchorMax = Vector2.one;
-                handleRect.offsetMin = Vector2.zero;
-                handleRect.offsetMax = Vector2.zero;
-                Image handleImage = handleObject.AddComponent<Image>();
-                handleImage.color = mainScript.blue32;
-                scrollbar.targetGraphic = handleImage;
-                scrollbar.handleRect = handleRect;
-            }
-
-            RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
-            scrollbarRect.anchorMin = new Vector2(EdgeAnchor, BaseAnchor);
-            scrollbarRect.anchorMax = new Vector2(EdgeAnchor, EdgeAnchor);
-            scrollbarRect.pivot = new Vector2(EdgeAnchor, EdgeAnchor);
-            scrollbarRect.sizeDelta = new Vector2(ScrollbarWidth, BaseAnchor);
-            scrollbarRect.anchoredPosition = new Vector2(ScrollbarOffsetX, BaseAnchor);
-            scrollbar.direction = Scrollbar.Direction.BottomToTop;
-            scrollbar.onValueChanged = new Scrollbar.ScrollEvent();
-            scrollbar.onValueChanged.AddListener(delegate(float value)
-            {
-                target.verticalNormalizedPosition = value;
-            });
-            target.verticalScrollbar = scrollbar;
-            target.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
-            target.verticalScrollbarSpacing = ScrollbarSpacing;
+            Button button = CheatUi.Button(parent, CloseButtonObjectName, CheatUi.Text(CloseButtonKey),
+                CloseButtonWidth, CloseButtonHeight, Close);
+            RectTransform rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(CenterAnchor, BaseAnchor);
+            rect.anchoredPosition = new Vector2(BaseAnchor, CloseButtonOffsetY);
         }
 
         private static void RecruitUniqueIdol(UniqueIdolEntry entry)
@@ -2048,20 +1668,21 @@ namespace CheatsMod
             dataGirls.Hire(recruitedGirl, true);
             dataGirls.UpdateList(true);
             entry.Recruited = true;
+            RefreshEditableCard(entry);
             if (entry.RecruitButton != null)
             {
-                entry.RecruitButton.interactable = false;
+                CheatUi.SetButtonInteractable(entry.RecruitButton, false);
             }
 
             if (entry.StatusText != null)
             {
-                entry.StatusText.text = GetLocalized(RecruitedStatusKey, RecruitedStatusFallback);
+                CheatUi.SetButtonText(entry.RecruitButton, CheatUi.Text(RecruitedStatusKey));
                 entry.StatusText.color = mainScript.white32;
             }
 
             string notificationFormat = GetLocalized(NotificationUniqueIdolRecruitedKey, NotificationUniqueIdolRecruitedFallback);
             NotificationManager.AddNotification(
-                string.Format(CultureInfo.CurrentCulture, notificationFormat, entry.PreviewGirl.GetName(true)),
+                string.Format(CheatUi.Culture, notificationFormat, entry.PreviewGirl.GetName(true)),
                 mainScript.green32,
                 NotificationManager._notification._type.idol_stat_change);
         }
@@ -2202,15 +1823,15 @@ namespace CheatsMod
                 return;
             }
 
+            RefreshEditableCard(entry);
             if (entry.RecruitButton != null)
             {
-                entry.RecruitButton.interactable = false;
+                CheatUi.SetButtonInteractable(entry.RecruitButton, false);
             }
 
             if (entry.StatusText != null)
             {
-                entry.StatusText.text = GetLocalized(AlreadyRecruitedStatusKey, AlreadyRecruitedStatusFallback);
-                entry.StatusText.color = mainScript.white32;
+                CheatUi.SetButtonText(entry.RecruitButton, CheatUi.Text(AlreadyRecruitedStatusKey));
             }
         }
 
@@ -2385,34 +2006,6 @@ namespace CheatsMod
             float itemRowsHeight = rowCount * TileHeight;
             float rowSpacingHeight = Mathf.Max(ZeroCount, rowCount - 1) * TileSpacingY;
             return ContentPaddingTop + itemRowsHeight + rowSpacingHeight + ContentPaddingBottom;
-        }
-
-        private static string BuildStatsText(data_girls.girls girl, int startIndex, int count)
-        {
-            StringBuilder builder = new StringBuilder();
-            int endIndex = Mathf.Min(DisplayedStatTypes.Length, startIndex + count);
-            for (int statIndex = startIndex; statIndex < endIndex; statIndex++)
-            {
-                data_girls._paramType statType = DisplayedStatTypes[statIndex];
-                data_girls.girls.param parameter = girl.getParam(statType);
-                int statValue = parameter != null ? parameter.GetIntegerPart() : ZeroCount;
-                int potentialValue = parameter != null
-                    ? Mathf.Clamp(parameter.GetPotential(), ZeroCount, MaximumDisplayedPotential)
-                    : ZeroCount;
-                if (builder.Length > ZeroCount)
-                {
-                    builder.Append(StatLineBreak);
-                }
-
-                builder.Append(string.Format(
-                    CultureInfo.CurrentCulture,
-                    GetLocalized(StatFormatKey, StatFormatFallback),
-                    GetStatLabel(statType),
-                    statValue.ToString(CultureInfo.CurrentCulture),
-                    potentialValue.ToString(CultureInfo.CurrentCulture)));
-            }
-
-            return builder.ToString();
         }
 
         private static string GetStatLabel(data_girls._paramType statType)
@@ -2769,46 +2362,8 @@ namespace CheatsMod
 
         private static bool TryRegisterPopup(PopupManager manager, GameObject root)
         {
-            if (manager == null || root == null)
-            {
-                return false;
-            }
-
-            PopupManager._type type = (PopupManager._type)UniqueIdolRecruitmentPopupTypeValue;
-            PopupManager._popup existing = manager.GetByType(type);
-            if (existing != null)
-            {
-                if (existing.obj != null && existing.obj != root)
-                {
-                    UnityEngine.Object.Destroy(existing.obj);
-                }
-
-                existing.obj = root;
-                existing.open = false;
-                existing.BGBlur = true;
-                existing.BGDarken = true;
-                existing.BGRenderTexture = null;
-                return true;
-            }
-
-            PopupManager._popup popup = new PopupManager._popup
-            {
-                type = type,
-                obj = root,
-                open = false,
-                BGBlur = true,
-                BGDarken = true
-            };
-
-            if (manager.popups == null)
-            {
-                manager.popups = new PopupManager._popup[] { popup };
-                return true;
-            }
-
-            Array.Resize(ref manager.popups, manager.popups.Length + 1);
-            manager.popups[manager.popups.Length - 1] = popup;
-            return true;
+            CheatUi.Initialize(manager);
+            return CheatUi.Register(UniqueIdolRecruitmentPopupTypeValue, root);
         }
 
         private static Transform GetPopupParent()
@@ -2830,71 +2385,6 @@ namespace CheatsMod
                         return popup.obj.transform.parent;
                     }
                 }
-            }
-
-            return null;
-        }
-
-        private static Scrollbar GetScrollbarTemplate()
-        {
-            Scrollbar preferred = FindScrollbarInPopup(PopupManager._type.producer_salaries);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.producer_contracts);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.producer_loans);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.notifications);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.awards);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.single_release);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.single_senbatsu);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.single_chart);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            preferred = FindScrollbarInPopup(PopupManager._type.SNS);
-            if (preferred != null)
-            {
-                return preferred;
-            }
-
-            Scrollbar[] scrollbars = UnityEngine.Object.FindObjectsOfType<Scrollbar>();
-            if (scrollbars != null && scrollbars.Length > ZeroCount)
-            {
-                return scrollbars[FirstTemplateIndex];
             }
 
             return null;
@@ -2929,33 +2419,6 @@ namespace CheatsMod
             return rarityFrameTemplate;
         }
 
-        private static Scrollbar FindScrollbarInPopup(PopupManager._type type)
-        {
-            GameObject popup = null;
-            PopupManager manager = GetPopupManager();
-            if (manager != null)
-            {
-                PopupManager._popup entry = manager.GetByType(type);
-                if (entry != null)
-                {
-                    popup = entry.obj;
-                }
-            }
-
-            if (popup == null)
-            {
-                return null;
-            }
-
-            Scrollbar[] scrollbars = popup.GetComponentsInChildren<Scrollbar>(true);
-            if (scrollbars != null && scrollbars.Length > ZeroCount)
-            {
-                return scrollbars[FirstTemplateIndex];
-            }
-
-            return null;
-        }
-
         private static GameObject CreateUIObject(string name, Transform parent)
         {
             GameObject obj = new GameObject(name, typeof(RectTransform));
@@ -2968,51 +2431,10 @@ namespace CheatsMod
             return obj;
         }
 
-        private static TextMeshProUGUI CreateText(
-            Transform parent,
-            string name,
-            string text,
-            int fontSize,
-            TextAlignmentOptions alignment,
-            Color32 color)
+        private static TextMeshProUGUI CreateText(Transform parent, string name, string text,
+            int fontSize, TextAlignmentOptions alignment, Color32 color)
         {
-            GameObject obj = CreateUIObject(name, parent);
-            TextMeshProUGUI tmp = obj.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = fontSize;
-            tmp.alignment = alignment;
-            tmp.color = color;
-            tmp.raycastTarget = false;
-            CaptureDefaultFont();
-            if (defaultFontSource != null && defaultFontSource.font != null)
-            {
-                tmp.font = defaultFontSource.font;
-            }
-
-            return tmp;
-        }
-
-        private static void CaptureDefaultFont()
-        {
-            if (defaultFontSource != null)
-            {
-                return;
-            }
-
-            TextMeshProUGUI[] textObjects = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>();
-            if (textObjects == null)
-            {
-                return;
-            }
-
-            for (int textIndex = 0; textIndex < textObjects.Length; textIndex++)
-            {
-                if (textObjects[textIndex] != null && textObjects[textIndex].font != null)
-                {
-                    defaultFontSource = textObjects[textIndex];
-                    return;
-                }
-            }
+            return CheatUi.Label(parent, name, text, fontSize, alignment, color);
         }
 
         private static void Close()
@@ -3029,6 +2451,7 @@ namespace CheatsMod
 
             UnityEngine.Object.Destroy(popupRoot);
             popupRoot = null;
+            recruitmentPanel = null;
         }
 
         private static PopupManager GetPopupManager()
@@ -3089,6 +2512,13 @@ namespace CheatsMod
         {
             internal data_girls_textures._textureAsset Asset;
             internal data_girls.girls PreviewGirl;
+            // Captured before any edits; changing age must never move its lower bound.
+            internal int OriginalAge;
+            internal TextMeshProUGUI NameText;
+            internal TextMeshProUGUI AgeText;
+            internal readonly Dictionary<data_girls._paramType, TextMeshProUGUI> StatLabels =
+                new Dictionary<data_girls._paramType, TextMeshProUGUI>();
+            internal readonly List<Button> EditButtons = new List<Button>();
             internal List<PortraitPartState> PortraitParts;
             internal Auditions.data._girl._type Rarity;
             internal string RarityValue;

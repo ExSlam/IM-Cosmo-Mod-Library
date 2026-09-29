@@ -49,7 +49,7 @@ List of cheats:
 [*] Set idol stamina to 100, cure depression and injuries, and return idols from hiatus
 [*] Cancel announced '3 months until graduation' phase and assign a new future graduation date for selected idol
 [*] Change graduation date for selected idol
-[*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for selected idol
+[*] Adjust Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart from 0 to 100 for a selected idol
 [*] Set selected idol's fame to a custom level from 1-10
 [*] Generate a random dating scandal for selected idol
 [*] Break up selected idol's non-producer dating relationship

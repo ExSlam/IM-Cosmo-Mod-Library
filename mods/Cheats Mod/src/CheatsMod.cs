@@ -200,7 +200,7 @@ namespace CheatsMod
         };
     }
 
-    public static class Cheats
+    public static partial class Cheats
     {
         private static readonly DateTime ClearedAuditionCooldownDate =
             new DateTime(1960, 1, 1);
@@ -398,6 +398,16 @@ namespace CheatsMod
             Execute(RevealBulliesCore);
         }
 
+        public static void CompleteRoomActivities()
+        {
+            Execute(CompleteRoomActivitiesCore);
+        }
+
+        public static void OpenAddBulliesPopup()
+        {
+            Execute(IdolTargetCheatPopup.OpenAddBullies);
+        }
+
         public static void EndAllBullying()
         {
             Execute(EndAllBullyingCore);
@@ -415,7 +425,7 @@ namespace CheatsMod
 
         public static void OpenSelectedIdolStatsPopup()
         {
-            Execute(IdolTargetCheatPopup.OpenStats100);
+            Execute(IdolTargetCheatPopup.OpenStatsEditor);
         }
 
         public static void OpenSelectedIdolFamePopup()

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using ModLocalizationSystem;
+using CheatsMod.EmbeddedIMUiFramework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -17,8 +18,8 @@ namespace CheatsMod
         private const string RetiringDialogueId = "retiring";
         private const string RetiringPrimaryActorTag = "girl1";
 
-        private const float PanelWidth = 930f;
-        private const float PanelHeight = 640f;
+        private const float PanelWidth = 1050f;
+        private const float PanelHeight = 700f;
         private const float Margin = 24f;
         private const float TitleHeight = 44f;
         private const float LeftWidth = 520f;
@@ -27,23 +28,16 @@ namespace CheatsMod
         private const float BodyTop = 82f;
         private const float BodyBottom = 70f;
         private const float PickerLabelHeight = 30f;
-        private const float PickerCellWidth = 225f;
-        private const float PickerCellHeight = 123f;
-        private const float PickerSpacing = 10f;
         private const float ControlRowHeight = 46f;
         private const float ControlSpacing = 12f;
         private const float ArrowWidth = 44f;
-        private const float ActionButtonWidth = 270f;
         private const float ActionButtonHeight = 42f;
         private const float CloseButtonWidth = 160f;
         private const float CloseButtonHeight = 38f;
 
         private const string CancelTitleKey = "ui.graduation.cancel.title";
-        private const string CancelTitleFallback = "Cancel Graduation Announcement";
         private const string ChangeTitleKey = "ui.graduation.date.title";
-        private const string ChangeTitleFallback = "Change Graduation Date";
         private const string SelectIdolKey = "ui.graduation.select_idol";
-        private const string SelectIdolFallback = "Select an idol";
         private const string SelectedIdolKey = "ui.graduation.selected_idol";
         private const string SelectedIdolFallback = "Selected idol: {0}";
         private const string CurrentDateKey = "ui.graduation.current_date";
@@ -51,26 +45,19 @@ namespace CheatsMod
         private const string NewDateKey = "ui.graduation.new_date";
         private const string NewDateFallback = "New graduation date: {0}";
         private const string MinimumDateKey = "ui.graduation.minimum_date";
-        private const string MinimumDateFallback = "Earliest allowed date: {0}";
         private const string DayKey = "ui.graduation.day";
-        private const string DayFallback = "Day";
         private const string MonthKey = "ui.graduation.month";
-        private const string MonthFallback = "Month";
         private const string YearKey = "ui.graduation.year";
-        private const string YearFallback = "Year";
         private const string CloseKey = "ui.graduation.close";
-        private const string CloseFallback = "Close";
         private const string CancelActionKey = "ui.graduation.cancel.action";
-        private const string CancelActionFallback = "Cancel graduation";
         private const string ApplyDateKey = "ui.graduation.date.apply";
-        private const string ApplyDateFallback = "Set graduation date";
 
         private const string NoAnnouncementsKey = "notification.no_announced_graduations";
         private const string NoAnnouncementsFallback = "No idols have announced a graduation.";
         private const string NoEditableIdolsKey = "notification.no_editable_graduation_dates";
         private const string NoEditableIdolsFallback = "No idols have an editable graduation date.";
         private const string CancelledKey = "notification.graduation_cancelled";
-        private const string CancelledFallback = "{0}'s graduation announcement was cancelled.";
+        private const string CancelledFallback = "{0}'s graduation announcement was cancelled. New date: {1}.";
         private const string DateChangedKey = "notification.graduation_date_changed";
         private const string DateChangedFallback = "{0}'s graduation date was changed to {1}.";
         private const string InvalidDateKey = "notification.invalid_graduation_date";
@@ -80,8 +67,26 @@ namespace CheatsMod
         private const string FailedKey = "notification.graduation_cheat_failed";
         private const string FailedFallback = "Graduation cheat action failed.";
 
+        private const string PopupName = "CheatsModGraduationPopup";
+        private const string TitleName = "Title";
+        private const string PickerName = "IdolScroll";
+        private const float NameHeight = 54f;
+        private const float CurrentDateOffset = 58f;
+        private const float MinimumDateOffset = 112f;
+        private const float NewDateOffset = 170f;
+        private const float DateRowsOffset = 230f;
+        private const float DateCaptionWidth = 96f;
+        private const float DateValueWidth = 116f;
+        private const float DateControlGap = 10f;
+        private const float ActionBottomInset = 124f;
+        private const int FirstCalendarDay = 1;
+        private const int LastCalendarMonth = 12;
+        private const int DateStep = 1;
+        private const int MissingDateYear = 1900;
+        private const string DateFormat = "d";
+        private const string MissingDateKey = "ui.editor.no_date";
+        private static readonly Dictionary<int, GameObject> selectionHighlights = new Dictionary<int, GameObject>();
         private static GameObject popupRoot;
-        private static TextMeshProUGUI defaultFontSource;
         private static Mode currentMode;
         private static data_girls.girls selectedGirl;
         private static DateTime selectedDate;
@@ -194,269 +199,56 @@ namespace CheatsMod
             return result;
         }
 
-        private static bool CreatePopup(
-            PopupManager manager,
-            List<data_girls.girls> eligible,
+        private static bool CreatePopup(PopupManager manager, List<data_girls.girls> eligible,
             GameObject girlButtonPrefab)
         {
-            Transform parent = GetPopupParent(manager);
-            if (parent == null)
-            {
-                return false;
-            }
-
             DestroyExistingRoot();
-
-            GameObject root = new GameObject(
-                "CheatsModGraduationPopup",
-                typeof(RectTransform),
-                typeof(CanvasGroup));
-            root.transform.SetParent(parent, false);
-            root.transform.SetAsLastSibling();
-            SetLayerRecursively(root, parent.gameObject.layer);
-
-            RectTransform rootRect = root.GetComponent<RectTransform>();
-            Stretch(rootRect);
-            CanvasGroup canvasGroup = root.GetComponent<CanvasGroup>();
-            canvasGroup.alpha = 0f;
-            canvasGroup.blocksRaycasts = true;
-            canvasGroup.interactable = true;
-            root.SetActive(false);
-
-            GameObject panel = CreateUIObject("Panel", root.transform);
-            RectTransform panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(PanelWidth, PanelHeight);
-            panelRect.anchoredPosition = Vector2.zero;
-            Image panelImage = panel.AddComponent<Image>();
-            panelImage.color = new Color32(245, 245, 245, 255);
-            panelImage.raycastTarget = true;
-
-            TextMeshProUGUI title = CreateText(
-                panel.transform,
-                "Title",
-                GetLocalized(
-                    currentMode == Mode.CancelAnnouncement ? CancelTitleKey : ChangeTitleKey,
-                    currentMode == Mode.CancelAnnouncement ? CancelTitleFallback : ChangeTitleFallback),
-                28,
-                TextAlignmentOptions.Center,
-                mainScript.black32);
-            SetRect(title.rectTransform, Margin, -14f, PanelWidth - (Margin * 2f), TitleHeight, true);
-
-            CreateGirlPicker(panel.transform, eligible, girlButtonPrefab);
-            CreateControls(panel.transform);
-            CreateCloseButton(panel.transform);
-
-            Popup popup = root.AddComponent<Popup>();
-            popup.ShowAnimation = true;
-            popup.HideAnimation = true;
-            popup.HideFast = false;
-            popup.Increase_Popup_Counter = true;
-            popup.OnOpen = new UnityEvent();
-
-            if (!TryRegisterPopup(manager, root))
-            {
-                UnityEngine.Object.Destroy(root);
-                return false;
-            }
-
-            popupRoot = root;
+            selectionHighlights.Clear();
+            Transform panel;
+            popupRoot = CheatUi.CreateShell(manager, PopupName, new Vector2(PanelWidth, PanelHeight), out panel);
+            string titleKey = currentMode == Mode.CancelAnnouncement ? CancelTitleKey : ChangeTitleKey;
+            TextMeshProUGUI title = CreateText(panel, TitleName, CheatUi.Text(titleKey), CheatUi.TitleFontSize,
+                TextAlignmentOptions.Center, mainScript.black32);
+            CheatUi.Place(title.rectTransform, Margin, CheatUi.TitleInset, PanelWidth - Margin * 2f, CheatUi.TitleHeight);
+            CreateGirlPicker(panel, eligible, girlButtonPrefab);
+            CreateControls(panel);
+            CreateCloseButton(panel);
+            if (!TryRegisterPopup(manager, popupRoot)) { DestroyExistingRoot(); return false; }
             RefreshSelectionUI();
             return true;
         }
 
-        private static void CreateGirlPicker(
-            Transform panel,
-            List<data_girls.girls> eligible,
+        private static void CreateGirlPicker(Transform panel, List<data_girls.girls> eligible,
             GameObject girlButtonPrefab)
         {
-            TextMeshProUGUI label = CreateText(
-                panel,
-                "PickerLabel",
-                GetLocalized(SelectIdolKey, SelectIdolFallback),
-                19,
-                TextAlignmentOptions.MidlineLeft,
-                mainScript.black32);
-            SetRect(label.rectTransform, Margin, -BodyTop, LeftWidth, PickerLabelHeight, true);
-
-            GameObject scrollObject = CreateUIObject("IdolScroll", panel);
-            RectTransform scrollRectTransform = scrollObject.GetComponent<RectTransform>();
-            float scrollHeight = PanelHeight - BodyTop - BodyBottom - PickerLabelHeight;
-            SetRect(
-                scrollRectTransform,
-                Margin,
-                -(BodyTop + PickerLabelHeight),
-                LeftWidth,
-                scrollHeight,
-                true);
-            Image scrollBackground = scrollObject.AddComponent<Image>();
-            scrollBackground.color = new Color32(229, 229, 229, 255);
-
-            ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-
-            GameObject viewport = CreateUIObject("Viewport", scrollObject.transform);
-            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-            Stretch(viewportRect);
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-            Image viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = Color.white;
-            viewportImage.raycastTarget = true;
-
-            GameObject content = CreateUIObject("Content", viewport.transform);
-            RectTransform contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0f, 1f);
-            contentRect.anchorMax = new Vector2(1f, 1f);
-            contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = Vector2.zero;
-
-            GridLayoutGroup grid = content.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(PickerCellWidth, PickerCellHeight);
-            grid.spacing = new Vector2(PickerSpacing, PickerSpacing);
-            grid.padding = new RectOffset(12, 12, 12, 12);
-            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-            grid.childAlignment = TextAnchor.UpperLeft;
-            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 2;
-
-            int rows = Mathf.CeilToInt(eligible.Count / 2f);
-            float contentHeight = 24f + (rows * PickerCellHeight) + (Mathf.Max(0, rows - 1) * PickerSpacing);
-            contentRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            scrollRect.verticalNormalizedPosition = 1f;
-
-            for (int index = 0; index < eligible.Count; index++)
-            {
-                data_girls.girls girl = eligible[index];
-                GameObject item = UnityEngine.Object.Instantiate<GameObject>(girlButtonPrefab);
-                item.name = "GraduationIdol_" + girl.id.ToString(CultureInfo.InvariantCulture);
-                item.transform.SetParent(content.transform, false);
-                SetLayerRecursively(item, panel.gameObject.layer);
-
-                GirlButtonSmall girlButton = item.GetComponent<GirlButtonSmall>();
-                if (girlButton != null)
-                {
-                    girlButton.DontDisableIfTraining = true;
-                    girlButton.DontDisableIfHiatus = true;
-                    girlButton.SetGirl(girl, false);
-                }
-
-                Button button = item.GetComponent<Button>();
-                if (button != null)
-                {
-                    data_girls.girls capturedGirl = girl;
-                    button.onClick = new Button.ButtonClickedEvent();
-                    button.onClick.AddListener(new UnityAction(delegate
-                    {
-                        SelectGirl(capturedGirl);
-                    }));
-                    button.interactable = true;
-                }
-            }
+            CheatUi.LabelAt(panel, SelectIdolKey, Margin, BodyTop, LeftWidth, PickerLabelHeight);
+            CheatUi.Picker(panel, PickerName, Margin, BodyTop + PickerLabelHeight,
+                LeftWidth, PanelHeight - BodyTop - BodyBottom - PickerLabelHeight, eligible,
+                girlButtonPrefab, SelectGirl, delegate(GameObject card, data_girls.girls girl)
+                { selectionHighlights[girl.id] = CheatUi.Highlight(card); });
         }
 
         private static void CreateControls(Transform panel)
         {
             float left = Margin + LeftWidth + ColumnGap;
-            float top = -BodyTop;
-
-            selectedIdolText = CreateText(
-                panel,
-                "SelectedIdol",
-                string.Empty,
-                19,
-                TextAlignmentOptions.TopLeft,
-                mainScript.black32);
-            SetRect(selectedIdolText.rectTransform, left, top, RightWidth, 54f, true);
-
-            currentDateText = CreateText(
-                panel,
-                "CurrentDate",
-                string.Empty,
-                16,
-                TextAlignmentOptions.TopLeft,
-                mainScript.black32);
-            SetRect(currentDateText.rectTransform, left, top - 58f, RightWidth, 48f, true);
-
-            if (currentMode == Mode.ChangeDate)
-            {
-                TextMeshProUGUI minimum = CreateText(
-                    panel,
-                    "MinimumDate",
-                    string.Format(
-                        CultureInfo.CurrentCulture,
-                        GetLocalized(MinimumDateKey, MinimumDateFallback),
-                        FormatDate(minimumDate)),
-                    15,
-                    TextAlignmentOptions.TopLeft,
-                    mainScript.grey_light32);
-                SetRect(minimum.rectTransform, left, top - 106f, RightWidth, 44f, true);
-
-                newDateText = CreateText(
-                    panel,
-                    "NewDate",
-                    string.Empty,
-                    18,
-                    TextAlignmentOptions.TopLeft,
-                    mainScript.black32);
-                SetRect(newDateText.rectTransform, left, top - 152f, RightWidth, 42f, true);
-
-                float rowTop = top - 208f;
-                dayValueText = CreateDateRow(panel, left, rowTop, GetLocalized(DayKey, DayFallback), DatePart.Day);
-                monthValueText = CreateDateRow(
-                    panel,
-                    left,
-                    rowTop - (ControlRowHeight + ControlSpacing),
-                    GetLocalized(MonthKey, MonthFallback),
-                    DatePart.Month);
-                yearValueText = CreateDateRow(
-                    panel,
-                    left,
-                    rowTop - ((ControlRowHeight + ControlSpacing) * 2f),
-                    GetLocalized(YearKey, YearFallback),
-                    DatePart.Year);
-
-                actionButton = CreateButton(
-                    panel,
-                    "ApplyDate",
-                    GetLocalized(ApplyDateKey, ApplyDateFallback),
-                    ActionButtonWidth,
-                    ActionButtonHeight,
-                    mainScript.blue32,
-                    ApplyDateChange);
-                SetRect(
-                    actionButton.GetComponent<RectTransform>(),
-                    left + ((RightWidth - ActionButtonWidth) / 2f),
-                    -PanelHeight + BodyBottom + ActionButtonHeight + 22f,
-                    ActionButtonWidth,
-                    ActionButtonHeight,
-                    true);
-            }
-            else
-            {
-                actionButton = CreateButton(
-                    panel,
-                    "CancelGraduation",
-                    GetLocalized(CancelActionKey, CancelActionFallback),
-                    ActionButtonWidth,
-                    ActionButtonHeight,
-                    mainScript.red32,
-                    CancelGraduation);
-                SetRect(
-                    actionButton.GetComponent<RectTransform>(),
-                    left + ((RightWidth - ActionButtonWidth) / 2f),
-                    top - 172f,
-                    ActionButtonWidth,
-                    ActionButtonHeight,
-                    true);
-            }
+            selectedIdolText = CheatUi.LabelAt(panel, SelectedIdolKey, left, BodyTop, RightWidth, NameHeight);
+            currentDateText = CheatUi.LabelAt(panel, CurrentDateKey, left, BodyTop + CurrentDateOffset, RightWidth, NameHeight);
+            TextMeshProUGUI minimum = CheatUi.LabelAt(panel, MinimumDateKey, left,
+                BodyTop + MinimumDateOffset, RightWidth, NameHeight, CheatUi.SmallFontSize);
+            minimum.text = string.Format(CheatUi.Culture, minimum.text, FormatDate(minimumDate));
+            newDateText = CheatUi.LabelAt(panel, NewDateKey, left, BodyTop + NewDateOffset, RightWidth, NameHeight);
+            float top = BodyTop + DateRowsOffset;
+            dayValueText = CreateDateRow(panel, left, top, CheatUi.Text(DayKey), DatePart.Day);
+            monthValueText = CreateDateRow(panel, left, top + ControlRowHeight + ControlSpacing,
+                CheatUi.Text(MonthKey), DatePart.Month);
+            yearValueText = CreateDateRow(panel, left, top + (ControlRowHeight + ControlSpacing) * 2f,
+                CheatUi.Text(YearKey), DatePart.Year);
+            string actionKey = currentMode == Mode.CancelAnnouncement ? CancelActionKey : ApplyDateKey;
+            actionButton = CreateButton(panel, actionKey, CheatUi.Text(actionKey), RightWidth,
+                ActionButtonHeight,
+                delegate { if (currentMode == Mode.CancelAnnouncement) CancelGraduation(); else ApplyDateChange(); });
+            CheatUi.Place(actionButton.GetComponent<RectTransform>(), left, PanelHeight - ActionBottomInset,
+                RightWidth, ActionButtonHeight);
         }
 
         private enum DatePart
@@ -466,71 +258,54 @@ namespace CheatsMod
             Year
         }
 
-        private static TextMeshProUGUI CreateDateRow(
-            Transform panel,
-            float left,
-            float top,
-            string label,
-            DatePart part)
+        private static TextMeshProUGUI CreateDateRow(Transform panel, float left, float top,
+            string label, DatePart part)
         {
-            TextMeshProUGUI caption = CreateText(
-                panel,
-                part.ToString() + "Label",
-                label,
-                16,
-                TextAlignmentOptions.MidlineLeft,
-                mainScript.black32);
-            SetRect(caption.rectTransform, left, top, 92f, ControlRowHeight, true);
-
-            Button previous = CreateButton(
-                panel,
-                part.ToString() + "Previous",
-                "<",
-                ArrowWidth,
-                ControlRowHeight,
-                mainScript.grey_light32,
-                delegate { AdjustDate(part, -1); });
-            SetRect(previous.GetComponent<RectTransform>(), left + 96f, top, ArrowWidth, ControlRowHeight, true);
-
-            TextMeshProUGUI value = CreateText(
-                panel,
-                part.ToString() + "Value",
-                string.Empty,
-                19,
-                TextAlignmentOptions.Center,
-                mainScript.black32);
-            SetRect(value.rectTransform, left + 146f, top, 104f, ControlRowHeight, true);
-
-            Button next = CreateButton(
-                panel,
-                part.ToString() + "Next",
-                ">",
-                ArrowWidth,
-                ControlRowHeight,
-                mainScript.grey_light32,
-                delegate { AdjustDate(part, 1); });
-            SetRect(next.GetComponent<RectTransform>(), left + 256f, top, ArrowWidth, ControlRowHeight, true);
-
+            TextMeshProUGUI caption = CreateText(panel, part.ToString(), label, CheatUi.BodyFontSize,
+                TextAlignmentOptions.MidlineLeft, mainScript.black32);
+            CheatUi.Place(caption.rectTransform, left, top, DateCaptionWidth, ControlRowHeight);
+            float cursor = left + DateCaptionWidth + DateControlGap;
+            Button previous = CheatUi.NumericButton(panel, CheatUi.NumericAction.Decrease,
+                delegate { AdjustDate(part, -DateStep); });
+            CheatUi.Place(previous.GetComponent<RectTransform>(), cursor, top, ArrowWidth, ControlRowHeight);
+            cursor += ArrowWidth + DateControlGap;
+            TextMeshProUGUI value = CreateText(panel, part.ToString(), string.Empty, CheatUi.BodyFontSize,
+                TextAlignmentOptions.Center, mainScript.black32);
+            CheatUi.Place(value.rectTransform, cursor, top, DateValueWidth, ControlRowHeight);
+            cursor += DateValueWidth + DateControlGap;
+            Button next = CheatUi.NumericButton(panel, CheatUi.NumericAction.Increase,
+                delegate { AdjustDate(part, DateStep); });
+            CheatUi.Place(next.GetComponent<RectTransform>(), cursor, top, ArrowWidth, ControlRowHeight);
+            cursor += ArrowWidth + DateControlGap;
+            Button edit = CheatUi.NumericButton(panel, CheatUi.NumericAction.Edit, delegate
+            {
+                int current = part == DatePart.Day ? selectedDate.Day : part == DatePart.Month ? selectedDate.Month : selectedDate.Year;
+                int minimum = part == DatePart.Year ? minimumDate.Year : FirstCalendarDay;
+                int maximum = part == DatePart.Day ? DateTime.DaysInMonth(selectedDate.Year, selectedDate.Month)
+                    : part == DatePart.Month ? LastCalendarMonth : maximumDate.Year;
+                CheatNumericEditor.Show(panel, label, current, minimum, maximum, true,
+                    delegate(float entered) { SetDatePart(part, Mathf.RoundToInt(entered)); });
+            });
+            CheatUi.Place(edit.GetComponent<RectTransform>(), cursor, top, ArrowWidth, ControlRowHeight);
             return value;
+        }
+
+        private static void SetDatePart(DatePart part, int value)
+        {
+            int year = part == DatePart.Year ? value : selectedDate.Year;
+            int month = part == DatePart.Month ? value : selectedDate.Month;
+            int day = part == DatePart.Day ? value : selectedDate.Day;
+            day = Mathf.Min(day, DateTime.DaysInMonth(year, month));
+            selectedDate = ClampDate(new DateTime(year, month, day));
+            RefreshSelectionUI();
         }
 
         private static void CreateCloseButton(Transform panel)
         {
-            Button close = CreateButton(
-                panel,
-                "Close",
-                GetLocalized(CloseKey, CloseFallback),
-                CloseButtonWidth,
-                CloseButtonHeight,
-                mainScript.grey_light32,
-                Close);
-            SetRect(
-                close.GetComponent<RectTransform>(),
-                (PanelWidth - CloseButtonWidth) / 2f,
-                -PanelHeight + 50f,
-                CloseButtonWidth,
-                CloseButtonHeight,
-                true);
+            Button close = CreateButton(panel, CloseKey, CheatUi.Text(CloseKey), CloseButtonWidth,
+                CloseButtonHeight, Close);
+            CheatUi.Place(close.GetComponent<RectTransform>(), (PanelWidth - CloseButtonWidth) * CheatUi.Center,
+                PanelHeight - CheatUi.FooterInset, CloseButtonWidth, CloseButtonHeight);
         }
 
         private static void SelectGirl(data_girls.girls girl)
@@ -541,10 +316,7 @@ namespace CheatsMod
             }
 
             selectedGirl = girl;
-            if (currentMode == Mode.ChangeDate)
-            {
-                selectedDate = GetInitialDate(girl);
-            }
+            selectedDate = GetInitialDate(girl);
 
             RefreshSelectionUI();
         }
@@ -557,43 +329,41 @@ namespace CheatsMod
             }
 
             selectedIdolText.text = string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(SelectedIdolKey, SelectedIdolFallback),
                 SafeGirlName(selectedGirl));
 
             if (currentDateText != null)
             {
                 currentDateText.text = string.Format(
-                    CultureInfo.CurrentCulture,
+                    CheatUi.Culture,
                     GetLocalized(CurrentDateKey, CurrentDateFallback),
                     FormatDate(selectedGirl.Graduation_Date));
             }
 
-            if (currentMode != Mode.ChangeDate)
-            {
-                return;
-            }
+            foreach (KeyValuePair<int, GameObject> entry in selectionHighlights)
+                if (entry.Value != null) entry.Value.SetActive(entry.Key == selectedGirl.id);
 
             selectedDate = ClampDate(selectedDate);
             if (newDateText != null)
             {
                 newDateText.text = string.Format(
-                    CultureInfo.CurrentCulture,
+                    CheatUi.Culture,
                     GetLocalized(NewDateKey, NewDateFallback),
                     FormatDate(selectedDate));
             }
 
             if (dayValueText != null)
             {
-                dayValueText.text = selectedDate.Day.ToString(CultureInfo.CurrentCulture);
+                dayValueText.text = selectedDate.Day.ToString(CheatUi.Culture);
             }
             if (monthValueText != null)
             {
-                monthValueText.text = selectedDate.Month.ToString(CultureInfo.CurrentCulture);
+                monthValueText.text = selectedDate.Month.ToString(CheatUi.Culture);
             }
             if (yearValueText != null)
             {
-                yearValueText.text = selectedDate.Year.ToString(CultureInfo.CurrentCulture);
+                yearValueText.text = selectedDate.Year.ToString(CheatUi.Culture);
             }
         }
 
@@ -638,20 +408,25 @@ namespace CheatsMod
                 return;
             }
 
+            if (selectedDate < GetMinimumDate())
+            {
+                NotifyWarning(InvalidDateKey, InvalidDateFallback);
+                return;
+            }
             string idolName = SafeGirlName(selectedGirl);
             data_girls._status restoredStatus = GetRestoredStatus(selectedGirl.previous_status);
             selectedGirl.previous_status = data_girls._status.announced_graduation;
             selectedGirl.status = restoredStatus;
-            selectedGirl.Graduation_Set_Default_Date();
+            selectedGirl.Graduation_Date = ClampDate(selectedDate);
             selectedGirl.Will_Graduate_At_18 = false;
             CancelPendingRetiringSubstory(selectedGirl);
             RefreshGirlAndList(selectedGirl);
 
             NotifySuccess(
                 string.Format(
-                    CultureInfo.CurrentCulture,
+                    CheatUi.Culture,
                     GetLocalized(CancelledKey, CancelledFallback),
-                    idolName));
+                    idolName, FormatDate(selectedGirl.Graduation_Date)));
             Close();
         }
 
@@ -758,7 +533,7 @@ namespace CheatsMod
 
             NotifySuccess(
                 string.Format(
-                    CultureInfo.CurrentCulture,
+                    CheatUi.Culture,
                     GetLocalized(DateChangedKey, DateChangedFallback),
                     SafeGirlName(selectedGirl),
                     FormatDate(target)));
@@ -780,7 +555,7 @@ namespace CheatsMod
 
         private static DateTime GetInitialDate(data_girls.girls girl)
         {
-            if (girl == null || girl.Graduation_Date.Year <= 1900)
+            if (girl == null || girl.Graduation_Date.Year <= MissingDateYear)
             {
                 return minimumDate;
             }
@@ -804,12 +579,7 @@ namespace CheatsMod
 
         private static string FormatDate(DateTime date)
         {
-            if (date.Year <= 1900)
-            {
-                return "-";
-            }
-
-            return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return date.Year <= MissingDateYear ? CheatUi.Text(MissingDateKey) : date.ToString(DateFormat, CheatUi.Culture);
         }
 
         private static void RefreshGirlAndList(data_girls.girls girl)
@@ -840,40 +610,8 @@ namespace CheatsMod
 
         private static bool TryRegisterPopup(PopupManager manager, GameObject root)
         {
-            PopupManager._type type = (PopupManager._type)PopupTypeValue;
-            PopupManager._popup existing = manager.GetByType(type);
-            if (existing != null)
-            {
-                if (existing.obj != null && existing.obj != root)
-                {
-                    UnityEngine.Object.Destroy(existing.obj);
-                }
-                existing.obj = root;
-                existing.open = false;
-                existing.BGBlur = true;
-                existing.BGDarken = true;
-                existing.BGRenderTexture = null;
-                return true;
-            }
-
-            PopupManager._popup popup = new PopupManager._popup
-            {
-                type = type,
-                obj = root,
-                open = false,
-                BGBlur = true,
-                BGDarken = true
-            };
-
-            if (manager.popups == null)
-            {
-                manager.popups = new PopupManager._popup[] { popup };
-                return true;
-            }
-
-            Array.Resize(ref manager.popups, manager.popups.Length + 1);
-            manager.popups[manager.popups.Length - 1] = popup;
-            return true;
+            CheatUi.Initialize(manager);
+            return CheatUi.Register(PopupTypeValue, root);
         }
 
         private static Transform GetPopupParent(PopupManager manager)
@@ -924,37 +662,10 @@ namespace CheatsMod
             return main == null ? null : main.Data;
         }
 
-        private static Button CreateButton(
-            Transform parent,
-            string name,
-            string label,
-            float width,
-            float height,
-            Color32 background,
-            UnityAction action)
+        private static Button CreateButton(Transform parent, string name, string label,
+            float width, float height, UnityAction action)
         {
-            GameObject buttonObject = CreateUIObject(name, parent);
-            RectTransform rect = buttonObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(width, height);
-            Image image = buttonObject.AddComponent<Image>();
-            image.color = background;
-            Button button = buttonObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick = new Button.ButtonClickedEvent();
-            if (action != null)
-            {
-                button.onClick.AddListener(action);
-            }
-
-            TextMeshProUGUI text = CreateText(
-                buttonObject.transform,
-                "Text",
-                label,
-                17,
-                TextAlignmentOptions.Center,
-                mainScript.white32);
-            Stretch(text.rectTransform);
-            return button;
+            return CheatUi.Button(parent, name, label, width, height, action);
         }
 
         private static GameObject CreateUIObject(string name, Transform parent)
@@ -968,51 +679,10 @@ namespace CheatsMod
             return obj;
         }
 
-        private static TextMeshProUGUI CreateText(
-            Transform parent,
-            string name,
-            string text,
-            int fontSize,
-            TextAlignmentOptions alignment,
-            Color32 color)
+        private static TextMeshProUGUI CreateText(Transform parent, string name, string text,
+            int fontSize, TextAlignmentOptions alignment, Color32 color)
         {
-            GameObject obj = CreateUIObject(name, parent);
-            TextMeshProUGUI label = obj.AddComponent<TextMeshProUGUI>();
-            label.text = text;
-            label.fontSize = fontSize;
-            label.alignment = alignment;
-            label.color = color;
-            label.enableWordWrapping = true;
-            label.raycastTarget = false;
-            CaptureDefaultFont();
-            if (defaultFontSource != null && defaultFontSource.font != null)
-            {
-                label.font = defaultFontSource.font;
-            }
-            return label;
-        }
-
-        private static void CaptureDefaultFont()
-        {
-            if (defaultFontSource != null)
-            {
-                return;
-            }
-
-            TextMeshProUGUI[] labels = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>();
-            if (labels == null)
-            {
-                return;
-            }
-
-            foreach (TextMeshProUGUI label in labels)
-            {
-                if (label != null && label.font != null)
-                {
-                    defaultFontSource = label;
-                    return;
-                }
-            }
+            return CheatUi.Label(parent, name, text, fontSize, alignment, color);
         }
 
         private static void SetRect(

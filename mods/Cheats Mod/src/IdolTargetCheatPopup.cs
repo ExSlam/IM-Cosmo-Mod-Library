@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using ModLocalizationSystem;
+using CheatsMod.EmbeddedIMUiFramework;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -9,7 +10,7 @@ using UnityEngine.UI;
 
 namespace CheatsMod
 {
-    internal static class IdolTargetCheatPopup
+    internal static partial class IdolTargetCheatPopup
     {
         private const int PopupTypeValue = 1431194194;
         private const int FirstIndex = 0;
@@ -19,8 +20,8 @@ namespace CheatsMod
         private const float MaximumStatValue = 100f;
         private const string DatingScandalTemplateId = "dating_scandal";
 
-        private const float PanelWidth = 930f;
-        private const float PanelHeight = 640f;
+        private const float PanelWidth = 1160f;
+        private const float PanelHeight = 700f;
         private const float Margin = 24f;
         private const float TitleHeight = 44f;
         private const float LeftWidth = 520f;
@@ -29,36 +30,27 @@ namespace CheatsMod
         private const float BodyTop = 82f;
         private const float BodyBottom = 70f;
         private const float PickerLabelHeight = 30f;
-        private const float PickerCellWidth = 225f;
-        private const float PickerCellHeight = 123f;
-        private const float PickerSpacing = 10f;
-        private const float ControlRowHeight = 46f;
-        private const float ArrowWidth = 44f;
-        private const float ActionButtonWidth = 270f;
         private const float ActionButtonHeight = 42f;
         private const float CloseButtonWidth = 160f;
         private const float CloseButtonHeight = 38f;
 
         private const string SelectIdolKey = "ui.idol_cheat.select_idol";
-        private const string SelectIdolFallback = "Select an idol";
         private const string SelectedIdolKey = "ui.idol_cheat.selected_idol";
         private const string SelectedIdolFallback = "Selected idol: {0}";
         private const string CloseKey = "ui.idol_cheat.close";
-        private const string CloseFallback = "Close";
 
         private const string StatsTitleKey = "ui.idol_cheat.stats.title";
-        private const string StatsTitleFallback = "Set Idol Stats to 100";
+        private const string StatsTitleFallback = "Adjust Idol Stats";
         private const string StatsDescriptionKey = "ui.idol_cheat.stats.description";
-        private const string StatsDescriptionFallback = "Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100.";
+        private const string StatsDescriptionFallback = "Adjust each stat from 0 to 100, then apply your changes.";
         private const string StatsActionKey = "ui.idol_cheat.stats.action";
-        private const string StatsActionFallback = "Set stats to 100";
+        private const string StatsActionFallback = "Apply stats";
 
         private const string FameTitleKey = "ui.idol_cheat.fame.title";
         private const string FameTitleFallback = "Set Idol Fame";
         private const string FameCurrentKey = "ui.idol_cheat.fame.current";
         private const string FameCurrentFallback = "Current fame level: {0}";
         private const string FameTargetKey = "ui.idol_cheat.fame.target";
-        private const string FameTargetFallback = "Target fame level";
         private const string FameActionKey = "ui.idol_cheat.fame.action";
         private const string FameActionFallback = "Set fame level";
 
@@ -89,8 +81,8 @@ namespace CheatsMod
         private const string NoSelectableIdolsFallback = "No idols are available for this cheat.";
         private const string NoScandalEligibleIdolsKey = "notification.no_scandal_eligible_idols";
         private const string NoScandalEligibleIdolsFallback = "No active idol is eligible for a generated scandal.";
-        private const string StatsAppliedKey = "notification.selected_idol_stats_100";
-        private const string StatsAppliedFallback = "{0}'s core stats were set to 100.";
+        private const string StatsAppliedKey = "notification.selected_idol_stats";
+        private const string StatsAppliedFallback = "{0}'s stats were updated.";
         private const string FameAppliedKey = "notification.selected_idol_fame";
         private const string FameAppliedFallback = "{0}'s fame was set to level {1}.";
         private const string ScandalFailedKey = "notification.selected_idol_scandal_failed";
@@ -152,19 +144,42 @@ namespace CheatsMod
             data_girls._paramType.smart
         };
 
+        private const float MinimumStatValue = 0f;
+        private const float SelectedNameHeight = 56f;
+        private const float DescriptionOffset = 62f;
+        private const float DescriptionHeight = 52f;
+        private const float StatsRowsOffset = 122f;
+        private const float DetailsHeight = 170f;
+        private const float FameRowOffset = 210f;
+        private const float SimpleActionOffset = 290f;
+        private const float StatsActionBottom = 118f;
+        private const string PopupName = "CheatsModSelectedIdolPopup";
+        private const string TitleName = "Title";
+        private const string PickerName = "IdolScroll";
+        private const string SelectedName = "SelectedIdol";
+        private const string DetailName = "Detail";
+        private const string ActionName = "ApplyCheat";
+        private static readonly string[] StatLabelKeys =
+        {
+            "ui.unique_idols.stat.cute", "ui.unique_idols.stat.cool",
+            "ui.unique_idols.stat.sexy", "ui.unique_idols.stat.pretty",
+            "ui.unique_idols.stat.dance", "ui.unique_idols.stat.vocal",
+            "ui.unique_idols.stat.funny", "ui.unique_idols.stat.smart"
+        };
+        private static readonly float[] pendingStats = new float[CoreStatTypes.Length];
+        private static readonly List<CheatNumericRow> numericRows = new List<CheatNumericRow>();
+        private static readonly Dictionary<int, GameObject> selectionHighlights = new Dictionary<int, GameObject>();
         private static GameObject popupRoot;
-        private static TextMeshProUGUI defaultFontSource;
         private static Mode currentMode;
         private static data_girls.girls selectedGirl;
         private static int targetFameLevel = MinimumFameLevel;
         private static TextMeshProUGUI selectedIdolText;
         private static TextMeshProUGUI detailText;
-        private static TextMeshProUGUI fameValueText;
         private static Button actionButton;
 
         private enum Mode
         {
-            Stats100,
+            StatsEditor,
             Fame,
             RandomScandal,
             BreakupDating,
@@ -172,12 +187,13 @@ namespace CheatsMod
             EeCulture1,
             EeCulture2,
             EeTrainedSexy,
-            EeTrainedCute
+            EeTrainedCute,
+            AddBullies
         }
 
-        internal static void OpenStats100()
+        internal static void OpenStatsEditor()
         {
-            Open(Mode.Stats100);
+            Open(Mode.StatsEditor);
         }
 
         internal static void OpenFame()
@@ -254,9 +270,11 @@ namespace CheatsMod
                     return false;
                 }
 
+                ResetBullyingSelection();
                 currentMode = mode;
-                selectedGirl = eligible[FirstIndex];
+                selectedGirl = mode == Mode.AddBullies ? null : eligible[FirstIndex];
                 targetFameLevel = GetInitialFameLevel(selectedGirl);
+                LoadPendingStats();
 
                 if (!CreatePopup(manager, eligible, girlButtonPrefab))
                 {
@@ -315,285 +333,118 @@ namespace CheatsMod
             return !mainScript.IsCensored() || girl.Is_AOC();
         }
 
-        private static bool CreatePopup(
-            PopupManager manager,
-            List<data_girls.girls> eligible,
+        private static bool CreatePopup(PopupManager manager, List<data_girls.girls> eligible,
             GameObject girlButtonPrefab)
         {
-            Transform parent = GetPopupParent(manager);
-            if (parent == null)
-            {
-                return false;
-            }
-
             DestroyExistingRoot();
-
-            GameObject root = new GameObject(
-                "CheatsModSelectedIdolPopup",
-                typeof(RectTransform),
-                typeof(CanvasGroup));
-            root.transform.SetParent(parent, false);
-            root.transform.SetAsLastSibling();
-            SetLayerRecursively(root, parent.gameObject.layer);
-
-            RectTransform rootRect = root.GetComponent<RectTransform>();
-            Stretch(rootRect);
-            CanvasGroup canvasGroup = root.GetComponent<CanvasGroup>();
-            canvasGroup.alpha = 0f;
-            canvasGroup.blocksRaycasts = true;
-            canvasGroup.interactable = true;
-            root.SetActive(false);
-
-            GameObject panel = CreateUIObject("Panel", root.transform);
-            RectTransform panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(PanelWidth, PanelHeight);
-            panelRect.anchoredPosition = Vector2.zero;
-            Image panelImage = panel.AddComponent<Image>();
-            panelImage.color = new Color32(245, 245, 245, 255);
-            panelImage.raycastTarget = true;
-
-            TextMeshProUGUI title = CreateText(
-                panel.transform,
-                "Title",
-                GetModeTitle(),
-                28,
-                TextAlignmentOptions.Center,
-                mainScript.black32);
-            SetRect(title.rectTransform, Margin, -14f, PanelWidth - (Margin * 2f), TitleHeight, true);
-
-            CreateGirlPicker(panel.transform, eligible, girlButtonPrefab);
-            CreateControls(panel.transform);
-            CreateCloseButton(panel.transform);
-
-            Popup popup = root.AddComponent<Popup>();
-            popup.ShowAnimation = true;
-            popup.HideAnimation = true;
-            popup.HideFast = false;
-            popup.Increase_Popup_Counter = true;
-            popup.OnOpen = new UnityEvent();
-
-            if (!TryRegisterPopup(manager, root))
+            numericRows.Clear();
+            selectionHighlights.Clear();
+            Transform panel;
+            popupRoot = CheatUi.CreateShell(manager, PopupName, new Vector2(PanelWidth, PanelHeight), out panel);
+            TextMeshProUGUI title = CreateText(panel, TitleName, GetModeTitle(), CheatUi.TitleFontSize,
+                TextAlignmentOptions.Center, mainScript.black32);
+            CheatUi.Place(title.rectTransform, Margin, CheatUi.TitleInset, PanelWidth - Margin * 2f, CheatUi.TitleHeight);
+            if (currentMode == Mode.AddBullies)
             {
-                UnityEngine.Object.Destroy(root);
+                bullyingPanel = panel;
+                bullyingTitle = title;
+            }
+            CreateGirlPicker(panel, eligible, girlButtonPrefab);
+            CreateControls(panel);
+            CreateCloseButton(panel);
+            if (!TryRegisterPopup(manager, popupRoot))
+            {
+                DestroyExistingRoot();
                 return false;
             }
-
-            popupRoot = root;
             RefreshSelectionUI();
             return true;
         }
 
-        private static void CreateGirlPicker(
-            Transform panel,
-            List<data_girls.girls> eligible,
+        private static void CreateGirlPicker(Transform panel, List<data_girls.girls> eligible,
             GameObject girlButtonPrefab)
         {
-            TextMeshProUGUI label = CreateText(
-                panel,
-                "PickerLabel",
-                GetLocalized(SelectIdolKey, SelectIdolFallback),
-                19,
-                TextAlignmentOptions.MidlineLeft,
-                mainScript.black32);
-            SetRect(label.rectTransform, Margin, -BodyTop, LeftWidth, PickerLabelHeight, true);
-
-            GameObject scrollObject = CreateUIObject("IdolScroll", panel);
-            RectTransform scrollRectTransform = scrollObject.GetComponent<RectTransform>();
-            float scrollHeight = PanelHeight - BodyTop - BodyBottom - PickerLabelHeight;
-            SetRect(
-                scrollRectTransform,
-                Margin,
-                -(BodyTop + PickerLabelHeight),
-                LeftWidth,
-                scrollHeight,
-                true);
-            Image scrollBackground = scrollObject.AddComponent<Image>();
-            scrollBackground.color = new Color32(229, 229, 229, 255);
-
-            ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-
-            GameObject viewport = CreateUIObject("Viewport", scrollObject.transform);
-            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-            Stretch(viewportRect);
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-            Image viewportImage = viewport.AddComponent<Image>();
-            viewportImage.color = Color.white;
-            viewportImage.raycastTarget = true;
-
-            GameObject content = CreateUIObject("Content", viewport.transform);
-            RectTransform contentRect = content.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0f, 1f);
-            contentRect.anchorMax = new Vector2(1f, 1f);
-            contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = Vector2.zero;
-
-            GridLayoutGroup grid = content.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(PickerCellWidth, PickerCellHeight);
-            grid.spacing = new Vector2(PickerSpacing, PickerSpacing);
-            grid.padding = new RectOffset(12, 12, 12, 12);
-            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-            grid.childAlignment = TextAnchor.UpperLeft;
-            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 2;
-
-            int rows = Mathf.CeilToInt(eligible.Count / 2f);
-            float contentHeight = 24f + (rows * PickerCellHeight) + (Mathf.Max(0, rows - 1) * PickerSpacing);
-            contentRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            scrollRect.verticalNormalizedPosition = 1f;
-
-            for (int index = 0; index < eligible.Count; index++)
+            TextMeshProUGUI label = CheatUi.LabelAt(panel, SelectIdolKey, Margin, BodyTop, LeftWidth, PickerLabelHeight);
+            if (currentMode == Mode.AddBullies) label.text = GetBullyingHeading();
+            IMUiScrollViewHandle picker = CheatUi.Picker(panel, PickerName, Margin, BodyTop + PickerLabelHeight,
+                LeftWidth, PanelHeight - BodyTop - BodyBottom - PickerLabelHeight, eligible,
+                girlButtonPrefab, SelectGirl, delegate(GameObject card, data_girls.girls girl)
+                {
+                    if (currentMode == Mode.AddBullies) CreateBullyingHighlight(card, girl);
+                    else selectionHighlights[girl.id] = CheatUi.Highlight(card);
+                });
+            if (currentMode == Mode.AddBullies)
             {
-                data_girls.girls girl = eligible[index];
-                GameObject item = UnityEngine.Object.Instantiate<GameObject>(girlButtonPrefab);
-                item.name = "CheatIdol_" + girl.id.ToString(CultureInfo.InvariantCulture);
-                item.transform.SetParent(content.transform, false);
-                SetLayerRecursively(item, panel.gameObject.layer);
-
-                GirlButtonSmall girlButton = item.GetComponent<GirlButtonSmall>();
-                if (girlButton != null)
-                {
-                    girlButton.DontDisableIfTraining = true;
-                    girlButton.DontDisableIfHiatus = true;
-                    girlButton.SetGirl(girl, false);
-                }
-
-                Button button = item.GetComponent<Button>();
-                if (button != null)
-                {
-                    data_girls.girls capturedGirl = girl;
-                    button.onClick = new Button.ButtonClickedEvent();
-                    button.onClick.AddListener(new UnityAction(delegate
-                    {
-                        SelectGirl(capturedGirl);
-                    }));
-                    button.interactable = true;
-                }
+                bullyingPickerLabel = label;
+                bullyingPickerScroll = picker.Root;
             }
         }
 
         private static void CreateControls(Transform panel)
         {
             float left = Margin + LeftWidth + ColumnGap;
-            float top = -BodyTop;
-
-            selectedIdolText = CreateText(
-                panel,
-                "SelectedIdol",
-                string.Empty,
-                19,
-                TextAlignmentOptions.TopLeft,
-                mainScript.black32);
-            SetRect(selectedIdolText.rectTransform, left, top, RightWidth, 58f, true);
-
-            detailText = CreateText(
-                panel,
-                "Detail",
-                string.Empty,
-                16,
-                TextAlignmentOptions.TopLeft,
-                mainScript.black32);
-            SetRect(detailText.rectTransform, left, top - 72f, RightWidth, 125f, true);
-
-            if (currentMode == Mode.Fame)
+            selectedIdolText = CreateText(panel, SelectedName, string.Empty, CheatUi.BodyFontSize,
+                TextAlignmentOptions.TopLeft, mainScript.black32);
+            CheatUi.Place(selectedIdolText.rectTransform, left, BodyTop, RightWidth, SelectedNameHeight);
+            detailText = CreateText(panel, DetailName, string.Empty, CheatUi.BodyFontSize,
+                TextAlignmentOptions.TopLeft, mainScript.black32);
+            CheatUi.Place(detailText.rectTransform, left, BodyTop + DescriptionOffset, RightWidth,
+                currentMode == Mode.StatsEditor ? DescriptionHeight : DetailsHeight);
+            if (currentMode == Mode.AddBullies)
             {
-                CreateFameRow(panel, left, top - 214f);
+                detailText.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, BullyingInstructionsHeight);
+                CreateBullyingNamesList(panel, left);
+                return;
             }
-
-            actionButton = CreateButton(
-                panel,
-                "ApplyCheat",
-                GetModeActionLabel(),
-                ActionButtonWidth,
+            if (currentMode == Mode.StatsEditor)
+            {
+                for (int index = 0; index < CoreStatTypes.Length; index++)
+                {
+                    int statIndex = index;
+                    numericRows.Add(new CheatNumericRow(panel, StatLabelKeys[index], left,
+                        BodyTop + StatsRowsOffset + index * (CheatUi.RowHeight + CheatUi.RowSpacing),
+                        MinimumStatValue, MaximumStatValue, delegate { return pendingStats[statIndex]; },
+                        delegate(float value) { pendingStats[statIndex] = value; }));
+                }
+            }
+            else if (currentMode == Mode.Fame)
+            {
+                numericRows.Add(new CheatNumericRow(panel, FameTargetKey, left, BodyTop + FameRowOffset,
+                    MinimumFameLevel, MaximumFameLevel, delegate { return targetFameLevel; },
+                    delegate(float value) { targetFameLevel = Mathf.RoundToInt(value); }, true));
+            }
+            actionButton = CreateButton(panel, ActionName, GetModeActionLabel(), RightWidth,
                 ActionButtonHeight,
-                currentMode == Mode.BreakupDating ? mainScript.red32 : mainScript.blue32,
                 ApplyCurrentCheat);
-            SetRect(
-                actionButton.GetComponent<RectTransform>(),
-                left + ((RightWidth - ActionButtonWidth) / 2f),
-                currentMode == Mode.Fame ? top - 310f : top - 226f,
-                ActionButtonWidth,
-                ActionButtonHeight,
-                true);
-        }
-
-        private static void CreateFameRow(Transform panel, float left, float top)
-        {
-            TextMeshProUGUI caption = CreateText(
-                panel,
-                "FameTargetLabel",
-                GetLocalized(FameTargetKey, FameTargetFallback),
-                16,
-                TextAlignmentOptions.MidlineLeft,
-                mainScript.black32);
-            SetRect(caption.rectTransform, left, top, 128f, ControlRowHeight, true);
-
-            Button previous = CreateButton(
-                panel,
-                "FamePrevious",
-                "<",
-                ArrowWidth,
-                ControlRowHeight,
-                mainScript.grey_light32,
-                delegate { AdjustFame(-1); });
-            SetRect(previous.GetComponent<RectTransform>(), left + 132f, top, ArrowWidth, ControlRowHeight, true);
-
-            fameValueText = CreateText(
-                panel,
-                "FameValue",
-                string.Empty,
-                21,
-                TextAlignmentOptions.Center,
-                mainScript.black32);
-            SetRect(fameValueText.rectTransform, left + 182f, top, 62f, ControlRowHeight, true);
-
-            Button next = CreateButton(
-                panel,
-                "FameNext",
-                ">",
-                ArrowWidth,
-                ControlRowHeight,
-                mainScript.grey_light32,
-                delegate { AdjustFame(1); });
-            SetRect(next.GetComponent<RectTransform>(), left + 250f, top, ArrowWidth, ControlRowHeight, true);
+            CheatUi.Place(actionButton.GetComponent<RectTransform>(), left,
+                currentMode == Mode.StatsEditor ? PanelHeight - StatsActionBottom : BodyTop + SimpleActionOffset,
+                RightWidth, ActionButtonHeight);
         }
 
         private static void CreateCloseButton(Transform panel)
         {
-            Button close = CreateButton(
-                panel,
-                "Close",
-                GetLocalized(CloseKey, CloseFallback),
-                CloseButtonWidth,
-                CloseButtonHeight,
-                mainScript.grey_light32,
-                Close);
-            SetRect(
-                close.GetComponent<RectTransform>(),
-                (PanelWidth - CloseButtonWidth) / 2f,
-                -PanelHeight + 50f,
-                CloseButtonWidth,
-                CloseButtonHeight,
-                true);
+            if (currentMode == Mode.AddBullies) { CreateBullyingFooter(panel); return; }
+            Button close = CreateButton(panel, CloseKey, CheatUi.Text(CloseKey), CloseButtonWidth,
+                CloseButtonHeight, Close);
+            CheatUi.Place(close.GetComponent<RectTransform>(), (PanelWidth - CloseButtonWidth) * CheatUi.Center,
+                PanelHeight - CheatUi.FooterInset, CloseButtonWidth, CloseButtonHeight);
         }
 
         private static void SelectGirl(data_girls.girls girl)
         {
+            if (currentMode == Mode.AddBullies)
+            {
+                SelectBullyingGirl(girl);
+                return;
+            }
+
             if (girl == null)
             {
                 return;
             }
 
             selectedGirl = girl;
+            LoadPendingStats();
             if (currentMode == Mode.Fame)
             {
                 targetFameLevel = GetInitialFameLevel(girl);
@@ -603,13 +454,19 @@ namespace CheatsMod
 
         private static void RefreshSelectionUI()
         {
+            if (currentMode == Mode.AddBullies)
+            {
+                RefreshBullyingSelection();
+                return;
+            }
+
             if (selectedIdolText == null || selectedGirl == null)
             {
                 return;
             }
 
             selectedIdolText.text = string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(SelectedIdolKey, SelectedIdolFallback),
                 SafeGirlName(selectedGirl));
 
@@ -618,21 +475,20 @@ namespace CheatsMod
                 detailText.text = GetModeDetailText();
             }
 
-            if (fameValueText != null)
-            {
-                fameValueText.text = targetFameLevel.ToString(CultureInfo.CurrentCulture);
-            }
+            foreach (CheatNumericRow row in numericRows) row.Refresh();
+            foreach (KeyValuePair<int, GameObject> entry in selectionHighlights)
+                if (entry.Value != null) entry.Value.SetActive(entry.Key == selectedGirl.id);
         }
 
         private static string GetModeDetailText()
         {
             switch (currentMode)
             {
-                case Mode.Stats100:
+                case Mode.StatsEditor:
                     return GetLocalized(StatsDescriptionKey, StatsDescriptionFallback);
                 case Mode.Fame:
                     return string.Format(
-                        CultureInfo.CurrentCulture,
+                        CheatUi.Culture,
                         GetLocalized(FameCurrentKey, FameCurrentFallback),
                         selectedGirl.GetFameLevel());
                 case Mode.RandomScandal:
@@ -641,7 +497,7 @@ namespace CheatsMod
                     return GetLocalized(BreakupDescriptionKey, BreakupDescriptionFallback);
                 case Mode.MaxPlayerRelationships:
                     return string.Format(
-                        CultureInfo.CurrentCulture,
+                        CheatUi.Culture,
                         GetLocalized(RelationshipsCurrentKey, RelationshipsCurrentFallback),
                         selectedGirl.GetRelationshipLevel(Relationships_Player._type.Influence),
                         selectedGirl.GetRelationshipLevel(Relationships_Player._type.Friendship),
@@ -659,15 +515,6 @@ namespace CheatsMod
             }
         }
 
-        private static void AdjustFame(int delta)
-        {
-            targetFameLevel = Mathf.Clamp(
-                targetFameLevel + delta,
-                MinimumFameLevel,
-                MaximumFameLevel);
-            RefreshSelectionUI();
-        }
-
         private static int GetInitialFameLevel(data_girls.girls girl)
         {
             if (girl == null)
@@ -680,9 +527,14 @@ namespace CheatsMod
 
         private static string GetModeTitle()
         {
+            if (currentMode == Mode.AddBullies)
+            {
+                return GetBullyingHeading();
+            }
+
             switch (currentMode)
             {
-                case Mode.Stats100:
+                case Mode.StatsEditor:
                     return GetLocalized(StatsTitleKey, StatsTitleFallback);
                 case Mode.Fame:
                     return GetLocalized(FameTitleKey, FameTitleFallback);
@@ -709,7 +561,7 @@ namespace CheatsMod
         {
             switch (currentMode)
             {
-                case Mode.Stats100:
+                case Mode.StatsEditor:
                     return GetLocalized(StatsActionKey, StatsActionFallback);
                 case Mode.Fame:
                     return GetLocalized(FameActionKey, FameActionFallback);
@@ -734,7 +586,8 @@ namespace CheatsMod
 
         private static void ApplyCurrentCheat()
         {
-            if (selectedGirl == null)
+            if (selectedGirl == null || data_girls.girl == null || !data_girls.girl.Contains(selectedGirl)
+                || selectedGirl.status == data_girls._status.graduated)
             {
                 NotifyWarning(NoSelectionKey, NoSelectionFallback);
                 return;
@@ -744,8 +597,8 @@ namespace CheatsMod
             {
                 switch (currentMode)
                 {
-                    case Mode.Stats100:
-                        ApplyStats100();
+                    case Mode.StatsEditor:
+                        ApplyStats();
                         break;
                     case Mode.Fame:
                         ApplyFame();
@@ -784,21 +637,25 @@ namespace CheatsMod
             }
         }
 
-        private static void ApplyStats100()
+        private static void ApplyStats()
         {
             string idolName = SafeGirlName(selectedGirl);
             for (int statIndex = 0; statIndex < CoreStatTypes.Length; statIndex++)
-            {
-                selectedGirl.setParam(CoreStatTypes[statIndex], MaximumStatValue);
-            }
-
+                selectedGirl.setParam(CoreStatTypes[statIndex], Mathf.Clamp(pendingStats[statIndex], MinimumStatValue, MaximumStatValue));
             RefreshGirlAndList(selectedGirl);
-            NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
-                GetLocalized(StatsAppliedKey, StatsAppliedFallback),
-                idolName),
+            NotifySuccess(string.Format(CheatUi.Culture, GetLocalized(StatsAppliedKey, StatsAppliedFallback), idolName),
                 NotificationManager._notification._type.idol_stat_change);
             Close();
+        }
+
+        private static void LoadPendingStats()
+        {
+            for (int index = 0; index < CoreStatTypes.Length; index++)
+            {
+                data_girls.girls.param parameter = selectedGirl == null ? null : selectedGirl.getParam(CoreStatTypes[index]);
+                pendingStats[index] = parameter == null ? MinimumStatValue
+                    : Mathf.Clamp(parameter.val, MinimumStatValue, MaximumStatValue);
+            }
         }
 
         private static void ApplyFame()
@@ -808,7 +665,7 @@ namespace CheatsMod
             selectedGirl.setParam(data_girls._paramType.famePoints, resources.FameLevelToPoints(level));
             RefreshGirlAndList(selectedGirl);
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(FameAppliedKey, FameAppliedFallback),
                 idolName,
                 level),
@@ -1047,7 +904,7 @@ namespace CheatsMod
 
             RefreshGirlAndList(selectedGirl);
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(BreakupAppliedKey, BreakupAppliedFallback),
                 idolName),
                 NotificationManager._notification._type.idol_relationship_change);
@@ -1080,7 +937,7 @@ namespace CheatsMod
             RefreshGirlAndList(selectedGirl);
 
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(RelationshipsAppliedKey, RelationshipsAppliedFallback),
                 idolName),
                 NotificationManager._notification._type.idol_relationship_change);
@@ -1093,7 +950,7 @@ namespace CheatsMod
             selectedGirl.SetVariable("ee_culture1");
             RefreshGirlAndList(selectedGirl);
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(EeCulture1AppliedKey, EeCulture1AppliedFallback),
                 idolName),
                 NotificationManager._notification._type.other);
@@ -1106,7 +963,7 @@ namespace CheatsMod
             selectedGirl.SetVariable("ee_culture2");
             RefreshGirlAndList(selectedGirl);
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(EeCulture2AppliedKey, EeCulture2AppliedFallback),
                 idolName),
                 NotificationManager._notification._type.other);
@@ -1133,7 +990,7 @@ namespace CheatsMod
             selectedGirl.SetVariable(sexy ? "ee_trained_sexy" : "ee_trained_cute");
             RefreshGirlAndList(selectedGirl);
             NotifySuccess(string.Format(
-                CultureInfo.CurrentCulture,
+                CheatUi.Culture,
                 GetLocalized(
                     sexy ? EeSexyTrainingAppliedKey : EeCuteTrainingAppliedKey,
                     sexy ? EeSexyTrainingAppliedFallback : EeCuteTrainingAppliedFallback),
@@ -1170,40 +1027,8 @@ namespace CheatsMod
 
         private static bool TryRegisterPopup(PopupManager manager, GameObject root)
         {
-            PopupManager._type type = (PopupManager._type)PopupTypeValue;
-            PopupManager._popup existing = manager.GetByType(type);
-            if (existing != null)
-            {
-                if (existing.obj != null && existing.obj != root)
-                {
-                    UnityEngine.Object.Destroy(existing.obj);
-                }
-                existing.obj = root;
-                existing.open = false;
-                existing.BGBlur = true;
-                existing.BGDarken = true;
-                existing.BGRenderTexture = null;
-                return true;
-            }
-
-            PopupManager._popup popup = new PopupManager._popup
-            {
-                type = type,
-                obj = root,
-                open = false,
-                BGBlur = true,
-                BGDarken = true
-            };
-
-            if (manager.popups == null)
-            {
-                manager.popups = new PopupManager._popup[] { popup };
-                return true;
-            }
-
-            Array.Resize(ref manager.popups, manager.popups.Length + 1);
-            manager.popups[manager.popups.Length - 1] = popup;
-            return true;
+            CheatUi.Initialize(manager);
+            return CheatUi.Register(PopupTypeValue, root);
         }
 
         private static Transform GetPopupParent(PopupManager manager)
@@ -1254,37 +1079,10 @@ namespace CheatsMod
             return main == null ? null : main.Data;
         }
 
-        private static Button CreateButton(
-            Transform parent,
-            string name,
-            string label,
-            float width,
-            float height,
-            Color32 background,
-            UnityAction action)
+        private static Button CreateButton(Transform parent, string name, string label,
+            float width, float height, UnityAction action)
         {
-            GameObject buttonObject = CreateUIObject(name, parent);
-            RectTransform rect = buttonObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(width, height);
-            Image image = buttonObject.AddComponent<Image>();
-            image.color = background;
-            Button button = buttonObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick = new Button.ButtonClickedEvent();
-            if (action != null)
-            {
-                button.onClick.AddListener(action);
-            }
-
-            TextMeshProUGUI text = CreateText(
-                buttonObject.transform,
-                "Text",
-                label,
-                17,
-                TextAlignmentOptions.Center,
-                mainScript.white32);
-            Stretch(text.rectTransform);
-            return button;
+            return CheatUi.Button(parent, name, label, width, height, action);
         }
 
         private static GameObject CreateUIObject(string name, Transform parent)
@@ -1298,51 +1096,10 @@ namespace CheatsMod
             return obj;
         }
 
-        private static TextMeshProUGUI CreateText(
-            Transform parent,
-            string name,
-            string text,
-            int fontSize,
-            TextAlignmentOptions alignment,
-            Color32 color)
+        private static TextMeshProUGUI CreateText(Transform parent, string name, string text,
+            int fontSize, TextAlignmentOptions alignment, Color32 color)
         {
-            GameObject obj = CreateUIObject(name, parent);
-            TextMeshProUGUI label = obj.AddComponent<TextMeshProUGUI>();
-            label.text = text;
-            label.fontSize = fontSize;
-            label.alignment = alignment;
-            label.color = color;
-            label.enableWordWrapping = true;
-            label.raycastTarget = false;
-            CaptureDefaultFont();
-            if (defaultFontSource != null && defaultFontSource.font != null)
-            {
-                label.font = defaultFontSource.font;
-            }
-            return label;
-        }
-
-        private static void CaptureDefaultFont()
-        {
-            if (defaultFontSource != null)
-            {
-                return;
-            }
-
-            TextMeshProUGUI[] labels = UnityEngine.Object.FindObjectsOfType<TextMeshProUGUI>();
-            if (labels == null)
-            {
-                return;
-            }
-
-            foreach (TextMeshProUGUI label in labels)
-            {
-                if (label != null && label.font != null)
-                {
-                    defaultFontSource = label;
-                    return;
-                }
-            }
+            return CheatUi.Label(parent, name, text, fontSize, alignment, color);
         }
 
         private static void SetRect(
@@ -1399,6 +1156,10 @@ namespace CheatsMod
 
         private static void Close()
         {
+            if (currentMode == Mode.AddBullies)
+            {
+                ResetBullyingSelection();
+            }
             PopupManager.Close_();
         }
 

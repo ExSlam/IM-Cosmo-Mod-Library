@@ -19,10 +19,7 @@
 artifacts/
 Mods_legacy/
 steam workshop files/
-mods/Assistant Manager/assets/Textures/AssistantManager_Female_Pro.png
-mods/Assistant Manager/assets/Textures/AssistantManager_Female.png
-mods/Assistant Manager/assets/Textures/AssistantManager_Male_Pro.png
-mods/Assistant Manager/assets/Textures/AssistantManager_Male.png
+mods/Assistant Manager/assets/Textures/*
 mods/localization issues.txt
 .tmp*
 mods/Singles Marketing Checkbox Fix/assets/thumb2.png
@@ -67,3 +64,5 @@ mods/IM Data Core/docs/V6V3_UNITY_QUALIFICATION_2026_09_09.md
 mods/IM Data Core/docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md
 mods/Divorce Fix/tests/*
 mods/IM Data Core/qualification/*
+mods/Cosmo-Mod-Library-Rename-Idols-Idol-Nationalities-cumulative-head-overlay/*
+mods/Cosmo-Mod-Library-Rename-Idols-Idol-Nationalities-cumulative-head-overlay.zip
