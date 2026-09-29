@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 Cosmo
 
-This repository is source-available, not open source.
+This repository is source-available (locally if source code is downloaded, and) at <https://github.com/ExSlam/IM-Cosmo-Mod-Library>. This repository is not open source.
 
 You may:
 
