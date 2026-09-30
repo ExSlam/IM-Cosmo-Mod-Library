@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=Sauvegarde de la partie en cours
+SAVE_PROGRESS_COMPLETED=Sauvegarde de la partie terminée.
+SAVE_PROGRESS_FAILED=Échec de la sauvegarde de la partie.
+SAVE_PROGRESS_COMPANION_FAILED=IM Data Core n’a pas pu sauvegarder ses données supplémentaires.

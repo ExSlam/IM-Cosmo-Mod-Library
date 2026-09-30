@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=게임 저장 시작
+SAVE_PROGRESS_COMPLETED=게임 저장이 완료되었습니다.
+SAVE_PROGRESS_FAILED=게임 저장에 실패했습니다.
+SAVE_PROGRESS_COMPANION_FAILED=IM Data Core의 추가 데이터를 저장하지 못했습니다.

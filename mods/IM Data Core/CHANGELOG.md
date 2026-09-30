@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.7.5
+
+- Added player-facing instructions for running the included IMDataCore Data Migration Tool.exe before loading supported legacy 1.0.0-1.3.0 data, and clarified its scope separately from the current-only runtime loader.
+- Reconciled the release README's current storage descriptions with sidecar v6 / journal v3 and documented the standalone migration tool, author, and license.
+- Included a byte-for-byte repository LICENSE.md copy in both the mod source root and runtime assets, and completed all seven languages for the four save-status messages.
+
+- Normalized the mod version from 3.4.35 to 3.7.5 under the repository rule that minor and patch components stay within 0-9. This renumbering does not change saved-data formats.
+- Synchronized project metadata, mod metadata, current README version labels, and the Workshop version heading.
+- Corrected the Workshop description to identify the implemented sidecar format 6 / transactional journal format 3, distinguish storage-format numbers from the mod version, and clarify that the runtime does not load or automatically convert older IMDC data formats.
+
 ## 3.4.35
 
 - Added an optional reflection-only bridge for Madxis' current `Idol Nationality + Name Editor` (`com.madxis.idolnationality`) without taking a compile-time dependency on that mod.

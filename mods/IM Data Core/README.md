@@ -1,4 +1,16 @@
-# IM Data Core 3.4.35
+# IM Data Core 3.7.5
+
+## Release 3.7.5
+
+Author: **Cosmo**. This version normalizes the former `3.4.35` package number under the repository's single-digit minor/patch rule. The runtime and save formats remain sidecar **6** / journal **3**. See [CHANGELOG.md](CHANGELOG.md) and the included [LICENSE.md](LICENSE.md).
+
+### Installation and migration of old data
+
+The runtime package contains the current `com.cosmo.imdatacore.dll`, `info.json`, `thumb.png`, seven-language `Localization` folder, Workshop description, license, and the standalone `IMDataCore Data Migration Tool winx64` folder. Keep that tool folder beside the mod files; its source/build parent directories are not part of the package. The included migration executable is version **2.0.2**.
+
+When upgrading a career that uses legacy IMDataCore **1.0.0-1.3.0** database or fallback files, close Idol Manager and run **IMDataCore Data Migration Tool.exe** from that included folder before loading the career with the new mod. Keep a backup, select the matching raw vanilla save and old IMDataCore file, choose **Validate only**, then **Migrate copy**. Follow the tool's **Help** for matching or branch-repair questions. Existing sidecar-v6/journal-v3 data does not need conversion.
+
+The standalone tool handles those legacy database/fallback formats; it is not a general converter for every v1-v5 lightweight sidecar or v1-v2 journal. The game's IMDataCore runtime itself continues to reject unsupported storage generations. The converter writes a current v6 document for the selected exact vanilla checkpoint; migration does not invent the newer identity/coverage history that older versions never recorded. See [the migration tool documentation](IMDataCore-Data-Migration-Tool/README.md).
 
 ## Current implementation and qualification (2026-09-21)
 
@@ -9,7 +21,7 @@ The active loader accepts only native sidecar v6 / journal v3. It rejects older 
 Current evidence is recorded in [V6V3_QUALIFICATION_STATUS.md](docs/V6V3_QUALIFICATION_STATUS.md). Native Unity tests pass selected persistence, consumer, Save As and normal Save & Quit/restart cases, including SNLF/SWOF combinations. Native testing also found and fixed omitted GD record lists and IMDC random-event effect arrays. The complete 23-regression gate, visual UI checks and interruption/stress cases remain open.
 
 
-> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported release inputs. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
+> **Current storage compatibility policy (3.4.34+):** IM Data Core supports only **sidecar v6 + journal v3**. Sidecar v1-v5 and journal v1-v2 are unsupported inputs to the in-game runtime; supported legacy databases can be converted separately with the included tool described above. IMDC does **not** promise, qualify, or require in-place migration, conversion, adoption, or rewrite from those older storage generations. Encountering an unsupported older generation must fail closed without converting it or overwriting its bytes. Any v5/v2 migration language retained below is historical design/task context, not a current compatibility commitment.
 
 Version 3.4.34 fixes autosave/manual sidecar failures reporting `A populated event namespace has no durable namespace-owner binding.` Client session tokens survive storage replacement during load/new game; validating those sessions now also restores or verifies their owner binding in the current engine before allowing access. Foreign owners and unadopted legacy namespaces remain protected. `tests/Test-SessionOwnerPersistenceRuntime.ps1` exercises the production validation method with the compiled storage engine, writes both save scopes, and reloads their events and bindings.
 
@@ -17,8 +29,12 @@ Version 3.4.35 adds optional reflection-only history capture for Madxis' current
 
 IM Data Core is the shared persistence and historical-event backend used by Cosmo Idol Manager mods. It keeps mod-owned state and selected gameplay history tied to the exact vanilla save file without modifying vanilla save JSON.
 
-**Current persistence generation:** IMDC 3.4.35 runs **sidecar v6 / journal v3** as one atomic live generation. **There is no supported backwards-compatibility path for IMDC storage generations.** Sidecar v1-v5 and journal v1-v2 are unsupported inputs and are not release-qualified for migration into v6/v3. They must fail closed without conversion or overwrite. Earlier v5/v2 and migration statements below are historical implementation notes only. Finding #56 is therefore intentionally retired from the current release obligation rather than treated as an unfinished migration feature. See [`docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md`](docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md).
+**Current persistence generation:** IMDC 3.7.5 runs **sidecar v6 / journal v3** as one atomic live generation. **The runtime does not convert unsupported IMDC storage generations.** Sidecar v1-v5 and journal v1-v2 are unsupported inputs and are not release-qualified for migration into v6/v3. They must fail closed without conversion or overwrite. Earlier v5/v2 and migration statements below are historical implementation notes only. Finding #56 is therefore intentionally retired from the current release obligation rather than treated as an unfinished migration feature. See [`docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md`](docs/IMDC_WAVE5_TASK6_CURRENT_V6V3_COMBINED_CORRECTNESS_AUDIT.md).
 The remaining audit regressions that require live restart/F9/Save-As/compaction/fault evidence are planned in [`docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md`](docs/IMDC_DEFERRED_RUNTIME_QUALIFICATION_PLAN.md).
+
+## Historical implementation milestones
+
+The Wave/task sections below record earlier development checkpoints. References to staged systems or v5/v2 describe those checkpoints, not the current release. Current runtime behavior and storage are documented after these milestones.
 
 At the IMDC 3.4.33 checkpoint, IMDC wrote sidecar format 5 and transactional journal format 2, and that runtime accepted exactly sidecar format 5. The cumulative Wave-0 storage foundation is complete in staged form, all five Wave-1 family-specific durable-identity contracts are implemented, and the shared Area-#12 D06-D10 compatibility layer is now staged as well. Business contracts use opaque `g:` generations, cliques use opaque `q:` generations, bullying intervals use opaque `b:` episode generations parented to the clique generation, generated non-custom tasks use opaque `t:` occurrence generations, and room-work SSK/tour targets use the existing durable room generation plus distinct `ssk:<ID>` / `tour:<ID>` owner namespaces. Exact legacy-unbound checkpoints deterministically derive forward generations from the selected checkpoint stamp plus serialized locator/witness and migration salt, while checkpoint-owned legacy candidate metadata preserves `Exact` / `Ambiguous` / `Unresolved` quality without rewriting old event rows. At that historical checkpoint, the normal runtime v6/v3 cutover remained intentionally disabled, so the four opaque-generation families and durable candidate multimap are not advertised as restart-stable until v6 is live; the existing room/theater/cafe generations and SSK/tour room-work identity remain safe on v5.
 
@@ -177,7 +193,7 @@ Vanilla agency-room IDs are runtime-only, and theater/cafe IDs can be recycled a
 
 The raw vanilla `room_id`, `theater_id`, and `cafe_id` payload fields are retained for immediate game-state correlation. They are not stable historical keys. Consumers grouping historical rows should use `(EntityKind, EntityId)`.
 
-Every v5 checkpoint freezes the room-generation map in vanilla's serialized floor/room order and reassociates it while vanilla reconstructs rooms on load. `AgencyRoomIdentities` is required in every accepted v5 checkpoint, including an empty array when the save contains no rooms. A format-5 checkpoint that omits the field is invalid rather than treated as an older compatible schema.
+Every current checkpoint freezes the room-generation map in vanilla's serialized floor/room order and reassociates it while vanilla reconstructs rooms on load. `AgencyRoomIdentities` is required in every accepted v5 checkpoint, including an empty array when the save contains no rooms. A format-5 checkpoint that omits the field is invalid rather than treated as an older compatible schema.
 
 ### Staged durable contract-generation identity
 
@@ -239,14 +255,17 @@ Each physical vanilla save owns one mirrored IMDC sidecar beneath the sibling `I
 
 `global_data.json` is not a game-save scope and never receives an IMDC sidecar.
 
-## Version 5 sidecar
+## Current sidecar and journal formats
 
-The current private disk format remains:
+The current private disk format is:
 
 - `FormatName`: `IMDataCore.LightweightSidecar`
-- `FormatVersion`: `5`
+- `FormatVersion`: `6`
+- Transactional journal format: `3`
 
-V5 keeps JSON-native event/custom-data storage and adds `ContentFingerprint` to every checkpoint. The fingerprint is `sha256:<64 lowercase hex characters>` over Unity's compact JSON representation of that exact vanilla `SavedData` state. A built-in event can look like:
+V6 retains JSON-native history and exact save fingerprints and adds durable identity bindings, namespace-owner provenance, capability/coverage records, historical-baseline assertions, and generation/forward-compatibility metadata. See [STORAGE_LAYOUT.md](docs/STORAGE_LAYOUT.md) and [JOURNAL_V3_SCHEMA.md](docs/JOURNAL_V3_SCHEMA.md). The following event example illustrates the common JSON payload fields, not a complete v6 document.
+
+The earlier V5 format introduced `ContentFingerprint` to every checkpoint. The fingerprint is `sha256:<64 lowercase hex characters>` over Unity's compact JSON representation of that exact vanilla `SavedData` state. A built-in event can look like:
 
 ```json
 {
@@ -266,19 +285,19 @@ V5 keeps JSON-native event/custom-data storage and adds `ContentFingerprint` to 
 }
 ```
 
-A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. Sidecar formats older than 5 are not accepted by this development build.
+A namespaced event created through `TryAppendCustomEventOnce` may additionally contain an optional `IdempotencyKey`. The current runtime accepts only sidecar format 6.
 
-The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v5 document so consumers do not need to understand the private sidecar schema.
+The public `IMDataCoreEvent.PayloadJson`, `EventId`, and `GameDateKey` members remain available. IMDC reconstructs those views from the v6 document so consumers do not need to understand the private sidecar schema.
 
 ## Exact checkpoint loading
 
 A checkpoint identifies one vanilla save state using its physical relative path, vanilla `LastSave`, playtime seconds, game date/time, the vanilla-content SHA-256 fingerprint, and the IMDC sequence watermark. The content fingerprint removes the same-second collision that is possible if timestamp/playtime fields alone are used.
 
-Each v5 checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
+Each current checkpoint also freezes the enabled Idol Manager mod set. Each row stores the mod name/title, author, declared version, and every DLL filename found under that mod's folder; JSON-only mods remain represented with an empty DLL list. On later load, including after returning to the main menu or restarting the game, IMDC compares that saved inventory to the current registry and logs missing, disabled, and metadata/DLL mismatches without blocking vanilla load.
 
-Every v5 checkpoint freezes a required `AgencyRoomIdentities` snapshot. It records one IMDC room-generation ID for each serialized vanilla room and is used only to restore durable historical identity after load; it does not modify vanilla save JSON or change exact-checkpoint identity. The array may be empty for a save with no agency rooms, but the field itself may not be omitted.
+Every current checkpoint freezes a required `AgencyRoomIdentities` snapshot. It records one IMDC room-generation ID for each serialized vanilla room and is used only to restore durable historical identity after load; it does not modify vanilla save JSON or change exact-checkpoint identity. The array may be empty for a save with no agency rooms, but the field itself may not be omitted.
 
-When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC 3.4.25 **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
+When an existing sidecar does not contain an exact checkpoint for the vanilla save being loaded, IMDC **fails closed**. It detaches supplemental state for that physical save, protects the existing sidecar from overwrite, and does not activate history using a date-only approximation.
 
 This avoids cross-branch leakage when two different save histories happen to share the same in-game date.
 
@@ -329,15 +348,15 @@ Use occurrence-specific keys. Do not use a permanent key such as `promotion` if 
 
 ## Long-campaign persistence
 
-IMDC keeps complete source history, so retained disk history still grows with genuine event volume. Version 3.4 avoids reprocessing that complete history on every ordinary save:
+IMDC keeps complete source history, so retained disk history still grows with genuine event volume. The current runtime avoids reprocessing that complete history on every ordinary save:
 
-- a compact v5 sidecar remains the base snapshot;
+- a compact v6 sidecar remains the base snapshot;
 - append-only generations are written to `<sidecar>.imdc.journal`, whose header contains the SHA-256 of the exact base file it extends;
 - normal save preparation copies only newly appended immutable records, not every historical event;
-- journals use transactional format 2: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; older journal formats are intentionally rejected;
+- journals use transactional format 3: `BEGIN`, bounded per-record NDJSON rows, then `COMMIT`; older journal formats are intentionally rejected;
 - routine compaction is queued when journal bytes reach a 1-16 MiB bounded base-relative threshold; a size-scaled 2,048-32,768 transaction ceiling exists only to bound pathological replay depth;
 - rewinds, destructive branch changes, recovery writes, New Save, or an incompatible baseline immediately use a full atomic snapshot instead;
-- an incomplete v2 transaction is ignored, a completely written retry is idempotent by declared counts, and a mismatched journal hash is never replayed onto another base;
+- an incomplete v3 transaction is ignored, a completely written retry is idempotent by declared counts, and a mismatched journal hash is never replayed onto another base;
 - when compaction creates `<sidecar>.imdc.bak`, its matching previous journal is preserved as `<sidecar>.imdc.bak.imdc.journal`; if that copy is interrupted or fails, recovery can pair the backup base with the still-present current journal only after parsing a real matching header, and a later healing write preserves that recovery journal beside the backup before removing its primary-path copy;
 - missing/empty/first-header-torn journals are distinguished from real base-hash matches, so a torn preferred primary journal cannot mask a valid `.imdc.bak.imdc.journal`;
 - when a physical save scope is initialized, IMDC best-effort scavenges only its exact sidecar-derived temp files that are at least 24 hours old; fresh temp files and unrelated files are left alone;
@@ -358,15 +377,15 @@ Harmony-veto interoperability follows a conservative rule: missing `__state` is 
 
 ## Substory completion after load
 
-Vanilla persists its dialogue queue. IMDC 3.4 rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
+Vanilla persists its dialogue queue. IMDC rebuilds its transient pending-substory completion counters from that restored queue after load. A dialogue queued before saving can therefore still produce its normal `substory_completed` event after the save is reloaded and the dialogue eventually closes.
 
 ## Current-format-only persistence
 
-IMDC 3.4.25 reads only sidecar format 5 and replays only transactional journal format 2 for the matching compact-base generation. Journal headers are decoded through a version-agnostic affinity envelope first: an unsupported IMDC journal bound to a different compact-base SHA-256 is treated as a stale generation suffix, while an unsupported journal whose hash matches the candidate base fails closed and write-protects that save scope because it may contain authoritative committed state. An unsupported primary sidecar likewise blocks backup fallback, preventing an older runtime from healing newer/unknown semantics backward. Older lightweight sidecars are not migrated by the normal runtime.
+IMDC 3.7.5 reads only sidecar format 6 and replays only transactional journal format 3 for the matching compact-base generation. Journal headers are decoded through a version-agnostic affinity envelope first: an unsupported IMDC journal bound to a different compact-base SHA-256 is treated as a stale generation suffix, while an unsupported journal whose hash matches the candidate base fails closed and write-protects that save scope because it may contain authoritative committed state. An unsupported primary sidecar likewise blocks backup fallback, preventing an older runtime from healing newer/unknown semantics backward. Older lightweight sidecars are not migrated by the normal runtime.
 
 The v6 event codec carries `ParticipantSchemaVersion` for current-format schema evolution. Pre-v6 sidecars are unsupported storage inputs and are not imported or normalized into current v6 rows. Current contradictory list/count/pair metadata remains malformed and quarantined.
 
-Pre-2.0 database persistence is also not imported by the runtime mod. Historical migration belongs in a separate purpose-built utility.
+Legacy database persistence is not imported by the runtime mod. The included standalone IMDataCore Data Migration Tool converts supported 1.0.0-1.3.0 database/fallback files before the game is opened; see the installation and migration section above.
 
 ## Source versions and generated build artifacts
 
@@ -472,8 +491,12 @@ IM Data Core/
 ├── IM Data Core.csproj
 ├── README.md
 ├── CHANGELOG.md
+├── LICENSE.md
 ├── assets/
 │   ├── info.json
+│   ├── thumb.png
+│   ├── LICENSE.md
+│   ├── Localization/
 │   └── steam description.txt
 ├── docs/
 ├── scripts/
@@ -504,4 +527,4 @@ When current Save n Load Fixes is the authoritative transport, IMDC reports its 
 
 IMDC begins and ends a persistence-progress transaction around each actual vanilla save boundary, including autosaves, manual saves, and chapter saves. Authoritative SNLF owns notifications through its reflection-only `SaveProgressApi`. Otherwise IMDC supplies standalone notifications and observes the exact vanilla target until the asynchronous DataSaver worker has changed it and produced the matching complete SavedData fingerprint.
 
-The messages are `Game saving started` and `Game saving completed.` If the vanilla save succeeds but the sidecar fails, completion is accompanied by a separate red sidecar-failure notification. An unconfirmed vanilla write times out after 120 seconds with `Game saving failed.` Notifications use the game's prefab and history, remain visible during forced pauses, and do not depend on the Other notification filter. Transactions are tracked independently; completion runs on the main thread and leaves vanilla popup closure unchanged.
+Save-status messages are localized in English, Simplified Chinese, French, Japanese, Korean, Brazilian Portuguese, and Russian. The English messages are `Game saving started` and `Game saving completed.` If the vanilla save succeeds but the sidecar fails, completion is accompanied by a separate red sidecar-failure notification. An unconfirmed vanilla write times out after 120 seconds with `Game saving failed.` Notifications use the game's prefab and history, remain visible during forced pauses, and do not depend on the Other notification filter. Transactions are tracked independently; completion runs on the main thread and leaves vanilla popup closure unchanged.
