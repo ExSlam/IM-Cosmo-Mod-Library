@@ -1,23 +1,101 @@
-Save n Load Fixes repairs save/load bugs and related gameplay problems in Idol Manager. It helps your agency keep its progress, relationships, schedules and financial records when you save and return to the game.
+[b]Save n Load Fixes[/b]
 
-[olist]
-[*][b]Saving and loading:[/b] Prevents overlapping saves from finishing in the wrong order and loading from reading an unfinished save.
-[*][b]Save and Exit:[/b] Waits for SNLF and participating mods to finish their save attempts before exiting or returning to the main menu, including attempts that fail.
-[*][b]Save notifications:[/b] Shows when saving starts, finishes or fails.
-[*][b]Money and large totals:[/b] Fixes calculations and displays that could turn large amounts into incorrect or negative numbers, including salaries, loans, business income, theater revenue and fan totals. Includes compatibility support for Fans Watch Shows 1.0.0, TBS Balance Patch 1.0.0 and BuffMe 1.0.0. BuffMe fan bonuses are also corrected so the fan multiplier is applied once instead of twice.
-[*][b]Training and business:[/b] Preserves training progress, paused idols, remaining job time and business proposals selected by events.
-[*][b]Singles, shows, concerts, tours and elections:[/b] Restores missing project progress information and fixes scheduling and completion-date errors.
-[*][b]Fans and target audiences:[/b] Preserves show fan appeal, single comparisons and group audience settings after loading.
-[*][b]Idol relationships:[/b] Preserves relationship behavior across saves and properly clears both idols' relationship state when you force them to break up.
-[*][b]Graduation:[/b] Fixes graduation-date changes that were not being applied and restores pending successor introductions after loading.
-[*][b]Activities and idol pushes:[/b] Preserves queued activities and recent activity history, and resets push duration when you change the selected idol.
-[*][b]Story events and agency scenes:[/b] Preserves event timing, queued dialogue setup and pending scenes, and fixes events that remained active after ending.
-[*][b]Awards:[/b] Preserves pending nominations and fixes inconsistent nominated singles and award-speech choices.
-[*][b]Tutorials:[/b] Restores missing tutorial progress and delayed steps, and clears effects left behind by finished or skipped tutorials.
-[*][b]SNS:[/b] Preserves saved messages and their replies after loading.
-[*][b]Audition portraits:[/b] Retries portraits that fail to load and replaces candidates whose portraits still cannot be displayed.
-[*][b]Modded idol and staff portraits:[/b] Preserves original portrait choices when a portrait pack is temporarily unavailable.
-[*][b]Older saves:[/b] Keeps reconstructed idol ages, fan distribution, relationships and rival groups consistent across repeated loads.
-[*][b]Reloading during play:[/b] Stops delayed actions from a previous load from affecting your current game.
-[*][b]Settings and other gameplay fixes:[/b] Fixes saved settings not applying at startup, along with issues involving birthday checks, bankruptcy warnings, risky marketing and graduation records.
-[/olist]
+Save n Load Fixes fixes bugs that can make Idol Manager forget, lose, or mishandle game progress after saving and loading. It also fixes large-number problems that can make very high money, fan, research, and other totals become incorrect or negative.
+
+[b]What it fixes[/b]
+
+[list]
+[*] Makes saves finish in the correct order and prevents loading an unfinished save.
+[*] Makes Save & Exit wait for saving to finish before closing the game or returning to the main menu.
+[*] Preserves more in-progress game state, including training, business jobs, activities, relationships, graduations, events, awards, tutorials, and SNS messages.
+[*] Fixes several problems when loading older saves.
+[*] Fixes large-number calculations for money, fans, loans, business income, theater and café income, research, and other totals.
+[*] Fixes several smaller vanilla bugs found while repairing the save system.
+[*] Shows simple notifications when saving starts, finishes, or fails.
+[/list]
+
+[b]Requirement[/b]
+
+[list]
+[*] IM-HarmonyIntegration Plugin: https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863
+[/list]
+
+[b]Save Write Ordering Fix / CreateAnAlbum[/b]
+
+Save Write Ordering Fix is [b]not[/b] normally required by Save n Load Fixes.
+
+If you use [b]CreateAnAlbum[/b] together with Save n Load Fixes, install Save Write Ordering Fix too. This prevents CreateAnAlbum's own save handling from conflicting with Save n Load Fixes.
+
+[b]Built-in compatibility support[/b]
+
+Save n Load Fixes includes specific compatibility code for mods that touch the same save data or large-number calculations:
+
+[list]
+[*] Fans Watch Shows 1.0.0
+[*] TBS Balance Patch 1.0.0
+[*] BuffMe 1.0.0
+[*] Shelon's Tweaks & QoL Improvements 1.0.0
+[*] Going Viral
+[*] Fan Attrition
+[*] Stale Theater Shows
+[*] Extended SSK
+[*] Unofficial Patch
+[*] MBTI Personalities
+[*] More Sister Groups
+[*] Tour Stamina Limit
+[*] Traits Fix
+[*] Traits Expansion
+[*] Targeted Auditions
+[*] EroEvents
+[*] IM Data Core
+[*] Graduation Details
+[/list]
+
+Some compatibility patches are made for specific versions of those mods. If one of them receives a major update, its compatibility may need to be checked again.
+
+[b]Other known compatibility[/b]
+
+[list]
+[*] Compatible with all other Cosmo Mods.
+[*] Compatible with: https://steamcommunity.com/sharedfiles/filedetails/?id=3783606924
+[*] Compatible with: https://steamcommunity.com/sharedfiles/filedetails/?id=3778902721
+[*] Compatible with: https://steamcommunity.com/sharedfiles/filedetails/?id=3781484403
+[*] Compatible with: https://steamcommunity.com/sharedfiles/filedetails/?id=3782469762
+[*] Should be compatible with: https://steamcommunity.com/sharedfiles/filedetails/?id=3159762405
+[/list]
+
+[b]Untested / not confirmed[/b]
+
+These are not confirmed incompatible, but have not been fully tested with Save n Load Fixes:
+
+[list]
+[*] Theater Idol Selector: https://steamcommunity.com/sharedfiles/filedetails/?id=3782277556
+May have some calculation issues.
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3781250147
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3779175588
+[*] Idol Roles Dashboard: https://steamcommunity.com/sharedfiles/filedetails/?id=3770400953
+[/list]
+
+[b]Incompatible / outdated[/b]
+
+These should currently be treated as incompatible or outdated with Save n Load Fixes until their compatibility is updated:
+
+[list]
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791755011
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791765611
+[*] K-pop Idol Manager Overhaul: https://steamcommunity.com/sharedfiles/filedetails/?id=3791355099
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791354970
+[*] Probably incompatible, but not fully confirmed yet: https://steamcommunity.com/sharedfiles/filedetails/?id=3795134201
+[*] RivalsReborn needs to be updated with some bugfixes before it can become compatible with Save n Load Fixes mod.
+[/list]
+
+[b]Not needed with Save n Load Fixes[/b]
+
+These fix problems that Save n Load Fixes already fixes:
+
+[list]
+[*] BestSingleFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3136750680
+[*] BestEmployerFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3158389459
+[/list]
+
+If you find a mod that behaves strangely with Save n Load Fixes, let me know which mod and version you are using.
