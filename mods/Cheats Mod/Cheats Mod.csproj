@@ -17,6 +17,8 @@
     <Compile Include="src\GraduationCheatPopup.cs" />
     <Compile Include="src\IdolTargetCheatPopup.cs" />
     <Compile Include="src\BullyingCheat.cs" />
+    <Compile Include="src\CliqueDisplayUi.cs" />
+    <Compile Include="src\RelationshipAndCliqueCheats.cs" />
     <Compile Include="src\RoomActivityCheats.cs" />
     <Compile Include="src\EroEventsCheatPopup.cs" />
   </ItemGroup>

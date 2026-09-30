@@ -198,6 +198,6 @@ namespace CheatsMod
     internal static class CheatNumericEditorClose
     {
         // Escape closes the focused numeric sheet first, leaving the selector and its popup queue intact.
-        private static bool Prefix() { return !CheatNameEditor.CancelActive() && !CheatNumericEditor.CancelActive(); }
+        private static bool Prefix() { return !CheatNameEditor.CancelActive() && !CheatNumericEditor.CancelActive() && !RelationshipBondEditor.CancelActive(); }
     }
 }

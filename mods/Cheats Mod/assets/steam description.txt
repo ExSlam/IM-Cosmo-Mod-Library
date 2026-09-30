@@ -31,13 +31,20 @@ List of cheats:
 [*] Add 10k points to every research type
 [*] Unlock all research and set every research level to 10
 [*] Set Performance and Promotion activities to level 10
+[*] Complete all current room activities instantly
 [*] Increase every idol's fame by one level
 [*] Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols
 [*] Reveal idol friend relationships
 [*] Reveal idol best friend relationships
 [*] Reveal idol dislike and hate relationships
+[*] Adjust friends for a selected idol, including bond values and trends
+[*] Adjust best friends for a selected idol, including bond values and trends
+[*] Adjust disliked idols for a selected idol, including bond values and trends
+[*] Adjust hated idols for a selected idol, including bond values and trends
 [*] Reveal all idol cliques
+[*] Adjust cliques, including creating, editing, and disbanding them
 [*] Reveal all known bullying targets
+[*] Adjust bullying cliques and members who have stopped bullying
 [*] End all bullying
 [*] Reveal all idol relationships, cliques, and bullying targets
 [*] Reveal every idol's current dating status
@@ -55,5 +62,6 @@ List of cheats:
 [*] Break up selected idol's non-producer dating relationship
 [*] Max influence, friendship, and romance with selected idol
 [*] Recruit Unique Idol cheat with selection popup
+[*] Open EroEvents cheats if EroEvents is installed and enabled
 [*] Add custom amount of fans
 [/olist]

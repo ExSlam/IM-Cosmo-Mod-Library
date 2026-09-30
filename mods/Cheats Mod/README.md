@@ -32,6 +32,13 @@ Adds cheat actions to the Mod Buttons action hub.
 - Reveal friend relationships
 - Reveal best friend relationships
 - Reveal disliked idol relationships
+- Adjust friends for an idol: add/remove the Friends status, or use the per-idol pencil editor to set the exact saved bond value and runtime dynamic trend
+- Adjust best friends for an idol with the same add/remove and pencil-editor workflow
+- Adjust disliked idols for an idol with the same add/remove and pencil-editor workflow
+- Adjust hated idols for an idol with the same add/remove and pencil-editor workflow
+- Adjust cliques with portrait-rich Leader/Members cards: create, edit membership, remove members peacefully or hostilely, and disband
+- Adjust bullying with victim → clique → stopped-bullying-member selection: existing bullying cliques/exceptions are preselected, cliques can be added or removed, and newly added bullying uses the game’s normal consequences. The selection summary previews starts/stops, bond/trend changes, dating-driven violent clique ejections, immediate Mental Stamina changes, the -10 Mental Stamina weekly effect for each active bullying clique, leader/disband effects, and stopped/resumed members before confirmation. A stopped-member choice does not shield an idol from the normal start effects: if she is dating the victim, the game ejects her first. If the optional No Bullying Policy mod is enabled and its No Bullying Policy option is actively blocking new bullying, the cheat applies the requested change without changing the selected policy; that policy can still clear bullying on the next weekly update. The integration is detected at runtime and No Bullying Policy is not a dependency.
+- Relationship bond values edited by the pencil are persisted through the game's normal `Vals` save data. Vanilla does not serialize relationship `Dynamic`, so edited trends reset to Neutral after loading a save.
 - Reveal cliques
 - Reveal bullying targets
 - Reveal all idol relationships, cliques, and bullying targets

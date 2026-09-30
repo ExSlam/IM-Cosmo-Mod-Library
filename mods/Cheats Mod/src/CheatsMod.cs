@@ -403,9 +403,41 @@ namespace CheatsMod
             Execute(CompleteRoomActivitiesCore);
         }
 
-        public static void OpenAddBulliesPopup()
+        public static void OpenAdjustBullyingPopup()
         {
-            Execute(IdolTargetCheatPopup.OpenAddBullies);
+            Execute(IdolTargetCheatPopup.OpenAdjustBullying);
+        }
+
+        public static void OpenAdjustFriendsPopup()
+        {
+            Execute(IdolRelationshipCheatPopup.OpenFriends);
+        }
+
+        public static void OpenAdjustBestFriendsPopup()
+        {
+            Execute(IdolRelationshipCheatPopup.OpenBestFriends);
+        }
+
+        public static void OpenAdjustDislikedIdolsPopup()
+        {
+            Execute(IdolRelationshipCheatPopup.OpenDisliked);
+        }
+
+        public static void OpenAdjustHatedIdolsPopup()
+        {
+            Execute(IdolRelationshipCheatPopup.OpenHated);
+        }
+
+        // Compatibility aliases for older Mod Buttons manifests and external callers.
+        public static void OpenAddBulliesPopup() { OpenAdjustBullyingPopup(); }
+        public static void OpenAddFriendsPopup() { OpenAdjustFriendsPopup(); }
+        public static void OpenAddBestFriendsPopup() { OpenAdjustBestFriendsPopup(); }
+        public static void OpenAddDislikedIdolsPopup() { OpenAdjustDislikedIdolsPopup(); }
+        public static void OpenAddHatedIdolsPopup() { OpenAdjustHatedIdolsPopup(); }
+
+        public static void OpenAdjustCliquePopup()
+        {
+            Execute(CliqueCheatPopup.Open);
         }
 
         public static void EndAllBullying()

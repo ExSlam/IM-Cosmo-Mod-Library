@@ -1,503 +1,553 @@
 [
-	{
-		"label": "+10k fans",
-		"codeLabel": "cheat.button.add_fans",
-		"tooltip": "Add 10k fans.",
-		"codeTooltip": "cheat.tooltip.add_fans",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddTenThousandFans"
-	},
-	{
-		"label": "+10k fame",
-		"codeLabel": "cheat.button.add_fame",
-		"tooltip": "Add 10k fame.",
-		"codeTooltip": "cheat.tooltip.add_fame",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddTenThousandFame"
-	},
-	{
-		"label": "Add 1B yen",
-		"codeLabel": "cheat.button.add_money",
-		"tooltip": "Add 1B yen to company funds.",
-		"codeTooltip": "cheat.tooltip.add_money",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddOneBillionYen"
-	},
-	{
-		"label": "+100 buzz",
-		"codeLabel": "cheat.button.add_buzz",
-		"tooltip": "Add 100 buzz.",
-		"codeTooltip": "cheat.tooltip.add_buzz",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddOneHundredBuzz"
-	},
-	{
-		"label": "Physical stamina 100",
-		"codeLabel": "cheat.button.refresh_physical_stamina",
-		"tooltip": "Set active idol physical stamina to 100.",
-		"codeTooltip": "cheat.tooltip.refresh_physical_stamina",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RefreshActiveIdolPhysicalStamina"
-	},
-	{
-		"label": "Mental stamina 100",
-		"codeLabel": "cheat.button.refresh_mental_stamina",
-		"tooltip": "Set active idol mental stamina to 100.",
-		"codeTooltip": "cheat.tooltip.refresh_mental_stamina",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RefreshActiveIdolMentalStamina"
-	},
-	{
-		"label": "-1 general scandal",
-		"codeLabel": "cheat.button.reduce_general_scandal_points",
-		"tooltip": "Reduce general scandal points by 1.",
-		"codeTooltip": "cheat.tooltip.reduce_general_scandal_points",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "ReduceGeneralScandalPoints"
-	},
-	{
-		"label": "+1 general scandal",
-		"codeLabel": "cheat.button.add_general_scandal_points",
-		"tooltip": "Add 1 general scandal point.",
-		"codeTooltip": "cheat.tooltip.add_general_scandal_points",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddGeneralScandalPoints"
-	},
-	{
-		"label": "+1 scandal all idols",
-		"codeLabel": "cheat.button.add_idol_scandal_points",
-		"tooltip": "Add 1 scandal point to all idols.",
-		"codeTooltip": "cheat.tooltip.add_idol_scandal_points",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddOneScandalPointToAllIdols"
-	},
-	{
-		"label": "Clear scandal points",
-		"codeLabel": "cheat.button.clear_scandal_points",
-		"tooltip": "Set general and idol scandal points to 0.",
-		"codeTooltip": "cheat.tooltip.clear_scandal_points",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "ClearAllScandalPoints"
-	},
-	{
-		"label": "Trigger random scandal",
-		"codeLabel": "cheat.button.trigger_random_scandal",
-		"tooltip": "Trigger a random dating scandal for an eligible idol.",
-		"codeTooltip": "cheat.tooltip.trigger_random_scandal",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "TriggerRandomScandal"
-	},
-	{
-		"label": "+1 influence level",
-		"codeLabel": "cheat.button.increase_influence",
-		"tooltip": "Increase every active idol's influence by one level.",
-		"codeTooltip": "cheat.tooltip.increase_influence",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "IncreaseActiveIdolInfluence"
-	},
-	{
-		"label": "+1 friendship level",
-		"codeLabel": "cheat.button.increase_friendship",
-		"tooltip": "Increase every active idol's friendship by one level.",
-		"codeTooltip": "cheat.tooltip.increase_friendship",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "IncreaseActiveIdolFriendship"
-	},
-	{
-		"label": "+1 romance level",
-		"codeLabel": "cheat.button.increase_romance",
-		"tooltip": "Increase every active idol's romance by one level.",
-		"codeTooltip": "cheat.tooltip.increase_romance",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "IncreaseActiveIdolRomance"
-	},
-	{
-		"label": "Max relationships",
-		"codeLabel": "cheat.button.max_player_relationships",
-		"tooltip": "Max active idol influence, friendship, and romance.",
-		"codeTooltip": "cheat.tooltip.max_player_relationships",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "MaxOutActiveIdolPlayerRelationships"
-	},
-	{
-		"label": "Max relations with rivals",
-		"codeLabel": "cheat.button.max_rival_relationships",
-		"tooltip": "Max friendship, influence, and romance with every Rivals Reborn rival idol.",
-		"codeTooltip": "cheat.tooltip.max_rival_relationships",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "MaxRelationsWithRivals"
-	},
-	{
-		"label": "+25k staff EXP",
-		"codeLabel": "cheat.button.add_staff_experience",
-		"tooltip": "Add 25k EXP to all staff skills.",
-		"codeTooltip": "cheat.tooltip.add_staff_experience",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddStaffExperience"
-	},
-	{
-		"label": "Staff level 20",
-		"codeLabel": "cheat.button.max_staff_levels",
-		"tooltip": "Set every staff skill level to 20.",
-		"codeTooltip": "cheat.tooltip.max_staff_levels",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "MaxOutStaffLevels"
-	},
-	{
-		"label": "+10k all research",
-		"codeLabel": "cheat.button.add_research_points",
-		"tooltip": "Add 10k points to every research type.",
-		"codeTooltip": "cheat.tooltip.add_research_points",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddResearchPoints"
-	},
-	{
-		"label": "Research level 10",
-		"codeLabel": "cheat.button.max_research",
-		"tooltip": "Unlock all research and set every research level to 10.",
-		"codeTooltip": "cheat.tooltip.max_research",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "MaxOutResearch"
-	},
-	{
-		"label": "Agency activities level 10",
-		"codeLabel": "cheat.button.max_agency_activities",
-		"tooltip": "Set Performance and Promotion agency activities to level 10.",
-		"codeTooltip": "cheat.tooltip.max_agency_activities",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "MaxOutAgencyActivities"
-	},
-	{
-		"label": "+1 idol fame level",
-		"codeLabel": "cheat.button.increase_idol_fame",
-		"tooltip": "Increase every idol's fame by one level.",
-		"codeTooltip": "cheat.tooltip.increase_idol_fame",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "IncreaseIdolFameLevel"
-	},
-	{
-		"label": "All idol stats 100",
-		"codeLabel": "cheat.button.set_idol_stats",
-		"tooltip": "Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols.",
-		"codeTooltip": "cheat.tooltip.set_idol_stats",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "SetIdolStatsToMaximum"
-	},
-	{
-		"label": "Reveal friends",
-		"codeLabel": "cheat.button.reveal_friends",
-		"tooltip": "Reveal idol friend relationships.",
-		"codeTooltip": "cheat.tooltip.reveal_friends",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealFriends"
-	},
-	{
-		"label": "Reveal best friends",
-		"codeLabel": "cheat.button.reveal_best_friends",
-		"tooltip": "Reveal idol best friend relationships.",
-		"codeTooltip": "cheat.tooltip.reveal_best_friends",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealBestFriends"
-	},
-	{
-		"label": "Reveal disliked idols",
-		"codeLabel": "cheat.button.reveal_disliked_idols",
-		"tooltip": "Reveal idol dislike and hate relationships.",
-		"codeTooltip": "cheat.tooltip.reveal_disliked_idols",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealDislikedIdols"
-	},
-	{
-		"label": "Reveal cliques",
-		"codeLabel": "cheat.button.reveal_cliques",
-		"tooltip": "Reveal all idol cliques.",
-		"codeTooltip": "cheat.tooltip.reveal_cliques",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealCliques"
-	},
-	{
-		"label": "Reveal bullies",
-		"codeLabel": "cheat.button.reveal_bullies",
-		"tooltip": "Reveal all known bullying targets.",
-		"codeTooltip": "cheat.tooltip.reveal_bullies",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealBullies"
-	},
-	{
-		"label": "End all bullying",
-		"codeLabel": "cheat.button.end_all_bullying",
-		"tooltip": "Stop every active bullying relationship.",
-		"codeTooltip": "cheat.tooltip.end_all_bullying",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "EndAllBullying"
-	},
-	{
-		"label": "Reveal all relationships",
-		"codeLabel": "cheat.button.reveal_all_relationships",
-		"tooltip": "Reveal all idol relationships, cliques, and bullying targets.",
-		"codeTooltip": "cheat.tooltip.reveal_all_relationships",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealAllRelationships"
-	},
-	{
-		"label": "Reveal dating status",
-		"codeLabel": "cheat.button.reveal_dating_status",
-		"tooltip": "Reveal every idol's current dating status.",
-		"codeTooltip": "cheat.tooltip.reveal_dating_status",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealDatingStatus"
-	},
-	{
-		"label": "Reveal dating preference",
-		"codeLabel": "cheat.button.reveal_dating_preference",
-		"tooltip": "Reveal every idol's dating preference.",
-		"codeTooltip": "cheat.tooltip.reveal_dating_preference",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "RevealDatingPreference"
-	},
-	{
-		"label": "End idol dating",
-		"codeLabel": "cheat.button.break_up_idol_dating",
-		"tooltip": "End all idol dating relationships except relationships with the producer.",
-		"codeTooltip": "cheat.tooltip.break_up_idol_dating",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "BreakUpIdolDatingRelationships"
-	},
-	{
-		"label": "Reset event cooldowns",
-		"codeLabel": "cheat.button.reset_special_event_cooldowns",
-		"tooltip": "Reset special event cooldowns.",
-		"codeTooltip": "cheat.tooltip.reset_special_event_cooldowns",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "ResetSpecialEventCooldowns"
-	},
-	{
-		"label": "Reset audition cooldowns",
-		"codeLabel": "cheat.button.reset_audition_cooldowns",
-		"tooltip": "Reset regional and nationwide audition cooldowns.",
-		"codeTooltip": "cheat.tooltip.reset_audition_cooldowns",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "ResetAuditionCooldowns"
-	},
-	{
-		"label": "Reset group transfer cooldowns",
-		"codeLabel": "cheat.button.reset_group_transfer_cooldowns",
-		"tooltip": "Allow all active idols to transfer between sister groups immediately.",
-		"codeTooltip": "cheat.tooltip.reset_group_transfer_cooldowns",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "ResetGroupTransferCooldowns"
-	},
-	{
-		"label": "Heal & end hiatus",
-		"codeLabel": "cheat.button.heal_and_end_hiatus",
-		"tooltip": "Set idol stamina to 100, cure depression and injuries, and return idols from hiatus.",
-		"codeTooltip": "cheat.tooltip.heal_and_end_hiatus",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "HealAndEndHiatus"
-	},
-	{
-		"label": "Cancel graduation",
-		"codeLabel": "cheat.button.cancel_graduation",
-		"tooltip": "Cancel an idol's announced graduation and choose a replacement date at least three months away.",
-		"codeTooltip": "cheat.tooltip.cancel_graduation",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenCancelGraduationPopup"
-	},
-	{
-		"label": "Change graduation date",
-		"codeLabel": "cheat.button.change_graduation_date",
-		"tooltip": "Set a non-announced idol's graduation date to a date at least three months away.",
-		"codeTooltip": "cheat.tooltip.change_graduation_date",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenChangeGraduationDatePopup"
-	},
-	{
-		"label": "Adjust selected idol stats",
-		"codeLabel": "cheat.button.selected_idol_stats",
-		"tooltip": "Pick an idol and adjust each of her eight core stats from 0 to 100.",
-		"codeTooltip": "cheat.tooltip.selected_idol_stats",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenSelectedIdolStatsPopup"
-	},
-	{
-		"label": "Set selected idol fame",
-		"codeLabel": "cheat.button.selected_idol_fame",
-		"tooltip": "Pick an idol and set fame to a chosen level from 1 to 10.",
-		"codeTooltip": "cheat.tooltip.selected_idol_fame",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenSelectedIdolFamePopup"
-	},
-	{
-		"label": "Generate idol scandal",
-		"codeLabel": "cheat.button.selected_idol_random_scandal",
-		"tooltip": "Pick an eligible idol and generate a random dating scandal event for her.",
-		"codeTooltip": "cheat.tooltip.selected_idol_random_scandal",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenSelectedIdolScandalPopup"
-	},
-	{
-		"label": "Break up selected idol",
-		"codeLabel": "cheat.button.selected_idol_breakup",
-		"tooltip": "Pick an idol and end her non-producer dating relationship.",
-		"codeTooltip": "cheat.tooltip.selected_idol_breakup",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenSelectedIdolBreakupPopup"
-	},
-	{
-		"label": "Max selected idol relationships",
-		"codeLabel": "cheat.button.selected_idol_max_relationships",
-		"tooltip": "Pick an idol and max influence, friendship, and romance with the producer.",
-		"codeTooltip": "cheat.tooltip.selected_idol_max_relationships",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenSelectedIdolMaxRelationshipsPopup"
-	},
-	{
-		"label": "Recruit unique idol",
-		"codeLabel": "cheat.button.recruit_unique_idol",
-		"tooltip": "Open a picker to recruit any loaded unique idol.",
-		"codeTooltip": "cheat.tooltip.recruit_unique_idol",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenUniqueIdolRecruitmentPopup"
-	},
-	{
-		"label": "EroEvents cheats",
-		"codeLabel": "cheat.button.eroevents_cheats",
-		"tooltip": "Open optional EroEvents progression and grind shortcuts.",
-		"codeTooltip": "cheat.tooltip.eroevents_cheats",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenEroEventsCheatsPopup"
-	},
-	{
-		"label": "Add fans",
-		"codeLabel": "cheat.button.add_custom_fans",
-		"tooltip": "Add the specified number of fans.",
-		"codeTooltip": "cheat.tooltip.add_custom_fans",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "AddFans",
-		"inputs": [
-			{
-				"id": "amount",
-				"type": "integer",
-				"label": "Fans to add",
-				"codeLabel": "cheat.input.add_custom_fans_amount",
-				"default": 10000,
-				"min": 1,
-				"max": 1000000000
-			}
-		]
-	},
-	{
-		"label": "Complete all room activities",
-		"codeLabel": "cheat.button.complete_room_activities",
-		"tooltip": "Instantly finish each current timed room activity once, including training, production, auditions and treatment.",
-		"codeTooltip": "cheat.tooltip.complete_room_activities",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "CompleteRoomActivities"
-	},
-	{
-		"label": "Add bullies to idol",
-		"codeLabel": "cheat.button.add_bullies",
-		"tooltip": "Choose a victim, then select the idols who will bully her.",
-		"codeTooltip": "cheat.tooltip.add_bullies",
-		"icon": "",
-		"assembly": "com.cosmo.cheatsmod",
-		"class": "CheatsMod.Cheats",
-		"method": "OpenAddBulliesPopup"
-	}
+  {
+    "label": "+10k fans",
+    "codeLabel": "cheat.button.add_fans",
+    "tooltip": "Add 10k fans.",
+    "codeTooltip": "cheat.tooltip.add_fans",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddTenThousandFans"
+  },
+  {
+    "label": "+10k fame",
+    "codeLabel": "cheat.button.add_fame",
+    "tooltip": "Add 10k fame.",
+    "codeTooltip": "cheat.tooltip.add_fame",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddTenThousandFame"
+  },
+  {
+    "label": "Add 1B yen",
+    "codeLabel": "cheat.button.add_money",
+    "tooltip": "Add 1B yen to company funds.",
+    "codeTooltip": "cheat.tooltip.add_money",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddOneBillionYen"
+  },
+  {
+    "label": "+100 buzz",
+    "codeLabel": "cheat.button.add_buzz",
+    "tooltip": "Add 100 buzz.",
+    "codeTooltip": "cheat.tooltip.add_buzz",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddOneHundredBuzz"
+  },
+  {
+    "label": "Physical stamina 100",
+    "codeLabel": "cheat.button.refresh_physical_stamina",
+    "tooltip": "Set active idol physical stamina to 100.",
+    "codeTooltip": "cheat.tooltip.refresh_physical_stamina",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RefreshActiveIdolPhysicalStamina"
+  },
+  {
+    "label": "Mental stamina 100",
+    "codeLabel": "cheat.button.refresh_mental_stamina",
+    "tooltip": "Set active idol mental stamina to 100.",
+    "codeTooltip": "cheat.tooltip.refresh_mental_stamina",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RefreshActiveIdolMentalStamina"
+  },
+  {
+    "label": "-1 general scandal",
+    "codeLabel": "cheat.button.reduce_general_scandal_points",
+    "tooltip": "Reduce general scandal points by 1.",
+    "codeTooltip": "cheat.tooltip.reduce_general_scandal_points",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "ReduceGeneralScandalPoints"
+  },
+  {
+    "label": "+1 general scandal",
+    "codeLabel": "cheat.button.add_general_scandal_points",
+    "tooltip": "Add 1 general scandal point.",
+    "codeTooltip": "cheat.tooltip.add_general_scandal_points",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddGeneralScandalPoints"
+  },
+  {
+    "label": "+1 scandal all idols",
+    "codeLabel": "cheat.button.add_idol_scandal_points",
+    "tooltip": "Add 1 scandal point to all idols.",
+    "codeTooltip": "cheat.tooltip.add_idol_scandal_points",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddOneScandalPointToAllIdols"
+  },
+  {
+    "label": "Clear scandal points",
+    "codeLabel": "cheat.button.clear_scandal_points",
+    "tooltip": "Set general and idol scandal points to 0.",
+    "codeTooltip": "cheat.tooltip.clear_scandal_points",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "ClearAllScandalPoints"
+  },
+  {
+    "label": "Trigger random scandal",
+    "codeLabel": "cheat.button.trigger_random_scandal",
+    "tooltip": "Trigger a random dating scandal for an eligible idol.",
+    "codeTooltip": "cheat.tooltip.trigger_random_scandal",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "TriggerRandomScandal"
+  },
+  {
+    "label": "+1 influence level",
+    "codeLabel": "cheat.button.increase_influence",
+    "tooltip": "Increase every active idol's influence by one level.",
+    "codeTooltip": "cheat.tooltip.increase_influence",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "IncreaseActiveIdolInfluence"
+  },
+  {
+    "label": "+1 friendship level",
+    "codeLabel": "cheat.button.increase_friendship",
+    "tooltip": "Increase every active idol's friendship by one level.",
+    "codeTooltip": "cheat.tooltip.increase_friendship",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "IncreaseActiveIdolFriendship"
+  },
+  {
+    "label": "+1 romance level",
+    "codeLabel": "cheat.button.increase_romance",
+    "tooltip": "Increase every active idol's romance by one level.",
+    "codeTooltip": "cheat.tooltip.increase_romance",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "IncreaseActiveIdolRomance"
+  },
+  {
+    "label": "Max relationships",
+    "codeLabel": "cheat.button.max_player_relationships",
+    "tooltip": "Max active idol influence, friendship, and romance.",
+    "codeTooltip": "cheat.tooltip.max_player_relationships",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutActiveIdolPlayerRelationships"
+  },
+  {
+    "label": "Max relations with rivals",
+    "codeLabel": "cheat.button.max_rival_relationships",
+    "tooltip": "Max friendship, influence, and romance with every Rivals Reborn rival idol.",
+    "codeTooltip": "cheat.tooltip.max_rival_relationships",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxRelationsWithRivals"
+  },
+  {
+    "label": "+25k staff EXP",
+    "codeLabel": "cheat.button.add_staff_experience",
+    "tooltip": "Add 25k EXP to all staff skills.",
+    "codeTooltip": "cheat.tooltip.add_staff_experience",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddStaffExperience"
+  },
+  {
+    "label": "Staff level 20",
+    "codeLabel": "cheat.button.max_staff_levels",
+    "tooltip": "Set every staff skill level to 20.",
+    "codeTooltip": "cheat.tooltip.max_staff_levels",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutStaffLevels"
+  },
+  {
+    "label": "+10k all research",
+    "codeLabel": "cheat.button.add_research_points",
+    "tooltip": "Add 10k points to every research type.",
+    "codeTooltip": "cheat.tooltip.add_research_points",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddResearchPoints"
+  },
+  {
+    "label": "Research level 10",
+    "codeLabel": "cheat.button.max_research",
+    "tooltip": "Unlock all research and set every research level to 10.",
+    "codeTooltip": "cheat.tooltip.max_research",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutResearch"
+  },
+  {
+    "label": "Agency activities level 10",
+    "codeLabel": "cheat.button.max_agency_activities",
+    "tooltip": "Set Performance and Promotion agency activities to level 10.",
+    "codeTooltip": "cheat.tooltip.max_agency_activities",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "MaxOutAgencyActivities"
+  },
+  {
+    "label": "+1 idol fame level",
+    "codeLabel": "cheat.button.increase_idol_fame",
+    "tooltip": "Increase every idol's fame by one level.",
+    "codeTooltip": "cheat.tooltip.increase_idol_fame",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "IncreaseIdolFameLevel"
+  },
+  {
+    "label": "All idol stats 100",
+    "codeLabel": "cheat.button.set_idol_stats",
+    "tooltip": "Set Cute, Cool, Sexy, Pretty, Dance, Vocal, Funny, and Smart to 100 for all idols.",
+    "codeTooltip": "cheat.tooltip.set_idol_stats",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "SetIdolStatsToMaximum"
+  },
+  {
+    "label": "Reveal friends",
+    "codeLabel": "cheat.button.reveal_friends",
+    "tooltip": "Reveal idol friend relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealFriends"
+  },
+  {
+    "label": "Reveal best friends",
+    "codeLabel": "cheat.button.reveal_best_friends",
+    "tooltip": "Reveal idol best friend relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_best_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealBestFriends"
+  },
+  {
+    "label": "Reveal disliked idols",
+    "codeLabel": "cheat.button.reveal_disliked_idols",
+    "tooltip": "Reveal idol dislike and hate relationships.",
+    "codeTooltip": "cheat.tooltip.reveal_disliked_idols",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDislikedIdols"
+  },
+  {
+    "label": "Reveal cliques",
+    "codeLabel": "cheat.button.reveal_cliques",
+    "tooltip": "Reveal all idol cliques.",
+    "codeTooltip": "cheat.tooltip.reveal_cliques",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealCliques"
+  },
+  {
+    "label": "Reveal bullies",
+    "codeLabel": "cheat.button.reveal_bullies",
+    "tooltip": "Reveal all known bullying targets.",
+    "codeTooltip": "cheat.tooltip.reveal_bullies",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealBullies"
+  },
+  {
+    "label": "End all bullying",
+    "codeLabel": "cheat.button.end_all_bullying",
+    "tooltip": "Stop every active bullying relationship.",
+    "codeTooltip": "cheat.tooltip.end_all_bullying",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "EndAllBullying"
+  },
+  {
+    "label": "Reveal all relationships",
+    "codeLabel": "cheat.button.reveal_all_relationships",
+    "tooltip": "Reveal all idol relationships, cliques, and bullying targets.",
+    "codeTooltip": "cheat.tooltip.reveal_all_relationships",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealAllRelationships"
+  },
+  {
+    "label": "Reveal dating status",
+    "codeLabel": "cheat.button.reveal_dating_status",
+    "tooltip": "Reveal every idol's current dating status.",
+    "codeTooltip": "cheat.tooltip.reveal_dating_status",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDatingStatus"
+  },
+  {
+    "label": "Reveal dating preference",
+    "codeLabel": "cheat.button.reveal_dating_preference",
+    "tooltip": "Reveal every idol's dating preference.",
+    "codeTooltip": "cheat.tooltip.reveal_dating_preference",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "RevealDatingPreference"
+  },
+  {
+    "label": "End idol dating",
+    "codeLabel": "cheat.button.break_up_idol_dating",
+    "tooltip": "End all idol dating relationships except relationships with the producer.",
+    "codeTooltip": "cheat.tooltip.break_up_idol_dating",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "BreakUpIdolDatingRelationships"
+  },
+  {
+    "label": "Reset event cooldowns",
+    "codeLabel": "cheat.button.reset_special_event_cooldowns",
+    "tooltip": "Reset special event cooldowns.",
+    "codeTooltip": "cheat.tooltip.reset_special_event_cooldowns",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "ResetSpecialEventCooldowns"
+  },
+  {
+    "label": "Reset audition cooldowns",
+    "codeLabel": "cheat.button.reset_audition_cooldowns",
+    "tooltip": "Reset regional and nationwide audition cooldowns.",
+    "codeTooltip": "cheat.tooltip.reset_audition_cooldowns",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "ResetAuditionCooldowns"
+  },
+  {
+    "label": "Reset group transfer cooldowns",
+    "codeLabel": "cheat.button.reset_group_transfer_cooldowns",
+    "tooltip": "Allow all active idols to transfer between sister groups immediately.",
+    "codeTooltip": "cheat.tooltip.reset_group_transfer_cooldowns",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "ResetGroupTransferCooldowns"
+  },
+  {
+    "label": "Heal & end hiatus",
+    "codeLabel": "cheat.button.heal_and_end_hiatus",
+    "tooltip": "Set idol stamina to 100, cure depression and injuries, and return idols from hiatus.",
+    "codeTooltip": "cheat.tooltip.heal_and_end_hiatus",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "HealAndEndHiatus"
+  },
+  {
+    "label": "Cancel graduation",
+    "codeLabel": "cheat.button.cancel_graduation",
+    "tooltip": "Cancel an idol's announced graduation and choose a replacement date at least three months away.",
+    "codeTooltip": "cheat.tooltip.cancel_graduation",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenCancelGraduationPopup"
+  },
+  {
+    "label": "Change graduation date",
+    "codeLabel": "cheat.button.change_graduation_date",
+    "tooltip": "Set a non-announced idol's graduation date to a date at least three months away.",
+    "codeTooltip": "cheat.tooltip.change_graduation_date",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenChangeGraduationDatePopup"
+  },
+  {
+    "label": "Adjust selected idol stats",
+    "codeLabel": "cheat.button.selected_idol_stats",
+    "tooltip": "Pick an idol and adjust each of her eight core stats from 0 to 100.",
+    "codeTooltip": "cheat.tooltip.selected_idol_stats",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenSelectedIdolStatsPopup"
+  },
+  {
+    "label": "Set selected idol fame",
+    "codeLabel": "cheat.button.selected_idol_fame",
+    "tooltip": "Pick an idol and set fame to a chosen level from 1 to 10.",
+    "codeTooltip": "cheat.tooltip.selected_idol_fame",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenSelectedIdolFamePopup"
+  },
+  {
+    "label": "Generate idol scandal",
+    "codeLabel": "cheat.button.selected_idol_random_scandal",
+    "tooltip": "Pick an eligible idol and generate a random dating scandal event for her.",
+    "codeTooltip": "cheat.tooltip.selected_idol_random_scandal",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenSelectedIdolScandalPopup"
+  },
+  {
+    "label": "Break up selected idol",
+    "codeLabel": "cheat.button.selected_idol_breakup",
+    "tooltip": "Pick an idol and end her non-producer dating relationship.",
+    "codeTooltip": "cheat.tooltip.selected_idol_breakup",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenSelectedIdolBreakupPopup"
+  },
+  {
+    "label": "Max selected idol relationships",
+    "codeLabel": "cheat.button.selected_idol_max_relationships",
+    "tooltip": "Pick an idol and max influence, friendship, and romance with the producer.",
+    "codeTooltip": "cheat.tooltip.selected_idol_max_relationships",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenSelectedIdolMaxRelationshipsPopup"
+  },
+  {
+    "label": "Recruit unique idol",
+    "codeLabel": "cheat.button.recruit_unique_idol",
+    "tooltip": "Open a picker to recruit any loaded unique idol.",
+    "codeTooltip": "cheat.tooltip.recruit_unique_idol",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenUniqueIdolRecruitmentPopup"
+  },
+  {
+    "label": "EroEvents cheats",
+    "codeLabel": "cheat.button.eroevents_cheats",
+    "tooltip": "Open optional EroEvents progression and grind shortcuts.",
+    "codeTooltip": "cheat.tooltip.eroevents_cheats",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenEroEventsCheatsPopup"
+  },
+  {
+    "label": "Add fans",
+    "codeLabel": "cheat.button.add_custom_fans",
+    "tooltip": "Add the specified number of fans.",
+    "codeTooltip": "cheat.tooltip.add_custom_fans",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "AddFans",
+    "inputs": [
+      {
+        "id": "amount",
+        "type": "integer",
+        "label": "Fans to add",
+        "codeLabel": "cheat.input.add_custom_fans_amount",
+        "default": 10000,
+        "min": 1,
+        "max": 1000000000
+      }
+    ]
+  },
+  {
+    "label": "Complete all room activities",
+    "codeLabel": "cheat.button.complete_room_activities",
+    "tooltip": "Instantly finish each current timed room activity once, including training, production, auditions and treatment.",
+    "codeTooltip": "cheat.tooltip.complete_room_activities",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "CompleteRoomActivities"
+  },
+  {
+    "label": "Adjust friends for idol",
+    "codeLabel": "cheat.button.adjust_friends",
+    "tooltip": "Choose an idol, then add or remove friends and edit each bond value and trend.",
+    "codeTooltip": "cheat.tooltip.adjust_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustFriendsPopup"
+  },
+  {
+    "label": "Adjust best friends for idol",
+    "codeLabel": "cheat.button.adjust_best_friends",
+    "tooltip": "Choose an idol, then add or remove best friends and edit each bond value and trend.",
+    "codeTooltip": "cheat.tooltip.adjust_best_friends",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustBestFriendsPopup"
+  },
+  {
+    "label": "Adjust disliked idols for idol",
+    "codeLabel": "cheat.button.adjust_disliked_idols",
+    "tooltip": "Choose an idol, then add or remove disliked relationships and edit each bond value and trend.",
+    "codeTooltip": "cheat.tooltip.adjust_disliked_idols",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustDislikedIdolsPopup"
+  },
+  {
+    "label": "Adjust hated idols for idol",
+    "codeLabel": "cheat.button.adjust_hated_idols",
+    "tooltip": "Choose an idol, then add or remove hate relationships and edit each bond value and trend.",
+    "codeTooltip": "cheat.tooltip.adjust_hated_idols",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustHatedIdolsPopup"
+  },
+  {
+    "label": "Adjust cliques",
+    "codeLabel": "cheat.button.adjust_cliques",
+    "tooltip": "Edit existing cliques, add or remove members, choose peaceful or hostile removals, disband cliques, or create new ones.",
+    "codeTooltip": "cheat.tooltip.adjust_cliques",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustCliquePopup"
+  },
+  {
+    "label": "Adjust bullying",
+    "codeLabel": "cheat.button.adjust_bullying",
+    "tooltip": "Choose a victim, add or remove bullying cliques, then edit which selected clique members have stopped bullying.",
+    "codeTooltip": "cheat.tooltip.adjust_bullying",
+    "icon": "",
+    "assembly": "com.cosmo.cheatsmod",
+    "class": "CheatsMod.Cheats",
+    "method": "OpenAdjustBullyingPopup"
+  }
 ]
