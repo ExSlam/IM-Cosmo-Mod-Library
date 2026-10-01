@@ -1,4 +1,4 @@
-# IM Data Core 3.7.5
+# IM Data Core 3.7.6
 
 ## Release 3.7.5
 

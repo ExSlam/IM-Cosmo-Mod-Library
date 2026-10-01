@@ -551,7 +551,7 @@ namespace IMDataCore
     /// Mutations update memory only; callers explicitly persist at vanilla save
     /// boundaries or through TryFlushNow.
     /// </summary>
-    internal sealed class LightweightCoreStorageEngine : IDisposable
+    internal sealed partial class LightweightCoreStorageEngine : IDisposable
     {
         internal const string SidecarFormatName = "IMDataCore.LightweightSidecar";
         internal const int SidecarFormatVersion = 6;

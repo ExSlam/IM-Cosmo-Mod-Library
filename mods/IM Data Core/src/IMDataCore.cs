@@ -1262,7 +1262,7 @@ namespace IMDataCore
     /// <summary>
     /// Public facade that other mods can call to use IM Data Core services.
     /// </summary>
-    public static class IMDataCoreApi
+    public static partial class IMDataCoreApi
     {
         /// <summary>
         /// Returns true when the core runtime and storage backend are ready.
@@ -1754,7 +1754,7 @@ namespace IMDataCore
     /// The consumer passes its own Assembly explicitly so Assembly.GetCallingAssembly()
     /// cannot be distorted by MethodInfo.Invoke frames.
     /// </summary>
-    public static class IMDataCoreInteropApi
+    public static partial class IMDataCoreInteropApi
     {
         public static bool TryRegisterNamespace(
             string namespaceIdentifier,
@@ -2100,7 +2100,7 @@ namespace IMDataCore
     /// <summary>
     /// Compatibility alias for callers that prefer uppercase API naming.
     /// </summary>
-    public static class IMDataCoreAPI
+    public static partial class IMDataCoreAPI
     {
         /// <summary>
         /// Returns true when the core runtime and storage backend are ready.

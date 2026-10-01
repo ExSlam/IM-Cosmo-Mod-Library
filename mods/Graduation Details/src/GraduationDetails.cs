@@ -602,6 +602,7 @@ namespace GraduationDetails
     [Serializable]
     internal sealed class GraduationSnapshot
     {
+        public GraduationCareerSnapshot Career;
         public int GirlId = -1;
         public string Birthdate = "";
         public int AgeAtGraduation = -1;
@@ -2161,6 +2162,7 @@ namespace GraduationDetails
                 SetActiveSafe(__instance.Jobs_Singles, true);
                 SetActiveSafe(__instance.Jobs_Shows, true);
                 SetActiveSafe(__instance.Jobs_Contracts, true);
+                CareerProfile.Render(__instance);
                 return;
             }
 
@@ -2170,8 +2172,7 @@ namespace GraduationDetails
                 return;
             }
 
-            string earnings = ModLocalization.Get("jobs.total_earnings_prefix", "Total earnings: ")
-                + ExtensionMethods.formatMoney(girl.GetTotalEarnings(), false, false, false);
+            string earnings = CareerProfile.GetArchivedEarnings(girl);
             ExtensionMethods.SetText(__instance.Jobs_Salary, earnings);
 
             string singlesList = BuildReleasedSinglesList(girl);
@@ -2181,6 +2182,7 @@ namespace GraduationDetails
             ExtensionMethods.SetText(__instance.Jobs_Contracts, BuildCustodyText(girl));
 
             SetActiveSafe(__instance.Jobs_Singles, false);
+            CareerProfile.Render(__instance);
 
             if (__instance.Jobs_Container != null)
             {
@@ -3041,9 +3043,15 @@ namespace GraduationDetails
     [HarmonyPatch(typeof(data_girls.girls), nameof(data_girls.girls.Graduate))]
     internal static class data_girls_girls_Graduate_Patch
     {
-        private static void Prefix(data_girls.girls __instance)
+        private static void Prefix(data_girls.girls __instance, out GraduationCareerSnapshot __state)
         {
+            __state = CareerProfile.CaptureBeforeGraduation(__instance);
             GraduationSnapshotStore.Capture(__instance);
+        }
+
+        private static void Postfix(data_girls.girls __instance, GraduationCareerSnapshot __state)
+        {
+            CareerProfile.CommitGraduation(__instance, __state);
         }
     }
 

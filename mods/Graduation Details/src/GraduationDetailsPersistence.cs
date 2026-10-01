@@ -1018,7 +1018,7 @@ namespace GraduationDetails
     /// IMDC is not installed, while IMDC custom state supplies its checkpointed,
     /// fail-closed persistence when available.
     /// </summary>
-    internal static class GraduationDetailsImDataCoreBridge
+    internal static partial class GraduationDetailsImDataCoreBridge
     {
         private const string ExpectedAssemblyName = "com.cosmo.imdatacore";
         private const string ApiTypeName = "IMDataCore.IMDataCoreApi";
@@ -2999,7 +2999,8 @@ namespace GraduationDetails
                 (!string.IsNullOrEmpty(snapshot.PortraitFile) &&
                  !GraduationDetailsPaths.IsSafePortraitFileName(
                      snapshot.PortraitFile)) ||
-                snapshot.Fans == null || snapshot.Bonds == null)
+                snapshot.Fans == null || snapshot.Bonds == null ||
+                (snapshot.Career != null && !snapshot.Career.IsValid()))
             {
                 return false;
             }
@@ -4184,6 +4185,7 @@ namespace GraduationDetails
             }
             GraduationSnapshot clone = new GraduationSnapshot
             {
+                Career = source.Career == null ? null : source.Career.Clone(),
                 GirlId = source.GirlId,
                 Birthdate = source.Birthdate ?? "",
                 AgeAtGraduation = source.AgeAtGraduation,
@@ -4314,6 +4316,7 @@ namespace GraduationDetails
             if (first == null || second == null ||
                 first.GirlId != second.GirlId ||
                 first.AgeAtGraduation != second.AgeAtGraduation ||
+                !GraduationCareerSnapshot.Same(first.Career, second.Career) ||
                 !SameText(first.Birthdate, second.Birthdate) ||
                 !SameText(first.PortraitFile, second.PortraitFile) ||
                 !SameText(first.FirstName, second.FirstName) ||

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.7.6
+
+- Added TryGetIdolCareerPay to the public and reflection-friendly APIs. It totals saved per-idol salary payments from the existing payment hook without estimating past pay from current salaries or altering vanilla Total Earnings.
+- Career pay follows the selected save checkpoint, has no history paging limit, uses checked 64-bit totals, and distinguishes complete tracking from partial history using the recorded hire event and durable money-history coverage.
+- Salary batches with unexplained payment remainders or invalid per-idol allocations are excluded from career pay and reported as incomplete. Existing transaction records and sidecar 6 / journal 3 formats are unchanged.
+
 ## 3.7.5
 
 - Added player-facing instructions for running the included IMDataCore Data Migration Tool.exe before loading supported legacy 1.0.0-1.3.0 data, and clarified its scope separately from the current-only runtime loader.

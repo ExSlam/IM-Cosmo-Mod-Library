@@ -16,3 +16,11 @@ jobs.custody_player_prefix=Children Living With: Player ({0})
 jobs.custody_idol_prefix=Children Living With: Idol ({0})
 jobs.custody_none=Children: None
 
+career.not_recorded=Not recorded
+career.hire_date=Hire date: {0}
+career.graduation_date=Graduation date: {0}
+career.tenure=Tenure: {0}
+career.tenure_duration={0} yr {1} mo {2} d
+career.total_paid=Total Paid by Agency: {0}
+career.partial_pay={0} (recorded payments only; earlier or missing payments are not included)
+career.pay_unavailable=Requires updated IM Data Core
