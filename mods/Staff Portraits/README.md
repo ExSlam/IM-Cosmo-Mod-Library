@@ -25,7 +25,7 @@ Staff Portraits deliberately excludes:
 - the player/producer staff record; and
 - staff who already have any composite portrait data.
 
-Open **Action Hub > Staff Stylist** to edit an eligible staff member manually. The editor changes its preview first. **Apply** writes the selected staff-only texture assets to that staff member's existing `textureAssets` field. The mod then requests the staff object's texture refresh method when that method is available in the running game build.
+Open **Action Hub > Staff Stylist** to browse all hired non-producer staff in the mini-portrait picker. Each entry shows its name and translated job title beneath the portrait, and the selected entry is highlighted. Former idols, unique staff, and staff with other authored portraits remain visible for inspection with portrait editing disabled. Ordinary staff using this mod's own portrait parts remain editable. Hover an entry to see the game's staff card with its portrait, skill stars, name, and current assignment. The editor changes its preview first. **Apply** writes the selected staff-only texture assets to that staff member's existing `textureAssets` field. The mod then refreshes the staff texture IDs, queues the composite portrait through the same renderer used by vanilla staff loading, and refreshes staff portrait views when that request finishes. An older render request cannot refresh a newer assignment.
 
 If no valid staff portrait pack is installed, Staff Portraits leaves existing staff portraits unchanged and the Staff Stylist shows a localized explanation instead of borrowing assets from the idol pool.
 
@@ -59,9 +59,9 @@ Cosmo Mod Library's separate **Save n Load Fixes** mod contains its own general 
 
 ## UI implementation
 
-Staff Stylist uses an embedded, mod-specific copy of the IM UI Framework components used elsewhere in Cosmo Mod Library. The popup is registered with `PopupManager` so normal popup queueing, input blocking, blur/darken behavior, and close handling remain under the game's popup lifecycle.
+Staff Stylist uses an embedded, mod-specific copy of the IM UI Framework components used elsewhere in Cosmo Mod Library. The editor is constructed on first opening, after native button templates are available. The popup is registered with `PopupManager` so normal popup queueing, input blocking, blur/darken behavior, and close handling remain under the game's popup lifecycle.
 
-The popup uses the game's font handling and framework-provided panel, card, native button, and chart-arrow controls. All Staff Portraits player-facing strings are loaded through the embedded localization runtime.
+The picker alone scrolls. Its viewport and native indicator align with the preview and selector columns, and its content height follows the full grid. The indicator is disabled when the list fits. Close, Randomize, and Apply share one footer row; Close discards unapplied preview choices. The preview's empty-state message and selector text wrap inside fixed column bounds. Action buttons clone the Settings-tab scene controls using the same binding reset as Cheats Mod and Mod Buttons. Selectors preserve the Singles-chart arrow glyphs and icon font. Picker entries call TooltipManager.ShowStatusButtonTooltip's staff overload; closing the popup or leaving a clipped entry stops the hover preview. Preview textures are released when the popup closes. All Staff Portraits player-facing strings are loaded through the embedded localization runtime.
 
 ## Localization
 
@@ -85,4 +85,4 @@ The project uses the repository-level `Directory.Build.props` and expects the sa
 dotnet build "mods/Staff Portraits/Staff Portraits.csproj" -c Release
 ```
 
-The project assembly name and Harmony ID are both `com.cosmo.staffportraits`. The current mod version is `1.0.0`. The runtime package includes the Release DLL, mod metadata, thumbnail, Mod Buttons action, all seven localizations, Workshop description assets, and license. Source, tests, build intermediates, debug symbols, project files, README, and changelog are excluded from the live mod folder.
+The project assembly name and Harmony ID are both `com.cosmo.staffportraits`. The current mod version is `1.0.2`. The runtime package includes the Release DLL, mod metadata, thumbnail, Mod Buttons action, all seven localizations, Workshop description assets, and license. Source, tests, build intermediates, debug symbols, project files, README, and changelog are excluded from the live mod folder.

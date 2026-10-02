@@ -8,13 +8,29 @@ namespace StaffPortraits
 {
     internal static class StaffPortraitAssignment
     {
-        internal static bool IsEditableStaff(staff._staff staffer)
+        internal static bool IsListedStaff(staff._staff staffer)
         {
             return staffer != null
-                && !staffer.IsIdol()
                 && staffer.type != staff._type.player
-                && staffer.type != staff._type.player_female
-                && staffer.UniqueType == staff._staff._unique_type.NONE;
+                && staffer.type != staff._type.player_female;
+        }
+
+        internal static bool IsEditableStaff(staff._staff staffer)
+        {
+            if (!IsListedStaff(staffer) || staffer.UniqueType != staff._staff._unique_type.NONE)
+                return false;
+            if (!staffer.IsIdol()) return true;
+
+            // Vanilla IsIdol only checks for texture assets, so it also reports ordinary
+            // staff as idols after this mod assigns a portrait. Permit our own parts to be
+            // edited again while preserving former idols and other authored portraits.
+            foreach (data_girls.girls._textureAsset part in staffer.textureAssets)
+            {
+                string stableId;
+                if (part == null || !StaffPortraitCatalog.TryGetStableId(part.asset, out stableId))
+                    return false;
+            }
+            return true;
         }
 
         internal static void BackfillEligibleStaff()
@@ -269,6 +285,21 @@ namespace StaffPortraits
                 if (refreshMethod != null)
                 {
                     refreshMethod.Invoke(staffer, null);
+                    // UpdateTextureData replaces IDs only. As in vanilla staff loading,
+                    // queue the composite so picker thumbnails and staff cards receive sprites.
+                    data_girls.girls._texture renderedTexture = staffer.texture;
+                    data_girls.girls portraitRequest = new data_girls.girls
+                    {
+                        texture = renderedTexture,
+                        textureAssets = staffer.textureAssets
+                    };
+                    portraitRequest.TexturesUpdate += delegate
+                    {
+                        // A later Apply can replace the texture before this request completes.
+                        if (ReferenceEquals(staffer.texture, renderedTexture) && staffer.UpdatePortrait != null)
+                            staffer.UpdatePortrait();
+                    };
+                    data_girls_textures.AddToQueue(portraitRequest);
                 }
             }
             catch (Exception exception)

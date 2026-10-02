@@ -5,7 +5,8 @@ namespace StaffPortraits
 {
     /// <summary>
     /// Initializes the embedded UI framework after PopupManager has created the vanilla popup registry.
-    /// Vanilla has no Staff Portraits editor, so this patch only prepares the registered custom popup.
+    /// Build the editor only when its action is opened: Settings-tab button templates are not
+    /// guaranteed to exist yet during PopupManager.Start.
     /// </summary>
     [HarmonyPatch(typeof(PopupManager), StaffPortraitsConstants.PopupManagerStartMethodName)]
     internal static class PopupManager_Start_StaffPortraitsPatch
@@ -13,7 +14,6 @@ namespace StaffPortraits
         private static void Postfix(PopupManager __instance)
         {
             IMUiKit.Initialize(__instance);
-            StaffPortraitStylist.Initialize(__instance);
         }
     }
 

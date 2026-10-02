@@ -22,14 +22,14 @@ namespace StaffPortraits
         }
     }
 
-    internal static class StaffPortraitStylist
+    internal static partial class StaffPortraitStylist
     {
         private static readonly PopupManager._type PopupType =
             (PopupManager._type)StaffPortraitsConstants.PopupTypeValue;
 
         private static PopupManager popupManager;
         private static PopupScaffold scaffold;
-        private static readonly List<staff._staff> EditableStaff = new List<staff._staff>();
+        private static readonly List<staff._staff> PickerStaff = new List<staff._staff>();
         private static int selectedStaffIndex;
         private static StaffPortraitSelection selection;
 
@@ -128,7 +128,7 @@ namespace StaffPortraits
             ClearPreviewResources();
             PreviewLayers.Clear();
             SelectorValueTexts.Clear();
-            EditableStaff.Clear();
+            PickerStaff.Clear();
             selectedStaffIndex = StaffPortraitsConstants.FirstIndex;
             selection = null;
             staffNameText = null;
@@ -139,282 +139,7 @@ namespace StaffPortraits
             randomizeButton = null;
             scaffold = null;
             theme = null;
-        }
-
-        private static void BuildEditorUi()
-        {
-            if (scaffold == null || scaffold.ContentRoot == null)
-            {
-                return;
-            }
-
-            if (scaffold.TitleText != null)
-            {
-                scaffold.TitleText.text = Text(StaffPortraitsConstants.TitleKey, StaffPortraitsConstants.TitleFallback);
-            }
-
-            if (scaffold.CloseButton != null)
-            {
-                SetButtonText(scaffold.CloseButton, Text(StaffPortraitsConstants.CloseKey, StaffPortraitsConstants.CloseFallback));
-            }
-
-            GameObject editorRoot = new GameObject("StaffPortraitsEditorRoot", typeof(RectTransform), typeof(LayoutElement));
-            editorRoot.transform.SetParent(scaffold.ContentRoot, false);
-            RectTransform editorRect = editorRoot.GetComponent<RectTransform>();
-            editorRect.sizeDelta = new Vector2(StaffPortraitsConstants.PopupWidth - StaffPortraitsConstants.EditorWidthInset, StaffPortraitsConstants.EditorHeight);
-            LayoutElement editorLayout = editorRoot.GetComponent<LayoutElement>();
-            editorLayout.preferredHeight = StaffPortraitsConstants.EditorHeight;
-            editorLayout.minHeight = StaffPortraitsConstants.EditorHeight;
-
-            CreateStaffHeader(editorRoot.transform);
-            CreatePreview(editorRoot.transform);
-            CreateSelectors(editorRoot.transform);
-            CreateActionButtons(editorRoot.transform);
-            CreateStateMessage(editorRoot.transform);
-        }
-
-        private static void CreateStaffHeader(Transform parent)
-        {
-            staffNameText = IMUiPrimitives.CreateLabel(
-                parent,
-                string.Empty,
-                StaffPortraitsConstants.StaffNameFontSize,
-                TextAlignmentOptions.Center,
-                theme);
-            SetRect(staffNameText.rectTransform, 0f, StaffPortraitsConstants.HeaderNameYOffset, StaffPortraitsConstants.HeaderTextWidth, StaffPortraitsConstants.HeaderNameHeight, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-            staffRoleText = IMUiPrimitives.CreateLabel(
-                parent,
-                string.Empty,
-                StaffPortraitsConstants.StaffRoleFontSize,
-                TextAlignmentOptions.Center,
-                theme);
-            SetRect(staffRoleText.rectTransform, 0f, StaffPortraitsConstants.HeaderRoleYOffset, StaffPortraitsConstants.HeaderTextWidth, StaffPortraitsConstants.HeaderRoleHeight, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-            Button previousButton;
-            if (IMUiPrimitives.TryCreateButton(
-                parent,
-                IMUiButtonPreset.ChartPreviousMonth,
-                string.Empty,
-                delegate { ChangeStaff(StaffPortraitsConstants.PreviousSelectionOffset); },
-                theme,
-                out previousButton))
-            {
-                previousButton.name = "PreviousStaff";
-                SetRect(previousButton.GetComponent<RectTransform>(), -StaffPortraitsConstants.StaffNavigationXOffset, StaffPortraitsConstants.StaffNavigationYOffset,
-                    StaffPortraitsConstants.StaffNavigationButtonWidth,
-                    StaffPortraitsConstants.StaffNavigationButtonHeight,
-                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-                SetTooltip(previousButton.gameObject, Text(StaffPortraitsConstants.PreviousStaffKey, StaffPortraitsConstants.PreviousStaffFallback));
-            }
-
-            Button nextButton;
-            if (IMUiPrimitives.TryCreateButton(
-                parent,
-                IMUiButtonPreset.ChartNextMonth,
-                string.Empty,
-                delegate { ChangeStaff(StaffPortraitsConstants.NextSelectionOffset); },
-                theme,
-                out nextButton))
-            {
-                nextButton.name = "NextStaff";
-                SetRect(nextButton.GetComponent<RectTransform>(), StaffPortraitsConstants.StaffNavigationXOffset, StaffPortraitsConstants.StaffNavigationYOffset,
-                    StaffPortraitsConstants.StaffNavigationButtonWidth,
-                    StaffPortraitsConstants.StaffNavigationButtonHeight,
-                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-                SetTooltip(nextButton.gameObject, Text(StaffPortraitsConstants.NextStaffKey, StaffPortraitsConstants.NextStaffFallback));
-            }
-        }
-
-        private static void CreatePreview(Transform parent)
-        {
-            GameObject previewCard = IMUiPrimitives.CreateCard(
-                parent,
-                "PortraitPreview",
-                new Vector2(StaffPortraitsConstants.PreviewWidth, StaffPortraitsConstants.PreviewHeight),
-                theme);
-            RectTransform cardRect = previewCard.GetComponent<RectTransform>();
-            SetRect(cardRect, StaffPortraitsConstants.PreviewXOffset, StaffPortraitsConstants.MainCardsYOffset,
-                StaffPortraitsConstants.PreviewWidth,
-                StaffPortraitsConstants.PreviewHeight,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-            for (int layerIndex = 0; layerIndex < StaffPortraitsConstants.PreviewLayerCount; layerIndex++)
-            {
-                GameObject layerObject = new GameObject("PortraitLayer_" + layerIndex, typeof(RectTransform), typeof(Image));
-                layerObject.transform.SetParent(previewCard.transform, false);
-                RectTransform layerRect = layerObject.GetComponent<RectTransform>();
-                layerRect.anchorMin = new Vector2(0.5f, 0.5f);
-                layerRect.anchorMax = new Vector2(0.5f, 0.5f);
-                layerRect.pivot = new Vector2(0.5f, 0.5f);
-                layerRect.sizeDelta = new Vector2(StaffPortraitsConstants.PreviewWidth - StaffPortraitsConstants.PreviewContentInset, StaffPortraitsConstants.PreviewHeight - StaffPortraitsConstants.PreviewContentInset);
-                Image image = layerObject.GetComponent<Image>();
-                image.preserveAspect = true;
-                image.raycastTarget = false;
-                image.color = Color.white;
-                PreviewLayers.Add(image);
-            }
-        }
-
-        private static void CreateSelectors(Transform parent)
-        {
-            GameObject selectorCard = IMUiPrimitives.CreateCard(
-                parent,
-                "Selectors",
-                new Vector2(StaffPortraitsConstants.SelectorAreaWidth, StaffPortraitsConstants.SelectorAreaHeight),
-                theme);
-            RectTransform cardRect = selectorCard.GetComponent<RectTransform>();
-            SetRect(cardRect, StaffPortraitsConstants.SelectorXOffset, StaffPortraitsConstants.MainCardsYOffset,
-                StaffPortraitsConstants.SelectorAreaWidth,
-                StaffPortraitsConstants.SelectorAreaHeight,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-            float top = StaffPortraitsConstants.SelectorInitialTop;
-            packValueText = CreateSelectorRow(
-                selectorCard.transform,
-                "Pack",
-                Text(StaffPortraitsConstants.PackLabelKey, StaffPortraitsConstants.PackLabelFallback),
-                top,
-                delegate { ChangePack(StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePack(StaffPortraitsConstants.NextSelectionOffset); });
-
-            top -= StaffPortraitsConstants.SelectorRowHeight + StaffPortraitsConstants.SelectorRowSpacing;
-            SelectorValueTexts[data_girls_textures._spriteType.body] = CreateSelectorRow(
-                selectorCard.transform,
-                "Body",
-                Text(StaffPortraitsConstants.BodyLabelKey, StaffPortraitsConstants.BodyLabelFallback),
-                top,
-                delegate { ChangePart(data_girls_textures._spriteType.body, StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePart(data_girls_textures._spriteType.body, StaffPortraitsConstants.NextSelectionOffset); });
-
-            top -= StaffPortraitsConstants.SelectorRowHeight + StaffPortraitsConstants.SelectorRowSpacing;
-            SelectorValueTexts[data_girls_textures._spriteType.hair] = CreateSelectorRow(
-                selectorCard.transform,
-                "Hair",
-                Text(StaffPortraitsConstants.HairLabelKey, StaffPortraitsConstants.HairLabelFallback),
-                top,
-                delegate { ChangePart(data_girls_textures._spriteType.hair, StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePart(data_girls_textures._spriteType.hair, StaffPortraitsConstants.NextSelectionOffset); });
-
-            top -= StaffPortraitsConstants.SelectorRowHeight + StaffPortraitsConstants.SelectorRowSpacing;
-            SelectorValueTexts[data_girls_textures._spriteType.face] = CreateSelectorRow(
-                selectorCard.transform,
-                "Face",
-                Text(StaffPortraitsConstants.FaceLabelKey, StaffPortraitsConstants.FaceLabelFallback),
-                top,
-                delegate { ChangePart(data_girls_textures._spriteType.face, StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePart(data_girls_textures._spriteType.face, StaffPortraitsConstants.NextSelectionOffset); });
-
-            top -= StaffPortraitsConstants.SelectorRowHeight + StaffPortraitsConstants.SelectorRowSpacing;
-            SelectorValueTexts[data_girls_textures._spriteType.acc] = CreateSelectorRow(
-                selectorCard.transform,
-                "Accessory",
-                Text(StaffPortraitsConstants.AccessoryLabelKey, StaffPortraitsConstants.AccessoryLabelFallback),
-                top,
-                delegate { ChangePart(data_girls_textures._spriteType.acc, StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePart(data_girls_textures._spriteType.acc, StaffPortraitsConstants.NextSelectionOffset); });
-        }
-
-        private static TextMeshProUGUI CreateSelectorRow(
-            Transform parent,
-            string objectName,
-            string label,
-            float top,
-            UnityAction onPrevious,
-            UnityAction onNext)
-        {
-            GameObject row = new GameObject(objectName + "Row", typeof(RectTransform));
-            row.transform.SetParent(parent, false);
-            RectTransform rowRect = row.GetComponent<RectTransform>();
-            SetRect(rowRect, 0f, top, StaffPortraitsConstants.SelectorAreaWidth - StaffPortraitsConstants.SelectorInnerHorizontalInset, StaffPortraitsConstants.SelectorRowHeight,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-            TextMeshProUGUI labelText = IMUiPrimitives.CreateLabel(
-                row.transform,
-                label,
-                StaffPortraitsConstants.SelectorFontSize,
-                TextAlignmentOptions.Left,
-                theme);
-            SetRect(labelText.rectTransform, StaffPortraitsConstants.SelectorLabelXOffset, 0f, StaffPortraitsConstants.SelectorLabelWidth, StaffPortraitsConstants.SelectorRowHeight,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-
-            TextMeshProUGUI valueText = IMUiPrimitives.CreateLabel(
-                row.transform,
-                string.Empty,
-                StaffPortraitsConstants.SelectorValueFontSize,
-                TextAlignmentOptions.Center,
-                theme);
-            valueText.enableWordWrapping = false;
-            valueText.overflowMode = TextOverflowModes.Ellipsis;
-            SetRect(valueText.rectTransform, 0f, 0f, StaffPortraitsConstants.SelectorValueWidth, StaffPortraitsConstants.SelectorRowHeight,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-
-            Button previous;
-            if (IMUiPrimitives.TryCreateButton(
-                row.transform, IMUiButtonPreset.ChartPreviousMonth, string.Empty, onPrevious, theme, out previous))
-            {
-                SetRect(previous.GetComponent<RectTransform>(), StaffPortraitsConstants.SelectorPreviousXOffset, 0f,
-                    StaffPortraitsConstants.SelectorArrowSize, StaffPortraitsConstants.SelectorArrowSize,
-                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-            }
-
-            Button next;
-            if (IMUiPrimitives.TryCreateButton(
-                row.transform, IMUiButtonPreset.ChartNextMonth, string.Empty, onNext, theme, out next))
-            {
-                SetRect(next.GetComponent<RectTransform>(), StaffPortraitsConstants.SelectorNextXOffset, 0f,
-                    StaffPortraitsConstants.SelectorArrowSize, StaffPortraitsConstants.SelectorArrowSize,
-                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-            }
-
-            return valueText;
-        }
-
-        private static void CreateActionButtons(Transform parent)
-        {
-            float totalWidth = StaffPortraitsConstants.ActionButtonWidth * 2f + StaffPortraitsConstants.ActionButtonSpacing;
-            float leftX = -totalWidth / 2f + StaffPortraitsConstants.ActionButtonWidth / 2f;
-            float rightX = totalWidth / 2f - StaffPortraitsConstants.ActionButtonWidth / 2f;
-
-            if (IMUiPrimitives.TryCreateButton(
-                parent,
-                IMUiButtonPreset.Basic,
-                Text(StaffPortraitsConstants.RandomizeKey, StaffPortraitsConstants.RandomizeFallback),
-                RandomizeSelection,
-                theme,
-                out randomizeButton))
-            {
-                SetRect(randomizeButton.GetComponent<RectTransform>(), leftX, StaffPortraitsConstants.ActionButtonsYOffset,
-                    StaffPortraitsConstants.ActionButtonWidth, StaffPortraitsConstants.ActionButtonHeight,
-                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-            }
-
-            if (IMUiPrimitives.TryCreateButton(
-                parent,
-                IMUiButtonPreset.Basic,
-                Text(StaffPortraitsConstants.ApplyKey, StaffPortraitsConstants.ApplyFallback),
-                ApplySelection,
-                theme,
-                out applyButton))
-            {
-                SetRect(applyButton.GetComponent<RectTransform>(), rightX, StaffPortraitsConstants.ActionButtonsYOffset,
-                    StaffPortraitsConstants.ActionButtonWidth, StaffPortraitsConstants.ActionButtonHeight,
-                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-            }
-        }
-
-        private static void CreateStateMessage(Transform parent)
-        {
-            stateText = IMUiPrimitives.CreateLabel(
-                parent,
-                string.Empty,
-                StaffPortraitsConstants.StateMessageFontSize,
-                TextAlignmentOptions.Center,
-                theme);
-            stateText.enableWordWrapping = true;
-            SetRect(stateText.rectTransform, 0f, StaffPortraitsConstants.StateMessageYOffset, StaffPortraitsConstants.StateMessageWidth, StaffPortraitsConstants.StateMessageHeight,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-            stateText.gameObject.SetActive(false);
+            ResetPickerUi();
         }
 
         private static void OnOpened()
@@ -425,19 +150,20 @@ namespace StaffPortraits
             }
             if (scaffold != null && scaffold.CloseButton != null)
             {
-                SetButtonText(scaffold.CloseButton, Text(StaffPortraitsConstants.CloseKey, StaffPortraitsConstants.CloseFallback));
+                StaffPortraitUi.SetButtonText(scaffold.CloseButton, Text(StaffPortraitsConstants.CloseKey, StaffPortraitsConstants.CloseFallback));
             }
 
             StaffPortraitCatalog.EnsureLoaded();
-            RefreshEditableStaff();
-            selectedStaffIndex = Mathf.Clamp(selectedStaffIndex, 0, Mathf.Max(0, EditableStaff.Count - 1));
+            RefreshPickerStaff();
+            selectedStaffIndex = Mathf.Clamp(selectedStaffIndex, 0, Mathf.Max(0, PickerStaff.Count - 1));
+            RebuildStaffPicker();
             LoadCurrentStaffSelection();
             Render();
         }
 
-        private static void RefreshEditableStaff()
+        private static void RefreshPickerStaff()
         {
-            EditableStaff.Clear();
+            PickerStaff.Clear();
             if (staff.Staff == null)
             {
                 return;
@@ -446,37 +172,26 @@ namespace StaffPortraits
             for (int staffIndex = 0; staffIndex < staff.Staff.Count; staffIndex++)
             {
                 staff._staff staffer = staff.Staff[staffIndex];
-                if (StaffPortraitAssignment.IsEditableStaff(staffer))
+                if (StaffPortraitAssignment.IsListedStaff(staffer))
                 {
-                    EditableStaff.Add(staffer);
+                    PickerStaff.Add(staffer);
                 }
             }
         }
 
         private static void LoadCurrentStaffSelection()
         {
-            if (EditableStaff.Count == 0 || StaffPortraitCatalog.AllPacks.Count == 0)
+            if (PickerStaff.Count == 0 || StaffPortraitCatalog.AllPacks.Count == 0
+                || !StaffPortraitAssignment.IsEditableStaff(PickerStaff[selectedStaffIndex]))
             {
                 selection = null;
                 return;
             }
 
-            staff._staff staffer = EditableStaff[selectedStaffIndex];
+            staff._staff staffer = PickerStaff[selectedStaffIndex];
             StaffPortraitPack fallbackPack = StaffPortraitCatalog.AllPacks[0];
             selection = StaffPortraitAssignment.CreateSelectionFromCurrentPortrait(staffer, fallbackPack);
             NormalizeSelection();
-        }
-
-        private static void ChangeStaff(int offset)
-        {
-            if (EditableStaff.Count == 0)
-            {
-                return;
-            }
-
-            selectedStaffIndex = WrapIndex(selectedStaffIndex + offset, EditableStaff.Count);
-            LoadCurrentStaffSelection();
-            Render();
         }
 
         private static void ChangePack(int offset)
@@ -552,12 +267,12 @@ namespace StaffPortraits
 
         private static void ApplySelection()
         {
-            if (EditableStaff.Count == 0 || selection == null)
+            if (PickerStaff.Count == 0 || selection == null)
             {
                 return;
             }
 
-            staff._staff staffer = EditableStaff[selectedStaffIndex];
+            staff._staff staffer = PickerStaff[selectedStaffIndex];
             if (!StaffPortraitAssignment.Apply(staffer, selection))
             {
                 return;
@@ -597,17 +312,18 @@ namespace StaffPortraits
 
         private static void Render()
         {
-            bool hasStaff = EditableStaff.Count > 0;
+            bool hasStaff = PickerStaff.Count > 0;
             bool hasPacks = StaffPortraitCatalog.AllPacks.Count > 0;
-            bool ready = hasStaff && hasPacks && selection != null && selection.Pack != null && selection.Pack.HasRequiredAssets;
+            bool editable = hasStaff && StaffPortraitAssignment.IsEditableStaff(PickerStaff[selectedStaffIndex]);
+            bool ready = editable && hasPacks && selection != null && selection.Pack != null && selection.Pack.HasRequiredAssets;
 
             if (staffNameText != null)
             {
-                staffNameText.text = hasStaff ? EditableStaff[selectedStaffIndex].GetName(true, false) : string.Empty;
+                staffNameText.text = hasStaff ? PickerStaff[selectedStaffIndex].GetName(true, false) : string.Empty;
             }
             if (staffRoleText != null)
             {
-                staffRoleText.text = hasStaff ? EditableStaff[selectedStaffIndex].GetJobTitle() : string.Empty;
+                staffRoleText.text = hasStaff ? GetStaffJobTitle(PickerStaff[selectedStaffIndex]) : string.Empty;
             }
 
             if (stateText != null)
@@ -616,6 +332,10 @@ namespace StaffPortraits
                 if (!hasStaff)
                 {
                     stateMessage = Text(StaffPortraitsConstants.NoStaffKey, StaffPortraitsConstants.NoStaffFallback);
+                }
+                else if (!editable)
+                {
+                    stateMessage = Text(StaffPortraitsConstants.ProtectedPortraitKey, StaffPortraitsConstants.ProtectedPortraitFallback);
                 }
                 else if (!hasPacks)
                 {
@@ -631,13 +351,13 @@ namespace StaffPortraits
 
             if (applyButton != null)
             {
-                applyButton.interactable = ready;
-                SetButtonText(applyButton, Text(StaffPortraitsConstants.ApplyKey, StaffPortraitsConstants.ApplyFallback));
+                StaffPortraitUi.SetInteractable(applyButton, ready);
+                StaffPortraitUi.SetButtonText(applyButton, Text(StaffPortraitsConstants.ApplyKey, StaffPortraitsConstants.ApplyFallback));
             }
             if (randomizeButton != null)
             {
-                randomizeButton.interactable = ready;
-                SetButtonText(randomizeButton, Text(StaffPortraitsConstants.RandomizeKey, StaffPortraitsConstants.RandomizeFallback));
+                StaffPortraitUi.SetInteractable(randomizeButton, ready);
+                StaffPortraitUi.SetButtonText(randomizeButton, Text(StaffPortraitsConstants.RandomizeKey, StaffPortraitsConstants.RandomizeFallback));
             }
 
             if (packValueText != null)
@@ -648,6 +368,9 @@ namespace StaffPortraits
             UpdateSelectorValue(data_girls_textures._spriteType.hair, selection != null ? selection.HairIndex : -1);
             UpdateSelectorValue(data_girls_textures._spriteType.face, selection != null ? selection.FaceIndex : -1);
             UpdateSelectorValue(data_girls_textures._spriteType.acc, selection != null ? selection.AccessoryIndex : -1);
+            RefreshPickerSelection();
+            foreach (Button selectorButton in SelectorButtons)
+                StaffPortraitUi.SetInteractable(selectorButton, editable && hasPacks);
             RenderPreview(ready);
         }
 
@@ -839,46 +562,5 @@ namespace StaffPortraits
             return ModLocalization.Get(key, fallback);
         }
 
-        private static void SetRect(
-            RectTransform rect,
-            float x,
-            float y,
-            float width,
-            float height,
-            Vector2 anchor,
-            Vector2 pivot)
-        {
-            if (rect == null)
-            {
-                return;
-            }
-            rect.anchorMin = anchor;
-            rect.anchorMax = anchor;
-            rect.pivot = pivot;
-            rect.sizeDelta = new Vector2(width, height);
-            rect.anchoredPosition = new Vector2(x, y);
-        }
-
-        private static void SetButtonText(Button button, string text)
-        {
-            if (button == null)
-            {
-                return;
-            }
-            TextMeshProUGUI label = button.gameObject.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null)
-            {
-                label.text = text ?? string.Empty;
-            }
-        }
-
-        private static void SetTooltip(GameObject target, string tooltipText)
-        {
-            if (target == null || string.IsNullOrEmpty(tooltipText))
-            {
-                return;
-            }
-            IMUiKit.SetTooltip(target, tooltipText);
-        }
     }
 }
