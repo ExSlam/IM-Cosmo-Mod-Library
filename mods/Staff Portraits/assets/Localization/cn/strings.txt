@@ -1,0 +1,21 @@
+# Staff Portraits localization
+# Keep keys identical across all languages.
+
+ui.title=员工造型师
+common.close=关闭
+ui.staff.previous=上一位员工
+ui.staff.next=下一位员工
+ui.selector.pack=肖像包
+ui.selector.body=服装
+ui.selector.hair=发型
+ui.selector.face=面部
+ui.selector.accessory=配饰
+ui.selector.none=无
+ui.button.randomize=随机
+ui.button.apply=应用
+ui.state.no_staff=没有可编辑的员工。
+ui.state.no_packs=未安装员工肖像包。请添加一个包含 StaffPortraits/pack.json 的已启用模组。
+ui.state.pack_empty=此肖像包缺少所需的身体、头发或面部部件。
+notification.applied=已更新 {0} 的员工肖像。
+actionhub.staff_stylist.label=员工造型师
+actionhub.staff_stylist.tooltip=选择普通员工并自定义其员工肖像。

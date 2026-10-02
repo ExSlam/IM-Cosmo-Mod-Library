@@ -1,0 +1,21 @@
+# Staff Portraits localization
+# Keep keys identical across all languages.
+
+ui.title=スタッフスタイリスト
+common.close=閉じる
+ui.staff.previous=前のスタッフ
+ui.staff.next=次のスタッフ
+ui.selector.pack=ポートレートパック
+ui.selector.body=衣装
+ui.selector.hair=髪型
+ui.selector.face=顔
+ui.selector.accessory=アクセサリー
+ui.selector.none=なし
+ui.button.randomize=ランダム
+ui.button.apply=適用
+ui.state.no_staff=編集できるスタッフがいません。
+ui.state.no_packs=スタッフ用ポートレートパックがありません。StaffPortraits/pack.json を含む有効なMODを追加してください。
+ui.state.pack_empty=このポートレートパックには必要な体・髪・顔のパーツがありません。
+notification.applied={0} のスタッフポートレートを更新しました。
+actionhub.staff_stylist.label=スタッフスタイリスト
+actionhub.staff_stylist.tooltip=通常のスタッフを選び、スタッフポートレートをカスタマイズします。

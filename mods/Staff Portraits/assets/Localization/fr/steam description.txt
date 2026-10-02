@@ -1,0 +1,22 @@
+[h1]Staff Portraits[/h1]
+
+Donne au personnel ordinaire des portraits composites personnalisables provenant d'un ensemble de ressources réservé au personnel.
+
+[b]Auteur : Cosmo[/b]
+
+[h1]Fonctions[/h1]
+[list]
+[*]Portraits aléatoires lorsqu'un pack de portraits du personnel valide est installé.
+[*]Styliste du personnel dans l'Action Hub de Mod Buttons.
+[*]Choix du pack, de la tenue/corps, des cheveux, du visage et d'un accessoire facultatif.
+[*]Aperçu, génération aléatoire et application des changements.
+[*]Les ressources du personnel restent séparées de celles des idols.
+[/list]
+
+[h1]Prérequis[/h1]
+[list]
+[*]Mod Buttons est requis pour ouvrir le styliste.
+[*]Un pack contenant StaffPortraits/pack.json est requis pour de nouveaux portraits.
+[/list]
+
+Le joueur/producteur, les anciennes idols devenues employées, le personnel unique nommé et le personnel possédant déjà des données de portrait composite ne sont pas remplacés automatiquement. Le mod de base n'utilise pas les illustrations des idols. Gardez activés les packs utilisés par une sauvegarde ; si un pack requis manque au chargement, réactivez-le puis rechargez la sauvegarde avant d'enregistrer à nouveau.

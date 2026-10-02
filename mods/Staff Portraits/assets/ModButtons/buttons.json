@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Staff Stylist",
+    "codeLabel": "actionhub.staff_stylist.label",
+    "tooltip": "Choose an ordinary staff member and customize their staff portrait.",
+    "codeTooltip": "actionhub.staff_stylist.tooltip",
+    "icon": "",
+    "assembly": "com.cosmo.staffportraits",
+    "class": "StaffPortraits.StaffPortraitActions",
+    "method": "OpenStaffStylist"
+  }
+]

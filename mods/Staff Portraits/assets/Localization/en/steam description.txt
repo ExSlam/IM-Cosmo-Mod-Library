@@ -1,0 +1,22 @@
+[h1]Staff Portraits[/h1]
+
+Give ordinary agency staff customizable composite portraits from a dedicated staff-only portrait pool.
+
+[b]Author: Cosmo[/b]
+
+[h1]Features[/h1]
+[list]
+[*]Random staff portraits when a valid staff portrait pack is installed.
+[*]Staff Stylist in the Mod Buttons Action Hub.
+[*]Choose portrait pack, outfit/body, hair, face, and optional accessory.
+[*]Preview, randomize, and apply changes.
+[*]Staff portrait assets remain separate from the idol portrait pool.
+[/list]
+
+[h1]Requirements[/h1]
+[list]
+[*]Mod Buttons is required to open Staff Stylist.
+[*]A staff portrait pack containing StaffPortraits/pack.json is required for new portraits.
+[/list]
+
+Former idols, unique named staff, and staff who already have composite portraits are not automatically replaced. The base mod does not borrow idol artwork. Keep portrait packs used by a save enabled so their artwork remains available.

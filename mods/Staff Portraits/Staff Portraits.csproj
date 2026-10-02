@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ModName>Staff Portraits</ModName>
+    <RootNamespace>StaffPortraits</RootNamespace>
+    <AssemblyName>com.cosmo.staffportraits</AssemblyName>
+    <Version>1.0.0</Version>
+    <Authors>Cosmo</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\StaffPortraitsConstants.cs" />
+    <Compile Include="src\StaffPortraitModels.cs" />
+    <Compile Include="src\StaffPortraitCatalog.cs" />
+    <Compile Include="src\StaffPortraitAssignment.cs" />
+    <Compile Include="src\StaffPortraitPatches.cs" />
+    <Compile Include="src\StaffPortraitStylist.cs" />
+    <Compile Include="src\EmbeddedIMUiFramework\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="DOTween" Private="false">
+      <HintPath>$(dllDir)\DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextCoreModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.TextCoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule" Private="false">
+      <HintPath>$(dllDir)\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

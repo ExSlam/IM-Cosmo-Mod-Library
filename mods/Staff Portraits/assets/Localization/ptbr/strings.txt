@@ -1,0 +1,21 @@
+# Staff Portraits localization
+# Keep keys identical across all languages.
+
+ui.title=Estilista da Equipe
+common.close=Fechar
+ui.staff.previous=Funcionário anterior
+ui.staff.next=Próximo funcionário
+ui.selector.pack=Pacote de retratos
+ui.selector.body=Roupa
+ui.selector.hair=Cabelo
+ui.selector.face=Rosto
+ui.selector.accessory=Acessório
+ui.selector.none=Nenhum
+ui.button.randomize=Aleatório
+ui.button.apply=Aplicar
+ui.state.no_staff=Não há funcionários editáveis disponíveis.
+ui.state.no_packs=Nenhum pacote de retratos da equipe está instalado. Adicione um mod ativado que contenha StaffPortraits/pack.json.
+ui.state.pack_empty=Este pacote não contém as partes obrigatórias de corpo, cabelo e rosto.
+notification.applied=O retrato de {0} foi atualizado.
+actionhub.staff_stylist.label=Estilista da Equipe
+actionhub.staff_stylist.tooltip=Escolha um funcionário comum e personalize o retrato dele.
