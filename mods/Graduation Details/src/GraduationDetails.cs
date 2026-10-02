@@ -1551,15 +1551,15 @@ namespace GraduationDetails
 
         internal static bool IsFor(data_girls.girls girl)
         {
-            if (!Active || girl == null || girl.id != GirlId)
+            if (girl == null)
             {
                 return false;
             }
-            if (!AllowNonGraduated && girl.status != data_girls._status.graduated)
-            {
-                return false;
-            }
-            return true;
+            // A graduated idol always uses her archive, regardless of which profile
+            // entry point opened it or whether another popup cleared temporary state.
+            // The explicit staff context remains necessary for non-graduated idols.
+            return girl.status == data_girls._status.graduated ||
+                (Active && AllowNonGraduated && girl.id == GirlId);
         }
 
         internal static void Clear()
@@ -1620,8 +1620,7 @@ namespace GraduationDetails
 
             try
             {
-                GraduationDetailsState.Begin(girl, allowNonGraduated);
-                if (OpenProfile(girl))
+                if (OpenProfile(girl, allowNonGraduated))
                 {
                     return true;
                 }
@@ -1636,7 +1635,7 @@ namespace GraduationDetails
             return false;
         }
 
-        private static bool OpenProfile(data_girls.girls girl)
+        private static bool OpenProfile(data_girls.girls girl, bool allowNonGraduated)
         {
             if (girl == null || Camera.main == null)
             {
@@ -1663,6 +1662,9 @@ namespace GraduationDetails
                 return false;
             }
             popupManager.Open(PopupManager._type.girl_profile, true);
+            // Establish context after popup lifecycle callbacks, immediately before
+            // Set renders the header and selected tab.
+            GraduationDetailsState.Begin(girl, allowNonGraduated);
             profile.Set(girl);
             profile.SetTab(Profile_Popup._tabs.jobs);
             return true;
@@ -2013,7 +2015,11 @@ namespace GraduationDetails
     {
         private static void Prefix(Profile_Popup __instance, data_girls.girls _Girl)
         {
-            if (_Girl == null || !GraduationDetailsState.IsFor(_Girl))
+            if (_Girl != null && _Girl.status == data_girls._status.graduated)
+            {
+                GraduationDetailsState.Begin(_Girl);
+            }
+            else if (!GraduationDetailsState.IsFor(_Girl))
             {
                 GraduationDetailsState.Clear();
             }
@@ -2037,7 +2043,6 @@ namespace GraduationDetails
                     return;
                 }
                 ApplySnapshotDob(__instance, snapshot);
-                ApplySnapshotPortrait(__instance, snapshot);
             }
             catch (Exception ex)
             {
@@ -2075,20 +2080,19 @@ namespace GraduationDetails
             ExtensionMethods.SetText(profile.Header_DateOfBirth, text);
         }
 
-        private static void ApplySnapshotPortrait(Profile_Popup profile, GraduationSnapshot snapshot)
+        internal static bool TryApplySnapshotPortrait(Profile_Popup profile, GraduationSnapshot snapshot)
         {
             if (profile == null || profile.Girl == null || snapshot == null)
             {
-                return;
+                return false;
             }
 
-            // RenderHeader has already asked vanilla to render the live idol. In the
-            // overwhelmingly common case the graduated idol still carries the exact
-            // archived portrait identity, so doing nothing is both correct and safer.
-            // In particular this avoids duplicate Addressables loads for built-in unique idols.
+            // The RenderPortrait prefix chooses one source before any image load starts.
+            // If live and archived identities match, let vanilla handle that source.
+            // Otherwise render the archive alone so a later live callback cannot replace it.
             if (GraduationSnapshotStore.PortraitReferencesMatchCurrent(snapshot, profile.Girl))
             {
-                return;
+                return false;
             }
 
             data_girls.girls portraitGirl;
@@ -2109,7 +2113,7 @@ namespace GraduationDetails
                     if (targets.Count > 0)
                     {
                         textures._setFullPortrait(portraitGirl, targets);
-                        return;
+                        return true;
                     }
                 }
             }
@@ -2118,13 +2122,13 @@ namespace GraduationDetails
             string portraitPath = GraduationSnapshotStore.GetPortraitPath(snapshot);
             if (string.IsNullOrEmpty(portraitPath) || !File.Exists(portraitPath))
             {
-                return;
+                return false;
             }
             Image portrait = profile.Portrait != null ? profile.Portrait.GetComponent<Image>() : null;
             Image shadow = profile.Portrait_Shadow != null ? profile.Portrait_Shadow.GetComponent<Image>() : null;
             if (portrait == null && shadow == null)
             {
-                return;
+                return false;
             }
             string cacheKey = ("file://" + portraitPath).Replace("\\", "").Replace("/", "");
             Sprite cached = LoadTexture.GetSprite(cacheKey);
@@ -2132,7 +2136,7 @@ namespace GraduationDetails
             {
                 if (portrait != null) portrait.sprite = cached;
                 if (shadow != null) shadow.sprite = cached;
-                return;
+                return true;
             }
             if (LoadTexture.instance != null)
             {
@@ -2144,6 +2148,36 @@ namespace GraduationDetails
                 {
                     LoadTexture.instance.StartCoroutine(LoadTexture.LoadSprite(portraitPath, shadow, null));
                 }
+                return true;
+            }
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(Profile_Popup), Profile_Popup_RenderPortrait_Patch.MethodName)]
+    internal static class Profile_Popup_RenderPortrait_Patch
+    {
+        internal const string MethodName = "RenderPortrait";
+        private const string RenderFailureMessage =
+            "Graduation Details: archived portrait selection failed: ";
+
+        private static bool Prefix(Profile_Popup __instance)
+        {
+            if (__instance == null || !GraduationDetailsState.IsFor(__instance.Girl))
+            {
+                return true;
+            }
+            try
+            {
+                GraduationSnapshot snapshot =
+                    GraduationSnapshotStore.GetSnapshot(__instance.Girl.id);
+                return !Profile_Popup_RenderHeader_Patch.TryApplySnapshotPortrait(
+                    __instance, snapshot);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(RenderFailureMessage + exception);
+                return true;
             }
         }
     }

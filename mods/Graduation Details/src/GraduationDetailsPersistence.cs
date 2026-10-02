@@ -1951,6 +1951,7 @@ namespace GraduationDetails
             SaveManager.SavedData loadedSaveData,
             string dataFileName)
         {
+            GraduationDetailsState.Clear();
             GraduationDetailsImDataCoreBridge.ResetBranchState();
             GraduationDetailsStorageEngine loadedEngine =
                 new GraduationDetailsStorageEngine();
@@ -2222,6 +2223,7 @@ namespace GraduationDetails
         {
             try
             {
+                GraduationDetailsState.Clear();
                 GraduationDetailsImDataCoreBridge.ResetBranchState();
                 lock (PersistenceLock)
                 {
