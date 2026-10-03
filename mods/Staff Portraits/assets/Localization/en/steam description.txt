@@ -1,22 +1,23 @@
 [h1]Staff Portraits[/h1]
 
-Give ordinary agency staff customizable composite portraits from a dedicated staff-only portrait pool.
+Give ordinary agency staff customizable composite portraits from dedicated staff packs or compatible loaded Unique Idol packs.
 
 [b]Author: Cosmo[/b]
 
 [h1]Features[/h1]
 [list]
-[*]Random staff portraits when a valid staff portrait pack is installed.
+[*]Random automatic portraits from dedicated Staff Packs.
 [*]Staff Stylist in the Mod Buttons Action Hub.
-[*]Choose portrait pack, outfit/body, hair, face, and optional accessory.
-[*]Preview, randomize, and apply changes.
-[*]Staff portrait assets remain separate from the idol portrait pool.
+[*]Switch between Staff Packs and Unique Idol Packs.
+[*]Choose pack, outfit/body, hair, face, and optional accessory, then preview, randomize, and apply.
+[*]Unique Idol mode reuses compatible artwork already loaded by Idol Manager instead of copying it.
 [/list]
 
 [h1]Requirements[/h1]
 [list]
 [*]Mod Buttons is required to open Staff Stylist.
-[*]A staff portrait pack containing StaffPortraits/pack.json is required for new portraits.
+[*]Automatic portraits require a dedicated pack containing StaffPortraits/pack.json.
+[*]Manual Unique Idol styling requires an enabled compatible unique-idol mod with complete 1024 x 1500 body, hair, and face assets.
 [/list]
 
-Former idols, unique named staff, and staff who already have composite portraits are not automatically replaced. The base mod does not borrow idol artwork. Keep portrait packs used by a save enabled so their artwork remains available.
+The player/producer, former idols who became staff, unique named staff, and staff with existing composite portraits are not automatically replaced. Unique Idol artwork is manual-only and is never used for automatic hiring/backfill assignments. Keep every Staff Pack or Unique Idol source used by a save enabled.

@@ -29,11 +29,11 @@ def load_strings(path):
 def main():
     info = json.loads((MOD_ROOT / "assets" / "info.json").read_text(encoding="utf-8"))
     require(info["Author"] == "Cosmo", "metadata credits Cosmo as author")
-    require(info["Version"] == "1.0.0", "metadata version is 1.0.0")
+    require(info["Version"] == "1.0.4", "metadata version is 1.0.4")
     require(info["HarmonyID"] == "com.cosmo.staffportraits", "Harmony ID is stable")
 
     project = (MOD_ROOT / "Staff Portraits.csproj").read_text(encoding="utf-8")
-    require("<Version>1.0.0</Version>" in project, "project version matches metadata")
+    require("<Version>1.0.4</Version>" in project, "project version matches metadata")
     require("<Authors>Cosmo</Authors>" in project, "project credits Cosmo as author")
     require("<AssemblyName>com.cosmo.staffportraits</AssemblyName>" in project, "assembly identity matches Mod Buttons action")
 
@@ -61,6 +61,13 @@ def main():
     require("PortraitCanvasHeightPixels = 1500" in source, "portrait pack canvas height is fixed to 1500 pixels")
     require("value.Length > StaffPortraitsConstants.MaximumIdentifierCharacters" in source, "identifier length limit uses a named constant")
     require("StaffPortraitActions" in source and "OpenStaffStylist" in source, "Action Hub entry point exists")
+    require("StaffPortraitUi.SetInteractable(sourceSelectorButton, editable);" in source,
+            "pack-source selector stays usable when the active source is empty")
+    unique_catalog = (MOD_ROOT / "src" / "UniqueIdolPortraitCatalog.cs").read_text(encoding="utf-8")
+    require("StaffPortraitCatalog.IsPortraitCanvasFile" not in unique_catalog,
+            "unique-idol discovery does not impose the dedicated staff-pack canvas contract")
+    require("UniqueIdolPortraitCatalog.Refresh();" in source,
+            "switching to unique-idol packs refreshes runtime discovery")
 
     buttons = json.loads((MOD_ROOT / "assets" / "ModButtons" / "buttons.json").read_text(encoding="utf-8"))
     require(len(buttons) == 1, "exactly one Mod Buttons action is declared")

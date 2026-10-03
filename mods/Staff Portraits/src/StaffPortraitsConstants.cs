@@ -50,6 +50,9 @@ namespace StaffPortraits
         internal const string CloseKey = "common.close";
         internal const string PreviousStaffKey = "ui.staff.previous";
         internal const string NextStaffKey = "ui.staff.next";
+        internal const string PackSourceLabelKey = "ui.selector.source";
+        internal const string StaffPackSourceKey = "ui.selector.source.staff";
+        internal const string UniqueIdolPackSourceKey = "ui.selector.source.unique";
         internal const string PackLabelKey = "ui.selector.pack";
         internal const string BodyLabelKey = "ui.selector.body";
         internal const string HairLabelKey = "ui.selector.hair";
@@ -62,6 +65,8 @@ namespace StaffPortraits
         internal const string ProtectedPortraitKey = "ui.state.protected_portrait";
         internal const string JobUnavailableKey = "ui.staff.job_unavailable";
         internal const string NoPacksKey = "ui.state.no_packs";
+        internal const string NoStaffPacksKey = "ui.state.no_staff_packs";
+        internal const string NoUniqueIdolPacksKey = "ui.state.no_unique_idol_packs";
         internal const string PackEmptyKey = "ui.state.pack_empty";
         internal const string AppliedNotificationKey = "notification.applied";
         internal const string ActionHubLabelKey = "actionhub.staff_stylist.label";
@@ -71,6 +76,9 @@ namespace StaffPortraits
         internal const string CloseFallback = "Close";
         internal const string PreviousStaffFallback = "Previous staff member";
         internal const string NextStaffFallback = "Next staff member";
+        internal const string PackSourceLabelFallback = "Pack Source";
+        internal const string StaffPackSourceFallback = "Staff Packs";
+        internal const string UniqueIdolPackSourceFallback = "Unique Idol Packs";
         internal const string PackLabelFallback = "Portrait Pack";
         internal const string BodyLabelFallback = "Outfit";
         internal const string HairLabelFallback = "Hair";
@@ -82,7 +90,9 @@ namespace StaffPortraits
         internal const string NoStaffFallback = "No staff members are available.";
         internal const string ProtectedPortraitFallback = "This staff member keeps their original portrait. You can view their staff card, but cannot change their portrait here.";
         internal const string JobUnavailableFallback = "Job unavailable";
-        internal const string NoPacksFallback = "No staff portrait packs are installed. Enable a staff portrait pack to customize this portrait.";
+        internal const string NoPacksFallback = "No portrait packs are available.";
+        internal const string NoStaffPacksFallback = "No staff portrait packs are installed. Switch to Unique Idol Packs or enable a staff portrait pack.";
+        internal const string NoUniqueIdolPacksFallback = "No loaded unique idol packs were found. Switch to Staff Packs or enable a unique-idol mod.";
         internal const string PackEmptyFallback = "This portrait pack does not contain the required body, hair, and face parts.";
         internal const string AppliedNotificationFallback = "Updated {0}'s staff portrait.";
     }

@@ -27,7 +27,7 @@ namespace StaffPortraits
             foreach (data_girls.girls._textureAsset part in staffer.textureAssets)
             {
                 string stableId;
-                if (part == null || !StaffPortraitCatalog.TryGetStableId(part.asset, out stableId))
+                if (part == null || !TryGetManagedStableId(part.asset, out stableId))
                     return false;
             }
             return true;
@@ -132,6 +132,7 @@ namespace StaffPortraits
 
         internal static StaffPortraitSelection CreateSelectionFromCurrentPortrait(
             staff._staff staffer,
+            IList<StaffPortraitPack> candidatePacks,
             StaffPortraitPack fallbackPack)
         {
             StaffPortraitSelection fallback = new StaffPortraitSelection();
@@ -141,7 +142,10 @@ namespace StaffPortraits
             fallback.FaceIndex = StaffPortraitsConstants.FirstIndex;
             fallback.AccessoryIndex = StaffPortraitsConstants.AccessoryNoneSelectionIndex;
 
-            if (staffer == null || staffer.textureAssets == null || fallbackPack == null)
+            if (staffer == null
+                || staffer.textureAssets == null
+                || candidatePacks == null
+                || fallbackPack == null)
             {
                 return fallback;
             }
@@ -155,13 +159,13 @@ namespace StaffPortraits
                 }
 
                 string stableId;
-                if (!StaffPortraitCatalog.TryGetStableId(wrapper.asset, out stableId))
+                if (!TryGetManagedStableId(wrapper.asset, out stableId))
                 {
                     continue;
                 }
 
                 StaffPortraitSelection matchingSelection;
-                if (TryBuildSelectionForCurrentAssets(staffer, stableId, out matchingSelection))
+                if (TryBuildSelectionForCurrentAssets(staffer, candidatePacks, stableId, out matchingSelection))
                 {
                     return matchingSelection;
                 }
@@ -172,11 +176,15 @@ namespace StaffPortraits
 
         private static bool TryBuildSelectionForCurrentAssets(
             staff._staff staffer,
+            IList<StaffPortraitPack> packs,
             string anyStableId,
             out StaffPortraitSelection selection)
         {
             selection = null;
-            IList<StaffPortraitPack> packs = StaffPortraitCatalog.AllPacks;
+            if (packs == null)
+            {
+                return false;
+            }
             for (int packIndex = 0; packIndex < packs.Count; packIndex++)
             {
                 StaffPortraitPack pack = packs[packIndex];
@@ -226,8 +234,17 @@ namespace StaffPortraits
                     continue;
                 }
 
+                for (int assetIndex = 0; assetIndex < assets.Count; assetIndex++)
+                {
+                    StaffPortraitAsset candidate = assets[assetIndex];
+                    if (candidate != null && ReferenceEquals(candidate.GameAsset, wrapper.asset))
+                    {
+                        return assetIndex;
+                    }
+                }
+
                 string stableId;
-                if (!StaffPortraitCatalog.TryGetStableId(wrapper.asset, out stableId))
+                if (!TryGetManagedStableId(wrapper.asset, out stableId))
                 {
                     return StaffPortraitsConstants.NoSelectionIndex;
                 }
@@ -249,6 +266,18 @@ namespace StaffPortraits
                 }
             }
             return StaffPortraitsConstants.NoSelectionIndex;
+        }
+
+        private static bool TryGetManagedStableId(
+            data_girls_textures._textureAsset runtimeAsset,
+            out string stableId)
+        {
+            if (StaffPortraitCatalog.TryGetStableId(runtimeAsset, out stableId))
+            {
+                return true;
+            }
+
+            return UniqueIdolPortraitCatalog.TryGetStableId(runtimeAsset, out stableId);
         }
 
         private static bool HasAnyPortraitSlots(staff._staff staffer)

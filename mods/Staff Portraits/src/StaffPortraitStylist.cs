@@ -38,7 +38,9 @@ namespace StaffPortraits
         private static TextMeshProUGUI stateText;
         private static readonly Dictionary<data_girls_textures._spriteType, TextMeshProUGUI> SelectorValueTexts =
             new Dictionary<data_girls_textures._spriteType, TextMeshProUGUI>();
+        private static TextMeshProUGUI packSourceValueText;
         private static TextMeshProUGUI packValueText;
+        private static StaffPortraitPackSource selectedPackSource = StaffPortraitPackSource.Staff;
         private static Button applyButton;
         private static Button randomizeButton;
         private static readonly List<Image> PreviewLayers = new List<Image>();
@@ -134,7 +136,9 @@ namespace StaffPortraits
             staffNameText = null;
             staffRoleText = null;
             stateText = null;
+            packSourceValueText = null;
             packValueText = null;
+            selectedPackSource = StaffPortraitPackSource.Staff;
             applyButton = null;
             randomizeButton = null;
             scaffold = null;
@@ -154,8 +158,10 @@ namespace StaffPortraits
             }
 
             StaffPortraitCatalog.EnsureLoaded();
+            UniqueIdolPortraitCatalog.Refresh();
             RefreshPickerStaff();
             selectedStaffIndex = Mathf.Clamp(selectedStaffIndex, 0, Mathf.Max(0, PickerStaff.Count - 1));
+            SelectBestPackSourceForCurrentStaff();
             RebuildStaffPicker();
             LoadCurrentStaffSelection();
             Render();
@@ -181,7 +187,8 @@ namespace StaffPortraits
 
         private static void LoadCurrentStaffSelection()
         {
-            if (PickerStaff.Count == 0 || StaffPortraitCatalog.AllPacks.Count == 0
+            IList<StaffPortraitPack> packs = GetPacksForSource(selectedPackSource);
+            if (PickerStaff.Count == 0 || packs.Count == 0
                 || !StaffPortraitAssignment.IsEditableStaff(PickerStaff[selectedStaffIndex]))
             {
                 selection = null;
@@ -189,14 +196,97 @@ namespace StaffPortraits
             }
 
             staff._staff staffer = PickerStaff[selectedStaffIndex];
-            StaffPortraitPack fallbackPack = StaffPortraitCatalog.AllPacks[0];
-            selection = StaffPortraitAssignment.CreateSelectionFromCurrentPortrait(staffer, fallbackPack);
+            StaffPortraitPack fallbackPack = packs[0];
+            selection = StaffPortraitAssignment.CreateSelectionFromCurrentPortrait(staffer, packs, fallbackPack);
             NormalizeSelection();
+        }
+
+        private static void SelectBestPackSourceForCurrentStaff()
+        {
+            if (PickerStaff.Count > 0)
+            {
+                staff._staff staffer = PickerStaff[selectedStaffIndex];
+                if (StaffUsesPackSource(staffer, StaffPortraitPackSource.UniqueIdol))
+                {
+                    selectedPackSource = StaffPortraitPackSource.UniqueIdol;
+                    return;
+                }
+                if (StaffUsesPackSource(staffer, StaffPortraitPackSource.Staff))
+                {
+                    selectedPackSource = StaffPortraitPackSource.Staff;
+                    return;
+                }
+            }
+
+            if (GetPacksForSource(selectedPackSource).Count > 0)
+            {
+                return;
+            }
+
+            StaffPortraitPackSource alternateSource = selectedPackSource == StaffPortraitPackSource.Staff
+                ? StaffPortraitPackSource.UniqueIdol
+                : StaffPortraitPackSource.Staff;
+            if (GetPacksForSource(alternateSource).Count > 0)
+            {
+                selectedPackSource = alternateSource;
+            }
+        }
+
+        private static bool StaffUsesPackSource(staff._staff staffer, StaffPortraitPackSource source)
+        {
+            if (staffer == null || staffer.textureAssets == null)
+            {
+                return false;
+            }
+
+            for (int textureIndex = 0; textureIndex < staffer.textureAssets.Count; textureIndex++)
+            {
+                data_girls.girls._textureAsset wrapper = staffer.textureAssets[textureIndex];
+                if (wrapper == null || wrapper.asset == null)
+                {
+                    continue;
+                }
+
+                string stableId;
+                bool matches = source == StaffPortraitPackSource.Staff
+                    ? StaffPortraitCatalog.TryGetStableId(wrapper.asset, out stableId)
+                    : UniqueIdolPortraitCatalog.TryGetStableId(wrapper.asset, out stableId);
+                if (matches)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IList<StaffPortraitPack> GetPacksForSource(StaffPortraitPackSource source)
+        {
+            return source == StaffPortraitPackSource.UniqueIdol
+                ? UniqueIdolPortraitCatalog.AllPacks
+                : StaffPortraitCatalog.AllPacks;
+        }
+
+        private static void ChangePackSource(int offset)
+        {
+            int sourceCount = Enum.GetValues(typeof(StaffPortraitPackSource)).Length;
+            int nextSourceIndex = WrapIndex((int)selectedPackSource + offset, sourceCount);
+            selectedPackSource = (StaffPortraitPackSource)nextSourceIndex;
+
+            // Unique-idol assets are owned and loaded by other mods. Refresh when the player
+            // explicitly switches to that source so the selector sees the latest runtime catalog.
+            if (selectedPackSource == StaffPortraitPackSource.UniqueIdol)
+            {
+                UniqueIdolPortraitCatalog.Refresh();
+            }
+
+            LoadCurrentStaffSelection();
+            Render();
         }
 
         private static void ChangePack(int offset)
         {
-            IList<StaffPortraitPack> packs = StaffPortraitCatalog.AllPacks;
+            IList<StaffPortraitPack> packs = GetPacksForSource(selectedPackSource);
             if (packs.Count == 0)
             {
                 return;
@@ -313,7 +403,8 @@ namespace StaffPortraits
         private static void Render()
         {
             bool hasStaff = PickerStaff.Count > 0;
-            bool hasPacks = StaffPortraitCatalog.AllPacks.Count > 0;
+            IList<StaffPortraitPack> activePacks = GetPacksForSource(selectedPackSource);
+            bool hasPacks = activePacks.Count > 0;
             bool editable = hasStaff && StaffPortraitAssignment.IsEditableStaff(PickerStaff[selectedStaffIndex]);
             bool ready = editable && hasPacks && selection != null && selection.Pack != null && selection.Pack.HasRequiredAssets;
 
@@ -339,7 +430,9 @@ namespace StaffPortraits
                 }
                 else if (!hasPacks)
                 {
-                    stateMessage = Text(StaffPortraitsConstants.NoPacksKey, StaffPortraitsConstants.NoPacksFallback);
+                    stateMessage = selectedPackSource == StaffPortraitPackSource.UniqueIdol
+                        ? Text(StaffPortraitsConstants.NoUniqueIdolPacksKey, StaffPortraitsConstants.NoUniqueIdolPacksFallback)
+                        : Text(StaffPortraitsConstants.NoStaffPacksKey, StaffPortraitsConstants.NoStaffPacksFallback);
                 }
                 else if (!ready)
                 {
@@ -360,6 +453,12 @@ namespace StaffPortraits
                 StaffPortraitUi.SetButtonText(randomizeButton, Text(StaffPortraitsConstants.RandomizeKey, StaffPortraitsConstants.RandomizeFallback));
             }
 
+            if (packSourceValueText != null)
+            {
+                packSourceValueText.text = selectedPackSource == StaffPortraitPackSource.UniqueIdol
+                    ? Text(StaffPortraitsConstants.UniqueIdolPackSourceKey, StaffPortraitsConstants.UniqueIdolPackSourceFallback)
+                    : Text(StaffPortraitsConstants.StaffPackSourceKey, StaffPortraitsConstants.StaffPackSourceFallback);
+            }
             if (packValueText != null)
             {
                 packValueText.text = selection != null && selection.Pack != null ? selection.Pack.DisplayName : string.Empty;
@@ -369,6 +468,11 @@ namespace StaffPortraits
             UpdateSelectorValue(data_girls_textures._spriteType.face, selection != null ? selection.FaceIndex : -1);
             UpdateSelectorValue(data_girls_textures._spriteType.acc, selection != null ? selection.AccessoryIndex : -1);
             RefreshPickerSelection();
+            // The source selector must remain usable even when the currently discovered source
+            // is empty. Otherwise a fresh install with no Staff Packs strands the player on the
+            // Staff Packs page and makes the Unique Idol Packs source impossible to reach.
+            foreach (Button sourceSelectorButton in SourceSelectorButtons)
+                StaffPortraitUi.SetInteractable(sourceSelectorButton, editable);
             foreach (Button selectorButton in SelectorButtons)
                 StaffPortraitUi.SetInteractable(selectorButton, editable && hasPacks);
             RenderPreview(ready);

@@ -232,15 +232,7 @@ namespace StaffPortraits
                 return;
             }
 
-            int width;
-            int height;
-            if (!TryReadPngDimensions(fullPath, out width, out height))
-            {
-                return;
-            }
-
-            if (width != StaffPortraitsConstants.PortraitCanvasWidthPixels
-                || height != StaffPortraitsConstants.PortraitCanvasHeightPixels)
+            if (!IsPortraitCanvasFile(fullPath))
             {
                 Debug.LogWarning(StaffPortraitsConstants.LogPrefix
                     + "Skipped portrait asset that is not "
@@ -326,6 +318,15 @@ namespace StaffPortraits
                 AssetsByStableId.Add(asset.StableId, asset);
                 AssetsByRuntimeObject.Add(asset.GameAsset, asset);
             }
+        }
+
+        internal static bool IsPortraitCanvasFile(string path)
+        {
+            int width;
+            int height;
+            return TryReadPngDimensions(path, out width, out height)
+                && width == StaffPortraitsConstants.PortraitCanvasWidthPixels
+                && height == StaffPortraitsConstants.PortraitCanvasHeightPixels;
         }
 
         internal static List<StaffPortraitAsset> GetAssetList(

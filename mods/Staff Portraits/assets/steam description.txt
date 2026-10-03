@@ -1,26 +1,27 @@
 [h1]Staff Portraits[/h1]
 
-Give ordinary agency staff customizable composite portraits from a dedicated staff-only portrait pool.
+Give ordinary agency staff customizable composite portraits from dedicated staff packs or compatible loaded Unique Idol packs.
 
 [h1]Features[/h1]
 [list]
-[*]Automatically gives eligible ordinary staff a randomized composite portrait when a valid staff portrait pack is installed.
+[*]Automatically gives eligible ordinary staff a randomized composite portrait when a valid dedicated staff portrait pack is installed.
 [*]Adds [b]Staff Stylist[/b] to the Mod Buttons Action Hub.
-[*]Choose the staff member, portrait pack, outfit/body, hair, face, and optional accessory.
-[*]Preview changes, randomize a combination, then apply it.
-[*]Keeps staff portrait assets separate from the idol portrait asset pool.
-[*]Preserves staff portrait selections through the game's existing staff save data using stable pack and asset IDs.
+[*]Switch between [b]Staff Packs[/b] and [b]Unique Idol Packs[/b] while styling a staff member.
+[*]Choose the pack, outfit/body, hair, face, and optional accessory, then preview, randomize, and apply.
+[*]Unique Idol mode reuses compatible artwork that Idol Manager already loaded; it does not scrape or duplicate the source files.
+[*]Dedicated staff assets keep Staff Portraits namespaced save IDs, while Unique Idol selections keep the source mod's original IDs.
 [/list]
 
 [h1]Requirements[/h1]
 [list]
 [*][b]Mod Buttons[/b] is required to open Staff Stylist.
-[*]At least one enabled staff portrait pack containing [code]StaffPortraits/pack.json[/code] is required for new portraits.
+[*]Automatic staff portraits require an enabled dedicated pack containing [code]StaffPortraits/pack.json[/code].
+[*]Manual Unique Idol styling requires an enabled compatible unique-idol mod with complete 1024 x 1500 body, hair, and face assets.
 [/list]
 
 [h1]Compatibility behavior[/h1]
 Staff Portraits does not automatically replace the player/producer, former idols who became staff, unique named staff, or staff who already have composite portrait data.
 
-The base mod does not borrow idol artwork. If no staff portrait pack is installed, existing staff portraits remain unchanged and Staff Stylist tells you that a pack is required.
+Unique Idol artwork is [b]manual-only[/b]: installing a character pack will not make new hires randomly become that character. Choose Unique Idol Packs in Staff Stylist when you want to use one deliberately.
 
-Keep any portrait pack used by a save enabled. If a required pack is unavailable when you load a save, restore the pack and reload before saving again.
+Keep every Staff Pack or Unique Idol source used by a save enabled so its artwork and IDs remain available.

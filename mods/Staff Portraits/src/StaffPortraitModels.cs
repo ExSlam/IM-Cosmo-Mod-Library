@@ -2,6 +2,12 @@ using System.Collections.Generic;
 
 namespace StaffPortraits
 {
+    internal enum StaffPortraitPackSource
+    {
+        Staff = 0,
+        UniqueIdol = 1
+    }
+
     internal sealed class StaffPortraitPack
     {
         internal string PackId;

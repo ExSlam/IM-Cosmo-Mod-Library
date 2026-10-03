@@ -1,22 +1,23 @@
 [h1]Staff Portraits[/h1]
 
-Dá aos funcionários comuns retratos compostos personalizáveis usando um conjunto de imagens exclusivo para a equipe.
+Dá aos funcionários comuns retratos compostos personalizáveis vindos de pacotes próprios da equipe ou de pacotes Unique Idol compatíveis já carregados.
 
 [b]Autor: Cosmo[/b]
 
 [h1]Recursos[/h1]
 [list]
-[*]Retratos aleatórios quando um pacote válido de retratos da equipe está instalado.
+[*]Retratos automáticos aleatórios usando pacotes próprios da equipe.
 [*]Estilista da Equipe no Action Hub do Mod Buttons.
-[*]Escolha pacote, roupa/corpo, cabelo, rosto e acessório opcional.
-[*]Visualize, aleatorize e aplique as mudanças.
-[*]As imagens da equipe ficam separadas do conjunto de retratos das idols.
+[*]Alterne entre Pacotes da Equipe e Pacotes Unique Idol durante a edição.
+[*]Escolha pacote, roupa/corpo, cabelo, rosto e acessório opcional, depois visualize, aleatorize e aplique.
+[*]O modo Unique Idol reutiliza os recursos compatíveis já carregados pelo Idol Manager sem copiar os arquivos de origem.
 [/list]
 
 [h1]Requisitos[/h1]
 [list]
 [*]Mod Buttons é necessário para abrir o estilista.
-[*]Um pacote com StaffPortraits/pack.json é necessário para novos retratos.
+[*]Retratos automáticos exigem um pacote próprio ativado com StaffPortraits/pack.json.
+[*]A edição manual com Unique Idol exige um mod compatível ativado com recursos completos de corpo, cabelo e rosto em 1024 x 1500.
 [/list]
 
-O jogador/produtor, ex-idols que viraram funcionárias, funcionários únicos com nome e quem já possui dados de retrato composto não são substituídos automaticamente. O mod base não reutiliza arte de idols. Mantenha ativados os pacotes usados pelo seu save; se um pacote necessário estiver ausente ao carregar, restaure-o e recarregue o save antes de salvar novamente.
+O jogador/produtor, ex-idols que viraram funcionárias, funcionários únicos com nome e quem já possui retrato composto não são substituídos automaticamente. Os recursos Unique Idol são usados somente de forma manual e nunca entram nas atribuições automáticas de novas contratações ou de preenchimento de saves. Mantenha ativadas todas as fontes Staff Pack ou Unique Idol usadas pelo seu save.

@@ -3,7 +3,7 @@
     <ModName>Staff Portraits</ModName>
     <RootNamespace>StaffPortraits</RootNamespace>
     <AssemblyName>com.cosmo.staffportraits</AssemblyName>
-    <Version>1.0.2</Version>
+    <Version>1.0.4</Version>
     <Authors>Cosmo</Authors>
   </PropertyGroup>
 
@@ -11,6 +11,7 @@
     <Compile Include="src\StaffPortraitsConstants.cs" />
     <Compile Include="src\StaffPortraitModels.cs" />
     <Compile Include="src\StaffPortraitCatalog.cs" />
+    <Compile Include="src\UniqueIdolPortraitCatalog.cs" />
     <Compile Include="src\StaffPortraitAssignment.cs" />
     <Compile Include="src\StaffPortraitPatches.cs" />
     <Compile Include="src\StaffPortraitStylist.cs" />

@@ -1,22 +1,23 @@
 [h1]Staff Portraits[/h1]
 
-Donne au personnel ordinaire des portraits composites personnalisables provenant d'un ensemble de ressources réservé au personnel.
+Donne au personnel ordinaire des portraits composites personnalisables provenant de packs dédiés au personnel ou de packs Unique Idol compatibles déjà chargés.
 
 [b]Auteur : Cosmo[/b]
 
 [h1]Fonctions[/h1]
 [list]
-[*]Portraits aléatoires lorsqu'un pack de portraits du personnel valide est installé.
+[*]Portraits automatiques aléatoires provenant des packs dédiés au personnel.
 [*]Styliste du personnel dans l'Action Hub de Mod Buttons.
-[*]Choix du pack, de la tenue/corps, des cheveux, du visage et d'un accessoire facultatif.
-[*]Aperçu, génération aléatoire et application des changements.
-[*]Les ressources du personnel restent séparées de celles des idols.
+[*]Bascule entre les packs du personnel et les packs Unique Idol.
+[*]Choix du pack, de la tenue/corps, des cheveux, du visage et d'un accessoire facultatif, avec aperçu, génération aléatoire et application.
+[*]Le mode Unique Idol réutilise les ressources compatibles déjà chargées par Idol Manager sans copier les fichiers source.
 [/list]
 
 [h1]Prérequis[/h1]
 [list]
 [*]Mod Buttons est requis pour ouvrir le styliste.
-[*]Un pack contenant StaffPortraits/pack.json est requis pour de nouveaux portraits.
+[*]Les portraits automatiques nécessitent un pack dédié contenant StaffPortraits/pack.json.
+[*]Le style manuel Unique Idol nécessite un mod d'idol unique compatible et activé, avec des ressources corps, cheveux et visage complètes en 1024 x 1500.
 [/list]
 
-Le joueur/producteur, les anciennes idols devenues employées, le personnel unique nommé et le personnel possédant déjà des données de portrait composite ne sont pas remplacés automatiquement. Le mod de base n'utilise pas les illustrations des idols. Gardez activés les packs utilisés par une sauvegarde ; si un pack requis manque au chargement, réactivez-le puis rechargez la sauvegarde avant d'enregistrer à nouveau.
+Le joueur/producteur, les anciennes idols devenues employées, le personnel unique nommé et le personnel possédant déjà un portrait composite ne sont pas remplacés automatiquement. Les ressources Unique Idol sont uniquement utilisées manuellement et ne servent jamais aux attributions automatiques lors du recrutement ou du remplissage d'une sauvegarde. Gardez activées toutes les sources Staff Pack ou Unique Idol utilisées par une sauvegarde.

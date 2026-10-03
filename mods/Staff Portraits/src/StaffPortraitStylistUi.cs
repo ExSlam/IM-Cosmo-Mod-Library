@@ -44,12 +44,12 @@ namespace StaffPortraits
         private const float CardsTop = 72f;
         private const float CardsHeight = 392f;
         private const float CardInset = 12f;
-        private const float RowHeight = 64f;
-        private const float RowGap = 12f;
-        private const float SelectorLabelHeight = 24f;
-        private const float SelectorValueTop = 24f;
-        private const float SelectorValueHeight = 40f;
-        private const float ArrowSize = 36f;
+        private const float RowHeight = 52f;
+        private const float RowGap = 8f;
+        private const float SelectorLabelHeight = 20f;
+        private const float SelectorValueTop = 20f;
+        private const float SelectorValueHeight = 32f;
+        private const float ArrowSize = 30f;
         private const float ArrowTextGap = 8f;
         private const float ArrowTopInset = 2f;
         private const float ActionsTop = 484f;
@@ -79,12 +79,14 @@ namespace StaffPortraits
 
         private static IMUiScrollViewHandle staffPicker;
         private static readonly List<Image> PickerBackgrounds = new List<Image>();
+        private static readonly List<Button> SourceSelectorButtons = new List<Button>();
         private static readonly List<Button> SelectorButtons = new List<Button>();
 
         private static void ResetPickerUi()
         {
             staffPicker = null;
             PickerBackgrounds.Clear();
+            SourceSelectorButtons.Clear();
             SelectorButtons.Clear();
         }
 
@@ -164,9 +166,6 @@ namespace StaffPortraits
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = PickerColumns;
             grid.childAlignment = TextAnchor.UpperCenter;
-            ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
 
         private static void RebuildStaffPicker()
@@ -204,12 +203,22 @@ namespace StaffPortraits
                 item.AddComponent<StaffPortraitPickerEntry>().Bind(staffer, portrait, staffPicker.ScrollRect.viewport);
             }
 
-            // Resolve the grid's full height before resetting the native two-way Slider
-            // binding. A movable handle must not suggest hidden entries when the list fits.
-            IMUiKit.RebuildLayout(staffPicker.Content);
+            // The picker grid has fixed cells, so size its content deterministically instead of
+            // waiting for ContentSizeFitter. On the first popup open Unity can otherwise report a
+            // temporary zero preferred height and permanently disable ScrollRect.vertical.
+            RectTransform contentRect = staffPicker.Content as RectTransform;
+            float contentHeight = CalculatePickerContentHeight(PickerStaff.Count);
+            if (contentRect != null)
+            {
+                contentRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+                IMUiKit.RebuildLayout(contentRect);
+            }
             Canvas.ForceUpdateCanvases();
             ScrollRect scroll = staffPicker.ScrollRect;
-            bool canScroll = scroll.content.rect.height > scroll.viewport.rect.height + ScrollExtentTolerance;
+            float viewportHeight = scroll.viewport == null || scroll.viewport.rect.height <= ScrollExtentTolerance
+                ? PickerHeight
+                : scroll.viewport.rect.height;
+            bool canScroll = contentHeight > viewportHeight + ScrollExtentTolerance;
             scroll.vertical = canScroll;
             scroll.StopMovement();
             scroll.verticalNormalizedPosition = ScrollTop;
@@ -220,6 +229,19 @@ namespace StaffPortraits
                 indicator.interactable = canScroll;
                 indicator.SetValueWithoutNotify(ScrollTop);
             }
+        }
+
+        private static float CalculatePickerContentHeight(int itemCount)
+        {
+            if (itemCount <= 0)
+            {
+                return PickerPadding * 2f;
+            }
+
+            int rowCount = (itemCount + PickerColumns - 1) / PickerColumns;
+            return PickerPadding * 2f
+                + rowCount * PickerCellHeight
+                + Mathf.Max(0, rowCount - 1) * PickerSpacing;
         }
 
         private static string GetStaffJobTitle(staff._staff staffer)
@@ -235,6 +257,7 @@ namespace StaffPortraits
         {
             if (index < 0 || index >= PickerStaff.Count) return;
             selectedStaffIndex = index;
+            SelectBestPackSourceForCurrentStaff();
             LoadCurrentStaffSelection();
             Render();
         }
@@ -275,10 +298,17 @@ namespace StaffPortraits
                 new Vector2(SelectorsWidth, CardsHeight), theme);
             StaffPortraitUi.Place(card.GetComponent<RectTransform>(), SelectorsLeft, CardsTop, SelectorsWidth, CardsHeight);
             float top = CardInset;
+            packSourceValueText = CreateSelectorRow(card.transform, StaffPortraitsConstants.PackSourceLabelKey,
+                Text(StaffPortraitsConstants.PackSourceLabelKey, StaffPortraitsConstants.PackSourceLabelFallback), top,
+                delegate { ChangePackSource(StaffPortraitsConstants.PreviousSelectionOffset); },
+                delegate { ChangePackSource(StaffPortraitsConstants.NextSelectionOffset); },
+                SourceSelectorButtons);
+            top += RowHeight + RowGap;
             packValueText = CreateSelectorRow(card.transform, StaffPortraitsConstants.PackLabelKey,
                 Text(StaffPortraitsConstants.PackLabelKey, StaffPortraitsConstants.PackLabelFallback), top,
                 delegate { ChangePack(StaffPortraitsConstants.PreviousSelectionOffset); },
-                delegate { ChangePack(StaffPortraitsConstants.NextSelectionOffset); });
+                delegate { ChangePack(StaffPortraitsConstants.NextSelectionOffset); },
+                SelectorButtons);
             data_girls_textures._spriteType[] types = { data_girls_textures._spriteType.body,
                 data_girls_textures._spriteType.hair, data_girls_textures._spriteType.face, data_girls_textures._spriteType.acc };
             string[] keys = { StaffPortraitsConstants.BodyLabelKey, StaffPortraitsConstants.HairLabelKey,
@@ -291,12 +321,13 @@ namespace StaffPortraits
                 top += RowHeight + RowGap;
                 SelectorValueTexts[type] = CreateSelectorRow(card.transform, keys[index], Text(keys[index], fallbacks[index]), top,
                     delegate { ChangePart(type, StaffPortraitsConstants.PreviousSelectionOffset); },
-                    delegate { ChangePart(type, StaffPortraitsConstants.NextSelectionOffset); });
+                    delegate { ChangePart(type, StaffPortraitsConstants.NextSelectionOffset); },
+                    SelectorButtons);
             }
         }
 
         private static TextMeshProUGUI CreateSelectorRow(Transform parent, string name, string label, float top,
-            UnityAction previous, UnityAction next)
+            UnityAction previous, UnityAction next, List<Button> targetButtons)
         {
             float width = SelectorsWidth - CardInset * 2f;
             GameObject row = StaffPortraitUi.Object(name, parent);
@@ -307,14 +338,14 @@ namespace StaffPortraits
             TextMeshProUGUI value = StaffPortraitUi.Label(row.transform, name, string.Empty, valueLeft,
                 SelectorValueTop, width - valueLeft * 2f, SelectorValueHeight, BodyFontSize);
             CreateSelectorArrow(row.transform, true, 0f, previous,
-                string.Format(Text(PreviousPartKey, PreviousPartFallback), label));
+                string.Format(Text(PreviousPartKey, PreviousPartFallback), label), targetButtons);
             CreateSelectorArrow(row.transform, false, width - ArrowSize, next,
-                string.Format(Text(NextPartKey, NextPartFallback), label));
+                string.Format(Text(NextPartKey, NextPartFallback), label), targetButtons);
             return value;
         }
 
         private static void CreateSelectorArrow(Transform parent, bool previous, float left,
-            UnityAction onClick, string tooltip)
+            UnityAction onClick, string tooltip, List<Button> targetButtons)
         {
             IMUiElementHandle handle;
             // Do not pass empty text: that removes the chart's private-use arrow glyph.
@@ -327,7 +358,10 @@ namespace StaffPortraits
             StaffPortraitUi.Place(button.GetComponent<RectTransform>(), left,
                 SelectorValueTop + ArrowTopInset, ArrowSize, ArrowSize);
             IMUiKit.SetTooltip(button.gameObject, tooltip);
-            SelectorButtons.Add(button);
+            if (targetButtons != null)
+            {
+                targetButtons.Add(button);
+            }
         }
 
         internal static void ReleasePreviewResources()

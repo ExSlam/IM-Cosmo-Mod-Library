@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.4 - 2026-10-02
+
+- Keep the Pack Source arrows enabled for editable staff even when the current source has no discovered packs, so a player with no dedicated Staff Packs can still switch to Unique Idol Packs.
+- Refresh the loaded unique-idol catalog when switching to Unique Idol Packs.
+- Stop applying the dedicated Staff Pack 1024 x 1500 file-size contract to already-loaded unique-idol assets; the game's own unique-idol loader is the authority for those source assets.
+- Show a source-specific empty-state message after switching instead of the generic no-packs message.
+
+## 1.0.3 - 2026-10-02
+
+- Added a Staff Stylist pack-source selector that switches between dedicated Staff Packs and compatible loaded Unique Idol Packs.
+- Group unique-idol portrait parts by their loaded source mod and body ID, reuse the source assets directly, and keep the source mod's own texture IDs for vanilla save/load persistence.
+- Keep automatic hire/backfill portrait assignment restricted to dedicated staff packs; unique-idol artwork is used only when the player selects it in Staff Stylist.
+- Keep staff editable after applying a compatible unique-idol portrait while continuing to protect former idols, unique staff, and unrelated authored portraits.
+- Replaced the picker grid's deferred ContentSizeFitter sizing with deterministic fixed-grid content height so the staff list is scrollable on the first popup open whenever its rows exceed the viewport.
+- Added and repaired Staff Stylist localization strings across all seven supported languages.
+
 ## 1.0.2 - 2026-10-02
 
 - Show each staff member's translated job title below their name in the picker.
