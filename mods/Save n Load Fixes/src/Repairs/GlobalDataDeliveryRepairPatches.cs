@@ -20,7 +20,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(SaveManager).FullName, nameof(SaveManager.LoadGlobalData));
             }
 
-            GlobalDataDeliveryPatchHealth.ReportTargetResolved();
+            GlobalDataDeliveryPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -53,7 +53,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(staticVars).FullName, "Awake");
             }
 
-            GlobalDataDeliveryPatchHealth.ReportTargetResolved();
+            GlobalDataDeliveryPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -80,7 +80,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(staticVars).FullName, nameof(staticVars.LoadSettings));
             }
 
-            GlobalDataDeliveryPatchHealth.ReportTargetResolved();
+            GlobalDataDeliveryPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

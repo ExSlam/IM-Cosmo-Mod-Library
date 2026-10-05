@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=Сохранение игры началось.
+SAVE_PROGRESS_COMPLETED=Сохранение игры завершено.
+SAVE_PROGRESS_FAILED=Не удалось сохранить игру.
+SAVE_PROGRESS_COMPANION_FAILED=IM Data Core не удалось сохранить сопутствующий файл данных.

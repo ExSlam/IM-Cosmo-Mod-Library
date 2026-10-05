@@ -3,7 +3,8 @@
     <ModName>Save n Load Fixes</ModName>
     <RootNamespace>SaveNLoadFixes</RootNamespace>
     <AssemblyName>com.cosmo.savenloadfixes</AssemblyName>
-    <Version>5.6.0</Version>
+    <Version>5.6.1</Version>
+    <Authors>Cosmo</Authors>
   </PropertyGroup>
 
   <ItemGroup>

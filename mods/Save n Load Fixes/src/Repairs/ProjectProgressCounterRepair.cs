@@ -1103,9 +1103,11 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class ProjectProgressCounterPatchHealth
     {
+        private const string NullTargetDiagnostic = "ProjectProgressCounterPatchHealth received a null resolved target.";
         internal const int ExpectedTargetMethodCount = 2;
 
         private static readonly object Sync = new object();
+        private static readonly HashSet<MethodBase> ResolvedTargets = new HashSet<MethodBase>();
         private static int resolvedTargetMethodCount;
         private static string failure = string.Empty;
 
@@ -1132,11 +1134,22 @@ namespace SaveNLoadFixes.Repairs
             }
         }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(MethodBase target)
         {
             lock (Sync)
             {
-                resolvedTargetMethodCount++;
+                // Resolver signature checks run before reporting. Count actual methods,
+                // including overloads, once across Harmony repatch cycles.
+                if (target == null)
+                {
+                    ReportFailure(NullTargetDiagnostic);
+                    return;
+                }
+                if (!ResolvedTargets.Add(target))
+                {
+                    return;
+                }
+                resolvedTargetMethodCount = ResolvedTargets.Count;
                 if (resolvedTargetMethodCount > ExpectedTargetMethodCount)
                 {
                     failure = "A02 resolved more SaveManager.LoadData overloads than the frozen two-method manifest.";

@@ -1,4 +1,5 @@
 [b]Save n Load Fixes[/b]
+By Cosmo
 
 Save n Load Fixes fixes bugs that can make Idol Manager forget, lose, or mishandle game progress after saving and loading. It also fixes large-number problems that can make very high money, fan, research, and other totals become incorrect or negative.
 
@@ -19,6 +20,12 @@ Save n Load Fixes fixes bugs that can make Idol Manager forget, lose, or mishand
 [list]
 [*] IM-HarmonyIntegration Plugin: https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863
 [/list]
+
+[b]Loader compatibility[/b]
+
+Works with Tel's original IM-HarmonyIntegration, including version 1.1. Reopening or cancelling settings no longer makes the repaired save checks fail just because the loader reapplies the mod.
+
+[url=https://github.com/ExSlam/IM-HarmonyIntegration]Cosmo's updated HarmonyIntegration[/url] is recommended as replacement for Tel's outaded mod because Cosmo's updated version of IM Harmony Integration avoids unnecessary reloading of patches, but it is not required by Save n Load Fixes. This update does not change your save format.
 
 [b]Save Write Ordering Fix / CreateAnAlbum[/b]
 

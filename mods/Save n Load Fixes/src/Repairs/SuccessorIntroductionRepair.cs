@@ -617,6 +617,16 @@ namespace SaveNLoadFixes.Repairs
     internal static class SuccessorIntroductionPatchHealth
     {
         internal const int ExpectedTargetMethodCount = 3;
+        internal const string ScheduleTarget = "Date_Graduation.StartIntroductions()";
+        internal const string FlushTarget = "data_girls.StartIntroductions()";
+        internal const string LoadTarget = "data_girls.LoadFunction()";
+
+        private static readonly HashSet<string> ExpectedTargets = new HashSet<string>(StringComparer.Ordinal)
+        {
+            ScheduleTarget,
+            FlushTarget,
+            LoadTarget
+        };
         private static readonly object Sync = new object();
         private static readonly HashSet<string> ResolvedTargets = new HashSet<string>(StringComparer.Ordinal);
         private static string failure = string.Empty;
@@ -632,7 +642,8 @@ namespace SaveNLoadFixes.Repairs
             {
                 lock (Sync)
                 {
-                    return ResolvedTargets.Count == ExpectedTargetMethodCount && string.IsNullOrEmpty(failure);
+                    return ExpectedTargets.Count == ExpectedTargetMethodCount &&
+                        ResolvedTargets.SetEquals(ExpectedTargets) && string.IsNullOrEmpty(failure);
                 }
             }
         }
@@ -641,14 +652,18 @@ namespace SaveNLoadFixes.Repairs
         {
             lock (Sync)
             {
-                if (!ResolvedTargets.Add(target ?? string.Empty))
+                if (ExpectedTargets.Count != ExpectedTargetMethodCount ||
+                    !ExpectedTargets.Contains(target))
                 {
-                    failure = "A11 resolved the same Harmony target more than once: " + (target ?? string.Empty);
+                    failure = "A11 resolved an unexpected target or inconsistent frozen manifest: " +
+                        (target ?? string.Empty);
+                    return;
                 }
-                else if (ResolvedTargets.Count > ExpectedTargetMethodCount)
-                {
-                    failure = "A11 resolved more Harmony targets than the frozen three-method manifest.";
-                }
+
+                // Old HarmonyIntegration and HarmonyX may rediscover an identical
+                // logical target. This observation neither adds a target nor clears
+                // a real failure recorded by signature/site validation.
+                ResolvedTargets.Add(target);
             }
         }
 

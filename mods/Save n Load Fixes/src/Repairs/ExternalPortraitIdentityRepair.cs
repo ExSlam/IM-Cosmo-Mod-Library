@@ -1,3 +1,4 @@
+using System.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -935,6 +936,9 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class ExternalPortraitIdentityPatchHealth
     {
+        private const string NullTargetDiagnostic = "ExternalPortraitIdentityPatchHealth received a null resolved target.";
+        private static readonly object Sync = new object();
+        private static readonly HashSet<MethodBase> ResolvedTargets = new HashSet<MethodBase>();
         private static int resolvedTargetMethodCount;
         private static int failureCount;
         private static string lastDiagnostic = string.Empty;
@@ -944,9 +948,23 @@ namespace SaveNLoadFixes.Repairs
         internal static string LastDiagnostic { get { return lastDiagnostic; } }
         internal static bool IsHealthy { get { return ResolvedTargetMethodCount == 4 && FailureCount == 0; } }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(MethodBase target)
         {
-            Interlocked.Increment(ref resolvedTargetMethodCount);
+            lock (Sync)
+            {
+                // Resolver signature checks run before reporting. Count actual methods,
+                // including overloads, once across Harmony repatch cycles.
+                if (target == null)
+                {
+                    ReportFailure(NullTargetDiagnostic);
+                    return;
+                }
+                if (!ResolvedTargets.Add(target))
+                {
+                    return;
+                }
+                resolvedTargetMethodCount = ResolvedTargets.Count;
+            }
         }
 
         internal static void ReportFailure(string diagnostic)

@@ -23,7 +23,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Awards).FullName, nameof(Awards.LoadFunction));
             }
 
-            AwardTempNominationPatchHealth.ReportTargetResolved();
+            AwardTempNominationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

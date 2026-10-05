@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Date_Popup).FullName, "OnClick_ForceBreakup");
             }
 
-            ForcedBreakupPatchHealth.ReportTargetResolved();
+            ForcedBreakupPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

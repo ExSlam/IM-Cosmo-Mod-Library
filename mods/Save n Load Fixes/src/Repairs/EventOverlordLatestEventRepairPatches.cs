@@ -25,7 +25,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Event_Overlord).FullName, "LoadFunction");
             }
 
-            EventOverlordLatestEventPatchHealth.ReportTargetResolved();
+            EventOverlordLatestEventPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

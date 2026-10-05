@@ -1,0 +1,108 @@
+[b]Save n Load Fixes[/b]
+作者：Cosmo
+
+Save n Load Fixes 修复 Idol Manager 中可能导致保存或读取后进度丢失、遗忘或处理错误的漏洞。它还修复大数值问题，避免极高的金钱、粉丝、研究等数值变得错误或出现负数。
+
+[b]修复内容[/b]
+
+[list]
+[*] 让存档按正确顺序完成，并防止读取尚未完成的存档。
+[*] 让“保存并退出”在关闭游戏或返回主菜单前等待保存完成。
+[*] 保留更多进行中的游戏状态，包括训练、商业工作、活动、人际关系、毕业、事件、奖项、教程和 SNS 消息。
+[*] 修复读取旧存档时的若干问题。
+[*] 修复金钱、粉丝、贷款、商业收入、剧场与咖啡厅收入、研究及其他总量的大数值计算。
+[*] 修复在修复存档系统时发现的若干较小的原版游戏漏洞。
+[*] 在保存开始、完成或失败时显示简洁通知。
+[/list]
+
+[b]必要组件[/b]
+
+[list]
+[*] IM-HarmonyIntegration Plugin: https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863
+[/list]
+
+[b]加载器兼容性[/b]
+
+兼容 Tel 的原版 IM-HarmonyIntegration，包括 1.1 版。重新打开设置或取消设置时，即使加载器重新应用本模组，也不会再仅因此导致修复后的存档检查失效。
+
+[url=https://github.com/ExSlam/IM-HarmonyIntegration]Cosmo 更新版 HarmonyIntegration[/url] 更为推荐，因为它会避免不必要的补丁重新加载，但 Save n Load Fixes 并不强制要求使用它。本次更新不会改变你的存档格式。
+
+[b]Save Write Ordering Fix / CreateAnAlbum[/b]
+
+Save Write Ordering Fix 通常[b]不是[/b] Save n Load Fixes 的必要组件。
+
+如果你将 [b]CreateAnAlbum[/b] 与 Save n Load Fixes 一起使用，也请安装 Save Write Ordering Fix。这样可以防止 CreateAnAlbum 自身的存档处理与 Save n Load Fixes 发生冲突。
+
+[b]内置兼容支持[/b]
+
+Save n Load Fixes 针对会修改相同存档数据或大数值计算的模组内置了专门的兼容代码：
+
+[list]
+[*] Fans Watch Shows 1.0.0
+[*] TBS Balance Patch 1.0.0
+[*] BuffMe 1.0.0
+[*] Shelon's Tweaks & QoL Improvements 1.0.0
+[*] Going Viral
+[*] Fan Attrition
+[*] Stale Theater Shows
+[*] Extended SSK
+[*] Unofficial Patch
+[*] MBTI Personalities
+[*] More Sister Groups
+[*] Tour Stamina Limit
+[*] Traits Fix
+[*] Traits Expansion
+[*] Targeted Auditions
+[*] EroEvents
+[*] IM Data Core
+[*] Graduation Details
+[/list]
+
+部分兼容补丁针对这些模组的特定版本制作。如果其中某个模组进行了重大更新，可能需要重新检查兼容性。
+
+[b]其他已知兼容性[/b]
+
+[list]
+[*] 与所有其他 Cosmo Mods 兼容。
+[*] 兼容：https://steamcommunity.com/sharedfiles/filedetails/?id=3783606924
+[*] 兼容：https://steamcommunity.com/sharedfiles/filedetails/?id=3778902721
+[*] 兼容：https://steamcommunity.com/sharedfiles/filedetails/?id=3781484403
+[*] 兼容：https://steamcommunity.com/sharedfiles/filedetails/?id=3782469762
+[*] 应该兼容：https://steamcommunity.com/sharedfiles/filedetails/?id=3159762405
+[/list]
+
+[b]未测试 / 尚未确认[/b]
+
+以下项目并未确认不兼容，但尚未与 Save n Load Fixes 进行完整测试：
+
+[list]
+[*] Theater Idol Selector: https://steamcommunity.com/sharedfiles/filedetails/?id=3782277556
+可能存在一些计算问题。
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3781250147
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3779175588
+[*] Idol Roles Dashboard: https://steamcommunity.com/sharedfiles/filedetails/?id=3770400953
+[/list]
+
+[b]不兼容 / 已过时[/b]
+
+在相关兼容性得到更新前，目前应将以下项目视为与 Save n Load Fixes 不兼容或已过时：
+
+[list]
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791755011
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791765611
+[*] K-pop Idol Manager Overhaul: https://steamcommunity.com/sharedfiles/filedetails/?id=3791355099
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791354970
+[*] 可能不兼容，但尚未完全确认：https://steamcommunity.com/sharedfiles/filedetails/?id=3795134201
+[*] RivalsReborn 需要先更新并加入若干错误修复，才能与 Save n Load Fixes 兼容。
+[/list]
+
+[b]与 Save n Load Fixes 一起使用时不需要[/b]
+
+以下模组修复的问题已经由 Save n Load Fixes 修复：
+
+[list]
+[*] BestSingleFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3136750680
+[*] BestEmployerFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3158389459
+[/list]
+
+如果你发现某个模组与 Save n Load Fixes 一起使用时表现异常，请告诉我你使用的模组名称和版本。

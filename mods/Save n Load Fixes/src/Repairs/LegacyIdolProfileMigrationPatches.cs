@@ -20,7 +20,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(data_girls).FullName, nameof(data_girls.LoadFunction));
             }
 
-            LegacyIdolProfileMigrationPatchHealth.ReportTargetResolved();
+            LegacyIdolProfileMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

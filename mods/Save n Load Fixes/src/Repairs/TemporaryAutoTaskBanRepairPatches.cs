@@ -30,7 +30,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(agency).FullName, "ReturnGirl");
             }
 
-            TemporaryAutoTaskBanPatchHealth.ReportTargetResolved("agency.ReturnGirl(girls)");
+            TemporaryAutoTaskBanPatchHealth.ReportTargetResolved(TemporaryAutoTaskBanPatchHealth.FactoryTarget);
             return method;
         }
 
@@ -69,7 +69,7 @@ namespace SaveNLoadFixes.Repairs
                     method.Name.EndsWith(".MoveNext", StringComparison.Ordinal);
                 if (nameMatches && method.ReturnType == typeof(bool) && method.GetParameters().Length == 0)
                 {
-                    TemporaryAutoTaskBanPatchHealth.ReportTargetResolved("agency.<ReturnGirl>d__63.MoveNext()");
+                    TemporaryAutoTaskBanPatchHealth.ReportTargetResolved(TemporaryAutoTaskBanPatchHealth.MoveNextTarget);
                     return method;
                 }
             }
@@ -180,7 +180,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(data_girls).FullName, "LoadFunction");
             }
 
-            TemporaryAutoTaskBanPatchHealth.ReportTargetResolved("data_girls.LoadFunction()");
+            TemporaryAutoTaskBanPatchHealth.ReportTargetResolved(TemporaryAutoTaskBanPatchHealth.LoadTarget);
             return method;
         }
 

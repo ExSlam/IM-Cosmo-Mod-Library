@@ -34,7 +34,7 @@ namespace SaveNLoadFixes.Repairs
                     nameof(Shows._show.GetNextEpisodeDate));
             }
 
-            ShowNextEpisodeDatePatchHealth.ReportTargetResolved();
+            ShowNextEpisodeDatePatchHealth.ReportTargetResolved(method);
             return method;
         }
 

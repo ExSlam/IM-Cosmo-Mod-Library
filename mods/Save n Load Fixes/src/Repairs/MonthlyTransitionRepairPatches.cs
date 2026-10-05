@@ -44,7 +44,7 @@ namespace SaveNLoadFixes.Repairs
                     method.Name.EndsWith(".MoveNext", StringComparison.Ordinal);
                 if (nameMatches && method.ReturnType == typeof(bool) && method.GetParameters().Length == 0)
                 {
-                    MonthlyTransitionPatchHealth.ReportTargetResolved();
+                    MonthlyTransitionPatchHealth.ReportTargetResolved(method);
                     return method;
                 }
             }

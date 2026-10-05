@@ -25,7 +25,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(agency).FullName, "GetRoomDataForLoading");
             }
 
-            TrainingProgressInitPatchHealth.ReportTargetResolved();
+            TrainingProgressInitPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

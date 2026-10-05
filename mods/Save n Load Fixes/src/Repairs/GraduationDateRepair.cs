@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Collections.Generic;
 using System;
 using System.Threading;
 
@@ -98,11 +100,22 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class GraduationDatePatchHealth
     {
+        private const string NullTargetDiagnostic = "GraduationDatePatchHealth received a null resolved target.";
         internal const int ExpectedTargetMethodCount = 5;
         internal const int ExpectedAdjustmentSiteCount = 6;
 
         private static readonly object Sync = new object();
+        private static readonly HashSet<MethodBase> ResolvedTargets = new HashSet<MethodBase>();
         private static int resolvedTargetMethodCount;
+        private static readonly Dictionary<string, int> ExpectedSites = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            { "data_girls.girls.Set_Injured()", 1 },
+            { "data_girls.girls.Set_Depressed()", 1 },
+            { "data_girls.girls.Graduate(bool,string)", 2 },
+            { "data_girls.girls.Graduation_Date_Update()", 1 },
+            { "business.Accept()", 1 }
+        };
+        private static readonly Dictionary<string, int> ReportedSites = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int reportedTargetMethodCount;
         private static int observedAdjustmentSiteCount;
         private static string failure = string.Empty;
@@ -154,11 +167,22 @@ namespace SaveNLoadFixes.Repairs
             }
         }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(MethodBase target)
         {
             lock (Sync)
             {
-                resolvedTargetMethodCount++;
+                // Resolver signature checks run before reporting. Count actual methods,
+                // including overloads, once across Harmony repatch cycles.
+                if (target == null)
+                {
+                    ReportFailure(NullTargetDiagnostic);
+                    return;
+                }
+                if (!ResolvedTargets.Add(target))
+                {
+                    return;
+                }
+                resolvedTargetMethodCount = ResolvedTargets.Count;
                 if (resolvedTargetMethodCount > ExpectedTargetMethodCount)
                 {
                     failure = "A25 resolved more target methods than the frozen five-method manifest.";
@@ -170,7 +194,25 @@ namespace SaveNLoadFixes.Repairs
         {
             lock (Sync)
             {
-                reportedTargetMethodCount++;
+                int frozenExpected;
+                if (methodId == null || !ExpectedSites.TryGetValue(methodId, out frozenExpected) ||
+                    expected != frozenExpected || ExpectedSites.Count != ExpectedTargetMethodCount)
+                {
+                    failure = "A25 received an unexpected target or inconsistent site manifest: " + methodId;
+                    return;
+                }
+
+                int previous;
+                if (ReportedSites.TryGetValue(methodId, out previous))
+                {
+                    if (previous != observed || observed != frozenExpected)
+                    {
+                        failure = "A25 received inconsistent transpiler site reports for " + methodId;
+                    }
+                    return;
+                }
+                ReportedSites.Add(methodId, observed);
+                reportedTargetMethodCount = ReportedSites.Count;
                 observedAdjustmentSiteCount += observed;
                 if (observed != expected)
                 {

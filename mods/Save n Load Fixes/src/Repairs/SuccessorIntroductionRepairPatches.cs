@@ -25,7 +25,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Date_Graduation).FullName, "StartIntroductions");
             }
 
-            SuccessorIntroductionPatchHealth.ReportTargetResolved("Date_Graduation.StartIntroductions()");
+            SuccessorIntroductionPatchHealth.ReportTargetResolved(SuccessorIntroductionPatchHealth.ScheduleTarget);
             return method;
         }
 
@@ -56,7 +56,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(data_girls).FullName, "StartIntroductions");
             }
 
-            SuccessorIntroductionPatchHealth.ReportTargetResolved("data_girls.StartIntroductions()");
+            SuccessorIntroductionPatchHealth.ReportTargetResolved(SuccessorIntroductionPatchHealth.FlushTarget);
             return method;
         }
 
@@ -94,7 +94,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(data_girls).FullName, "LoadFunction");
             }
 
-            SuccessorIntroductionPatchHealth.ReportTargetResolved("data_girls.LoadFunction()");
+            SuccessorIntroductionPatchHealth.ReportTargetResolved(SuccessorIntroductionPatchHealth.LoadTarget);
             return method;
         }
 

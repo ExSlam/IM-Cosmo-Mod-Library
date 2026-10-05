@@ -1,0 +1,108 @@
+[b]Save n Load Fixes[/b]
+제작: Cosmo
+
+Save n Load Fixes는 저장하거나 불러온 뒤 Idol Manager가 게임 진행 상황을 잊거나 잃거나 잘못 처리하게 만드는 문제를 수정합니다. 또한 매우 큰 자금, 팬, 연구 및 기타 수치가 잘못되거나 음수가 되는 큰 수치 계산 문제도 수정합니다.
+
+[b]수정 내용[/b]
+
+[list]
+[*] 저장이 올바른 순서로 완료되도록 하고, 아직 끝나지 않은 저장 파일을 불러오지 못하게 합니다.
+[*] 저장 후 종료 시 게임을 닫거나 메인 메뉴로 돌아가기 전에 저장이 끝날 때까지 기다리도록 합니다.
+[*] 트레이닝, 비즈니스 업무, 활동, 관계, 졸업, 이벤트, 시상, 튜토리얼, SNS 메시지 등 진행 중인 게임 상태를 더 많이 보존합니다.
+[*] 오래된 저장 파일을 불러올 때 발생하는 여러 문제를 수정합니다.
+[*] 자금, 팬, 대출, 비즈니스 수입, 극장 및 카페 수입, 연구 등 여러 합계의 큰 수치 계산을 수정합니다.
+[*] 저장 시스템을 수정하는 과정에서 발견된 여러 작은 기본 게임 버그를 수정합니다.
+[*] 저장 시작, 완료 또는 실패 시 간단한 알림을 표시합니다.
+[/list]
+
+[b]필수 항목[/b]
+
+[list]
+[*] IM-HarmonyIntegration Plugin: https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863
+[/list]
+
+[b]로더 호환성[/b]
+
+Tel의 원본 IM-HarmonyIntegration과 호환되며 버전 1.1도 포함됩니다. 설정을 다시 열거나 취소하여 로더가 모드를 다시 적용하더라도, 그 이유만으로 수정된 저장 검사 기능이 실패하지 않습니다.
+
+[url=https://github.com/ExSlam/IM-HarmonyIntegration]Cosmo의 업데이트된 HarmonyIntegration[/url]은 불필요한 패치 재로딩을 피하므로 권장되지만 Save n Load Fixes의 필수 요소는 아닙니다. 이 업데이트는 저장 형식을 변경하지 않습니다.
+
+[b]Save Write Ordering Fix / CreateAnAlbum[/b]
+
+Save Write Ordering Fix는 일반적으로 Save n Load Fixes에 [b]필요하지 않습니다[/b].
+
+[b]CreateAnAlbum[/b]을 Save n Load Fixes와 함께 사용한다면 Save Write Ordering Fix도 설치하세요. CreateAnAlbum의 자체 저장 처리가 Save n Load Fixes와 충돌하는 것을 방지합니다.
+
+[b]내장 호환성 지원[/b]
+
+Save n Load Fixes에는 같은 저장 데이터나 큰 수치 계산을 수정하는 모드를 위한 전용 호환성 코드가 포함되어 있습니다:
+
+[list]
+[*] Fans Watch Shows 1.0.0
+[*] TBS Balance Patch 1.0.0
+[*] BuffMe 1.0.0
+[*] Shelon's Tweaks & QoL Improvements 1.0.0
+[*] Going Viral
+[*] Fan Attrition
+[*] Stale Theater Shows
+[*] Extended SSK
+[*] Unofficial Patch
+[*] MBTI Personalities
+[*] More Sister Groups
+[*] Tour Stamina Limit
+[*] Traits Fix
+[*] Traits Expansion
+[*] Targeted Auditions
+[*] EroEvents
+[*] IM Data Core
+[*] Graduation Details
+[/list]
+
+일부 호환성 패치는 해당 모드의 특정 버전을 기준으로 만들어졌습니다. 그중 하나가 대규모 업데이트를 받으면 호환성을 다시 확인해야 할 수 있습니다.
+
+[b]기타 확인된 호환성[/b]
+
+[list]
+[*] 다른 모든 Cosmo Mods와 호환됩니다.
+[*] 호환됨: https://steamcommunity.com/sharedfiles/filedetails/?id=3783606924
+[*] 호환됨: https://steamcommunity.com/sharedfiles/filedetails/?id=3778902721
+[*] 호환됨: https://steamcommunity.com/sharedfiles/filedetails/?id=3781484403
+[*] 호환됨: https://steamcommunity.com/sharedfiles/filedetails/?id=3782469762
+[*] 호환될 것으로 예상됨: https://steamcommunity.com/sharedfiles/filedetails/?id=3159762405
+[/list]
+
+[b]미테스트 / 미확인[/b]
+
+다음 항목은 비호환으로 확인된 것은 아니지만 Save n Load Fixes와 충분히 테스트되지 않았습니다:
+
+[list]
+[*] Theater Idol Selector: https://steamcommunity.com/sharedfiles/filedetails/?id=3782277556
+일부 계산 문제가 있을 수 있습니다.
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3781250147
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3779175588
+[*] Idol Roles Dashboard: https://steamcommunity.com/sharedfiles/filedetails/?id=3770400953
+[/list]
+
+[b]비호환 / 오래된 버전[/b]
+
+호환성이 업데이트될 때까지 다음 항목은 현재 Save n Load Fixes와 비호환이거나 오래된 것으로 취급해야 합니다:
+
+[list]
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791755011
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791765611
+[*] K-pop Idol Manager Overhaul: https://steamcommunity.com/sharedfiles/filedetails/?id=3791355099
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791354970
+[*] 비호환일 가능성이 높지만 아직 완전히 확인되지는 않음: https://steamcommunity.com/sharedfiles/filedetails/?id=3795134201
+[*] RivalsReborn은 Save n Load Fixes와 호환되기 전에 몇 가지 버그 수정이 포함된 업데이트가 필요합니다.
+[/list]
+
+[b]Save n Load Fixes와 함께 사용할 필요가 없는 모드[/b]
+
+다음 모드는 Save n Load Fixes가 이미 수정하는 문제를 수정합니다:
+
+[list]
+[*] BestSingleFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3136750680
+[*] BestEmployerFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3158389459
+[/list]
+
+Save n Load Fixes와 함께 사용할 때 이상하게 작동하는 모드를 발견하면 사용 중인 모드 이름과 버전을 알려 주세요.

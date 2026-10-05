@@ -15,7 +15,7 @@ namespace SaveNLoadFixes.Repairs
                 ExternalPortraitIdentityPatchHealth.ReportFailure("data_girls.LoadFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(data_girls).FullName, nameof(data_girls.LoadFunction));
             }
-            ExternalPortraitIdentityPatchHealth.ReportTargetResolved();
+            ExternalPortraitIdentityPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -45,7 +45,7 @@ namespace SaveNLoadFixes.Repairs
                 ExternalPortraitIdentityPatchHealth.ReportFailure("staff.LoadFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(staff).FullName, nameof(staff.LoadFunction));
             }
-            ExternalPortraitIdentityPatchHealth.ReportTargetResolved();
+            ExternalPortraitIdentityPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -75,7 +75,7 @@ namespace SaveNLoadFixes.Repairs
                 ExternalPortraitIdentityPatchHealth.ReportFailure("data_girls.SaveFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(data_girls).FullName, nameof(data_girls.SaveFunction));
             }
-            ExternalPortraitIdentityPatchHealth.ReportTargetResolved();
+            ExternalPortraitIdentityPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -98,7 +98,7 @@ namespace SaveNLoadFixes.Repairs
                 ExternalPortraitIdentityPatchHealth.ReportFailure("staff.SaveFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(staff).FullName, nameof(staff.SaveFunction));
             }
-            ExternalPortraitIdentityPatchHealth.ReportTargetResolved();
+            ExternalPortraitIdentityPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

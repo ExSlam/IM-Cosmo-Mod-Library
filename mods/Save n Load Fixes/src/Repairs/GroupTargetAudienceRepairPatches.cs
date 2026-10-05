@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Groups.GroupData).FullName, "Set");
             }
 
-            GroupTargetAudiencePatchHealth.ReportTargetResolved();
+            GroupTargetAudiencePatchHealth.ReportTargetResolved(method);
             return method;
         }
 

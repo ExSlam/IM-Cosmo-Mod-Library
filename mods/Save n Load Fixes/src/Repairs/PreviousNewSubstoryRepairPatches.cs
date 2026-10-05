@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Substories_Manager).FullName, "LoadFunction");
             }
 
-            PreviousNewSubstoryPatchHealth.ReportTargetResolved();
+            PreviousNewSubstoryPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

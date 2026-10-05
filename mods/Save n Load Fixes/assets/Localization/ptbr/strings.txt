@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=Salvamento do jogo iniciado.
+SAVE_PROGRESS_COMPLETED=Salvamento do jogo concluído.
+SAVE_PROGRESS_FAILED=Falha ao salvar o jogo.
+SAVE_PROGRESS_COMPANION_FAILED=O IM Data Core não conseguiu salvar seu arquivo de dados auxiliar.

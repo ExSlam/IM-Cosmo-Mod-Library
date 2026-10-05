@@ -20,7 +20,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(agency).FullName, "GetRoomDataForLoading");
             }
 
-            BusinessRemainingMinutesPatchHealth.ReportTargetResolved();
+            BusinessRemainingMinutesPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

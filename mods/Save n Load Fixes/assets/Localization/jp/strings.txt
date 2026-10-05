@@ -1,0 +1,4 @@
+SAVE_PROGRESS_STARTED=ゲームの保存を開始しました。
+SAVE_PROGRESS_COMPLETED=ゲームの保存が完了しました。
+SAVE_PROGRESS_FAILED=ゲームの保存に失敗しました。
+SAVE_PROGRESS_COMPANION_FAILED=IM Data Core のサイドカーファイルを保存できませんでした。

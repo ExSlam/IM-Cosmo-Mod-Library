@@ -1,18 +1,28 @@
 # Save n Load Fixes
 
-## Version 5.6.0
+## Version 5.6.1
 
-Current source version: **5.6.0**. This tree contains the cumulative repair set plus load-order-independent optional-mod isolation.
+Current source version: **5.6.1**. This tree contains the cumulative repair set plus load-order-independent optional-mod isolation.
 
 Save n Load Fixes (SNLF) is the Cosmo repair mod for Idol Manager save/load continuity, deterministic reconstruction of legacy or omitted state, safe save transport, and verified gameplay-state bugs that become persistence bugs. It is deliberately conservative: repair state must be attributable to the exact save being loaded, widened arithmetic must not silently wrap, and an uncertain repair should fail closed rather than guess.
 
 Release versions use decimal carry for all components: `5.5.9` advances to `5.6.0`, and `9.9.9` advances to `10.0.0`. The old `0.55.1` label was corrected to `5.5.1`; older changelog labels are retained as historical records.
 
-Implemented cumulatively through 5.6.0: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
+Implemented cumulatively through 5.6.1: all released SNLF repair/transport families listed below, plus the unreleased cumulative Rivals Reborn compatibility additions documented in this tree.
 
 See `CHANGELOG.md` for release history. This README is the canonical current contract and patch inventory. Historical sprint/task notes, one-off qualification reports, and staged RR notes have been folded into these two files and removed from the source bundle.
 
 ## Compatibility and optional integrations
+
+## HarmonyIntegration lifecycle compatibility (5.6.1)
+
+SNLF supports [Tel's upstream HarmonyIntegration](https://github.com/ui3TD/IM-HarmonyIntegration), including its Windows 1.1 release. The upstream loader unpatches and reapplies an enabled mod's assembly whenever vanilla calls `Mods.ReEnableMods()`, including settings cancellation. Patch discovery and transpiler recomposition can therefore report the same target more than once in a process.
+
+A11 and A13 now validate their frozen logical target allowlists and insert each target once. Empty/unknown identities, missing targets, inconsistent manifest sizes, signature failures and incorrect IL-site counts still fail closed. Repeated valid reports never clear a real failure. The health audit found only A11/A13 rejecting duplicate HashSet insertion directly, but also found 29 call-count-based trackers. Those now deduplicate the validated `MethodBase` values, preserving overloaded methods as distinct targets. A25 additionally records each target's transpiler-site report once and rejects inconsistent repeats instead of adding every recomposition to its total. A14/A29 and the existing set/dictionary/boolean trackers were already idempotent.
+
+[Cosmo's HarmonyIntegration fork](https://github.com/ExSlam/IM-HarmonyIntegration) remains recommended: the loader owns mod patch lifecycles and should avoid unnecessary unpatch/repatch work. This is a recommendation, not a dependency or minimum-loader-version requirement. SNLF does not install, replace, or modify HarmonyIntegration.
+
+No save format, repair-envelope version, or transport API change accompanies this update. Regression procedures and results are recorded in `tests/RepatchCompatibility.md`.
 
 **5.6.0 optional-integration invariant:** SNLF's assembly-wide Harmony discovery targets only vanilla/guaranteed game surfaces. Optional external methods are late-bound behind stable vanilla bootstraps, and their probing/installation exceptions are contained inside the optional profile. An absent optional mod must not emit a patch exception or affect ordered save transport health.
 

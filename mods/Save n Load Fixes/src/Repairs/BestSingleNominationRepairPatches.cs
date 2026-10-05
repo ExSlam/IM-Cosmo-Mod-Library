@@ -31,7 +31,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Awards).FullName, "AddTempNomination");
             }
 
-            BestSingleNominationPatchHealth.ReportTargetResolved();
+            BestSingleNominationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

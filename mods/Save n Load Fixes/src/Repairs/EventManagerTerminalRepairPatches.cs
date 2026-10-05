@@ -29,7 +29,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Event_Manager).FullName, nameof(Event_Manager.ConcludeEvent));
             }
 
-            EventManagerTerminalPatchHealth.ReportTargetResolved();
+            EventManagerTerminalPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -129,7 +129,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(iteratorType.FullName, "MoveNext");
             }
 
-            EventManagerTerminalPatchHealth.ReportTargetResolved();
+            EventManagerTerminalPatchHealth.ReportTargetResolved(moveNext);
             return moveNext;
         }
 

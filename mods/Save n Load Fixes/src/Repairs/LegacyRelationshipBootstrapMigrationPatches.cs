@@ -19,7 +19,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Relationships).FullName, AuditedMethodName);
             }
 
-            LegacyRelationshipBootstrapMigrationPatchHealth.ReportTargetResolved();
+            LegacyRelationshipBootstrapMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -53,7 +53,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Relationships._relationship).FullName, "Initialize");
             }
 
-            LegacyRelationshipBootstrapMigrationPatchHealth.ReportTargetResolved();
+            LegacyRelationshipBootstrapMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

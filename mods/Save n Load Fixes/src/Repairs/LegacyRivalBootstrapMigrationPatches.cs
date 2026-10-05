@@ -17,7 +17,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Rivals).FullName, nameof(Rivals.LoadFunction));
             }
 
-            LegacyRivalBootstrapMigrationPatchHealth.ReportTargetResolved();
+            LegacyRivalBootstrapMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -50,7 +50,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Rivals).FullName, AuditedMethodName);
             }
 
-            LegacyRivalBootstrapMigrationPatchHealth.ReportTargetResolved();
+            LegacyRivalBootstrapMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

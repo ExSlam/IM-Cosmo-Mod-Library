@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(string)");
             }
 
-            ProjectProgressCounterPatchHealth.ReportTargetResolved();
+            ProjectProgressCounterPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -54,7 +54,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(bool)");
             }
 
-            ProjectProgressCounterPatchHealth.ReportTargetResolved();
+            ProjectProgressCounterPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

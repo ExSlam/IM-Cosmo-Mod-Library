@@ -25,7 +25,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Relationships).FullName, "LoadFunction");
             }
 
-            RelationshipDynamicPatchHealth.ReportTargetResolved();
+            RelationshipDynamicPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

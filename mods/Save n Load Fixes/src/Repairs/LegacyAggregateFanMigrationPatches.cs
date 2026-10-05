@@ -22,7 +22,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(data_girls).FullName, AuditedMethodName);
             }
 
-            LegacyAggregateFanMigrationPatchHealth.ReportTargetResolved();
+            LegacyAggregateFanMigrationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

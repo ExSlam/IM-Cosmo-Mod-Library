@@ -1,0 +1,108 @@
+[b]Save n Load Fixes[/b]
+Por Cosmo
+
+Save n Load Fixes corrige bugs que podem fazer o Idol Manager esquecer, perder ou tratar incorretamente o progresso do jogo depois de salvar e carregar. Também corrige problemas com números muito grandes que podem fazer valores extremamente altos de dinheiro, fãs, pesquisa e outros totais ficarem incorretos ou negativos.
+
+[b]O que ele corrige[/b]
+
+[list]
+[*] Faz os salvamentos terminarem na ordem correta e impede o carregamento de um salvamento ainda incompleto.
+[*] Faz a opção Salvar e Sair esperar o salvamento terminar antes de fechar o jogo ou voltar ao menu principal.
+[*] Preserva mais estados em andamento do jogo, incluindo treinamento, trabalhos de negócios, atividades, relacionamentos, formaturas, eventos, prêmios, tutoriais e mensagens de SNS.
+[*] Corrige vários problemas ao carregar salvamentos antigos.
+[*] Corrige cálculos com números muito grandes para dinheiro, fãs, empréstimos, renda de negócios, renda do teatro e do café, pesquisa e outros totais.
+[*] Corrige vários bugs menores do jogo base encontrados durante o reparo do sistema de salvamento.
+[*] Exibe notificações simples quando o salvamento começa, termina ou falha.
+[/list]
+
+[b]Requisito[/b]
+
+[list]
+[*] IM-HarmonyIntegration Plugin: https://steamcommunity.com/sharedfiles/filedetails/?id=3102983863
+[/list]
+
+[b]Compatibilidade do carregador[/b]
+
+Funciona com o IM-HarmonyIntegration original do Tel, incluindo a versão 1.1. Reabrir ou cancelar as configurações não faz mais as verificações de salvamento corrigidas falharem apenas porque o carregador reaplica o mod.
+
+[url=https://github.com/ExSlam/IM-HarmonyIntegration]O HarmonyIntegration atualizado do Cosmo[/url] é recomendado porque evita recarregamentos desnecessários de patches, mas não é obrigatório para o Save n Load Fixes. Esta atualização não altera o formato dos seus salvamentos.
+
+[b]Save Write Ordering Fix / CreateAnAlbum[/b]
+
+O Save Write Ordering Fix [b]normalmente não[/b] é necessário para o Save n Load Fixes.
+
+Se você usa [b]CreateAnAlbum[/b] junto com Save n Load Fixes, instale também o Save Write Ordering Fix. Isso evita que o próprio sistema de salvamento do CreateAnAlbum entre em conflito com o Save n Load Fixes.
+
+[b]Suporte de compatibilidade integrado[/b]
+
+Save n Load Fixes inclui código específico de compatibilidade para mods que alteram os mesmos dados de salvamento ou cálculos com números grandes:
+
+[list]
+[*] Fans Watch Shows 1.0.0
+[*] TBS Balance Patch 1.0.0
+[*] BuffMe 1.0.0
+[*] Shelon's Tweaks & QoL Improvements 1.0.0
+[*] Going Viral
+[*] Fan Attrition
+[*] Stale Theater Shows
+[*] Extended SSK
+[*] Unofficial Patch
+[*] MBTI Personalities
+[*] More Sister Groups
+[*] Tour Stamina Limit
+[*] Traits Fix
+[*] Traits Expansion
+[*] Targeted Auditions
+[*] EroEvents
+[*] IM Data Core
+[*] Graduation Details
+[/list]
+
+Alguns patches de compatibilidade são feitos para versões específicas desses mods. Se algum deles receber uma grande atualização, talvez seja necessário verificar a compatibilidade novamente.
+
+[b]Outras compatibilidades conhecidas[/b]
+
+[list]
+[*] Compatível com todos os outros Cosmo Mods.
+[*] Compatível com: https://steamcommunity.com/sharedfiles/filedetails/?id=3783606924
+[*] Compatível com: https://steamcommunity.com/sharedfiles/filedetails/?id=3778902721
+[*] Compatível com: https://steamcommunity.com/sharedfiles/filedetails/?id=3781484403
+[*] Compatível com: https://steamcommunity.com/sharedfiles/filedetails/?id=3782469762
+[*] Deve ser compatível com: https://steamcommunity.com/sharedfiles/filedetails/?id=3159762405
+[/list]
+
+[b]Não testado / não confirmado[/b]
+
+Estes não foram confirmados como incompatíveis, mas ainda não foram totalmente testados com Save n Load Fixes:
+
+[list]
+[*] Theater Idol Selector: https://steamcommunity.com/sharedfiles/filedetails/?id=3782277556
+Pode apresentar alguns problemas de cálculo.
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3781250147
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3779175588
+[*] Idol Roles Dashboard: https://steamcommunity.com/sharedfiles/filedetails/?id=3770400953
+[/list]
+
+[b]Incompatível / desatualizado[/b]
+
+Por enquanto, estes devem ser tratados como incompatíveis ou desatualizados com Save n Load Fixes até que a compatibilidade seja atualizada:
+
+[list]
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791755011
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791765611
+[*] K-pop Idol Manager Overhaul: https://steamcommunity.com/sharedfiles/filedetails/?id=3791355099
+[*] https://steamcommunity.com/sharedfiles/filedetails/?id=3791354970
+[*] Provavelmente incompatível, mas ainda não totalmente confirmado: https://steamcommunity.com/sharedfiles/filedetails/?id=3795134201
+[*] RivalsReborn precisa ser atualizado com algumas correções de bugs antes de poder se tornar compatível com Save n Load Fixes.
+[/list]
+
+[b]Não é necessário com Save n Load Fixes[/b]
+
+Estes corrigem problemas que Save n Load Fixes já corrige:
+
+[list]
+[*] BestSingleFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3136750680
+[*] BestEmployerFix: https://steamcommunity.com/sharedfiles/filedetails/?id=3158389459
+[/list]
+
+Se você encontrar um mod que se comporte de forma estranha com Save n Load Fixes, diga qual mod e versão você está usando.

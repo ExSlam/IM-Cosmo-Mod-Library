@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Tutorial).FullName, "LoadFunction");
             }
 
-            TutorialActivityBaselinePatchHealth.ReportTargetResolved();
+            TutorialActivityBaselinePatchHealth.ReportTargetResolved(method);
             return method;
         }
 

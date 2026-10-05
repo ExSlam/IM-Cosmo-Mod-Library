@@ -15,7 +15,7 @@ namespace SaveNLoadFixes.Repairs
                 SelectedBusinessProposalPatchHealth.ReportFailure("Event_Manager.LoadFunction() could not be resolved with audited void signature.");
                 throw new MissingMethodException(typeof(Event_Manager).FullName, "LoadFunction");
             }
-            SelectedBusinessProposalPatchHealth.ReportTargetResolved();
+            SelectedBusinessProposalPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -37,7 +37,7 @@ namespace SaveNLoadFixes.Repairs
                 SelectedBusinessProposalPatchHealth.ReportFailure("SaveManager.LoadData(string) could not be resolved with audited void signature.");
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(string)");
             }
-            SelectedBusinessProposalPatchHealth.ReportTargetResolved();
+            SelectedBusinessProposalPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -59,7 +59,7 @@ namespace SaveNLoadFixes.Repairs
                 SelectedBusinessProposalPatchHealth.ReportFailure("SaveManager.LoadData(bool) could not be resolved with audited void signature.");
                 throw new MissingMethodException(typeof(SaveManager).FullName, "LoadData(bool)");
             }
-            SelectedBusinessProposalPatchHealth.ReportTargetResolved();
+            SelectedBusinessProposalPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

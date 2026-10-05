@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace SaveNLoadFixes.Repairs
@@ -125,11 +127,13 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class EventManagerTerminalPatchHealth
     {
+        private const string NullTargetDiagnostic = "EventManagerTerminalPatchHealth received a null resolved target.";
         internal const int ExpectedTargetMethodCount = 2;
         internal const int ExpectedConcludeReturnSiteCount = 2;
         internal const int ExpectedSnsDeliverySiteCount = 1;
 
         private static readonly object Sync = new object();
+        private static readonly HashSet<MethodBase> ResolvedTargets = new HashSet<MethodBase>();
         private static int resolvedTargetMethodCount;
         private static int observedConcludeReturnSiteCount = -1;
         private static int observedSnsDeliverySiteCount = -1;
@@ -169,11 +173,22 @@ namespace SaveNLoadFixes.Repairs
             get { lock (Sync) { return failure; } }
         }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(MethodBase target)
         {
             lock (Sync)
             {
-                resolvedTargetMethodCount++;
+                // Resolver signature checks run before reporting. Count actual methods,
+                // including overloads, once across Harmony repatch cycles.
+                if (target == null)
+                {
+                    ReportFailure(NullTargetDiagnostic);
+                    return;
+                }
+                if (!ResolvedTargets.Add(target))
+                {
+                    return;
+                }
+                resolvedTargetMethodCount = ResolvedTargets.Count;
                 if (resolvedTargetMethodCount > ExpectedTargetMethodCount)
                 {
                     failure = "N13 resolved more target methods than the frozen two-method manifest.";

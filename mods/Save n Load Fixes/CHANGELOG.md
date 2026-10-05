@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.6.1 - 2026-10-05
+
+- Keeps A11 successor introductions and A13 temporary auto-task bans healthy when Harmony rediscovers the same expected target. Unknown/missing targets, inconsistent manifests, invalid signatures and incorrect IL sites still fail closed.
+- Fixes the same repatch-counting problem in 29 older health trackers, including the A25 graduation-date transpiler's per-target site totals.
+- Supports Tel's upstream HarmonyIntegration repatch lifecycle without requiring Cosmo's fork. The fork remains recommended because it avoids unnecessary patch churn.
+- Adds executable regression coverage for repeated discovery, overloaded methods, incomplete/extra targets and sticky failures. No save-format or transport API changes.
+
 ## 5.6.0
 
 - Makes optional-mod absence non-fatal by construction. Rivals Reborn's fifteen external compatibility targets are removed from SNLF's assembly-wide `PatchAll` discovery and installed dynamically only after an RR assembly is actually present.

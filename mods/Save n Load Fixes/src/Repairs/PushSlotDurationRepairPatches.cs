@@ -29,7 +29,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Girl_Select_Popup).FullName, "OnClick");
             }
 
-            PushSlotDurationPatchHealth.ReportTargetResolved();
+            PushSlotDurationPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

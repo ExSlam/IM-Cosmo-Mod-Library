@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Shows).FullName, "LoadFunction");
             }
 
-            ShowFanAppealPatchHealth.ReportTargetResolved();
+            ShowFanAppealPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

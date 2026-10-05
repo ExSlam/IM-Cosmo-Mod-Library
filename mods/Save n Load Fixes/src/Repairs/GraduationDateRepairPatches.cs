@@ -79,7 +79,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(declaringType.FullName, methodName);
             }
 
-            GraduationDatePatchHealth.ReportTargetResolved();
+            GraduationDatePatchHealth.ReportTargetResolved(method);
             return method;
         }
 

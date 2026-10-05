@@ -26,7 +26,7 @@ namespace SaveNLoadFixes.Repairs
                 throw new MissingMethodException(typeof(Stats).FullName, "LoadFunction");
             }
 
-            RecentActivityRecencyPatchHealth.ReportTargetResolved();
+            RecentActivityRecencyPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

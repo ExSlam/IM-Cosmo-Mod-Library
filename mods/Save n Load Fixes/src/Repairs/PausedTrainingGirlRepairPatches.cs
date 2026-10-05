@@ -15,7 +15,7 @@ namespace SaveNLoadFixes.Repairs
                 PausedTrainingGirlPatchHealth.ReportFailure("agency.LoadFunction() could not be resolved with the audited void signature.");
                 throw new MissingMethodException(typeof(agency).FullName, "LoadFunction");
             }
-            PausedTrainingGirlPatchHealth.ReportTargetResolved();
+            PausedTrainingGirlPatchHealth.ReportTargetResolved(method);
             return method;
         }
 
@@ -37,7 +37,7 @@ namespace SaveNLoadFixes.Repairs
                 PausedTrainingGirlPatchHealth.ReportFailure("agency.GetRoomDataForLoading(RoomData) could not be resolved with the audited return type.");
                 throw new MissingMethodException(typeof(agency).FullName, "GetRoomDataForLoading");
             }
-            PausedTrainingGirlPatchHealth.ReportTargetResolved();
+            PausedTrainingGirlPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

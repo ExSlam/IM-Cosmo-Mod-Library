@@ -15,7 +15,7 @@ namespace SaveNLoadFixes.Repairs
                 QueuedBeforeStartPatchHealth.ReportFailure("Substories_Manager.LoadFunction() could not be resolved with audited void signature.");
                 throw new MissingMethodException(typeof(Substories_Manager).FullName, "LoadFunction");
             }
-            QueuedBeforeStartPatchHealth.ReportTargetResolved();
+            QueuedBeforeStartPatchHealth.ReportTargetResolved(method);
             return method;
         }
 

@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Collections.Generic;
 using System;
 using System.Threading;
 using UnityEngine;
@@ -141,9 +143,11 @@ namespace SaveNLoadFixes.Repairs
 
     internal static class TrainingProgressInitPatchHealth
     {
+        private const string NullTargetDiagnostic = "TrainingProgressInitPatchHealth received a null resolved target.";
         internal const int ExpectedTargetMethodCount = 1;
 
         private static readonly object Sync = new object();
+        private static readonly HashSet<MethodBase> ResolvedTargets = new HashSet<MethodBase>();
         private static int resolvedTargetMethodCount;
         private static string failure = string.Empty;
 
@@ -162,11 +166,22 @@ namespace SaveNLoadFixes.Repairs
         internal static int ResolvedTargetMethodCount { get { lock (Sync) { return resolvedTargetMethodCount; } } }
         internal static string Failure { get { lock (Sync) { return failure; } } }
 
-        internal static void ReportTargetResolved()
+        internal static void ReportTargetResolved(MethodBase target)
         {
             lock (Sync)
             {
-                resolvedTargetMethodCount++;
+                // Resolver signature checks run before reporting. Count actual methods,
+                // including overloads, once across Harmony repatch cycles.
+                if (target == null)
+                {
+                    ReportFailure(NullTargetDiagnostic);
+                    return;
+                }
+                if (!ResolvedTargets.Add(target))
+                {
+                    return;
+                }
+                resolvedTargetMethodCount = ResolvedTargets.Count;
                 if (resolvedTargetMethodCount > ExpectedTargetMethodCount)
                 {
                     failure = "A01 resolved more target methods than the frozen one-method manifest.";
