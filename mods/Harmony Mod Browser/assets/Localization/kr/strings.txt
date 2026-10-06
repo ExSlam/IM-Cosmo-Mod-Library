@@ -1,0 +1,38 @@
+# Harmony Mod Browser 1.0.0
+# key=value
+
+HMB_SEARCH_PLACEHOLDER=모드 검색...
+HMB_UPLOAD_SEARCH_PLACEHOLDER=업로드할 로컬 모드 검색...
+HMB_UPDATE_SEARCH_PLACEHOLDER=내 창작마당 모드 검색...
+HMB_UPDATE_SOURCE_SEARCH_PLACEHOLDER=로컬 버전 검색...
+HMB_PREVIOUS=이전
+HMB_NEXT=다음
+HMB_NO_RESULTS=결과 없음
+HMB_PAGE_FORMAT=페이지 {0} / {1}
+HMB_COUNT_FORMAT=모드 {0}개  |  페이지당 {1}개
+HMB_MATCH_COUNT_FORMAT=일치 {0}개  |  페이지당 {1}개
+HMB_VERSION_FORMAT=버전 {0}
+HMB_LOCAL=로컬
+HMB_WORKSHOP=창작마당
+HMB_ALL_MODS=모든 모드
+HMB_UPLOAD_MOD=모드 업로드
+HMB_UPDATE_MOD=모드 업데이트
+HMB_SELECT=선택
+HMB_CLOSE=닫기
+HMB_UPLOAD_CHOOSER_TITLE=로컬 모드 업로드
+HMB_UPDATE_CHOOSER_TITLE=내 창작마당 모드 업데이트
+HMB_UPDATE_SOURCE_TITLE=업로드할 로컬 버전 선택
+HMB_LOADING_OWNERSHIP=Steam 창작마당 소유권 정보를 불러오는 중...
+HMB_OWNERSHIP_UNAVAILABLE=Steam 소유권 정보를 불러오지 못했습니다. 소유권이 확인된 항목만 표시합니다.
+HMB_NO_LOCAL_MODS=로컬 모드를 찾을 수 없습니다.
+HMB_NO_OWNED_WORKSHOP=이 Steam 계정이 소유한 창작마당 모드를 찾을 수 없습니다.
+HMB_LOCAL_COUNT_FORMAT=로컬 모드 {0}개
+HMB_OWNED_COUNT_FORMAT=소유 창작마당 모드 {0}개
+
+HMB_DETAILS_TITLE=모드 상세 정보
+HMB_DETAILS_VERSION=버전: {0}
+HMB_DETAILS_AUTHOR=제작자: {0}
+HMB_DETAILS_DESCRIPTION=설명
+HMB_DETAILS_NOT_PROVIDED=미제공
+HMB_DETAILS_NO_THUMBNAIL=미리보기 이미지가 없습니다.
+HMB_DETAILS_NO_DESCRIPTION=설명이 없습니다.

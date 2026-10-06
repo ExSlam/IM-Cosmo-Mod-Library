@@ -45,6 +45,7 @@ Every player-facing string and displayed value must support all seven standard l
 - Avoid wording such as "Cosmo saves the data to diary and transports it to side car envelope." It misattributes software behavior and does not explain the operation.
 - Prefer concrete wording such as "When the player opens the graduation calendar, Graduation Calendar displays upcoming graduation dates using Idol Manager-styled controls." Describe persistence with the actual responsible mod, trigger, and storage location verified from the implementation.
 - Preserve required third-party credits and license notices alongside Cosmo's authorship. Do not attribute third-party assets or libraries to Cosmo.
+- All harmony mods in Cosmo Mod Library require <https://github.com/ExSlam/IM-HarmonyIntegration> to work. If players have the older version of Harmony Integration installed, they should replace it with this version that includes important bugfixes. (This should be mentioned in steam description.txt)
 
 ## 4. UI must follow the game's controls and framework patterns
 

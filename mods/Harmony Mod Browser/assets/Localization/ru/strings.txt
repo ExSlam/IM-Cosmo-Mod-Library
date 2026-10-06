@@ -1,0 +1,38 @@
+# Harmony Mod Browser 1.0.0
+# key=value
+
+HMB_SEARCH_PLACEHOLDER=Поиск модов...
+HMB_UPLOAD_SEARCH_PLACEHOLDER=Поиск локальных модов для загрузки...
+HMB_UPDATE_SEARCH_PLACEHOLDER=Поиск ваших модов Workshop...
+HMB_UPDATE_SOURCE_SEARCH_PLACEHOLDER=Поиск локальных версий...
+HMB_PREVIOUS=Назад
+HMB_NEXT=Далее
+HMB_NO_RESULTS=Нет результатов
+HMB_PAGE_FORMAT=Страница {0} / {1}
+HMB_COUNT_FORMAT=Модов: {0}  |  {1}/стр.
+HMB_MATCH_COUNT_FORMAT=Совпадений: {0}  |  {1}/стр.
+HMB_VERSION_FORMAT=версия {0}
+HMB_LOCAL=Локальный
+HMB_WORKSHOP=Workshop
+HMB_ALL_MODS=Все моды
+HMB_UPLOAD_MOD=Загрузить мод
+HMB_UPDATE_MOD=Обновить мод
+HMB_SELECT=Выбрать
+HMB_CLOSE=Закрыть
+HMB_UPLOAD_CHOOSER_TITLE=Загрузить локальный мод
+HMB_UPDATE_CHOOSER_TITLE=Обновить один из ваших модов Workshop
+HMB_UPDATE_SOURCE_TITLE=Выберите локальную версию для загрузки
+HMB_LOADING_OWNERSHIP=Загрузка данных о владельцах Steam Workshop...
+HMB_OWNERSHIP_UNAVAILABLE=Не удалось загрузить данные о владельцах Steam. Показаны только подтверждённо принадлежащие вам элементы.
+HMB_NO_LOCAL_MODS=Локальные моды не найдены.
+HMB_NO_OWNED_WORKSHOP=Не найдены моды Workshop, принадлежащие этому аккаунту Steam.
+HMB_LOCAL_COUNT_FORMAT=Локальных модов: {0}
+HMB_OWNED_COUNT_FORMAT=Ваших модов Workshop: {0}
+
+HMB_DETAILS_TITLE=Сведения о моде
+HMB_DETAILS_VERSION=Версия: {0}
+HMB_DETAILS_AUTHOR=Автор: {0}
+HMB_DETAILS_DESCRIPTION=Описание
+HMB_DETAILS_NOT_PROVIDED=Не указано
+HMB_DETAILS_NO_THUMBNAIL=Миниатюра отсутствует.
+HMB_DETAILS_NO_DESCRIPTION=Описание отсутствует.

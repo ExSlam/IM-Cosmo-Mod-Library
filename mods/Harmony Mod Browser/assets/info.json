@@ -1,0 +1,8 @@
+{
+  "Title": "Harmony Mod Browser",
+  "Description": "Improves Idol Manager's mod browser and Steam Workshop upload/update workflows. Requires HarmonyIntegration 1.2.0 or newer.",
+  "Author": "Cosmo",
+  "Version": "1.0.0",
+  "Tags": ["ui", "modding"],
+  "HarmonyID": "com.cosmo.harmonymodbrowser"
+}

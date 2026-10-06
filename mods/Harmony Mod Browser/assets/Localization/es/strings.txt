@@ -1,0 +1,38 @@
+# Harmony Mod Browser 1.0.0
+# key=value
+
+HMB_SEARCH_PLACEHOLDER=Buscar mods...
+HMB_UPLOAD_SEARCH_PLACEHOLDER=Buscar mods locales para subir...
+HMB_UPDATE_SEARCH_PLACEHOLDER=Buscar tus mods de Workshop...
+HMB_UPDATE_SOURCE_SEARCH_PLACEHOLDER=Buscar versiones locales...
+HMB_PREVIOUS=Anterior
+HMB_NEXT=Siguiente
+HMB_NO_RESULTS=Sin resultados
+HMB_PAGE_FORMAT=Página {0} / {1}
+HMB_COUNT_FORMAT={0} mods  |  {1}/página
+HMB_MATCH_COUNT_FORMAT={0} coincidencias  |  {1}/página
+HMB_VERSION_FORMAT=versión {0}
+HMB_LOCAL=Local
+HMB_WORKSHOP=Workshop
+HMB_ALL_MODS=Todos los mods
+HMB_UPLOAD_MOD=Subir mod
+HMB_UPDATE_MOD=Actualizar mod
+HMB_SELECT=Seleccionar
+HMB_CLOSE=Cerrar
+HMB_UPLOAD_CHOOSER_TITLE=Subir un mod local
+HMB_UPDATE_CHOOSER_TITLE=Actualizar uno de tus mods de Workshop
+HMB_UPDATE_SOURCE_TITLE=Elige la versión local que quieres subir
+HMB_LOADING_OWNERSHIP=Cargando propiedad de Steam Workshop...
+HMB_OWNERSHIP_UNAVAILABLE=No se pudieron cargar los datos de propiedad de Steam. Solo se muestran los elementos con propiedad verificada.
+HMB_NO_LOCAL_MODS=No se encontraron mods locales.
+HMB_NO_OWNED_WORKSHOP=No se encontraron mods de Workshop pertenecientes a esta cuenta de Steam.
+HMB_LOCAL_COUNT_FORMAT={0} mods locales
+HMB_OWNED_COUNT_FORMAT={0} mods propios de Workshop
+
+HMB_DETAILS_TITLE=Detalles del mod
+HMB_DETAILS_VERSION=Versión: {0}
+HMB_DETAILS_AUTHOR=Autor: {0}
+HMB_DETAILS_DESCRIPTION=Descripción
+HMB_DETAILS_NOT_PROVIDED=No indicado
+HMB_DETAILS_NO_THUMBNAIL=No hay miniatura disponible.
+HMB_DETAILS_NO_DESCRIPTION=No se ha proporcionado una descripción.

@@ -1,5 +1,4 @@
 [b]Save n Load Fixes[/b]
-By Cosmo
 
 Save n Load Fixes fixes bugs that can make Idol Manager forget, lose, or mishandle game progress after saving and loading. It also fixes large-number problems that can make very high money, fan, research, and other totals become incorrect or negative.
 
