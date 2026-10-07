@@ -24,7 +24,7 @@ Save n Load Fixes fixes bugs that can make Idol Manager forget, lose, or mishand
 
 Works with Tel's original IM-HarmonyIntegration, including version 1.1. Reopening or cancelling settings no longer makes the repaired save checks fail just because the loader reapplies the mod.
 
-[url=https://github.com/ExSlam/IM-HarmonyIntegration]Cosmo's updated HarmonyIntegration[/url] is recommended as replacement for Tel's outaded mod because Cosmo's updated version of IM Harmony Integration avoids unnecessary reloading of patches, but it is not required by Save n Load Fixes. This update does not change your save format.
+[url=https://github.com/ui3TD/IM-HarmonyIntegration/releases/tag/1.2.0]updated HarmonyIntegration[/url] is recommended as replacement for the outdated Integration 1.1.0 in your bepinex plugins folder, but it is not required by Save n Load Fixes. This update does not change your save format.
 
 [b]Save Write Ordering Fix / CreateAnAlbum[/b]
 
